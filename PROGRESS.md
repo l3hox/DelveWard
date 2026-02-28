@@ -2,34 +2,22 @@
 
 ## How to use this file
 
-Read this at the start of every Claude Code session to restore context. Update it at the end of each session — ask Claude Code to do it for you. This is the project's memory.
+Read this at the start of every Claude Code session to restore context. Update it at the end of each session. This is the project's session-to-session memory. See PLAN.md for full phase details and design decisions.
 
 ---
 
-## Current Status
+## Current Phase
 
-**Phase: Active development** — Scaffold complete and tested. Basic dungeon navigation working in browser.
+**Phase 1 — Foundation Refactor** (not started)
 
----
-
-## Decisions Made
-
-- **Renderer**: Three.js in browser (not Phaser, not Godot)
-- **Perspective**: True 3D with grid movement — Grimrock-style, not sprite-based like Eye of the Beholder
-- **Aesthetic**: Pixelart textures on 3D geometry
-- **Enemies**: Billboard sprites for now (camera-facing 2D sprites, not 3D models)
-- **Dungeon format**: Grid-based 2D array (hardcoded for now, JSON loading later)
-- **Platform**: Browser (desktop first), shareable via link
-- **Art generation**: Midjourney or Leonardo for textures, TBD for enemies
-- **Language**: TypeScript
-- **Build**: Vite + npm
-- **Camera movement**: Short tween animation on steps and turns (not instant snap)
+Scaffold exists and works. Next: refactor architecture before adding features.
 
 ---
 
 ## What's Done
 
 - [x] CLAUDE.md created — auto-loads project context each session
+- [x] PLAN.md created — full implementation plan with all design decisions resolved
 - [x] Project scaffolded — Vite + TypeScript + Three.js
 - [x] Dungeon renderer — builds wall/floor/ceiling geometry from a 2D map array
 - [x] Two-room map with connecting corridor
@@ -41,19 +29,42 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ---
 
-## Immediate Next Steps
+## Next Steps (Phase 1)
 
-1. Load dungeon map from an external JSON file (instead of hardcoded in main.ts)
-2. Apply first real pixelart textures to walls, floor, ceiling
-3. Expand map — more rooms, dead ends, variety
-4. Basic HUD — crosshair, health placeholder, minimap
+1. Extract `PlayerState` + grid logic (isWalkable, facing tables) into pure TS module — no Three.js dependency
+2. Define `DungeonLevel` type and `GameState` type
+3. Load dungeon from external JSON file (replace hardcoded `MAP` in main.ts)
+4. `buildDungeon` returns `THREE.Group` instead of adding to scene directly
+5. Add Vitest, write ~15 tests for grid logic
+
+---
+
+## Phase Overview
+
+| Phase | Name | Status |
+|---|---|---|
+| 1 | Foundation Refactor | **Next** |
+| 2 | Visual Polish (textures) | Pending |
+| 3 | Doors & Interaction | Pending |
+| 4 | HUD | Pending |
+| 5 | Multi-Level Dungeons | Pending |
+| 6 | Entities & Enemy System | Pending |
+| 7 | Combat | Pending |
+| 8 | Later Resources & Polish | Pending |
 
 ---
 
 ## Open Questions
 
 - Minimap — render in 3D scene or as 2D canvas overlay?
-- Combat system design — keep for later, don't over-design upfront
+- Combat interaction model — deferred to Phase 7
+- Death/respawn behavior — deferred to Phase 7
+
+---
+
+## Known Issues
+
+None.
 
 ---
 
@@ -71,17 +82,17 @@ Read this at the start of every Claude Code session to restore context. Update i
 - Two rooms connected by a corridor, grid movement with tween camera, torch flicker, fog
 - Tested successfully in browser
 
----
-
-## Known Issues
-
-None.
+### Session 2 — Planning
+- Ran Developer Council (4 specialists, 3 rounds) to identify all vague spots and create implementation plan
+- Resolved all underspecified design decisions (stats, doors, inventory, enemies, resources, transitions)
+- Created PLAN.md with 8-phase build order, architecture plan, and file structure
+- Established session workflow rules in CLAUDE.md
+- Updated PROGRESS.md to track phases
 
 ---
 
 ## Ideas Parking Lot
 
-- Torch flicker effect via animated point light intensity ✓ (done in scaffold)
 - Procedural dungeon generation (post v1)
 - Ambient sound — dripping water, distant echoes
 - Secret walls that push open

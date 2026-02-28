@@ -87,19 +87,43 @@ Developer background: Jakub is a senior backend/cloud engineer (20 years), VR/AR
 
 ---
 
-## Current Status
+## Session Workflow
 
-**Phase: Pre-production.** No code written yet. Design locked, ready to scaffold.
+Every session follows this protocol:
 
-See PROGRESS.md for session log, immediate next steps, and open questions.
-See DESIGN.md for full design rationale and motivation.
+### On session start
+1. **Read PROGRESS.md** — this tells you where the project is: current phase, what's done, what's next, known issues
+2. **Read PLAN.md only if needed** — PROGRESS.md references the current phase by name. Only open PLAN.md if you need the full phase details, architecture decisions, or design context
+3. **Do NOT re-read CLAUDE.md** — it's already auto-loaded
+
+### During the session
+- Work on the current phase's next steps as listed in PROGRESS.md
+- If a task is ambiguous, check PLAN.md for the design decision
+
+### On session end (when asked)
+- **Update PROGRESS.md**:
+  - Move completed items from "Next Steps" to "What's Done"
+  - Add new next steps if the phase progressed
+  - If a phase is fully complete, update "Current Phase" to the next one
+  - Log the session in the session log
+  - Add any new known issues or open questions
+- **Do NOT update PLAN.md** — it's the stable reference. Only update if a design decision is explicitly changed
+- **Update LOG.md** when design decisions are made/changed or significant code changes land — add a dated entry summarizing what and why
+
+### File roles
+| File | Role | Updates |
+|---|---|---|
+| `CLAUDE.md` | Project identity, tech stack, pillars, workflow rules | Rarely — only for structural project changes |
+| `PLAN.md` | Full implementation plan, all design decisions, phase definitions | Only when design decisions change |
+| `PROGRESS.md` | Session-to-session state: what's done, what's next, session log | Every session end |
+| `LOG.md` | Decision & change log — design decisions, architecture changes, significant code changes, with dates | When decisions or significant code changes land |
+| `DESIGN.md` | Original motivation and vision | Never (historical document) |
 
 ---
 
 ## Working Style Notes
 
-- Update PROGRESS.md at the end of each session (Claude Code handles this on request)
 - Keep solutions simple — avoid over-engineering
 - Frontend/WebGL details are a means to an end — don't over-explain JS/WebGL internals unless asked
-- The real focus is agent-assisted development workflow: Jakub drives, Claude Code executes
-- This will become a GitHub repo soon — keep code clean and commit-ready
+- The real focus is agent-assisted development workflow: developer drives, Claude Code executes
+- Keep code clean and commit-ready
