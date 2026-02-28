@@ -121,6 +121,15 @@ Every session follows this protocol:
 
 ---
 
+## Git Workflow
+
+- **Branch for non-trivial work** — phase steps, refactors, new features → work on a branch (e.g. `phase1/extract-player-state`), merge to main when it works
+- **Commit directly to main** for small stuff — doc fixes, config tweaks, trivial changes
+- **No PRs required** — just merge when ready. Use PRs only if you want a council/review on the branch diff before merging
+- **Keep main always working** — it should be shareable at any time
+
+---
+
 ## Working Style Notes
 
 - Keep solutions simple — avoid over-engineering
