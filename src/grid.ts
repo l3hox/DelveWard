@@ -21,10 +21,12 @@ export const FACING_DELTA: Record<Facing, [number, number]> = {
 export const TURN_LEFT: Record<Facing, Facing> = { N: 'W', W: 'S', S: 'E', E: 'N' };
 export const TURN_RIGHT: Record<Facing, Facing> = { N: 'E', E: 'S', S: 'W', W: 'N' };
 
-export function isWalkable(map: number[][], col: number, row: number): boolean {
-  if (row < 0 || row >= map.length) return false;
-  if (col < 0 || col >= map[0].length) return false;
-  return map[row][col] === 0;
+export const WALKABLE_CELLS = new Set(['.', 'D', 'S', 'U', 'O']);
+
+export function isWalkable(grid: string[], col: number, row: number): boolean {
+  if (row < 0 || row >= grid.length) return false;
+  if (col < 0 || col >= grid[0].length) return false;
+  return WALKABLE_CELLS.has(grid[row][col]);
 }
 
 export class PlayerState {
@@ -38,41 +40,41 @@ export class PlayerState {
     this.facing = facing;
   }
 
-  moveForward(map: number[][]): boolean {
+  moveForward(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
     const nx = this.gridX + dc;
     const nz = this.gridZ + dr;
-    if (!isWalkable(map, nx, nz)) return false;
+    if (!isWalkable(grid, nx, nz)) return false;
     this.gridX = nx;
     this.gridZ = nz;
     return true;
   }
 
-  moveBack(map: number[][]): boolean {
+  moveBack(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
     const nx = this.gridX - dc;
     const nz = this.gridZ - dr;
-    if (!isWalkable(map, nx, nz)) return false;
+    if (!isWalkable(grid, nx, nz)) return false;
     this.gridX = nx;
     this.gridZ = nz;
     return true;
   }
 
-  strafeLeft(map: number[][]): boolean {
+  strafeLeft(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[TURN_LEFT[this.facing]];
     const nx = this.gridX + dc;
     const nz = this.gridZ + dr;
-    if (!isWalkable(map, nx, nz)) return false;
+    if (!isWalkable(grid, nx, nz)) return false;
     this.gridX = nx;
     this.gridZ = nz;
     return true;
   }
 
-  strafeRight(map: number[][]): boolean {
+  strafeRight(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[TURN_RIGHT[this.facing]];
     const nx = this.gridX + dc;
     const nz = this.gridZ + dr;
-    if (!isWalkable(map, nx, nz)) return false;
+    if (!isWalkable(grid, nx, nz)) return false;
     this.gridX = nx;
     this.gridZ = nz;
     return true;

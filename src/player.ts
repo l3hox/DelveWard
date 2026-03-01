@@ -7,7 +7,7 @@ const ANIM_THRESHOLD = 0.05;
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
-  private map: number[][];
+  private grid: string[];
   private state: PlayerState;
 
   private currentPos: THREE.Vector3;
@@ -19,13 +19,13 @@ export class Player {
 
   constructor(
     camera: THREE.PerspectiveCamera,
-    map: number[][],
+    grid: string[],
     startCol: number,
     startRow: number,
     facing: Facing
   ) {
     this.camera = camera;
-    this.map = map;
+    this.grid = grid;
     this.state = new PlayerState(startCol, startRow, facing);
 
     const worldPos = this.gridToWorld(startCol, startRow);
@@ -57,28 +57,28 @@ export class Player {
 
   moveForward(): void {
     if (this.isAnimating()) return;
-    if (this.state.moveForward(this.map)) {
+    if (this.state.moveForward(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
     }
   }
 
   moveBack(): void {
     if (this.isAnimating()) return;
-    if (this.state.moveBack(this.map)) {
+    if (this.state.moveBack(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
     }
   }
 
   strafeLeft(): void {
     if (this.isAnimating()) return;
-    if (this.state.strafeLeft(this.map)) {
+    if (this.state.strafeLeft(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
     }
   }
 
   strafeRight(): void {
     if (this.isAnimating()) return;
-    if (this.state.strafeRight(this.map)) {
+    if (this.state.strafeRight(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
     }
   }
