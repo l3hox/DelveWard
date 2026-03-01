@@ -53,6 +53,12 @@ describe('isWalkable', () => {
     expect(isWalkable(specialGrid, 1, 2)).toBe(true); // Stairs up
     expect(isWalkable(specialGrid, 1, 3)).toBe(true); // Object
   });
+
+  it('returns false for void cells', () => {
+    const voidGrid = ['# #', '#.#'];
+    expect(isWalkable(voidGrid, 1, 0)).toBe(false); // void
+    expect(isWalkable(voidGrid, 1, 1)).toBe(true);  // floor
+  });
 });
 
 // --- WALKABLE_CELLS ---
@@ -158,6 +164,7 @@ describe('PlayerState', () => {
     const p = new PlayerState(1, 1, 'S'); // left of S is E → col+1 = 2 (ok), right of S is W → col 0 (wall)
     expect(p.strafeRight(GRID)).toBe(false);
     expect(p.gridX).toBe(1);
+    expect(p.gridZ).toBe(1);
   });
 
   it('turnLeft changes facing without moving', () => {
@@ -184,5 +191,14 @@ describe('PlayerState', () => {
     expect(p.gridX).toBe(2);
     expect(p.gridZ).toBe(2);
     expect(p.facing).toBe('E');
+  });
+
+  it('moveForward from edge into OOB fails', () => {
+    // 1-cell grid: player on the only floor cell
+    const tinyGrid = ['.'];
+    const p = new PlayerState(0, 0, 'N');
+    expect(p.moveForward(tinyGrid)).toBe(false);
+    expect(p.gridX).toBe(0);
+    expect(p.gridZ).toBe(0);
   });
 });

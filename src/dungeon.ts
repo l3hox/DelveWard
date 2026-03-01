@@ -12,6 +12,8 @@ const ceilMat = new THREE.MeshLambertMaterial({ color: 0x1a1510 });
 const wallGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
 const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
 
+// Rendering counterpart to isWalkable in grid.ts.
+// OOB cells are treated as solid (boundary walls) rather than non-walkable.
 function isSolid(grid: string[], col: number, row: number): boolean {
   if (row < 0 || row >= grid.length) return true;
   if (col < 0 || col >= grid[0].length) return true;

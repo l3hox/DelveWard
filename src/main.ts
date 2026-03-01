@@ -101,4 +101,7 @@ async function init(): Promise<void> {
   requestAnimationFrame(animate);
 }
 
-init();
+init().catch((err) => {
+  console.error('Failed to initialize:', err);
+  document.body.textContent = `Error: ${err.message}`;
+});
