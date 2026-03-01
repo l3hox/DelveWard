@@ -4,6 +4,29 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-01 — Phase 1 Complete: Foundation Refactor
+
+Completed all remaining Phase 1 steps in a single session:
+
+- **`DungeonLevel` type + supporting types** (`src/types.ts`)
+  - `DungeonLevel`, `Entity`, `CellOverride` interfaces
+  - Grid format changed from `number[][]` to `string[]` with char-based cells (`.#DSUO `)
+  - `WALKABLE_CELLS` set in `grid.ts` as single source of truth
+- **External JSON level loading** (`src/levelLoader.ts`)
+  - `loadLevel(url)` fetches + validates + returns typed `DungeonLevel`
+  - `validateLevel(data, source)` extracted as pure function for testability
+  - Validates: name, grid structure, uniform row lengths, known cell chars, playerStart bounds + walkability, facing, entities
+- **Level files** in `public/levels/` — level1.json (Two Rooms), level2.json (L-Corridor), level3.json (First Room)
+- **`buildDungeon` returns `THREE.Group`** — no longer mutates scene directly, enables level teardown/swap
+- **`main.ts` async init** — wraps everything in `async init()`, loads level via fetch, `.catch()` error handler
+- **Vitest test suite** — 38 tests across 2 files:
+  - `grid.test.ts` (26 tests): isWalkable, WALKABLE_CELLS, turn tables, FACING_DELTA, PlayerState movement/turning/paths, void cells, OOB movement
+  - `levelLoader.test.ts` (12 tests): all validation branches + happy path
+- **Developer Council review** — SoftwareDeveloper + QaTester specialists identified validation gaps and test coverage issues, all addressed
+- `tsconfig.json`: added `skipLibCheck: true` for vitest 4.x type compat
+
+---
+
 ## 2026-03-01 — Phase 1 Step 1: Extract PlayerState + grid logic
 
 Decoupled pure game logic from Three.js rendering in the player module:

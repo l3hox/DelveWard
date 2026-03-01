@@ -179,6 +179,34 @@ Final schema decided at implementation time, but the skeleton:
 
 ---
 
+## Dungeon Format — Future-Proofing Notes
+
+Design direction captured early to inform data model evolution. Not all of these are in scope for v1, but the format should not paint us into a corner.
+
+### 1. Text-editable grid with rich cell vocabulary
+
+The grid should stay human-editable in a text editor (no level editor planned soon). Single chars for common cells (`.#DSU`), but the entity system handles richer semantics — locked doors, lever-triggered doors, keys, etc. are expressed as entities referencing grid positions, not as multi-char grid tokens.
+
+### 2. Custom dungeon objects with future 3D models
+
+Objects like fountains, altars, bookshelves, thrones should be representable as entities on walkable cells (`O` cell type + entity metadata). Initially rendered as placeholder geometry or billboards; later each gets its own 3D model. Some will be interactable (examine, use, trigger effects). The `Entity` interface with `[key: string]: unknown` index signature supports this — type-specific props can be added per object kind without schema changes.
+
+### 3. Per-cell visual customization (ceiling heights, textures)
+
+Different areas of a level should support varied ceiling heights and wall/floor textures. The `CellOverride` interface already exists for this (`ceilingHeight`, `wallTexture`, `floorTexture`). Implementation deferred to Phase 2+ but the data model is ready. Could also be expressed as an overlay file alongside the grid for cleaner separation.
+
+### 4. True multi-level 3D scenes
+
+The long-term vision goes beyond separate levels loaded one at a time. Multiple vertical levels should coexist in a single 3D scene — the player walks across levels, sees down through voids to lower floors, and can fall to a lower level by stepping into open space. This requires:
+- Multiple grid layers stacked vertically with a Y offset
+- Void cells that are transparent (no floor geometry) — revealing the level below
+- Fall mechanic when stepping onto a void cell
+- Combined scene graph with all visible levels rendered simultaneously
+
+This is a significant architectural evolution beyond the current Phase 5 plan (which loads levels independently). Park for post-v1 or a dedicated phase.
+
+---
+
 ## Testing Strategy
 
 - **Framework**: Vitest (zero-config with Vite)

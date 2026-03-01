@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 1 — Foundation Refactor** (in progress)
+**Phase 2 — Visual Polish** (not started)
 
 ---
 
@@ -24,17 +24,23 @@ Read this at the start of every Claude Code session to restore context. Update i
 - [x] Torch point light with flicker, follows player
 - [x] Fog for atmosphere
 - [x] Tested and working in Windows browser via WSL2 (`npm run dev` → localhost:5173)
-- [x] Phase 1 Step 1: Extracted `PlayerState` + grid logic into `src/grid.ts` (pure TS, no Three.js)
+- [x] **Phase 1 complete** — Foundation Refactor:
+  - Extracted `PlayerState` + grid logic into `src/grid.ts` (pure TS, no Three.js)
+  - `DungeonLevel`, `Entity`, `CellOverride` types in `src/types.ts`
+  - Grid format: `string[]` with char-based cells, `WALKABLE_CELLS` set
+  - External JSON level loading with validation (`src/levelLoader.ts`)
+  - 3 level files in `public/levels/`
+  - `buildDungeon` returns `THREE.Group` (enables level teardown)
+  - `main.ts` async init with error handling
+  - Vitest: 38 tests (grid logic + loader validation)
 
 ---
 
-## Next Steps (Phase 1)
+## Next Steps (Phase 2)
 
-1. ~~Extract `PlayerState` + grid logic into pure TS module~~ — **done**
-2. Define `DungeonLevel` type and `GameState` type
-3. Load dungeon from external JSON file (replace hardcoded `MAP` in main.ts)
-4. `buildDungeon` returns `THREE.Group` instead of adding to scene directly
-5. Add Vitest, write ~15 tests for grid logic
+1. Apply pixelart textures to walls, floor, ceiling (TextureLoader, nearest-filter)
+2. Expand map — more rooms, dead ends, varied layouts
+3. Texture variety — stone, brick, wood, moss variants per wall
 
 ---
 
@@ -42,8 +48,8 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 | Phase | Name | Status |
 |---|---|---|
-| 1 | Foundation Refactor | **In Progress** |
-| 2 | Visual Polish (textures) | Pending |
+| 1 | Foundation Refactor | **Complete** |
+| 2 | Visual Polish (textures) | **Up Next** |
 | 3 | Doors & Interaction | Pending |
 | 4 | HUD | Pending |
 | 5 | Multi-Level Dungeons | Pending |
@@ -80,6 +86,17 @@ None.
 - Scaffolded full project: `index.html`, `package.json`, `tsconfig.json`, `src/main.ts`, `src/dungeon.ts`, `src/player.ts`, `.gitignore`
 - Two rooms connected by a corridor, grid movement with tween camera, torch flicker, fog
 - Tested successfully in browser
+
+### Session 4 — Phase 1 Complete
+- Completed all remaining Phase 1 steps (2–5) in one session
+- Defined `DungeonLevel` type, switched grid from `number[][]` to `string[]`
+- Built `levelLoader.ts` with `loadLevel()` + `validateLevel()` — fetch + validate JSON levels
+- Created 3 level files in `public/levels/`
+- `buildDungeon` returns `THREE.Group` instead of mutating scene
+- Wrapped `main.ts` in async `init()` with error handling
+- Added Vitest — 38 tests across grid logic and loader validation
+- Ran Developer Council code review (SoftwareDeveloper + QaTester)
+- Addressed all council findings: validation hardening, test coverage gaps, minor fixes
 
 ### Session 3 — Phase 1 Step 1: Extract PlayerState
 - Extracted pure grid logic (`Facing`, direction tables, `isWalkable`, `PlayerState`) into `src/grid.ts`
