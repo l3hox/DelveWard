@@ -1,26 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
-
-type Facing = 'N' | 'E' | 'S' | 'W';
-
-// Camera Y rotation for each facing direction (Three.js camera faces -Z by default = North)
-const FACING_ANGLE: Record<Facing, number> = {
-  N: 0,
-  E: -Math.PI / 2,
-  S: Math.PI,
-  W: Math.PI / 2,
-};
-
-// [dcol, drow] per facing
-const FACING_DELTA: Record<Facing, [number, number]> = {
-  N: [0, -1],
-  E: [1, 0],
-  S: [0, 1],
-  W: [-1, 0],
-};
-
-const TURN_LEFT: Record<Facing, Facing> = { N: 'W', W: 'S', S: 'E', E: 'N' };
-const TURN_RIGHT: Record<Facing, Facing> = { N: 'E', E: 'S', S: 'W', W: 'N' };
+import { PlayerState, Facing, FACING_ANGLE } from './grid';
 
 const TWEEN_SPEED = 20;
 const ANIM_THRESHOLD = 0.05;
@@ -28,9 +8,7 @@ const ANIM_THRESHOLD = 0.05;
 export class Player {
   private camera: THREE.PerspectiveCamera;
   private map: number[][];
-  private gridX: number; // col
-  private gridZ: number; // row
-  private facing: Facing;
+  private state: PlayerState;
 
   private currentPos: THREE.Vector3;
   private targetPos: THREE.Vector3;
@@ -48,9 +26,7 @@ export class Player {
   ) {
     this.camera = camera;
     this.map = map;
-    this.gridX = startCol;
-    this.gridZ = startRow;
-    this.facing = facing;
+    this.state = new PlayerState(startCol, startRow, facing);
 
     const worldPos = this.gridToWorld(startCol, startRow);
     this.currentPos = worldPos.clone();
@@ -72,12 +48,6 @@ export class Player {
     );
   }
 
-  private isWalkable(col: number, row: number): boolean {
-    if (row < 0 || row >= this.map.length) return false;
-    if (col < 0 || col >= this.map[0].length) return false;
-    return this.map[row][col] === 0;
-  }
-
   private isAnimating(): boolean {
     return (
       this.currentPos.distanceTo(this.targetPos) > ANIM_THRESHOLD ||
@@ -87,57 +57,41 @@ export class Player {
 
   moveForward(): void {
     if (this.isAnimating()) return;
-    const [dc, dr] = FACING_DELTA[this.facing];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!this.isWalkable(nx, nz)) return;
-    this.gridX = nx;
-    this.gridZ = nz;
-    this.targetPos.copy(this.gridToWorld(nx, nz));
+    if (this.state.moveForward(this.map)) {
+      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+    }
   }
 
   moveBack(): void {
     if (this.isAnimating()) return;
-    const [dc, dr] = FACING_DELTA[this.facing];
-    const nx = this.gridX - dc;
-    const nz = this.gridZ - dr;
-    if (!this.isWalkable(nx, nz)) return;
-    this.gridX = nx;
-    this.gridZ = nz;
-    this.targetPos.copy(this.gridToWorld(nx, nz));
+    if (this.state.moveBack(this.map)) {
+      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+    }
   }
 
   strafeLeft(): void {
     if (this.isAnimating()) return;
-    const [dc, dr] = FACING_DELTA[TURN_LEFT[this.facing]];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!this.isWalkable(nx, nz)) return;
-    this.gridX = nx;
-    this.gridZ = nz;
-    this.targetPos.copy(this.gridToWorld(nx, nz));
+    if (this.state.strafeLeft(this.map)) {
+      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+    }
   }
 
   strafeRight(): void {
     if (this.isAnimating()) return;
-    const [dc, dr] = FACING_DELTA[TURN_RIGHT[this.facing]];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!this.isWalkable(nx, nz)) return;
-    this.gridX = nx;
-    this.gridZ = nz;
-    this.targetPos.copy(this.gridToWorld(nx, nz));
+    if (this.state.strafeRight(this.map)) {
+      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+    }
   }
 
   turnLeft(): void {
     if (this.isAnimating()) return;
-    this.facing = TURN_LEFT[this.facing];
+    this.state.turnLeft();
     this.targetAngle += Math.PI / 2;
   }
 
   turnRight(): void {
     if (this.isAnimating()) return;
-    this.facing = TURN_RIGHT[this.facing];
+    this.state.turnRight();
     this.targetAngle -= Math.PI / 2;
   }
 

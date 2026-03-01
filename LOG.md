@@ -4,6 +4,23 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-01 — Phase 1 Step 1: Extract PlayerState + grid logic
+
+Decoupled pure game logic from Three.js rendering in the player module:
+
+- **Created `src/grid.ts`** — pure TypeScript, zero Three.js dependency
+  - `Facing` type, direction tables (`FACING_ANGLE`, `FACING_DELTA`, `TURN_LEFT`, `TURN_RIGHT`)
+  - `isWalkable()` as a pure function (takes map as parameter)
+  - `PlayerState` class — holds grid position + facing, movement methods return success boolean
+- **Slimmed `src/player.ts`** — now rendering-only
+  - Imports `PlayerState` from `grid.ts`, delegates all grid logic
+  - Retains Three.js camera tween, `gridToWorld`, `isAnimating`, `update`, `getWorldPosition`
+- `dungeon.ts` and `main.ts` unchanged
+
+This enables unit testing grid logic without Three.js and sets up clean type separation for later steps.
+
+---
+
 ## 2026-02-28 — Planning session: all design decisions resolved
 
 Developer Council (4 specialists, 3 rounds) identified all vague spots in the project. Decisions made:

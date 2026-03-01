@@ -8,9 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 1 — Foundation Refactor** (not started)
-
-Scaffold exists and works. Next: refactor architecture before adding features.
+**Phase 1 — Foundation Refactor** (in progress)
 
 ---
 
@@ -26,12 +24,13 @@ Scaffold exists and works. Next: refactor architecture before adding features.
 - [x] Torch point light with flicker, follows player
 - [x] Fog for atmosphere
 - [x] Tested and working in Windows browser via WSL2 (`npm run dev` → localhost:5173)
+- [x] Phase 1 Step 1: Extracted `PlayerState` + grid logic into `src/grid.ts` (pure TS, no Three.js)
 
 ---
 
 ## Next Steps (Phase 1)
 
-1. Extract `PlayerState` + grid logic (isWalkable, facing tables) into pure TS module — no Three.js dependency
+1. ~~Extract `PlayerState` + grid logic into pure TS module~~ — **done**
 2. Define `DungeonLevel` type and `GameState` type
 3. Load dungeon from external JSON file (replace hardcoded `MAP` in main.ts)
 4. `buildDungeon` returns `THREE.Group` instead of adding to scene directly
@@ -43,7 +42,7 @@ Scaffold exists and works. Next: refactor architecture before adding features.
 
 | Phase | Name | Status |
 |---|---|---|
-| 1 | Foundation Refactor | **Next** |
+| 1 | Foundation Refactor | **In Progress** |
 | 2 | Visual Polish (textures) | Pending |
 | 3 | Doors & Interaction | Pending |
 | 4 | HUD | Pending |
@@ -81,6 +80,11 @@ None.
 - Scaffolded full project: `index.html`, `package.json`, `tsconfig.json`, `src/main.ts`, `src/dungeon.ts`, `src/player.ts`, `.gitignore`
 - Two rooms connected by a corridor, grid movement with tween camera, torch flicker, fog
 - Tested successfully in browser
+
+### Session 3 — Phase 1 Step 1: Extract PlayerState
+- Extracted pure grid logic (`Facing`, direction tables, `isWalkable`, `PlayerState`) into `src/grid.ts`
+- Refactored `src/player.ts` to delegate to `PlayerState`, keeping only Three.js rendering
+- TypeScript compiles clean, no Three.js dependency in grid.ts
 
 ### Session 2 — Planning
 - Ran Developer Council (4 specialists, 3 rounds) to identify all vague spots and create implementation plan
