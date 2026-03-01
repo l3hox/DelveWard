@@ -18,7 +18,8 @@ function isSolid(grid: string[], col: number, row: number): boolean {
   return !WALKABLE_CELLS.has(grid[row][col]);
 }
 
-export function buildDungeon(scene: THREE.Scene, grid: string[]): void {
+export function buildDungeon(grid: string[]): THREE.Group {
+  const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -33,19 +34,19 @@ export function buildDungeon(scene: THREE.Scene, grid: string[]): void {
       const floor = new THREE.Mesh(tileGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
       floor.position.set(cx, 0, cz);
-      scene.add(floor);
+      group.add(floor);
 
       // Ceiling
       const ceil = new THREE.Mesh(tileGeo, ceilMat);
       ceil.rotation.x = Math.PI / 2;
       ceil.position.set(cx, WALL_HEIGHT, cz);
-      scene.add(ceil);
+      group.add(ceil);
 
       // North wall
       if (isSolid(grid, col, row - 1)) {
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.position.set(cx, WALL_HEIGHT / 2, cz - CELL_SIZE / 2);
-        scene.add(wall);
+        group.add(wall);
       }
 
       // South wall
@@ -53,7 +54,7 @@ export function buildDungeon(scene: THREE.Scene, grid: string[]): void {
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI;
         wall.position.set(cx, WALL_HEIGHT / 2, cz + CELL_SIZE / 2);
-        scene.add(wall);
+        group.add(wall);
       }
 
       // East wall
@@ -61,7 +62,7 @@ export function buildDungeon(scene: THREE.Scene, grid: string[]): void {
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = -Math.PI / 2;
         wall.position.set(cx + CELL_SIZE / 2, WALL_HEIGHT / 2, cz);
-        scene.add(wall);
+        group.add(wall);
       }
 
       // West wall
@@ -69,8 +70,10 @@ export function buildDungeon(scene: THREE.Scene, grid: string[]): void {
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI / 2;
         wall.position.set(cx - CELL_SIZE / 2, WALL_HEIGHT / 2, cz);
-        scene.add(wall);
+        group.add(wall);
       }
     }
   }
+
+  return group;
 }

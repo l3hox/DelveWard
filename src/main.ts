@@ -33,7 +33,8 @@ async function init(): Promise<void> {
   // --- Level ---
   const level = await loadLevel('/levels/level3.json');
 
-  buildDungeon(scene, level.grid);
+  const dungeonGroup = buildDungeon(level.grid);
+  scene.add(dungeonGroup);
 
   const player = new Player(
     camera,
