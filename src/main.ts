@@ -31,7 +31,7 @@ async function init(): Promise<void> {
   scene.add(torchLight);
 
   // --- Level ---
-  const level = await loadLevel('/levels/level1.json');
+  const level = await loadLevel('/levels/level3.json');
 
   buildDungeon(scene, level.grid);
 
