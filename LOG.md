@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-03 — Phase 2 started: Procedural textures + input QoL
+
+First Phase 2 work — replaced flat-colored materials with procedural pixelart textures:
+
+- **`src/textures.ts`** (new) — Canvas2D texture generation with nearest-filter for pixel-perfect rendering
+  - `createWallTexture()` — grey-brown stone with per-pixel noise + brick mortar pattern
+  - `createFloorTexture()` — dark stone tile base with grid lines
+  - `createCeilingTexture()` — very dark rock with subtle crack lines
+  - All textures use `THREE.NearestFilter` and `SRGBColorSpace`
+- **`src/dungeon.ts`** — wall/floor/ceiling materials now use canvas textures instead of flat `MeshLambertMaterial` colors
+- **`src/main.ts`** — added `Q`/`E` key bindings for turning (alongside existing arrow keys)
+
+---
+
 ## 2026-03-01 — Phase 1 Complete: Foundation Refactor
 
 Completed all remaining Phase 1 steps in a single session:

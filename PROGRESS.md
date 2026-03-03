@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 2 — Visual Polish** (not started)
+**Phase 2 — Visual Polish** (in progress)
 
 ---
 
@@ -36,9 +36,15 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ---
 
+## What's In Progress (Phase 2)
+
+- [x] Procedural pixelart textures for walls, floor, ceiling (`src/textures.ts` — Canvas2D, nearest-filter)
+- [x] Dungeon materials wired to new textures (replaced flat colors)
+- [x] Q/E key bindings for turning (alongside arrow keys)
+
 ## Next Steps (Phase 2)
 
-1. Apply pixelart textures to walls, floor, ceiling (TextureLoader, nearest-filter)
+1. Commit current texture + input changes
 2. Expand map — more rooms, dead ends, varied layouts
 3. Texture variety — stone, brick, wood, moss variants per wall
 
@@ -49,7 +55,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 | Phase | Name | Status |
 |---|---|---|
 | 1 | Foundation Refactor | **Complete** |
-| 2 | Visual Polish (textures) | **Up Next** |
+| 2 | Visual Polish (textures) | **In Progress** |
 | 3 | Doors & Interaction | Pending |
 | 4 | HUD | Pending |
 | 5 | Multi-Level Dungeons | Pending |
