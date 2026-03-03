@@ -4,6 +4,34 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-03 — Phase 2: Texture variety, per-cell overrides, 3 new levels
+
+Added multiple texture styles and wired the `CellOverride` mechanism so levels can assign different textures per cell:
+
+- **`src/textureNames.ts`** (new) — pure constants file, no Three.js dependency
+  - `WALL_TEXTURES`: stone, brick, mossy, wood
+  - `FLOOR_TEXTURES`: stone_tile, dirt, cobblestone
+  - `CEILING_TEXTURES`: dark_rock, wooden_beams
+  - Type aliases + `Set<string>` versions for validation
+- **`src/textures.ts`** — expanded from 3 to 9 texture generators + cached registry
+  - New walls: `brick` (warm red-brown, wider bricks), `mossy` (stone + green patches), `wood` (vertical grain + knots)
+  - New floors: `dirt` (earthy brown, pebble spots), `cobblestone` (irregular rounded stones)
+  - New ceiling: `wooden_beams` (dark wood base + thick horizontal beams)
+  - Cached getters: `getWallTexture(name)`, `getFloorTexture(name)`, `getCeilingTexture(name)`
+  - Old direct-export functions removed
+- **`src/types.ts`** — added `ceilingTexture?: string` to `CellOverride`
+- **`src/dungeon.ts`** — `buildDungeon(grid, cellOverrides?)` now builds override lookup map and selects per-cell materials (cached `MeshLambertMaterial` per texture name)
+- **`src/levelLoader.ts`** — validates cellOverrides: array structure, numeric col/row, grid bounds, known texture names, ceilingHeight type
+- **`src/levelLoader.test.ts`** — 10 new tests for cellOverrides validation (48 total)
+- **3 new levels** using cellOverrides for themed zones:
+  - `level4.json` "The Sunken Crypt" (20×20) — brick hall → mossy crypt → wood library
+  - `level5.json` "Winding Depths" (18×18) — mossy cavern → brick guardroom → wood study
+  - `level6.json` "The Grand Hall" (20×20) — central brick hall with 4 themed corners
+
+**Known issue**: the per-cell cellOverrides model is verbose — next session will refactor to area-based overlays, level defaults, and special char definitions.
+
+---
+
 ## 2026-03-03 — Phase 2 started: Procedural textures + input QoL
 
 First Phase 2 work — replaced flat-colored materials with procedural pixelart textures:

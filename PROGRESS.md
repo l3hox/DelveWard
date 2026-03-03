@@ -41,12 +41,15 @@ Read this at the start of every Claude Code session to restore context. Update i
 - [x] Procedural pixelart textures for walls, floor, ceiling (`src/textures.ts` — Canvas2D, nearest-filter)
 - [x] Dungeon materials wired to new textures (replaced flat colors)
 - [x] Q/E key bindings for turning (alongside arrow keys)
+- [x] Texture variety — 9 texture styles across walls/floors/ceilings with cached registry
+- [x] `CellOverride` wired into dungeon builder — per-cell texture selection
+- [x] `cellOverrides` validation in level loader + 10 new tests (48 total)
+- [x] 3 new themed dungeon levels (level4–6) using cellOverrides for zone theming
 
 ## Next Steps (Phase 2)
 
-1. Commit current texture + input changes
-2. Expand map — more rooms, dead ends, varied layouts
-3. Texture variety — stone, brick, wood, moss variants per wall
+1. Refactor cellOverrides model — replace verbose per-cell overrides with area-based overlays, level defaults, and special char definitions (current JSON is too verbose/cluttered)
+2. Visual polish pass — verify all texture transitions look good in-game
 
 ---
 
@@ -75,7 +78,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Known Issues
 
-None.
+- cellOverrides JSON model is too verbose — each cell needs its own entry. Planned refactor: area-based overlays, level-wide defaults, and special char → texture mappings.
 
 ---
 
@@ -108,6 +111,16 @@ None.
 - Extracted pure grid logic (`Facing`, direction tables, `isWalkable`, `PlayerState`) into `src/grid.ts`
 - Refactored `src/player.ts` to delegate to `PlayerState`, keeping only Three.js rendering
 - TypeScript compiles clean, no Three.js dependency in grid.ts
+
+### Session 6 — Phase 2: Texture variety + new dungeons
+- Added 6 new procedural texture generators: brick/mossy/wood walls, dirt/cobblestone floors, wooden beams ceiling
+- Built texture registry with cached getters (`getWallTexture`, `getFloorTexture`, `getCeilingTexture`)
+- Created `src/textureNames.ts` — pure constants file with type-safe texture name validation
+- Wired `CellOverride` into `buildDungeon` — per-cell material selection via override lookup map
+- Added `ceilingTexture` field to `CellOverride` type
+- Level loader validates cellOverrides (bounds, known texture names, types) — 10 new tests
+- Created 3 new themed levels: level4 (Sunken Crypt), level5 (Winding Depths), level6 (Grand Hall)
+- Identified need to refactor cellOverrides model — current per-cell approach is too verbose for larger maps
 
 ### Session 2 — Planning
 - Ran Developer Council (4 specialists, 3 rounds) to identify all vague spots and create implementation plan

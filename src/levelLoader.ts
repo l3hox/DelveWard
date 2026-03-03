@@ -1,6 +1,7 @@
 import type { DungeonLevel } from './types';
 import type { Facing } from './grid';
 import { WALKABLE_CELLS } from './grid';
+import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './textureNames';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const KNOWN_CELLS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
@@ -61,6 +62,46 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   // entities
   if (!Array.isArray(obj.entities)) {
     throw new Error(`Level ${source}: "entities" must be an array`);
+  }
+
+  // cellOverrides (optional)
+  if (obj.cellOverrides !== undefined) {
+    if (!Array.isArray(obj.cellOverrides)) {
+      throw new Error(`Level ${source}: "cellOverrides" must be an array`);
+    }
+
+    for (let i = 0; i < obj.cellOverrides.length; i++) {
+      const ov = obj.cellOverrides[i];
+      if (typeof ov !== 'object' || ov === null || Array.isArray(ov)) {
+        throw new Error(`Level ${source}: cellOverrides[${i}] must be an object`);
+      }
+
+      const entry = ov as Record<string, unknown>;
+
+      if (typeof entry.col !== 'number' || typeof entry.row !== 'number') {
+        throw new Error(`Level ${source}: cellOverrides[${i}] must have numeric col and row`);
+      }
+
+      if (entry.row < 0 || entry.row >= grid.length || entry.col < 0 || entry.col >= rowLen) {
+        throw new Error(`Level ${source}: cellOverrides[${i}] (${entry.col},${entry.row}) is out of grid bounds`);
+      }
+
+      if (entry.wallTexture !== undefined && !WALL_TEXTURE_SET.has(entry.wallTexture as string)) {
+        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown wallTexture "${entry.wallTexture}"`);
+      }
+
+      if (entry.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(entry.floorTexture as string)) {
+        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown floorTexture "${entry.floorTexture}"`);
+      }
+
+      if (entry.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(entry.ceilingTexture as string)) {
+        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown ceilingTexture "${entry.ceilingTexture}"`);
+      }
+
+      if (entry.ceilingHeight !== undefined && typeof entry.ceilingHeight !== 'number') {
+        throw new Error(`Level ${source}: cellOverrides[${i}] ceilingHeight must be a number`);
+      }
+    }
   }
 
   return data as DungeonLevel;

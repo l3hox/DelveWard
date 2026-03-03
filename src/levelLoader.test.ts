@@ -80,4 +80,75 @@ describe('validateLevel', () => {
     expect(() => validateLevel(validLevel({ entities: undefined }), 'test')).toThrow('"entities" must be an array');
     expect(() => validateLevel(validLevel({ entities: 'bad' }), 'test')).toThrow('"entities" must be an array');
   });
+
+  // --- cellOverrides validation ---
+
+  it('accepts valid cellOverrides', () => {
+    const level = validateLevel(validLevel({
+      cellOverrides: [
+        { col: 1, row: 1, wallTexture: 'brick', floorTexture: 'dirt', ceilingTexture: 'wooden_beams' },
+      ],
+    }), 'test');
+    expect(level.cellOverrides).toHaveLength(1);
+  });
+
+  it('accepts missing cellOverrides', () => {
+    const level = validateLevel(validLevel(), 'test');
+    expect(level.cellOverrides).toBeUndefined();
+  });
+
+  it('rejects non-array cellOverrides', () => {
+    expect(() => validateLevel(validLevel({ cellOverrides: 'bad' }), 'test'))
+      .toThrow('"cellOverrides" must be an array');
+    expect(() => validateLevel(validLevel({ cellOverrides: {} }), 'test'))
+      .toThrow('"cellOverrides" must be an array');
+  });
+
+  it('rejects non-object entries in cellOverrides', () => {
+    expect(() => validateLevel(validLevel({ cellOverrides: [42] }), 'test'))
+      .toThrow('cellOverrides[0] must be an object');
+    expect(() => validateLevel(validLevel({ cellOverrides: [null] }), 'test'))
+      .toThrow('cellOverrides[0] must be an object');
+    expect(() => validateLevel(validLevel({ cellOverrides: [[1, 1]] }), 'test'))
+      .toThrow('cellOverrides[0] must be an object');
+  });
+
+  it('rejects non-numeric col/row in cellOverrides', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 'a', row: 1 }],
+    }), 'test')).toThrow('must have numeric col and row');
+  });
+
+  it('rejects out-of-bounds cellOverrides', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 10, row: 1 }],
+    }), 'test')).toThrow('is out of grid bounds');
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 1, row: 10 }],
+    }), 'test')).toThrow('is out of grid bounds');
+  });
+
+  it('rejects unknown wallTexture name', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 1, row: 1, wallTexture: 'marble' }],
+    }), 'test')).toThrow('unknown wallTexture "marble"');
+  });
+
+  it('rejects unknown floorTexture name', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 1, row: 1, floorTexture: 'lava' }],
+    }), 'test')).toThrow('unknown floorTexture "lava"');
+  });
+
+  it('rejects unknown ceilingTexture name', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 1, row: 1, ceilingTexture: 'glass' }],
+    }), 'test')).toThrow('unknown ceilingTexture "glass"');
+  });
+
+  it('rejects non-number ceilingHeight', () => {
+    expect(() => validateLevel(validLevel({
+      cellOverrides: [{ col: 1, row: 1, ceilingHeight: 'high' }],
+    }), 'test')).toThrow('ceilingHeight must be a number');
+  });
 });

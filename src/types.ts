@@ -25,4 +25,5 @@ export interface CellOverride {
   ceilingHeight?: number;
   wallTexture?: string;
   floorTexture?: string;
+  ceilingTexture?: string;
 }

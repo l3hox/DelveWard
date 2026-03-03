@@ -31,9 +31,9 @@ async function init(): Promise<void> {
   scene.add(torchLight);
 
   // --- Level ---
-  const level = await loadLevel('/levels/level3.json');
+  const level = await loadLevel('/levels/level6.json');
 
-  const dungeonGroup = buildDungeon(level.grid);
+  const dungeonGroup = buildDungeon(level.grid, level.cellOverrides);
   scene.add(dungeonGroup);
 
   const player = new Player(
@@ -79,7 +79,7 @@ async function init(): Promise<void> {
   hint.style.cssText =
     'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
     'color:#555;font:12px monospace;text-align:center;pointer-events:none;white-space:nowrap';
-  hint.textContent = 'W/↑ Forward   S/↓ Back   A Strafe Left   D Strafe Right   ←/→ Turn';
+  hint.textContent = 'W/↑ Forward   S/↓ Back   A Strafe Left   D Strafe Right   Q/← Turn Left   E/→ Turn Right';
   document.body.appendChild(hint);
 
   // --- Loop ---
