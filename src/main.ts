@@ -58,8 +58,10 @@ async function init(): Promise<void> {
       case 'KeyS': player.moveBack(); break;
       case 'KeyA': player.strafeLeft(); break;
       case 'KeyD': player.strafeRight(); break;
-      case 'ArrowLeft': player.turnLeft(); break;
-      case 'ArrowRight': player.turnRight(); break;
+      case 'ArrowLeft':
+      case 'KeyQ': player.turnLeft(); break;
+      case 'ArrowRight':
+      case 'KeyE': player.turnRight(); break;
     }
   });
 

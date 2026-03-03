@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { WALKABLE_CELLS } from './grid';
+import { createWallTexture, createFloorTexture, createCeilingTexture } from './textures';
 
 export const CELL_SIZE = 2;
 export const WALL_HEIGHT = 2.5;
 export const EYE_HEIGHT = 1.0;
 
-const wallMat = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
-const floorMat = new THREE.MeshLambertMaterial({ color: 0x2a2218 });
-const ceilMat = new THREE.MeshLambertMaterial({ color: 0x1a1510 });
+const wallMat = new THREE.MeshLambertMaterial({ map: createWallTexture() });
+const floorMat = new THREE.MeshLambertMaterial({ map: createFloorTexture() });
+const ceilMat = new THREE.MeshLambertMaterial({ map: createCeilingTexture() });
 
 const wallGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
 const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
