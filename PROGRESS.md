@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 4 — HUD** (not started)
+**Phase 5 — Multi-Level Dungeons** (not started)
 
 ---
 
@@ -63,9 +63,25 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Level 7 "The Locked Vault" — showcase level for all Phase 3 features
   - 167 tests (91 new)
 
-## Next Steps (Phase 4)
+---
 
-See PLAN.md Phase 4 for full details.
+- [x] **Phase 4 complete** — HUD:
+  - 2D canvas overlay (640x360 internal, `image-rendering: pixelated`) on top of Three.js viewport
+  - Compass rose (top-left) — N/E/S/W letters, active direction highlighted gold
+  - Minimap (top-right) — explored-cell top-down grid, player dot + facing line, centered on player
+  - Health bar (bottom-left) — heart icon, HP fill bar, low-HP pulse effect
+  - Torch indicator (bottom-center-left) — flame icon, fuel fill bar, low-fuel flicker effect
+  - Inventory panel (bottom-right) — key count with icon, 3 equipment slots (W/A/R), 8 backpack slots
+  - `GameState` gains `hp`/`maxHp`, `torchFuel`/`maxTorchFuel`, `exploredCells`, `revealAround()`
+  - `Player` gains `setOnTurn()` callback for exploration on facing change
+  - Exploration: current cell + 4 adjacent + line-of-sight forward until wall
+  - New `src/hud/` folder with 9 files
+  - Removed controls hint div (HUD replaces it)
+  - 187 tests (20 new)
+
+## Next Steps (Phase 5)
+
+See PLAN.md Phase 5 for full details.
 
 ---
 
@@ -76,7 +92,7 @@ See PLAN.md Phase 4 for full details.
 | 1 | Foundation Refactor | **Complete** |
 | 2 | Visual Polish (textures) | **Complete** |
 | 3 | Doors & Interaction | **Complete** |
-| 4 | HUD | Pending |
+| 4 | HUD | **Complete** |
 | 5 | Multi-Level Dungeons | Pending |
 | 6 | Entities & Enemy System | Pending |
 | 7 | Combat | Pending |
@@ -86,7 +102,7 @@ See PLAN.md Phase 4 for full details.
 
 ## Open Questions
 
-- Minimap — render in 3D scene or as 2D canvas overlay?
+- ~~Minimap — render in 3D scene or as 2D canvas overlay?~~ → Resolved: 2D canvas overlay
 - Combat interaction model — deferred to Phase 7
 - Death/respawn behavior — deferred to Phase 7
 
@@ -99,6 +115,18 @@ See PLAN.md Phase 4 for full details.
 ---
 
 ## Session Log
+
+### Session 11 — Phase 4 Complete: HUD overlay
+- Created `src/hud/` folder with 9 files: canvas setup, layout, colors, pixel font, compass, minimap, health bar, torch indicator, inventory panel
+- 2D canvas overlay (640x360) with `image-rendering: pixelated` for crisp pixel-art scaling
+- `GameState` gains `hp`, `maxHp`, `torchFuel`, `maxTorchFuel`, `exploredCells`, `revealAround()`
+- `revealAround()` marks current + 4 adjacent + line-of-sight forward as explored
+- `Player` gains `setOnTurn()` callback (same pattern as `setOnMove()`)
+- Wired exploration into initial position, onMove, and onTurn callbacks
+- Removed old controls hint div
+- Updated ARCHITECTURE.md with HUD module docs
+- 187 tests (20 new), TypeScript compiles clean
+- Phase 4 complete
 
 ### Session 0 — Project conceived
 - Decided on genre, tech stack, and approach via conversation with Claude (claude.ai)
