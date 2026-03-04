@@ -325,4 +325,114 @@ describe('validateLevel', () => {
       playerStart: { col: 1, row: 1, facing: 'N' },
     }), 'test')).toThrow('is not a walkable cell');
   });
+
+  // --- entity validation ---
+
+  function doorLevel(entities: unknown[]) {
+    return validLevel({
+      grid: ['#####', '#.D.#', '#...#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'E' },
+      entities,
+    });
+  }
+
+  it('accepts valid door entity', () => {
+    const level = validateLevel(doorLevel([
+      { col: 2, row: 1, type: 'door', state: 'closed' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('accepts valid locked door entity', () => {
+    const level = validateLevel(doorLevel([
+      { col: 2, row: 1, type: 'door', state: 'locked', keyId: 'gold_key' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('rejects door entity with invalid state', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 2, row: 1, type: 'door', state: 'broken' },
+    ]), 'test')).toThrow('door state must be open, closed, or locked');
+  });
+
+  it('rejects locked door without keyId', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 2, row: 1, type: 'door', state: 'locked' },
+    ]), 'test')).toThrow('locked door must have a string keyId');
+  });
+
+  it('rejects door entity on non-D cell', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 1, row: 1, type: 'door', state: 'closed' },
+    ]), 'test')).toThrow("door must be on a 'D' cell");
+  });
+
+  it('accepts valid key entity', () => {
+    const level = validateLevel(doorLevel([
+      { col: 1, row: 2, type: 'key', keyId: 'gold_key' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('rejects key entity without keyId', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 1, row: 2, type: 'key' },
+    ]), 'test')).toThrow('key must have a string keyId');
+  });
+
+  it('accepts valid lever entity', () => {
+    const level = validateLevel(validLevel({
+      grid: ['#####', '#.D.#', '#.O.#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [{ col: 2, row: 2, type: 'lever', targetDoor: '2,1' }],
+    }), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('rejects lever with invalid targetDoor format', () => {
+    expect(() => validateLevel(validLevel({
+      grid: ['#####', '#.D.#', '#.O.#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [{ col: 2, row: 2, type: 'lever', targetDoor: 'bad' }],
+    }), 'test')).toThrow('lever must have targetDoor in "col,row" format');
+  });
+
+  it('rejects lever targeting non-D cell', () => {
+    expect(() => validateLevel(validLevel({
+      grid: ['#####', '#...#', '#.O.#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [{ col: 2, row: 2, type: 'lever', targetDoor: '2,1' }],
+    }), 'test')).toThrow("lever targetDoor must reference a 'D' cell");
+  });
+
+  it('accepts valid pressure_plate entity', () => {
+    const level = validateLevel(doorLevel([
+      { col: 1, row: 2, type: 'pressure_plate', targetDoor: '2,1' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('rejects pressure_plate with missing targetDoor', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 1, row: 2, type: 'pressure_plate' },
+    ]), 'test')).toThrow('pressure_plate must have targetDoor in "col,row" format');
+  });
+
+  it('rejects entity with out-of-bounds position', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 20, row: 1, type: 'door', state: 'closed' },
+    ]), 'test')).toThrow('is out of grid bounds');
+  });
+
+  it('rejects entity without numeric col/row', () => {
+    expect(() => validateLevel(doorLevel([
+      { col: 'a', row: 1, type: 'door' },
+    ]), 'test')).toThrow('must have numeric col and row');
+  });
+
+  it('rejects non-object entity', () => {
+    expect(() => validateLevel(doorLevel([42]), 'test'))
+      .toThrow('entities[0] must be an object');
+  });
 });

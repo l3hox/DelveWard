@@ -128,6 +128,70 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "entities" must be an array`);
   }
 
+  const VALID_DOOR_STATES = new Set(['open', 'closed', 'locked']);
+
+  for (let i = 0; i < obj.entities.length; i++) {
+    const e = obj.entities[i] as Record<string, unknown>;
+    if (typeof e !== 'object' || e === null || Array.isArray(e)) {
+      throw new Error(`Level ${source}: entities[${i}] must be an object`);
+    }
+    if (typeof e.col !== 'number' || typeof e.row !== 'number') {
+      throw new Error(`Level ${source}: entities[${i}] must have numeric col and row`);
+    }
+    if (e.row < 0 || e.row >= grid.length || e.col < 0 || e.col >= rowLen) {
+      throw new Error(`Level ${source}: entities[${i}] (${e.col},${e.row}) is out of grid bounds`);
+    }
+    if (typeof e.type !== 'string') {
+      throw new Error(`Level ${source}: entities[${i}] must have a string type`);
+    }
+
+    const cellAtEntity = grid[e.row as number][e.col as number];
+
+    if (e.type === 'door') {
+      if (cellAtEntity !== 'D') {
+        throw new Error(`Level ${source}: entities[${i}] door must be on a 'D' cell, found '${cellAtEntity}'`);
+      }
+      if (e.state !== undefined && !VALID_DOOR_STATES.has(e.state as string)) {
+        throw new Error(`Level ${source}: entities[${i}] door state must be open, closed, or locked`);
+      }
+      if (e.state === 'locked' && typeof e.keyId !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] locked door must have a string keyId`);
+      }
+    }
+
+    if (e.type === 'key') {
+      if (typeof e.keyId !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] key must have a string keyId`);
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] key must be on a walkable cell`);
+      }
+    }
+
+    if (e.type === 'lever') {
+      if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever must have targetDoor in "col,row" format`);
+      }
+      const [tc, tr] = (e.targetDoor as string).split(',').map(Number);
+      if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
+        throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a 'D' cell`);
+      }
+    }
+
+    if (e.type === 'pressure_plate') {
+      if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have targetDoor in "col,row" format`);
+      }
+      const [tc, tr] = (e.targetDoor as string).split(',').map(Number);
+      if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate targetDoor must reference a 'D' cell`);
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
+      }
+    }
+  }
+
   // defaults (optional)
   if (obj.defaults !== undefined) {
     if (typeof obj.defaults !== 'object' || obj.defaults === null || Array.isArray(obj.defaults)) {

@@ -4,6 +4,38 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-04 — Phase 3 Complete: Doors & Interaction
+
+First interactive gameplay — doors, keys, levers, pressure plates. All entities are data-driven via level JSON.
+
+**New modules:**
+- **`src/gameState.ts`** — `GameState` class: runtime door state (open/closed/locked), key inventory (`Set<string>`), lever/plate tracking. Methods: `isDoorOpen`, `openDoor`, `unlockDoor`, `toggleDoor`, `pickupKeyAt`, `activateLever`, `activatePressurePlate`. Pure logic, no Three.js.
+- **`src/interaction.ts`** — `interact(playerState, grid, gameState)` dispatches Space key: opens closed doors, unlocks locked doors (consumes key from inventory), pulls levers (toggles linked door). Returns typed `InteractionResult`.
+- **`src/doorRenderer.ts`** — builds door meshes per `GameState.doors`. Auto-detects orientation from adjacent walls. `DoubleSide` material, visibility toggle on open/close.
+- **`src/keyRenderer.ts`** — gold key billboard meshes on floor. Hidden on pickup.
+
+**Modified modules:**
+- **`src/grid.ts`** — `isWalkable()` gained optional `isDoorOpen` callback: `'D'` cells delegate to callback when provided. `PlayerState` passes it through. New `getFacingCell()` helper.
+- **`src/player.ts`** — `getState()` exposes `PlayerState`, `setOnMove()` callback fires after each successful movement (for key pickup + pressure plates).
+- **`src/textures.ts`** — 2 new procedural textures: `getDoorTexture()` (dark wood planks with frame), `getLockedDoorTexture()` (darker with iron bands, studs, keyhole). Standalone cached getters, not in wall/floor/ceiling registries.
+- **`src/levelLoader.ts`** — entity validation: doors (state, keyId, D-cell), keys (keyId, walkable cell), levers (targetDoor format, D-cell target), pressure plates (targetDoor, walkable cell).
+- **`src/main.ts`** — wires GameState, door meshes, key meshes, interaction, onMove callback for pickup/plates.
+
+**New level:**
+- `public/levels/level7.json` "The Locked Vault" — puzzle level: closed doors, locked door + key, lever, pressure plate.
+
+**Design decisions:**
+- Interaction key: `Space`
+- Key pickup: auto on step (oldschool feel)
+- Inventory: `Set<string>` of key IDs only (full inventory deferred)
+- Door orientation: auto-detect from adjacent walls, default N-S if ambiguous
+- Pressure plates: one-way open (stays open)
+- Backward compat: `'D'` cell with no door entity = always open
+
+**Tests:** 147 total (71 new across 4 test files).
+
+---
+
 ## 2026-03-04 — Phase 2: charDefs texture system replaces verbose cellOverrides
 
 Replaced the per-cell `cellOverrides` model with a 4-layer texture resolution system. The key addition is `charDefs` — custom ASCII characters that carry texture information and can be painted directly into the grid.

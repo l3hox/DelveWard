@@ -36,7 +36,7 @@ async function init(): Promise<void> {
   scene.add(torchLight);
 
   // --- Level ---
-  const level = await loadLevel('/levels/level6.json');
+  const level = await loadLevel('/levels/level7.json');
   const walkable = buildWalkableSet(level.charDefs);
 
   const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs);
