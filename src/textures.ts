@@ -376,3 +376,98 @@ export function getCeilingTexture(name: CeilingTextureName = 'dark_rock'): THREE
   }
   return tex;
 }
+
+// ---------------------------------------------------------------------------
+// Door texture generators (standalone, not in registries)
+// ---------------------------------------------------------------------------
+
+function generateDoorTexture(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Dark wood base for door planks
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(100, 10);
+      const g = vary(65, 8);
+      const b = vary(35, 6);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Vertical plank separators
+  ctx.fillStyle = 'rgba(40, 25, 12, 0.7)';
+  ctx.fillRect(0, 0, 2, SIZE);       // left frame
+  ctx.fillRect(SIZE - 2, 0, 2, SIZE); // right frame
+  ctx.fillRect(21, 0, 1, SIZE);      // plank line
+  ctx.fillRect(42, 0, 1, SIZE);      // plank line
+
+  // Horizontal cross-braces
+  ctx.fillRect(0, 0, SIZE, 2);       // top frame
+  ctx.fillRect(0, SIZE - 2, SIZE, 2); // bottom frame
+  ctx.fillRect(0, 20, SIZE, 2);      // upper brace
+  ctx.fillRect(0, 42, SIZE, 2);      // lower brace
+
+  return makeTexture(canvas);
+}
+
+function generateLockedDoorTexture(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Darker wood base
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(70, 8);
+      const g = vary(45, 6);
+      const b = vary(25, 5);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Same plank structure
+  ctx.fillStyle = 'rgba(30, 18, 8, 0.8)';
+  ctx.fillRect(0, 0, 2, SIZE);
+  ctx.fillRect(SIZE - 2, 0, 2, SIZE);
+  ctx.fillRect(21, 0, 1, SIZE);
+  ctx.fillRect(42, 0, 1, SIZE);
+  ctx.fillRect(0, 0, SIZE, 2);
+  ctx.fillRect(0, SIZE - 2, SIZE, 2);
+  ctx.fillRect(0, 20, SIZE, 2);
+  ctx.fillRect(0, 42, SIZE, 2);
+
+  // Iron bands -- horizontal grey bands
+  ctx.fillStyle = 'rgba(120, 120, 130, 0.6)';
+  ctx.fillRect(0, 10, SIZE, 3);
+  ctx.fillRect(0, 50, SIZE, 3);
+
+  // Iron studs -- small bright squares
+  ctx.fillStyle = 'rgba(160, 155, 150, 0.8)';
+  for (const sx of [6, 30, 54]) {
+    for (const sy of [10, 50]) {
+      ctx.fillRect(sx, sy, 3, 3);
+    }
+  }
+
+  // Lock keyhole -- dark circle in center
+  ctx.fillStyle = 'rgba(20, 15, 10, 0.9)';
+  ctx.beginPath();
+  ctx.arc(32, 32, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(31, 32, 3, 8);
+
+  return makeTexture(canvas);
+}
+
+let doorTexCache: THREE.CanvasTexture | null = null;
+let lockedDoorTexCache: THREE.CanvasTexture | null = null;
+
+export function getDoorTexture(): THREE.CanvasTexture {
+  if (!doorTexCache) doorTexCache = generateDoorTexture();
+  return doorTexCache;
+}
+
+export function getLockedDoorTexture(): THREE.CanvasTexture {
+  if (!lockedDoorTexCache) lockedDoorTexCache = generateLockedDoorTexture();
+  return lockedDoorTexCache;
+}

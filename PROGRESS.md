@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 3 — Doors & Interaction** (not started)
+**Phase 3 — Doors & Interaction** (in progress — Steps 1–6 done, Step 7 remaining)
 
 ---
 
@@ -46,9 +46,30 @@ Read this at the start of every Claude Code session to restore context. Update i
   - 76 tests
   - Visual polish verified in-game
 
-## Next Steps (Phase 3)
+## Phase 3 — What's Done So Far
 
-See PLAN.md Phase 3 for full details.
+- [x] `GameState` class — door state (open/closed/locked), key inventory, lever/plate logic
+- [x] Door-aware walkability — `isDoorOpen` callback wired into `isWalkable()` and `PlayerState`
+- [x] `getFacingCell()` helper in grid.ts
+- [x] `Player` — `getState()`, `setOnMove()` callback, `isDoorOpen` passthrough
+- [x] Interaction system — `interact()` function handles doors + levers via Space key
+- [x] Door visuals — `doorRenderer.ts` with orientation auto-detect, open/close mesh visibility
+- [x] Door textures — procedural wood door + locked iron-banded door
+- [x] Key system — auto-pickup on step, `keyRenderer.ts` billboard meshes
+- [x] Lever system — Space to activate, toggles linked door
+- [x] Pressure plates — auto-trigger on step, opens linked door (one-way)
+- [x] 132 tests (56 new)
+
+## Next Steps (Phase 3 — remaining)
+
+See `TODONEXT.md` for detailed instructions.
+
+- [ ] Create `public/levels/level7.json` — "The Locked Vault" showcase level
+- [ ] Add entity validation to `levelLoader.ts` (doors, keys, levers, plates)
+- [ ] Add ~10 entity validation tests to `levelLoader.test.ts`
+- [ ] Update `main.ts` to load level7 by default
+- [ ] Final verification: all tests pass, TypeScript clean, browser playtest
+- [ ] Update PROGRESS.md, LOG.md, delete TODONEXT.md, commit
 
 ---
 
@@ -58,7 +79,7 @@ See PLAN.md Phase 3 for full details.
 |---|---|---|
 | 1 | Foundation Refactor | **Complete** |
 | 2 | Visual Polish (textures) | **Complete** |
-| 3 | Doors & Interaction | Pending |
+| 3 | Doors & Interaction | **In Progress** |
 | 4 | HUD | Pending |
 | 5 | Multi-Level Dungeons | Pending |
 | 6 | Entities & Enemy System | Pending |
@@ -131,6 +152,18 @@ See PLAN.md Phase 3 for full details.
 - Level loader validates cellOverrides (bounds, known texture names, types) — 10 new tests
 - Created 3 new themed levels: level4 (Sunken Crypt), level5 (Winding Depths), level6 (Grand Hall)
 - Identified need to refactor cellOverrides model — current per-cell approach is too verbose for larger maps
+
+### Session 8 — Phase 3: Doors & Interaction (Steps 1–6)
+- Created `gameState.ts` — doors (open/closed/locked), keys, levers, pressure plates, inventory
+- Added `isDoorOpen` callback to `isWalkable()` and `PlayerState` for door-aware movement
+- Created `interaction.ts` — Space key opens doors, unlocks with keys, pulls levers
+- Created `doorRenderer.ts` — door meshes with auto-orientation, visibility toggle
+- Added procedural door textures (wood + locked iron-banded) to `textures.ts`
+- Created `keyRenderer.ts` — gold key billboard meshes, auto-pickup on step
+- Levers toggle linked doors, pressure plates one-way open linked doors
+- `Player` gained `getState()`, `setOnMove()` callback for step-triggered events
+- 132 tests (56 new across gameState, interaction, grid)
+- Paused mid-phase: Step 7 (test level + entity validation) written to TODONEXT.md
 
 ### Session 2 — Planning
 - Ran Developer Council (4 specialists, 3 rounds) to identify all vague spots and create implementation plan

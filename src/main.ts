@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { buildDungeon } from './dungeon';
 import { Player } from './player';
 import { loadLevel } from './levelLoader';
-import { buildWalkableSet } from './grid';
+import { buildWalkableSet, getFacingCell } from './grid';
+import { GameState } from './gameState';
+import { interact } from './interaction';
+import { buildDoorMeshes, updateDoorMesh } from './doorRenderer';
+import { buildKeyMeshes, hideKeyMesh } from './keyRenderer';
 
 async function init(): Promise<void> {
   // --- Scene ---
@@ -38,6 +42,14 @@ async function init(): Promise<void> {
   const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs);
   scene.add(dungeonGroup);
 
+  const gameState = new GameState(level.entities);
+
+  const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
+  scene.add(doorMeshes.group);
+
+  const keyMeshes = buildKeyMeshes(gameState);
+  scene.add(keyMeshes.group);
+
   const player = new Player(
     camera,
     level.grid,
@@ -45,7 +57,25 @@ async function init(): Promise<void> {
     level.playerStart.row,
     level.playerStart.facing,
     walkable,
+    gameState.isDoorOpen.bind(gameState),
   );
+
+  player.setOnMove((col, row) => {
+    // Key pickup
+    const pickedUpKeyId = gameState.pickupKeyAt(col, row);
+    if (pickedUpKeyId) {
+      console.log(`Picked up key: ${pickedUpKeyId}`);
+      hideKeyMesh(keyMeshes.meshMap, col, row);
+    }
+
+    // Pressure plate activation
+    const plateTarget = gameState.activatePressurePlate(col, row);
+    if (plateTarget) {
+      console.log('Pressure plate activated.');
+      const [dc, dr] = plateTarget.split(',').map(Number);
+      updateDoorMesh(doorMeshes.meshMap, dc, dr, true);
+    }
+  });
 
   // --- Input ---
   const pressedKeys = new Set<string>();
@@ -65,6 +95,22 @@ async function init(): Promise<void> {
       case 'KeyQ': player.turnLeft(); break;
       case 'ArrowRight':
       case 'KeyE': player.turnRight(); break;
+      case 'Space':
+        {
+          const result = interact(player.getState(), level.grid, gameState);
+          if (result.message) {
+            console.log(result.message);
+          }
+          if (result.type === 'door_opened' || result.type === 'door_unlocked') {
+            const facing = getFacingCell(player.getState());
+            updateDoorMesh(doorMeshes.meshMap, facing.col, facing.row, true);
+          }
+          if (result.type === 'lever_activated' && result.targetDoor) {
+            const [dc, dr] = result.targetDoor.split(',').map(Number);
+            updateDoorMesh(doorMeshes.meshMap, dc, dr, gameState.isDoorOpen(dc, dr));
+          }
+        }
+        break;
     }
   });
 
@@ -82,7 +128,7 @@ async function init(): Promise<void> {
   hint.style.cssText =
     'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
     'color:#555;font:12px monospace;text-align:center;pointer-events:none;white-space:nowrap';
-  hint.textContent = 'W/↑ Forward   S/↓ Back   A Strafe Left   D Strafe Right   Q/← Turn Left   E/→ Turn Right';
+  hint.textContent = 'W/↑ Forward   S/↓ Back   A Strafe Left   D Strafe Right   Q/← Turn Left   E/→ Turn Right   Space Interact';
   document.body.appendChild(hint);
 
   // --- Loop ---

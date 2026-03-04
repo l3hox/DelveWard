@@ -3,6 +3,7 @@ import {
   isWalkable,
   buildWalkableSet,
   PlayerState,
+  getFacingCell,
   WALKABLE_CELLS,
   TURN_LEFT,
   TURN_RIGHT,
@@ -264,5 +265,74 @@ describe('isWalkable with custom walkable set', () => {
     const walkable = new Set(['.', 'b']);
     expect(isWalkable(customGrid, 1, 0, walkable)).toBe(true);
     expect(isWalkable(customGrid, 0, 0, walkable)).toBe(false);
+  });
+});
+
+// --- Door-aware walkability ---
+
+const DOOR_GRID = [
+  '#####',
+  '#.D.#',
+  '#...#',
+  '#####',
+];
+
+describe('isWalkable with isDoorOpen callback', () => {
+  it('D cell with isDoorOpen returning true is walkable', () => {
+    expect(isWalkable(DOOR_GRID, 2, 1, WALKABLE_CELLS, () => true)).toBe(true);
+  });
+
+  it('D cell with isDoorOpen returning false is not walkable', () => {
+    expect(isWalkable(DOOR_GRID, 2, 1, WALKABLE_CELLS, () => false)).toBe(false);
+  });
+
+  it('D cell with no callback is walkable (default behavior)', () => {
+    expect(isWalkable(DOOR_GRID, 2, 1)).toBe(true);
+  });
+
+  it('callback is not called for non-D cells', () => {
+    let called = false;
+    const cb = () => { called = true; return false; };
+    // floor cell — should be walkable regardless, callback should not be called
+    expect(isWalkable(DOOR_GRID, 1, 1, WALKABLE_CELLS, cb)).toBe(true);
+    expect(called).toBe(false);
+  });
+});
+
+describe('PlayerState with isDoorOpen', () => {
+  it('can walk through open door', () => {
+    const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => true);
+    expect(p.moveForward(DOOR_GRID)).toBe(true);
+    expect(p.gridX).toBe(2);
+  });
+
+  it('cannot walk through closed door', () => {
+    const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => false);
+    expect(p.moveForward(DOOR_GRID)).toBe(false);
+    expect(p.gridX).toBe(1);
+  });
+});
+
+// --- getFacingCell ---
+
+describe('getFacingCell', () => {
+  it('returns cell to the north', () => {
+    const p = new PlayerState(3, 3, 'N');
+    expect(getFacingCell(p)).toEqual({ col: 3, row: 2 });
+  });
+
+  it('returns cell to the east', () => {
+    const p = new PlayerState(3, 3, 'E');
+    expect(getFacingCell(p)).toEqual({ col: 4, row: 3 });
+  });
+
+  it('returns cell to the south', () => {
+    const p = new PlayerState(3, 3, 'S');
+    expect(getFacingCell(p)).toEqual({ col: 3, row: 4 });
+  });
+
+  it('returns cell to the west', () => {
+    const p = new PlayerState(3, 3, 'W');
+    expect(getFacingCell(p)).toEqual({ col: 2, row: 3 });
   });
 });

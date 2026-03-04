@@ -17,6 +17,8 @@ export class Player {
   private currentAngle: number;
   private targetAngle: number;
 
+  private onMoveCallback?: (col: number, row: number) => void;
+
   constructor(
     camera: THREE.PerspectiveCamera,
     grid: string[],
@@ -24,10 +26,11 @@ export class Player {
     startRow: number,
     facing: Facing,
     walkable?: Set<string>,
+    isDoorOpen?: (col: number, row: number) => boolean,
   ) {
     this.camera = camera;
     this.grid = grid;
-    this.state = new PlayerState(startCol, startRow, facing, walkable);
+    this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen);
 
     const worldPos = this.gridToWorld(startCol, startRow);
     this.currentPos = worldPos.clone();
@@ -56,10 +59,19 @@ export class Player {
     );
   }
 
+  getState(): PlayerState {
+    return this.state;
+  }
+
+  setOnMove(callback: (col: number, row: number) => void): void {
+    this.onMoveCallback = callback;
+  }
+
   moveForward(): void {
     if (this.isAnimating()) return;
     if (this.state.moveForward(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
     }
   }
 
@@ -67,6 +79,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.moveBack(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
     }
   }
 
@@ -74,6 +87,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.strafeLeft(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
     }
   }
 
@@ -81,6 +95,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.strafeRight(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
+      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
     }
   }
 
