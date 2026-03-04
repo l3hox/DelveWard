@@ -9,8 +9,8 @@ const HANDLE_LENGTH = 0.3;
 const HANDLE_RADIUS = 0.02;
 
 // Handle pivot rotation angles (around X in local space)
-const ANGLE_UP = -0.4;   // tilted away from wall (up position)
-const ANGLE_DOWN = 0.6;  // tilted toward floor (down position)
+const ANGLE_UP = -1.047;   // ~60° above horizontal
+const ANGLE_DOWN = 1.047;  // ~60° below horizontal
 
 const WALL_DIR: Record<Facing, { dx: number; dz: number; rotY: number }> = {
   N: { dx: 0, dz: -1, rotY: Math.PI },     // N wall -> face south
@@ -54,11 +54,12 @@ export function buildLeverMeshes(
     pivot.position.set(0, 0, 0.02); // slightly off wall
 
     const handle = new THREE.Mesh(handleGeo, handleMat);
-    handle.position.set(0, HANDLE_LENGTH / 2, 0);
+    handle.rotation.x = Math.PI / 2; // orient along Z (outward from wall)
+    handle.position.set(0, 0, HANDLE_LENGTH / 2);
     pivot.add(handle);
 
     const knob = new THREE.Mesh(knobGeo, knobMat);
-    knob.position.set(0, HANDLE_LENGTH, 0);
+    knob.position.set(0, 0, HANDLE_LENGTH);
     pivot.add(knob);
 
     // Set initial angle
@@ -85,7 +86,7 @@ export function buildLeverMeshes(
 
 // --- Lever Animator ---
 
-const LEVER_SPEED = 4.0; // radians per second
+const LEVER_SPEED = 6.0; // radians per second
 
 interface LeverAnimEntry {
   pivot: THREE.Group;
