@@ -16,12 +16,12 @@
   "playerStart": { "col": 1, "row": 1, "facing": "S" },
   "entities": [
     { "col": 5, "row": 2, "type": "door", "state": "closed" },
-    { "col": 3, "row": 5, "type": "door", "state": "locked", "keyId": "gold_key" },
-    { "col": 9, "row": 5, "type": "door", "state": "closed" },
-    { "col": 5, "row": 7, "type": "door", "state": "closed" },
+    { "col": 2, "row": 5, "type": "door", "state": "locked", "keyId": "gold_key" },
+    { "col": 8, "row": 5, "type": "door", "state": "closed" },
+    { "col": 4, "row": 7, "type": "door", "state": "closed" },
     { "col": 9, "row": 1, "type": "key", "keyId": "gold_key" },
-    { "col": 7, "row": 8, "type": "lever", "targetDoor": "9,5" },
-    { "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "5,7" }
+    { "col": 7, "row": 8, "type": "lever", "targetDoor": "8,5" },
+    { "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
   ],
   "defaults": {
     "wallTexture": "stone",
