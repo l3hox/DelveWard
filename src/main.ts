@@ -7,8 +7,8 @@ import { GameState } from './gameState';
 import { interact } from './interaction';
 import { buildDoorMeshes, updateDoorMesh } from './doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './keyRenderer';
-import { buildPlateMeshes } from './plateRenderer';
-import { buildLeverMeshes } from './leverRenderer';
+import { buildPlateMeshes, pressPlate } from './plateRenderer';
+import { buildLeverMeshes, LeverAnimator } from './leverRenderer';
 import { DoorAnimator } from './doorAnimator';
 
 async function init(): Promise<void> {
@@ -65,6 +65,12 @@ async function init(): Promise<void> {
   const leverMeshes = buildLeverMeshes(gameState);
   scene.add(leverMeshes.group);
 
+  const leverAnimator = new LeverAnimator();
+  for (const [key, pivot] of leverMeshes.handleMap) {
+    const lever = gameState.levers.get(key);
+    leverAnimator.register(key, pivot, lever ? lever.state : 'up');
+  }
+
   const player = new Player(
     camera,
     level.grid,
@@ -89,6 +95,7 @@ async function init(): Promise<void> {
       console.log('Pressure plate activated.');
       const [dc, dr] = plateTarget.split(',').map(Number);
       updateDoorMesh(doorMeshes.panelMap, dc, dr, true, doorAnimator);
+      pressPlate(plateMeshes.meshMap, col, row);
     }
   });
 
@@ -127,6 +134,10 @@ async function init(): Promise<void> {
           if (result.type === 'lever_activated' && result.targetDoor) {
             const [dc, dr] = result.targetDoor.split(',').map(Number);
             updateDoorMesh(doorMeshes.panelMap, dc, dr, gameState.isDoorOpen(dc, dr), doorAnimator);
+            // Animate lever handle
+            const leverKey = `${player.getState().gridX},${player.getState().gridZ}`;
+            const lever = gameState.levers.get(leverKey);
+            if (lever) leverAnimator.setState(leverKey, lever.state);
           }
         }
         break;
@@ -159,6 +170,7 @@ async function init(): Promise<void> {
 
     player.update(delta);
     doorAnimator.update(delta);
+    leverAnimator.update(delta);
 
     // Torch follows player with subtle flicker
     const pos = player.getWorldPosition();

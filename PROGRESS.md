@@ -57,11 +57,11 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Interactive doors have brass buttons on frame to visually distinguish them
   - `D` cells without door entity auto-create a closed, non-mechanical door
   - Key system — auto-pickup on step, `keyRenderer.ts` billboard meshes
-  - Lever system — stand on lever cell, face the wall to pull; `wall` field (N/S/E/W) in entity
-  - Pressure plates — static stone slab visual, auto-trigger on step, opens linked door (one-way)
+  - Lever system — repeatable up/down state, stand on cell + face wall to pull, animated handle
+  - Pressure plates — one-time use, visual pressed state (sinks + darkens), auto-trigger on step
   - Entity validation in `levelLoader.ts` — doors, keys, levers (incl. wall), pressure plates
   - Level 7 "The Locked Vault" — showcase level for all Phase 3 features
-  - 166 tests (90 new)
+  - 167 tests (91 new)
 
 ## Next Steps (Phase 4)
 
@@ -149,19 +149,18 @@ See PLAN.md Phase 4 for full details.
 - Created 3 new themed levels: level4 (Sunken Crypt), level5 (Winding Depths), level6 (Grand Hall)
 - Identified need to refactor cellOverrides model — current per-cell approach is too verbose for larger maps
 
-### Session 10 — Door system improvements
+### Session 10 — Door system improvements + lever/plate polish
 - 3D door frames — stone pillars + lintel (always visible), door panel slides up/down via `DoorAnimator`
 - `D` cells without entity auto-create closed doors (no more empty doorways)
 - Doors re-closable with Space (non-mechanical only)
 - Mechanical flag — doors targeted by levers/plates can't be opened/closed by player
 - Interactive doors have brass buttons on frame to distinguish from mechanical
-- Lever interaction redesigned — player stands on `O` cell, faces the wall lever is mounted on
-- `wall` field (N/S/E/W) added to lever entity, auto-detected as fallback
-- Pressure plate and lever static visuals — `plateRenderer.ts` (stone slab), `leverRenderer.ts` (wall-mounted handle)
-- Door frame texture (`getDoorFrameTexture`) + `DoorAnimator` class (constant-speed slide)
+- Lever: repeatable up/down state with animated handle (`LeverAnimator`), directional wall interaction
+- Pressure plate: one-time use, pressed state sinks mesh + darker cracked texture
+- Door animation speed increased (3.0 → 5.0 units/sec)
 - `openDoor()` rejects mechanical doors; `activatePressurePlate` bypasses check
 - Entity validation for lever `wall` field
-- 166 tests (19 new), TypeScript compiles clean
+- 167 tests (20 new), TypeScript compiles clean
 
 ### Session 9 — Phase 3 Complete: Test level + entity validation (Step 7)
 - Created `public/levels/level7.json` "The Locked Vault" — showcase level with all Phase 3 features

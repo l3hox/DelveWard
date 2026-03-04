@@ -268,7 +268,7 @@ describe('lever interaction', () => {
     expect(result.type).toBe('nothing');
   });
 
-  it('already toggled lever returns nothing', () => {
+  it('lever can be toggled repeatedly', () => {
     const entities: Entity[] = [
       { col: 2, row: 2, type: 'door', state: 'closed' },
       { col: 2, row: 1, type: 'lever', targetDoor: '2,2' },
@@ -276,11 +276,14 @@ describe('lever interaction', () => {
     const gs = new GameState(entities, LEVER_GRID);
     const player = new PlayerState(2, 1, 'N');
 
-    // First activation
-    interact(player, LEVER_GRID, gs);
+    // First pull — opens door
+    let result = interact(player, LEVER_GRID, gs);
+    expect(result.type).toBe('lever_activated');
+    expect(gs.getDoor(2, 2)!.state).toBe('open');
 
-    // Second should return nothing
-    const result = interact(player, LEVER_GRID, gs);
-    expect(result.type).toBe('nothing');
+    // Second pull — closes door
+    result = interact(player, LEVER_GRID, gs);
+    expect(result.type).toBe('lever_activated');
+    expect(gs.getDoor(2, 2)!.state).toBe('closed');
   });
 });

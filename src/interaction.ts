@@ -58,7 +58,7 @@ export function interact(
   const playerCell = grid[playerState.gridZ]?.[playerState.gridX];
   if (playerCell === 'O') {
     const lever = gameState.getLever(playerState.gridX, playerState.gridZ);
-    if (lever && !lever.toggled && lever.wall === playerState.facing) {
+    if (lever && lever.wall === playerState.facing) {
       const targetDoor = gameState.activateLever(playerState.gridX, playerState.gridZ);
       if (targetDoor) {
         return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };

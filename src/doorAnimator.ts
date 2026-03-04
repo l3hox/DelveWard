@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { WALL_HEIGHT } from './dungeon';
 
 const FRAME_WIDTH = 0.15;
-const SPEED = 3.0; // units per second
+const SPEED = 5.0; // units per second
 
 interface PanelEntry {
   panel: THREE.Mesh;

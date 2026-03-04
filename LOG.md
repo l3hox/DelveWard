@@ -4,14 +4,14 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
-## 2026-03-04 — Door system improvements (post Phase 3)
+## 2026-03-04 — Door system improvements + lever/plate polish (post Phase 3)
 
-Four improvements to the Phase 3 door system, plus lever/plate visuals.
+Door improvements, repeatable lever with animation, pressure plate pressed state.
 
 **New modules:**
-- **`src/doorAnimator.ts`** — `DoorAnimator` class: registers door panels, animates constant-speed vertical slide (3.0 units/sec). Panels slide above ceiling on open, back down on close. Position-based hiding (always visible in scene).
-- **`src/plateRenderer.ts`** — static stone slab mesh on floor at each pressure plate position. Dark stone with beveled edges.
-- **`src/leverRenderer.ts`** — wall-mounted lever: metal base plate + wooden handle + iron knob. Uses `lever.wall` to position against the correct wall face.
+- **`src/doorAnimator.ts`** — `DoorAnimator` class: registers door panels, animates constant-speed vertical slide (5.0 units/sec). Panels slide above ceiling on open, back down on close. Position-based hiding (always visible in scene).
+- **`src/plateRenderer.ts`** — pressure plate mesh on floor. Normal: raised stone slab with beveled edges. Pressed: sunk below floor, darker cracked texture. `pressPlate()` function for runtime state change.
+- **`src/leverRenderer.ts`** — wall-mounted lever: metal base plate + pivot group (handle + knob). Pivot rotates between up/down angles. `LeverAnimator` class animates rotation at 4.0 rad/sec. Returns `handleMap` for animator registration.
 
 **Modified modules:**
 - **`src/gameState.ts`**:
@@ -19,25 +19,29 @@ Four improvements to the Phase 3 door system, plus lever/plate visuals.
   - `GameState` constructor accepts optional `grid` — auto-creates closed doors for bare `D` cells
   - `openDoor()` rejects mechanical doors; `closeDoor()` rejects mechanical/locked/missing
   - `activatePressurePlate()` bypasses `openDoor` — directly sets door state
+  - `LeverInstance.state: 'up' | 'down'` — replaces `toggled: boolean`, repeatable
+  - `activateLever()` toggles state each call (no longer one-shot)
   - `LeverInstance.wall: Facing` — which wall the lever is mounted on
   - `getLever()` method, `autoDetectLeverWall()` helper for backward compat
 - **`src/interaction.ts`**:
   - `door_closed` result type — Space on open non-mechanical door closes it
   - Mechanical doors show "This door is operated by a mechanism."
-  - Lever interaction redesigned: player stands ON the `O` cell and faces the wall (`lever.wall === playerState.facing`)
+  - Lever interaction: repeatable, no `toggled` guard; player stands ON `O` cell, faces wall
 - **`src/doorRenderer.ts`** — rewritten: each door is `THREE.Group` with stone frame (2 pillars + lintel) + door panel. Non-mechanical doors get brass button on left pillar. `meshMap` → `panelMap`. `updateDoorMesh` accepts optional `DoorAnimator`.
 - **`src/textures.ts`** — `getDoorFrameTexture()`: grey stone with chisel marks.
 - **`src/levelLoader.ts`** — validates lever `wall` field (N/S/E/W if present).
-- **`src/main.ts`** — wires `DoorAnimator`, plate/lever renderers, `door_closed` handler.
+- **`src/main.ts`** — wires `DoorAnimator`, `LeverAnimator`, plate/lever renderers, `door_closed` handler, `pressPlate` on activation.
 
 **Design decisions:**
+- Lever is repeatable with up/down state (each pull toggles linked door)
+- Lever animation: pivot rotates handle between -0.4 (up) and 0.6 (down) radians
+- Pressure plate: one-time use, visual feedback (sinks + darkens)
 - Mechanical doors can't be interacted with at all (not just closing — opening too)
 - Lever interaction: stand on cell + face wall (directional, must see the lever)
-- Lever `wall` field is optional in JSON (auto-detected from adjacent walls as fallback)
-- Door animation: constant speed slide (not eased) — keeps oldschool feel
+- Door animation: constant speed slide at 5.0 units/sec
 - Interactive doors distinguished by brass button on frame (subtle visual cue)
 
-**Tests:** 166 total (19 new).
+**Tests:** 167 total (20 new).
 
 ---
 

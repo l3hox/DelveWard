@@ -18,12 +18,14 @@ export interface KeyInstance {
   pickedUp: boolean;
 }
 
+export type LeverState = 'up' | 'down';
+
 export interface LeverInstance {
   col: number;
   row: number;
   targetDoor: string; // "col,row" of the door to toggle
   wall: Facing;       // which wall the lever is mounted on
-  toggled: boolean;
+  state: LeverState;
 }
 
 export interface PlateInstance {
@@ -88,7 +90,7 @@ export class GameState {
           row: e.row,
           targetDoor: e.targetDoor as string,
           wall,
-          toggled: false,
+          state: 'up',
         });
       } else if (e.type === 'pressure_plate') {
         this.plates.set(doorKey(e.col, e.row), {
@@ -199,8 +201,8 @@ export class GameState {
 
   activateLever(col: number, row: number): string | undefined {
     const lever = this.levers.get(doorKey(col, row));
-    if (!lever || lever.toggled) return undefined;
-    lever.toggled = true;
+    if (!lever) return undefined;
+    lever.state = lever.state === 'up' ? 'down' : 'up';
     const [dc, dr] = lever.targetDoor.split(',').map(Number);
     this.toggleDoor(dc, dr);
     return lever.targetDoor;

@@ -310,14 +310,27 @@ describe('GameState', () => {
       expect(gs.getDoor(5, 3)!.state).toBe('open');
     });
 
-    it('activateLever returns undefined for already toggled lever', () => {
+    it('activateLever toggles lever state up -> down -> up', () => {
+      const gs = new GameState([
+        doorEntity(5, 3, 'closed'),
+        { col: 2, row: 1, type: 'lever', targetDoor: '5,3' },
+      ]);
+      expect(gs.getLever(2, 1)!.state).toBe('up');
+      gs.activateLever(2, 1);
+      expect(gs.getLever(2, 1)!.state).toBe('down');
+      gs.activateLever(2, 1);
+      expect(gs.getLever(2, 1)!.state).toBe('up');
+    });
+
+    it('activateLever is repeatable — toggles door back', () => {
       const gs = new GameState([
         doorEntity(5, 3, 'closed'),
         { col: 2, row: 1, type: 'lever', targetDoor: '5,3' },
       ]);
       gs.activateLever(2, 1);
-      const result = gs.activateLever(2, 1);
-      expect(result).toBeUndefined();
+      expect(gs.getDoor(5, 3)!.state).toBe('open');
+      gs.activateLever(2, 1);
+      expect(gs.getDoor(5, 3)!.state).toBe('closed');
     });
 
     it('activateLever returns undefined when no lever at position', () => {
