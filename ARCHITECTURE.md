@@ -17,6 +17,16 @@ src/
 │   ├── levelLoader.ts       # Fetch + validate level JSON files
 │   ├── textureNames.ts      # Texture name constants and type-safe sets
 │   └── *.test.ts            # Co-located tests (vitest)
+├── hud/                     # 2D canvas HUD overlay (no Three.js)
+│   ├── hudCanvas.ts         # HudOverlay class — canvas setup, resize, orchestrates draw
+│   ├── hudLayout.ts         # Layout constants (positions, sizes, 640x360 internal res)
+│   ├── hudColors.ts         # Shared pixel-art color palette
+│   ├── hudFont.ts           # Minimal 3x5 pixel font (digits, letters, symbols)
+│   ├── compassRose.ts       # Facing indicator (top-left)
+│   ├── minimapRenderer.ts   # Explored-cell minimap (top-right)
+│   ├── healthBar.ts         # HP bar with heart icon (bottom-left)
+│   ├── torchIndicator.ts    # Torch fuel bar with flame icon (bottom-center-left)
+│   └── inventoryPanel.ts    # Key count + equipment/backpack slots (bottom-right)
 ├── rendering/               # Three.js rendering and visual representation
 │   ├── dungeon.ts           # Builds wall/floor/ceiling geometry from grid
 │   ├── textures.ts          # Procedural pixelart texture generators + cache
@@ -57,9 +67,12 @@ Zero Three.js imports. Safe for unit testing and pure logic.
   - `levers: Map<string, LeverInstance>` — keyed by `"col,row"`, has `wall: Facing`
   - `plates: Map<string, PlateInstance>` — keyed by `"col,row"`, one-time use
   - `inventory: Set<string>` — collected key IDs
+  - `hp` / `maxHp` — health (default 20/20)
+  - `torchFuel` / `maxTorchFuel` — torch fuel (default 100/100)
+  - `exploredCells: Set<string>` — explored minimap cells, `"col,row"` keys
 - Auto-creates doors for `D` cells with no entity
 - Marks doors as `mechanical` when targeted by levers/plates
-- Key methods: `isDoorOpen()`, `openDoor()`, `closeDoor()`, `toggleDoor()`, `activateLever()`, `activatePressurePlate()`, `pickupKeyAt()`
+- Key methods: `isDoorOpen()`, `openDoor()`, `closeDoor()`, `toggleDoor()`, `activateLever()`, `activatePressurePlate()`, `pickupKeyAt()`, `revealAround()`
 
 ### interaction.ts
 - `interact(playerState, grid, gameState)` → `InteractionResult`
@@ -99,7 +112,8 @@ All files depend on Three.js. Import core types via `../core/`.
 - Tween-based smooth movement (lerp position + angle)
 - `TWEEN_SPEED = 20` — controls animation speed
 - Blocks input during animation (`isAnimating()`)
-- `setOnMove(callback)` — fires after grid position changes (used for key pickup, plates)
+- `setOnMove(callback)` — fires after grid position changes (key pickup, plates, exploration)
+- `setOnTurn(callback)` — fires after facing changes (exploration)
 - `getState()` → `PlayerState`, `getWorldPosition()` → `THREE.Vector3`
 
 ### doorRenderer.ts
@@ -131,6 +145,33 @@ All files depend on Three.js. Import core types via `../core/`.
 
 ---
 
+## HUD Module (`src/hud/`)
+
+Separate 2D canvas overlay on top of the Three.js canvas. Fixed 640x360 internal resolution scaled with `image-rendering: pixelated`. No Three.js — pure 2D canvas rendering.
+
+### hudCanvas.ts
+- `HudOverlay` — creates a fixed-position canvas, orchestrates all HUD component drawing
+- `attach(parent?)` — appends canvas to DOM
+- `draw(gameState, playerState, grid, delta)` — clears and redraws all components each frame
+
+### hudLayout.ts
+- Internal resolution: `HUD_WIDTH = 640`, `HUD_HEIGHT = 360`
+- Component positions: `COMPASS` (top-left 48x48), `MINIMAP` (top-right 128x128), `HEALTH_BAR` (bottom-left 160x24), `TORCH_BAR` (bottom-center-left 120x24), `INVENTORY` (bottom-right 144x120)
+
+### hudFont.ts
+- 3x5 pixel bitmap font rendered via `fillRect` calls
+- `drawPixelText(ctx, text, x, y, color, scale)` / `measurePixelText(text, scale)`
+- Supports: 0-9, N/E/S/W, H/P/T/K/A/R, x, /
+
+### Component files
+- `compassRose.ts` — N/E/S/W letters, active direction highlighted gold
+- `minimapRenderer.ts` — top-down grid centered on player, explored cells only, player dot + facing line
+- `healthBar.ts` — horizontal bar with heart icon, low-HP pulse effect
+- `torchIndicator.ts` — horizontal bar with flame icon, low-fuel flicker effect
+- `inventoryPanel.ts` — key count with icon, 3 equipment slots (W/A/R), 8 backpack slots (empty placeholders)
+
+---
+
 ## main.ts — Entry Point
 
 Orchestrates everything:
@@ -138,9 +179,11 @@ Orchestrates everything:
 2. Loads level JSON → builds dungeon geometry + all entity meshes
 3. Constructs `GameState` from entities
 4. Creates `Player` with door-aware walkability
-5. Wires input (WASD/arrows/QE for movement, Space for interact)
-6. Wires `onMove` callback for key pickup + pressure plate activation
-7. Runs animation loop: player tween, door/lever animation, torch flicker, render
+5. Creates `HudOverlay` — 2D canvas overlay for compass, minimap, bars, inventory
+6. Wires input (WASD/arrows/QE for movement, Space for interact)
+7. Wires `onMove` callback for key pickup, pressure plate activation, and map exploration
+8. Wires `onTurn` callback for map exploration on facing change
+9. Runs animation loop: player tween, door/lever animation, torch flicker, HUD draw, render
 
 ---
 
@@ -164,6 +207,7 @@ Game Loop → player.update(delta)
           → doorAnimator.update(delta)
           → leverAnimator.update(delta)
           → torch flicker
+          → hud.draw(gameState, playerState, grid, delta)
           → renderer.render()
 ```
 

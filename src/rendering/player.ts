@@ -18,6 +18,7 @@ export class Player {
   private targetAngle: number;
 
   private onMoveCallback?: (col: number, row: number) => void;
+  private onTurnCallback?: () => void;
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -67,6 +68,10 @@ export class Player {
     this.onMoveCallback = callback;
   }
 
+  setOnTurn(callback: () => void): void {
+    this.onTurnCallback = callback;
+  }
+
   moveForward(): void {
     if (this.isAnimating()) return;
     if (this.state.moveForward(this.grid)) {
@@ -103,12 +108,14 @@ export class Player {
     if (this.isAnimating()) return;
     this.state.turnLeft();
     this.targetAngle += Math.PI / 2;
+    this.onTurnCallback?.();
   }
 
   turnRight(): void {
     if (this.isAnimating()) return;
     this.state.turnRight();
     this.targetAngle -= Math.PI / 2;
+    this.onTurnCallback?.();
   }
 
   update(delta: number): void {

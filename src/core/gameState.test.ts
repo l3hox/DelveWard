@@ -469,4 +469,125 @@ describe('GameState', () => {
       expect(gs.levers.get('2,2')!.wall).toBe('N');
     });
   });
+
+  // --- HP and torch fuel ---
+
+  describe('hp and torchFuel defaults', () => {
+    it('hp defaults to 20/20', () => {
+      const gs = new GameState([]);
+      expect(gs.hp).toBe(20);
+      expect(gs.maxHp).toBe(20);
+    });
+
+    it('torchFuel defaults to 100/100', () => {
+      const gs = new GameState([]);
+      expect(gs.torchFuel).toBe(100);
+      expect(gs.maxTorchFuel).toBe(100);
+    });
+
+    it('exploredCells starts empty', () => {
+      const gs = new GameState([]);
+      expect(gs.exploredCells.size).toBe(0);
+    });
+  });
+
+  // --- revealAround ---
+
+  describe('revealAround', () => {
+    const grid = [
+      '#####',
+      '#...#',
+      '#...#',
+      '#...#',
+      '#####',
+    ];
+
+    it('reveals current cell', () => {
+      const gs = new GameState([]);
+      gs.revealAround(2, 2, 'N', grid);
+      expect(gs.exploredCells.has('2,2')).toBe(true);
+    });
+
+    it('reveals 4 adjacent cells', () => {
+      const gs = new GameState([]);
+      gs.revealAround(2, 2, 'N', grid);
+      expect(gs.exploredCells.has('2,1')).toBe(true); // N
+      expect(gs.exploredCells.has('2,3')).toBe(true); // S
+      expect(gs.exploredCells.has('1,2')).toBe(true); // W
+      expect(gs.exploredCells.has('3,2')).toBe(true); // E
+    });
+
+    it('reveals line-of-sight forward (N) until wall', () => {
+      const gs = new GameState([]);
+      gs.revealAround(2, 3, 'N', grid);
+      // Forward from (2,3) facing N: (2,2), (2,1), (2,0)=#wall
+      expect(gs.exploredCells.has('2,2')).toBe(true);
+      expect(gs.exploredCells.has('2,1')).toBe(true);
+      expect(gs.exploredCells.has('2,0')).toBe(true); // wall itself is revealed
+    });
+
+    it('reveals line-of-sight forward (E) until wall', () => {
+      const gs = new GameState([]);
+      gs.revealAround(1, 2, 'E', grid);
+      // Forward from (1,2) facing E: (2,2), (3,2), (4,2)=#wall
+      expect(gs.exploredCells.has('2,2')).toBe(true);
+      expect(gs.exploredCells.has('3,2')).toBe(true);
+      expect(gs.exploredCells.has('4,2')).toBe(true);
+    });
+
+    it('stops at wall — does not reveal beyond', () => {
+      const narrowGrid = [
+        '#######',
+        '#.#...#',
+        '#######',
+      ];
+      const gs = new GameState([]);
+      gs.revealAround(1, 1, 'E', narrowGrid);
+      // Forward from (1,1) facing E: (2,1)=# wall — stops
+      expect(gs.exploredCells.has('2,1')).toBe(true);
+      expect(gs.exploredCells.has('3,1')).toBe(false);
+    });
+
+    it('does not reveal out-of-bounds cells', () => {
+      const gs = new GameState([]);
+      gs.revealAround(0, 0, 'N', grid);
+      // Adjacent N would be (0,-1) — out of bounds, should not crash
+      expect(gs.exploredCells.has('0,0')).toBe(true);
+      expect(gs.exploredCells.has('0,-1')).toBe(false);
+    });
+
+    it('accumulates explored cells across multiple calls', () => {
+      const gs = new GameState([]);
+      gs.revealAround(1, 1, 'N', grid);
+      const firstCount = gs.exploredCells.size;
+      gs.revealAround(3, 3, 'S', grid);
+      expect(gs.exploredCells.size).toBeGreaterThan(firstCount);
+    });
+
+    it('does not duplicate cells in set', () => {
+      const gs = new GameState([]);
+      gs.revealAround(2, 2, 'N', grid);
+      const count = gs.exploredCells.size;
+      gs.revealAround(2, 2, 'N', grid);
+      expect(gs.exploredCells.size).toBe(count);
+    });
+
+    it('reveals line-of-sight south', () => {
+      const gs = new GameState([]);
+      gs.revealAround(2, 1, 'S', grid);
+      // Forward S from (2,1): (2,2), (2,3), (2,4)=#wall
+      expect(gs.exploredCells.has('2,2')).toBe(true);
+      expect(gs.exploredCells.has('2,3')).toBe(true);
+      expect(gs.exploredCells.has('2,4')).toBe(true);
+    });
+
+    it('reveals line-of-sight west', () => {
+      const gs = new GameState([]);
+      gs.revealAround(3, 2, 'W', grid);
+      // Forward W from (3,2): (2,2), (1,2), (0,2)=#wall
+      expect(gs.exploredCells.has('2,2')).toBe(true);
+      expect(gs.exploredCells.has('1,2')).toBe(true);
+      expect(gs.exploredCells.has('0,2')).toBe(true);
+    });
+  });
 });

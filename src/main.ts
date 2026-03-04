@@ -11,6 +11,7 @@ import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
+import { HudOverlay } from './hud/hudCanvas';
 
 // Cap delta to prevent physics jumps when tab is backgrounded
 const MAX_FRAME_DELTA = 0.1;
@@ -95,7 +96,17 @@ async function init(): Promise<void> {
     gameState.isDoorOpen.bind(gameState),
   );
 
+  // --- HUD ---
+  const hud = new HudOverlay();
+  hud.attach();
+
+  // Reveal initial position
+  const ps = player.getState();
+  gameState.revealAround(ps.col, ps.row, ps.facing, level.grid);
+
   player.setOnMove((col, row) => {
+    // Reveal explored cells on move
+    gameState.revealAround(col, row, player.getState().facing, level.grid);
     // Key pickup
     const pickedUpKeyId = gameState.pickupKeyAt(col, row);
     if (pickedUpKeyId) {
@@ -111,6 +122,11 @@ async function init(): Promise<void> {
       updateDoorMesh(doorMeshes.panelMap, dc, dr, true, doorAnimator);
       pressPlate(plateMeshes.meshMap, col, row);
     }
+  });
+
+  player.setOnTurn(() => {
+    const s = player.getState();
+    gameState.revealAround(s.col, s.row, s.facing, level.grid);
   });
 
   // --- Input ---
@@ -167,14 +183,6 @@ async function init(): Promise<void> {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // --- Controls hint ---
-  const hint = document.createElement('div');
-  hint.style.cssText =
-    'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
-    'color:#555;font:12px monospace;text-align:center;pointer-events:none;white-space:nowrap';
-  hint.textContent = 'W/↑ Forward   S/↓ Back   A Strafe Left   D Strafe Right   Q/← Turn Left   E/→ Turn Right   Space Interact';
-  document.body.appendChild(hint);
-
   // --- Loop ---
   let lastTime = 0;
 
@@ -196,6 +204,7 @@ async function init(): Promise<void> {
     }
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
 
+    hud.draw(gameState, player.getState(), level.grid, delta);
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }

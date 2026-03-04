@@ -1,5 +1,6 @@
 import type { Entity } from './types';
 import type { Facing } from './grid';
+import { FACING_DELTA } from './grid';
 
 export type DoorState = 'open' | 'closed' | 'locked';
 
@@ -63,12 +64,24 @@ export class GameState {
   plates: Map<string, PlateInstance>;
   inventory: Set<string>;
 
+  hp: number;
+  maxHp: number;
+  torchFuel: number;
+  maxTorchFuel: number;
+  exploredCells: Set<string>;
+
   constructor(entities: Entity[], grid?: string[]) {
     this.doors = new Map();
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
     this.inventory = new Set();
+
+    this.hp = 20;
+    this.maxHp = 20;
+    this.torchFuel = 100;
+    this.maxTorchFuel = 100;
+    this.exploredCells = new Set();
 
     for (const e of entities) {
       if (e.type === 'door') {
@@ -225,5 +238,35 @@ export class GameState {
       door.state = 'open';
     }
     return plate.targetDoor;
+  }
+
+  /** Mark current cell + 4 adjacent + line-of-sight forward as explored */
+  revealAround(col: number, row: number, facing: Facing, grid: string[]): void {
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    const markIfInBounds = (c: number, r: number): void => {
+      if (r >= 0 && r < rows && c >= 0 && c < cols) {
+        this.exploredCells.add(doorKey(c, r));
+      }
+    };
+
+    // Current cell + 4 adjacent
+    markIfInBounds(col, row);
+    markIfInBounds(col, row - 1);
+    markIfInBounds(col, row + 1);
+    markIfInBounds(col - 1, row);
+    markIfInBounds(col + 1, row);
+
+    // Line-of-sight forward: walk forward until hitting a wall
+    const [dc, dr] = FACING_DELTA[facing];
+    let c = col + dc;
+    let r = row + dr;
+    while (r >= 0 && r < rows && c >= 0 && c < cols) {
+      markIfInBounds(c, r);
+      if (grid[r][c] === '#') break; // wall stops line-of-sight
+      c += dc;
+      r += dr;
+    }
   }
 }
