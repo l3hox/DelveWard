@@ -35,7 +35,9 @@ async function init(): Promise<void> {
   const ambient = new THREE.AmbientLight(0x111111);
   scene.add(ambient);
 
-  const torchLight = new THREE.PointLight(0xff8844, 3, 8);
+  const torchLight = new THREE.PointLight(0xffaa66, 3, 8);
+  let flickerTarget = 2.8;
+  let flickerTimer = 0;
   scene.add(torchLight);
 
   // --- Level ---
@@ -172,10 +174,15 @@ async function init(): Promise<void> {
     doorAnimator.update(delta);
     leverAnimator.update(delta);
 
-    // Torch follows player with subtle flicker
+    // Torch follows player with variable flicker
     const pos = player.getWorldPosition();
     torchLight.position.set(pos.x, pos.y + 0.3, pos.z);
-    torchLight.intensity = 2.8 + Math.random() * 0.4;
+    flickerTimer -= delta;
+    if (flickerTimer <= 0) {
+      flickerTarget = 2.6 + Math.random() * 0.6;
+      flickerTimer = 0.08 + Math.random() * 0.25; // variable interval
+    }
+    torchLight.intensity += (flickerTarget - torchLight.intensity) * 0.15;
 
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
