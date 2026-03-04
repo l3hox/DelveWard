@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { WallTextureName, FloorTextureName, CeilingTextureName } from './textureNames';
+import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 
 const SIZE = 64;
 

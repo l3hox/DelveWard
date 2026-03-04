@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import type { GameState } from './gameState';
+import type { GameState } from '../core/gameState';
 
 const PLATE_SIZE = 0.8;
 const PLATE_HEIGHT = 0.02;

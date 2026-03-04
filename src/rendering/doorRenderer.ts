@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 import { getDoorTexture, getLockedDoorTexture, getDoorFrameTexture } from './textures';
-import type { GameState } from './gameState';
+import type { GameState } from '../core/gameState';
 import type { DoorAnimator } from './doorAnimator';
 
 export type DoorOrientation = 'NS' | 'EW'; // NS = door faces N-S (blocks E-W passage), EW = door faces E-W (blocks N-S passage)

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
-import { PlayerState, Facing, FACING_ANGLE } from './grid';
+import { PlayerState, Facing, FACING_ANGLE } from '../core/grid';
 
 const TWEEN_SPEED = 20;
 const ANIM_THRESHOLD = 0.05;

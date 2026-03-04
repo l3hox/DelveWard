@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { WALKABLE_CELLS, buildWalkableSet } from './grid';
+import { WALKABLE_CELLS, buildWalkableSet } from '../core/grid';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from './textures';
-import type { TextureSet, TextureArea, CharDef } from './types';
-import type { WallTextureName, FloorTextureName, CeilingTextureName } from './textureNames';
+import type { TextureSet, TextureArea, CharDef } from '../core/types';
+import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 
 export const CELL_SIZE = 2;
 export const WALL_HEIGHT = 2.5;

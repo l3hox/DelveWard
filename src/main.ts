@@ -1,15 +1,15 @@
 import * as THREE from 'three';
-import { buildDungeon } from './dungeon';
-import { Player } from './player';
-import { loadLevel } from './levelLoader';
-import { buildWalkableSet, getFacingCell } from './grid';
-import { GameState } from './gameState';
-import { interact } from './interaction';
-import { buildDoorMeshes, updateDoorMesh } from './doorRenderer';
-import { buildKeyMeshes, hideKeyMesh } from './keyRenderer';
-import { buildPlateMeshes, pressPlate } from './plateRenderer';
-import { buildLeverMeshes, LeverAnimator } from './leverRenderer';
-import { DoorAnimator } from './doorAnimator';
+import { buildDungeon } from './rendering/dungeon';
+import { Player } from './rendering/player';
+import { loadLevel } from './core/levelLoader';
+import { buildWalkableSet, getFacingCell } from './core/grid';
+import { GameState } from './core/gameState';
+import { interact } from './core/interaction';
+import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
+import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
+import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
+import { buildLeverMeshes, LeverAnimator } from './rendering/leverRenderer';
+import { DoorAnimator } from './rendering/doorAnimator';
 
 async function init(): Promise<void> {
   // --- Scene ---

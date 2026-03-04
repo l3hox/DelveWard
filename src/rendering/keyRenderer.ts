@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import type { GameState } from './gameState';
+import type { GameState } from '../core/gameState';
 
 const KEY_SIZE = 0.4;
 const KEY_HEIGHT = 0.15; // just above the floor

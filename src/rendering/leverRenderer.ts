@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import type { GameState, LeverState } from './gameState';
-import type { Facing } from './grid';
+import type { GameState, LeverState } from '../core/gameState';
+import type { Facing } from '../core/grid';
 
 const LEVER_HEIGHT = 1.2; // eye-ish height on wall
 const BASE_SIZE = 0.15;
