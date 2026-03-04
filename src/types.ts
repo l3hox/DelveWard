@@ -1,11 +1,25 @@
 import type { Facing } from './grid';
 
+export interface TextureSet {
+  wallTexture?: string;
+  floorTexture?: string;
+  ceilingTexture?: string;
+}
+
+export interface TextureArea extends TextureSet {
+  fromCol: number;
+  toCol: number;
+  fromRow: number;
+  toRow: number;
+}
+
 export interface DungeonLevel {
   name: string;
   grid: string[];            // each string = one row of chars
   playerStart: { col: number; row: number; facing: Facing };
   entities: Entity[];
-  cellOverrides?: CellOverride[];
+  defaults?: TextureSet;
+  areas?: TextureArea[];
 }
 
 // Grid char legend:
@@ -17,13 +31,4 @@ export interface Entity {
   row: number;
   type: string;              // "door", "object", "key", "enemy", etc.
   [key: string]: unknown;    // type-specific props (keyId, objectId, locked...)
-}
-
-export interface CellOverride {
-  col: number;
-  row: number;
-  ceilingHeight?: number;
-  wallTexture?: string;
-  floorTexture?: string;
-  ceilingTexture?: string;
 }

@@ -81,74 +81,125 @@ describe('validateLevel', () => {
     expect(() => validateLevel(validLevel({ entities: 'bad' }), 'test')).toThrow('"entities" must be an array');
   });
 
-  // --- cellOverrides validation ---
+  // --- defaults validation ---
 
-  it('accepts valid cellOverrides', () => {
+  it('accepts valid defaults', () => {
     const level = validateLevel(validLevel({
-      cellOverrides: [
-        { col: 1, row: 1, wallTexture: 'brick', floorTexture: 'dirt', ceilingTexture: 'wooden_beams' },
+      defaults: { wallTexture: 'brick', floorTexture: 'dirt', ceilingTexture: 'wooden_beams' },
+    }), 'test');
+    expect(level.defaults).toEqual({ wallTexture: 'brick', floorTexture: 'dirt', ceilingTexture: 'wooden_beams' });
+  });
+
+  it('accepts missing defaults', () => {
+    const level = validateLevel(validLevel(), 'test');
+    expect(level.defaults).toBeUndefined();
+  });
+
+  it('rejects non-object defaults', () => {
+    expect(() => validateLevel(validLevel({ defaults: 'bad' }), 'test'))
+      .toThrow('"defaults" must be an object');
+    expect(() => validateLevel(validLevel({ defaults: [1] }), 'test'))
+      .toThrow('"defaults" must be an object');
+  });
+
+  it('rejects unknown wallTexture in defaults', () => {
+    expect(() => validateLevel(validLevel({
+      defaults: { wallTexture: 'marble' },
+    }), 'test')).toThrow('defaults has unknown wallTexture "marble"');
+  });
+
+  it('rejects unknown floorTexture in defaults', () => {
+    expect(() => validateLevel(validLevel({
+      defaults: { floorTexture: 'lava' },
+    }), 'test')).toThrow('defaults has unknown floorTexture "lava"');
+  });
+
+  it('rejects unknown ceilingTexture in defaults', () => {
+    expect(() => validateLevel(validLevel({
+      defaults: { ceilingTexture: 'glass' },
+    }), 'test')).toThrow('defaults has unknown ceilingTexture "glass"');
+  });
+
+  // --- areas validation ---
+
+  it('accepts valid areas', () => {
+    const level = validateLevel(validLevel({
+      areas: [
+        { fromCol: 1, toCol: 1, fromRow: 1, toRow: 1, wallTexture: 'brick' },
       ],
     }), 'test');
-    expect(level.cellOverrides).toHaveLength(1);
+    expect(level.areas).toHaveLength(1);
   });
 
-  it('accepts missing cellOverrides', () => {
+  it('accepts missing areas', () => {
     const level = validateLevel(validLevel(), 'test');
-    expect(level.cellOverrides).toBeUndefined();
+    expect(level.areas).toBeUndefined();
   });
 
-  it('rejects non-array cellOverrides', () => {
-    expect(() => validateLevel(validLevel({ cellOverrides: 'bad' }), 'test'))
-      .toThrow('"cellOverrides" must be an array');
-    expect(() => validateLevel(validLevel({ cellOverrides: {} }), 'test'))
-      .toThrow('"cellOverrides" must be an array');
+  it('rejects non-array areas', () => {
+    expect(() => validateLevel(validLevel({ areas: 'bad' }), 'test'))
+      .toThrow('"areas" must be an array');
+    expect(() => validateLevel(validLevel({ areas: {} }), 'test'))
+      .toThrow('"areas" must be an array');
   });
 
-  it('rejects non-object entries in cellOverrides', () => {
-    expect(() => validateLevel(validLevel({ cellOverrides: [42] }), 'test'))
-      .toThrow('cellOverrides[0] must be an object');
-    expect(() => validateLevel(validLevel({ cellOverrides: [null] }), 'test'))
-      .toThrow('cellOverrides[0] must be an object');
-    expect(() => validateLevel(validLevel({ cellOverrides: [[1, 1]] }), 'test'))
-      .toThrow('cellOverrides[0] must be an object');
+  it('rejects non-object entries in areas', () => {
+    expect(() => validateLevel(validLevel({ areas: [42] }), 'test'))
+      .toThrow('areas[0] must be an object');
+    expect(() => validateLevel(validLevel({ areas: [null] }), 'test'))
+      .toThrow('areas[0] must be an object');
+    expect(() => validateLevel(validLevel({ areas: [[1, 1]] }), 'test'))
+      .toThrow('areas[0] must be an object');
   });
 
-  it('rejects non-numeric col/row in cellOverrides', () => {
+  it('rejects missing coordinate fields in areas', () => {
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 'a', row: 1 }],
-    }), 'test')).toThrow('must have numeric col and row');
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 1, wallTexture: 'brick' }],
+    }), 'test')).toThrow('must have numeric fromCol, toCol, fromRow, toRow');
   });
 
-  it('rejects out-of-bounds cellOverrides', () => {
+  it('rejects fromCol > toCol in areas', () => {
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 10, row: 1 }],
+      areas: [{ fromCol: 2, toCol: 1, fromRow: 1, toRow: 1, wallTexture: 'brick' }],
+    }), 'test')).toThrow('fromCol > toCol or fromRow > toRow');
+  });
+
+  it('rejects fromRow > toRow in areas', () => {
+    expect(() => validateLevel(validLevel({
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 2, toRow: 1, wallTexture: 'brick' }],
+    }), 'test')).toThrow('fromCol > toCol or fromRow > toRow');
+  });
+
+  it('rejects out-of-bounds areas', () => {
+    expect(() => validateLevel(validLevel({
+      areas: [{ fromCol: 0, toCol: 10, fromRow: 0, toRow: 0, wallTexture: 'brick' }],
     }), 'test')).toThrow('is out of grid bounds');
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 1, row: 10 }],
+      areas: [{ fromCol: 0, toCol: 0, fromRow: 0, toRow: 10, wallTexture: 'brick' }],
     }), 'test')).toThrow('is out of grid bounds');
   });
 
-  it('rejects unknown wallTexture name', () => {
+  it('rejects areas with no textures specified', () => {
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 1, row: 1, wallTexture: 'marble' }],
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 1, toRow: 1 }],
+    }), 'test')).toThrow('must specify at least one texture');
+  });
+
+  it('rejects unknown wallTexture in areas', () => {
+    expect(() => validateLevel(validLevel({
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 1, toRow: 1, wallTexture: 'marble' }],
     }), 'test')).toThrow('unknown wallTexture "marble"');
   });
 
-  it('rejects unknown floorTexture name', () => {
+  it('rejects unknown floorTexture in areas', () => {
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 1, row: 1, floorTexture: 'lava' }],
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 1, toRow: 1, floorTexture: 'lava' }],
     }), 'test')).toThrow('unknown floorTexture "lava"');
   });
 
-  it('rejects unknown ceilingTexture name', () => {
+  it('rejects unknown ceilingTexture in areas', () => {
     expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 1, row: 1, ceilingTexture: 'glass' }],
+      areas: [{ fromCol: 1, toCol: 1, fromRow: 1, toRow: 1, ceilingTexture: 'glass' }],
     }), 'test')).toThrow('unknown ceilingTexture "glass"');
-  });
-
-  it('rejects non-number ceilingHeight', () => {
-    expect(() => validateLevel(validLevel({
-      cellOverrides: [{ col: 1, row: 1, ceilingHeight: 'high' }],
-    }), 'test')).toThrow('ceilingHeight must be a number');
   });
 });

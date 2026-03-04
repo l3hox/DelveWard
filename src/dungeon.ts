@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { WALKABLE_CELLS } from './grid';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from './textures';
-import type { CellOverride } from './types';
+import type { TextureSet, TextureArea } from './types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from './textureNames';
 
 export const CELL_SIZE = 2;
@@ -51,18 +51,45 @@ function isSolid(grid: string[], col: number, row: number): boolean {
   return !WALKABLE_CELLS.has(grid[row][col]);
 }
 
-export function buildDungeon(grid: string[], cellOverrides?: CellOverride[]): THREE.Group {
+function resolveTextures(
+  col: number,
+  row: number,
+  defaults?: TextureSet,
+  areas?: TextureArea[],
+): { wall: WallTextureName; floor: FloorTextureName; ceiling: CeilingTextureName } {
+  let wall: string = 'stone';
+  let floor: string = 'stone_tile';
+  let ceiling: string = 'dark_rock';
+
+  // Layer 2: level defaults
+  if (defaults) {
+    if (defaults.wallTexture) wall = defaults.wallTexture;
+    if (defaults.floorTexture) floor = defaults.floorTexture;
+    if (defaults.ceilingTexture) ceiling = defaults.ceilingTexture;
+  }
+
+  // Layer 3: areas (later entries win)
+  if (areas) {
+    for (const area of areas) {
+      if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
+        if (area.wallTexture) wall = area.wallTexture;
+        if (area.floorTexture) floor = area.floorTexture;
+        if (area.ceilingTexture) ceiling = area.ceilingTexture;
+      }
+    }
+  }
+
+  return {
+    wall: wall as WallTextureName,
+    floor: floor as FloorTextureName,
+    ceiling: ceiling as CeilingTextureName,
+  };
+}
+
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[]): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
-
-  // Build override lookup map
-  const overrideMap = new Map<string, CellOverride>();
-  if (cellOverrides) {
-    for (const ov of cellOverrides) {
-      overrideMap.set(`${ov.col},${ov.row}`, ov);
-    }
-  }
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
@@ -71,13 +98,10 @@ export function buildDungeon(grid: string[], cellOverrides?: CellOverride[]): TH
       const cx = col * CELL_SIZE + CELL_SIZE / 2;
       const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
-      const ov = overrideMap.get(`${col},${row}`);
-      const wallName = (ov?.wallTexture ?? 'stone') as WallTextureName;
-      const floorName = (ov?.floorTexture ?? 'stone_tile') as FloorTextureName;
-      const ceilName = (ov?.ceilingTexture ?? 'dark_rock') as CeilingTextureName;
-      const cellWallMat = getWallMaterial(wallName);
-      const cellFloorMat = getFloorMaterial(floorName);
-      const cellCeilMat = getCeilingMaterial(ceilName);
+      const tex = resolveTextures(col, row, defaults, areas);
+      const cellWallMat = getWallMaterial(tex.wall);
+      const cellFloorMat = getFloorMaterial(tex.floor);
+      const cellCeilMat = getCeilingMaterial(tex.ceiling);
 
       // Floor
       const floor = new THREE.Mesh(tileGeo, cellFloorMat);

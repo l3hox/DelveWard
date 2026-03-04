@@ -64,42 +64,66 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "entities" must be an array`);
   }
 
-  // cellOverrides (optional)
-  if (obj.cellOverrides !== undefined) {
-    if (!Array.isArray(obj.cellOverrides)) {
-      throw new Error(`Level ${source}: "cellOverrides" must be an array`);
+  // defaults (optional)
+  if (obj.defaults !== undefined) {
+    if (typeof obj.defaults !== 'object' || obj.defaults === null || Array.isArray(obj.defaults)) {
+      throw new Error(`Level ${source}: "defaults" must be an object`);
     }
 
-    for (let i = 0; i < obj.cellOverrides.length; i++) {
-      const ov = obj.cellOverrides[i];
-      if (typeof ov !== 'object' || ov === null || Array.isArray(ov)) {
-        throw new Error(`Level ${source}: cellOverrides[${i}] must be an object`);
+    const def = obj.defaults as Record<string, unknown>;
+
+    if (def.wallTexture !== undefined && !WALL_TEXTURE_SET.has(def.wallTexture as string)) {
+      throw new Error(`Level ${source}: defaults has unknown wallTexture "${def.wallTexture}"`);
+    }
+    if (def.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(def.floorTexture as string)) {
+      throw new Error(`Level ${source}: defaults has unknown floorTexture "${def.floorTexture}"`);
+    }
+    if (def.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(def.ceilingTexture as string)) {
+      throw new Error(`Level ${source}: defaults has unknown ceilingTexture "${def.ceilingTexture}"`);
+    }
+  }
+
+  // areas (optional)
+  if (obj.areas !== undefined) {
+    if (!Array.isArray(obj.areas)) {
+      throw new Error(`Level ${source}: "areas" must be an array`);
+    }
+
+    for (let i = 0; i < obj.areas.length; i++) {
+      const area = obj.areas[i];
+      if (typeof area !== 'object' || area === null || Array.isArray(area)) {
+        throw new Error(`Level ${source}: areas[${i}] must be an object`);
       }
 
-      const entry = ov as Record<string, unknown>;
+      const entry = area as Record<string, unknown>;
 
-      if (typeof entry.col !== 'number' || typeof entry.row !== 'number') {
-        throw new Error(`Level ${source}: cellOverrides[${i}] must have numeric col and row`);
+      if (typeof entry.fromCol !== 'number' || typeof entry.toCol !== 'number' ||
+          typeof entry.fromRow !== 'number' || typeof entry.toRow !== 'number') {
+        throw new Error(`Level ${source}: areas[${i}] must have numeric fromCol, toCol, fromRow, toRow`);
       }
 
-      if (entry.row < 0 || entry.row >= grid.length || entry.col < 0 || entry.col >= rowLen) {
-        throw new Error(`Level ${source}: cellOverrides[${i}] (${entry.col},${entry.row}) is out of grid bounds`);
+      if (entry.fromCol > entry.toCol || entry.fromRow > entry.toRow) {
+        throw new Error(`Level ${source}: areas[${i}] has fromCol > toCol or fromRow > toRow`);
+      }
+
+      const rows = grid.length;
+      if (entry.fromCol < 0 || (entry.toCol as number) >= rowLen ||
+          entry.fromRow < 0 || (entry.toRow as number) >= rows) {
+        throw new Error(`Level ${source}: areas[${i}] is out of grid bounds`);
+      }
+
+      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined) {
+        throw new Error(`Level ${source}: areas[${i}] must specify at least one texture`);
       }
 
       if (entry.wallTexture !== undefined && !WALL_TEXTURE_SET.has(entry.wallTexture as string)) {
-        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown wallTexture "${entry.wallTexture}"`);
+        throw new Error(`Level ${source}: areas[${i}] has unknown wallTexture "${entry.wallTexture}"`);
       }
-
       if (entry.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(entry.floorTexture as string)) {
-        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown floorTexture "${entry.floorTexture}"`);
+        throw new Error(`Level ${source}: areas[${i}] has unknown floorTexture "${entry.floorTexture}"`);
       }
-
       if (entry.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(entry.ceilingTexture as string)) {
-        throw new Error(`Level ${source}: cellOverrides[${i}] has unknown ceilingTexture "${entry.ceilingTexture}"`);
-      }
-
-      if (entry.ceilingHeight !== undefined && typeof entry.ceilingHeight !== 'number') {
-        throw new Error(`Level ${source}: cellOverrides[${i}] ceilingHeight must be a number`);
+        throw new Error(`Level ${source}: areas[${i}] has unknown ceilingTexture "${entry.ceilingTexture}"`);
       }
     }
   }
