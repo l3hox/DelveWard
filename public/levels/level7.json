@@ -9,7 +9,7 @@
     "#.D.#.#.D.#",
     "#.#.#.#.#.#",
     "#.#.D.#.#.#",
-    "#.#...#O#.#",
+    "#.#.###O#.#",
     "#.#...#.#.#",
     "###########"
   ],
@@ -20,7 +20,7 @@
     { "col": 8, "row": 5, "type": "door", "state": "closed" },
     { "col": 4, "row": 7, "type": "door", "state": "closed" },
     { "col": 9, "row": 1, "type": "key", "keyId": "gold_key" },
-    { "col": 7, "row": 8, "type": "lever", "targetDoor": "8,5" },
+    { "col": 7, "row": 8, "type": "lever", "targetDoor": "8,5", "wall": "E" },
     { "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
   ],
   "defaults": {

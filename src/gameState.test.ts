@@ -105,6 +105,15 @@ describe('GameState', () => {
     expect(gs.getDoor(1, 1)!.state).toBe('locked');
   });
 
+  it('openDoor: mechanical door returns false', () => {
+    const gs = new GameState([
+      doorEntity(3, 2, 'closed'),
+      { col: 1, row: 1, type: 'lever', targetDoor: '3,2' },
+    ]);
+    expect(gs.openDoor(3, 2)).toBe(false);
+    expect(gs.getDoor(3, 2)!.state).toBe('closed');
+  });
+
   // --- unlockDoor ---
 
   it('unlockDoor: locked -> closed with correct key returns true', () => {
@@ -144,6 +153,100 @@ describe('GameState', () => {
     const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
     gs.toggleDoor(1, 1);
     expect(gs.getDoor(1, 1)!.state).toBe('locked');
+  });
+
+  // --- closeDoor ---
+
+  it('closeDoor: open -> closed returns true', () => {
+    const gs = new GameState([doorEntity(1, 1, 'open')]);
+    expect(gs.closeDoor(1, 1)).toBe(true);
+    expect(gs.getDoor(1, 1)!.state).toBe('closed');
+  });
+
+  it('closeDoor: closed returns false', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed')]);
+    expect(gs.closeDoor(1, 1)).toBe(false);
+  });
+
+  it('closeDoor: locked returns false', () => {
+    const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
+    expect(gs.closeDoor(1, 1)).toBe(false);
+  });
+
+  it('closeDoor: no door returns false', () => {
+    const gs = new GameState([]);
+    expect(gs.closeDoor(9, 9)).toBe(false);
+  });
+
+  it('closeDoor: mechanical door returns false', () => {
+    const gs = new GameState([
+      doorEntity(3, 2, 'closed'),
+      { col: 1, row: 1, type: 'lever', targetDoor: '3,2' },
+    ]);
+    // Open via lever
+    gs.activateLever(1, 1);
+    expect(gs.getDoor(3, 2)!.state).toBe('open');
+    expect(gs.closeDoor(3, 2)).toBe(false);
+  });
+
+  // --- mechanical flag ---
+
+  it('door targeted by lever is marked mechanical', () => {
+    const gs = new GameState([
+      doorEntity(5, 3, 'closed'),
+      { col: 2, row: 1, type: 'lever', targetDoor: '5,3' },
+    ]);
+    expect(gs.getDoor(5, 3)!.mechanical).toBe(true);
+  });
+
+  it('door targeted by pressure plate is marked mechanical', () => {
+    const gs = new GameState([
+      doorEntity(5, 3, 'closed'),
+      { col: 2, row: 2, type: 'pressure_plate', targetDoor: '5,3' },
+    ]);
+    expect(gs.getDoor(5, 3)!.mechanical).toBe(true);
+  });
+
+  it('door without lever/plate is not mechanical', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed')]);
+    expect(gs.getDoor(1, 1)!.mechanical).toBe(false);
+  });
+
+  // --- auto-created doors from grid ---
+
+  describe('auto-door creation from grid', () => {
+    const grid = [
+      '#####',
+      '#.D.#',
+      '#...#',
+      '#####',
+    ];
+
+    it('D cell without entity gets auto-created door', () => {
+      const gs = new GameState([], grid);
+      const door = gs.getDoor(2, 1);
+      expect(door).toBeDefined();
+      expect(door!.state).toBe('closed');
+      expect(door!.mechanical).toBe(false);
+    });
+
+    it('D cell with entity is not overwritten', () => {
+      const gs = new GameState([doorEntity(2, 1, 'locked', 'key1')], grid);
+      const door = gs.getDoor(2, 1);
+      expect(door!.state).toBe('locked');
+      expect(door!.keyId).toBe('key1');
+    });
+
+    it('auto-created door is openable', () => {
+      const gs = new GameState([], grid);
+      expect(gs.openDoor(2, 1)).toBe(true);
+      expect(gs.getDoor(2, 1)!.state).toBe('open');
+    });
+
+    it('no grid parameter keeps backward compat', () => {
+      const gs = new GameState([]);
+      expect(gs.doors.size).toBe(0);
+    });
   });
 
   // --- addKey / hasKey ---

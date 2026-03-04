@@ -176,6 +176,9 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
         throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a 'D' cell`);
       }
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
+      }
     }
 
     if (e.type === 'pressure_plate') {

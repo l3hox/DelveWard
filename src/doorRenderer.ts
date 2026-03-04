@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
-import { getDoorTexture, getLockedDoorTexture } from './textures';
+import { getDoorTexture, getLockedDoorTexture, getDoorFrameTexture } from './textures';
 import type { GameState } from './gameState';
+import type { DoorAnimator } from './doorAnimator';
 
 export type DoorOrientation = 'NS' | 'EW'; // NS = door faces N-S (blocks E-W passage), EW = door faces E-W (blocks N-S passage)
+
+const FRAME_DEPTH = 0.15;
+const FRAME_WIDTH = 0.15;
 
 export function detectDoorOrientation(
   grid: string[],
@@ -30,7 +34,64 @@ export function detectDoorOrientation(
 
 export interface DoorMeshes {
   group: THREE.Group;
-  meshMap: Map<string, THREE.Mesh>;
+  panelMap: Map<string, THREE.Mesh>;
+}
+
+const BUTTON_SIZE = 0.06;
+const BUTTON_DEPTH = 0.03;
+const BUTTON_HEIGHT = 1.1; // slightly above center, near eye level
+
+function addFrameButtons(frame: THREE.Group, buttonMat: THREE.Material): void {
+  const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
+  const buttonGeo = new THREE.BoxGeometry(BUTTON_SIZE, BUTTON_SIZE, BUTTON_DEPTH);
+
+  // Button on left pillar — facing outward on both sides
+  const leftButtonFront = new THREE.Mesh(buttonGeo, buttonMat);
+  leftButtonFront.position.set(
+    -panelWidth / 2 - FRAME_WIDTH / 2,
+    BUTTON_HEIGHT,
+    FRAME_DEPTH / 2 + BUTTON_DEPTH / 2,
+  );
+  frame.add(leftButtonFront);
+
+  const leftButtonBack = new THREE.Mesh(buttonGeo, buttonMat);
+  leftButtonBack.position.set(
+    -panelWidth / 2 - FRAME_WIDTH / 2,
+    BUTTON_HEIGHT,
+    -(FRAME_DEPTH / 2 + BUTTON_DEPTH / 2),
+  );
+  frame.add(leftButtonBack);
+}
+
+function buildDoorFrame(orientation: DoorOrientation, cx: number, cz: number, frameMat: THREE.Material): THREE.Group {
+  const frame = new THREE.Group();
+
+  const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
+
+  // Left pillar
+  const pillarGeo = new THREE.BoxGeometry(FRAME_WIDTH, WALL_HEIGHT, FRAME_DEPTH);
+  const leftPillar = new THREE.Mesh(pillarGeo, frameMat);
+  leftPillar.position.set(-panelWidth / 2 - FRAME_WIDTH / 2, WALL_HEIGHT / 2, 0);
+  frame.add(leftPillar);
+
+  // Right pillar
+  const rightPillar = new THREE.Mesh(pillarGeo, frameMat);
+  rightPillar.position.set(panelWidth / 2 + FRAME_WIDTH / 2, WALL_HEIGHT / 2, 0);
+  frame.add(rightPillar);
+
+  // Lintel (top beam)
+  const lintelGeo = new THREE.BoxGeometry(CELL_SIZE, FRAME_WIDTH, FRAME_DEPTH);
+  const lintel = new THREE.Mesh(lintelGeo, frameMat);
+  lintel.position.set(0, WALL_HEIGHT - FRAME_WIDTH / 2, 0);
+  frame.add(lintel);
+
+  frame.position.set(cx, 0, cz);
+
+  if (orientation === 'NS') {
+    frame.rotation.y = Math.PI / 2;
+  }
+
+  return frame;
 }
 
 export function buildDoorMeshes(
@@ -39,9 +100,11 @@ export function buildDoorMeshes(
   walkable: Set<string>,
 ): DoorMeshes {
   const group = new THREE.Group();
-  const meshMap = new Map<string, THREE.Mesh>();
+  const panelMap = new Map<string, THREE.Mesh>();
 
-  const doorGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
+  const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
+  const panelHeight = WALL_HEIGHT - FRAME_WIDTH;
+  const panelGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.08);
   const doorMat = new THREE.MeshLambertMaterial({
     map: getDoorTexture(),
     side: THREE.DoubleSide,
@@ -50,6 +113,10 @@ export function buildDoorMeshes(
     map: getLockedDoorTexture(),
     side: THREE.DoubleSide,
   });
+  const frameMat = new THREE.MeshLambertMaterial({
+    map: getDoorFrameTexture(),
+  });
+  const buttonMat = new THREE.MeshLambertMaterial({ color: 0xcc8833 });
 
   for (const [key, door] of gameState.doors) {
     const { col, row } = door;
@@ -57,38 +124,46 @@ export function buildDoorMeshes(
     const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
     const orientation = detectDoorOrientation(grid, col, row, walkable);
+
+    // Frame (always visible)
+    const frame = buildDoorFrame(orientation, cx, cz, frameMat);
+    if (!door.mechanical) {
+      addFrameButtons(frame, buttonMat);
+    }
+    group.add(frame);
+
+    // Panel (toggles visibility)
     const mat = door.state === 'locked' ? lockedDoorMat : doorMat;
+    const panel = new THREE.Mesh(panelGeo, mat);
+    panel.position.set(cx, panelHeight / 2, cz);
 
-    const mesh = new THREE.Mesh(doorGeo, mat);
-    mesh.position.set(cx, WALL_HEIGHT / 2, cz);
-
-    if (orientation === 'EW') {
-      // Door faces east-west (blocks N-S passage) -- no rotation needed
-      // PlaneGeometry faces +Z by default
-      mesh.rotation.y = 0;
-    } else {
-      // Door faces north-south (blocks E-W passage) -- rotate 90 degrees
-      mesh.rotation.y = Math.PI / 2;
+    if (orientation === 'NS') {
+      panel.rotation.y = Math.PI / 2;
     }
 
-    mesh.visible = door.state !== 'open';
+    panel.visible = door.state !== 'open';
 
-    group.add(mesh);
-    meshMap.set(key, mesh);
+    group.add(panel);
+    panelMap.set(key, panel);
   }
 
-  return { group, meshMap };
+  return { group, panelMap };
 }
 
 export function updateDoorMesh(
-  meshMap: Map<string, THREE.Mesh>,
+  panelMap: Map<string, THREE.Mesh>,
   col: number,
   row: number,
   isOpen: boolean,
+  animator?: DoorAnimator,
 ): void {
   const key = `${col},${row}`;
-  const mesh = meshMap.get(key);
-  if (mesh) {
-    mesh.visible = !isOpen;
+  if (animator) {
+    animator.setOpen(key, isOpen);
+  } else {
+    const mesh = panelMap.get(key);
+    if (mesh) {
+      mesh.visible = !isOpen;
+    }
   }
 }

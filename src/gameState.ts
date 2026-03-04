@@ -1,4 +1,5 @@
 import type { Entity } from './types';
+import type { Facing } from './grid';
 
 export type DoorState = 'open' | 'closed' | 'locked';
 
@@ -7,6 +8,7 @@ export interface DoorInstance {
   row: number;
   state: DoorState;
   keyId?: string;
+  mechanical: boolean;
 }
 
 export interface KeyInstance {
@@ -20,6 +22,7 @@ export interface LeverInstance {
   col: number;
   row: number;
   targetDoor: string; // "col,row" of the door to toggle
+  wall: Facing;       // which wall the lever is mounted on
   toggled: boolean;
 }
 
@@ -34,6 +37,17 @@ function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
 
+function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing {
+  if (!grid) return 'N';
+  const rows = grid.length;
+  const cols = grid[0].length;
+  if (row - 1 >= 0 && grid[row - 1][col] === '#') return 'N';
+  if (row + 1 < rows && grid[row + 1][col] === '#') return 'S';
+  if (col + 1 < cols && grid[row][col + 1] === '#') return 'E';
+  if (col - 1 >= 0 && grid[row][col - 1] === '#') return 'W';
+  return 'N';
+}
+
 export class GameState {
   doors: Map<string, DoorInstance>;
   keys: Map<string, KeyInstance>;
@@ -41,7 +55,7 @@ export class GameState {
   plates: Map<string, PlateInstance>;
   inventory: Set<string>;
 
-  constructor(entities: Entity[]) {
+  constructor(entities: Entity[], grid?: string[]) {
     this.doors = new Map();
     this.keys = new Map();
     this.levers = new Map();
@@ -57,6 +71,7 @@ export class GameState {
           row: e.row,
           state,
           keyId,
+          mechanical: false,
         });
       } else if (e.type === 'key') {
         this.keys.set(doorKey(e.col, e.row), {
@@ -66,10 +81,13 @@ export class GameState {
           pickedUp: false,
         });
       } else if (e.type === 'lever') {
+        const wall = (e.wall as Facing | undefined) ??
+          autoDetectLeverWall(e.col, e.row, grid);
         this.levers.set(doorKey(e.col, e.row), {
           col: e.col,
           row: e.row,
           targetDoor: e.targetDoor as string,
+          wall,
           toggled: false,
         });
       } else if (e.type === 'pressure_plate') {
@@ -79,6 +97,35 @@ export class GameState {
           targetDoor: e.targetDoor as string,
           activated: false,
         });
+      }
+    }
+
+    // Mark doors targeted by levers/plates as mechanical
+    for (const lever of this.levers.values()) {
+      const door = this.doors.get(lever.targetDoor);
+      if (door) door.mechanical = true;
+    }
+    for (const plate of this.plates.values()) {
+      const door = this.doors.get(plate.targetDoor);
+      if (door) door.mechanical = true;
+    }
+
+    // Auto-create doors for D cells with no entity
+    if (grid) {
+      for (let row = 0; row < grid.length; row++) {
+        for (let col = 0; col < grid[row].length; col++) {
+          if (grid[row][col] === 'D') {
+            const key = doorKey(col, row);
+            if (!this.doors.has(key)) {
+              this.doors.set(key, {
+                col,
+                row,
+                state: 'closed',
+                mechanical: false,
+              });
+            }
+          }
+        }
       }
     }
   }
@@ -97,6 +144,7 @@ export class GameState {
     const door = this.getDoor(col, row);
     if (!door) return false;
     if (door.state !== 'closed') return false;
+    if (door.mechanical) return false;
     door.state = 'open';
     return true;
   }
@@ -106,6 +154,15 @@ export class GameState {
     if (!door) return false;
     if (door.state !== 'locked') return false;
     if (!door.keyId || !this.hasKey(door.keyId)) return false;
+    door.state = 'closed';
+    return true;
+  }
+
+  closeDoor(col: number, row: number): boolean {
+    const door = this.getDoor(col, row);
+    if (!door) return false;
+    if (door.state !== 'open') return false;
+    if (door.mechanical) return false;
     door.state = 'closed';
     return true;
   }
@@ -136,6 +193,10 @@ export class GameState {
     return key.keyId;
   }
 
+  getLever(col: number, row: number): LeverInstance | undefined {
+    return this.levers.get(doorKey(col, row));
+  }
+
   activateLever(col: number, row: number): string | undefined {
     const lever = this.levers.get(doorKey(col, row));
     if (!lever || lever.toggled) return undefined;
@@ -150,7 +211,11 @@ export class GameState {
     if (!plate || plate.activated) return undefined;
     plate.activated = true;
     const [dc, dr] = plate.targetDoor.split(',').map(Number);
-    this.openDoor(dc, dr);
+    // Bypass openDoor check — mechanisms can always operate their doors
+    const door = this.getDoor(dc, dr);
+    if (door && door.state === 'closed') {
+      door.state = 'open';
+    }
     return plate.targetDoor;
   }
 }

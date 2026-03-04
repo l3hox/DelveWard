@@ -3,7 +3,7 @@ import { getFacingCell } from './grid';
 import type { GameState } from './gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'nothing';
   message?: string;
   targetDoor?: string; // "col,row" of affected door (for mesh updates)
 }
@@ -28,7 +28,10 @@ export function interact(
     if (!door) return { type: 'nothing' }; // no door entity = always open, nothing to interact with
 
     if (door.state === 'open') {
-      return { type: 'nothing' }; // already open
+      if (gameState.closeDoor(col, row)) {
+        return { type: 'door_closed', message: 'Door closed.' };
+      }
+      return { type: 'nothing' }; // mechanical door, can't close manually
     }
 
     if (door.state === 'locked') {
@@ -42,17 +45,24 @@ export function interact(
     }
 
     if (door.state === 'closed') {
+      if (door.mechanical) {
+        return { type: 'nothing', message: 'This door is operated by a mechanism.' };
+      }
       if (gameState.openDoor(col, row)) {
         return { type: 'door_opened', message: 'Door opened.' };
       }
     }
   }
 
-  // Lever interaction (on 'O' cells)
-  if (cell === 'O') {
-    const targetDoor = gameState.activateLever(col, row);
-    if (targetDoor) {
-      return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
+  // Lever interaction — player stands on lever cell, faces the wall
+  const playerCell = grid[playerState.gridZ]?.[playerState.gridX];
+  if (playerCell === 'O') {
+    const lever = gameState.getLever(playerState.gridX, playerState.gridZ);
+    if (lever && !lever.toggled && lever.wall === playerState.facing) {
+      const targetDoor = gameState.activateLever(playerState.gridX, playerState.gridZ);
+      if (targetDoor) {
+        return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
+      }
     }
   }
 

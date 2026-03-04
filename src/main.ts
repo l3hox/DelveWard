@@ -7,6 +7,9 @@ import { GameState } from './gameState';
 import { interact } from './interaction';
 import { buildDoorMeshes, updateDoorMesh } from './doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './keyRenderer';
+import { buildPlateMeshes } from './plateRenderer';
+import { buildLeverMeshes } from './leverRenderer';
+import { DoorAnimator } from './doorAnimator';
 
 async function init(): Promise<void> {
   // --- Scene ---
@@ -42,13 +45,25 @@ async function init(): Promise<void> {
   const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs);
   scene.add(dungeonGroup);
 
-  const gameState = new GameState(level.entities);
+  const gameState = new GameState(level.entities, level.grid);
 
   const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
   scene.add(doorMeshes.group);
 
+  const doorAnimator = new DoorAnimator();
+  for (const [key, panel] of doorMeshes.panelMap) {
+    const door = gameState.doors.get(key);
+    doorAnimator.register(key, panel, door ? door.state === 'open' : false);
+  }
+
   const keyMeshes = buildKeyMeshes(gameState);
   scene.add(keyMeshes.group);
+
+  const plateMeshes = buildPlateMeshes(gameState);
+  scene.add(plateMeshes.group);
+
+  const leverMeshes = buildLeverMeshes(gameState);
+  scene.add(leverMeshes.group);
 
   const player = new Player(
     camera,
@@ -73,7 +88,7 @@ async function init(): Promise<void> {
     if (plateTarget) {
       console.log('Pressure plate activated.');
       const [dc, dr] = plateTarget.split(',').map(Number);
-      updateDoorMesh(doorMeshes.meshMap, dc, dr, true);
+      updateDoorMesh(doorMeshes.panelMap, dc, dr, true, doorAnimator);
     }
   });
 
@@ -103,11 +118,15 @@ async function init(): Promise<void> {
           }
           if (result.type === 'door_opened' || result.type === 'door_unlocked') {
             const facing = getFacingCell(player.getState());
-            updateDoorMesh(doorMeshes.meshMap, facing.col, facing.row, true);
+            updateDoorMesh(doorMeshes.panelMap, facing.col, facing.row, true, doorAnimator);
+          }
+          if (result.type === 'door_closed') {
+            const facing = getFacingCell(player.getState());
+            updateDoorMesh(doorMeshes.panelMap, facing.col, facing.row, false, doorAnimator);
           }
           if (result.type === 'lever_activated' && result.targetDoor) {
             const [dc, dr] = result.targetDoor.split(',').map(Number);
-            updateDoorMesh(doorMeshes.meshMap, dc, dr, gameState.isDoorOpen(dc, dr));
+            updateDoorMesh(doorMeshes.panelMap, dc, dr, gameState.isDoorOpen(dc, dr), doorAnimator);
           }
         }
         break;
@@ -139,6 +158,7 @@ async function init(): Promise<void> {
     lastTime = time;
 
     player.update(delta);
+    doorAnimator.update(delta);
 
     // Torch follows player with subtle flicker
     const pos = player.getWorldPosition();

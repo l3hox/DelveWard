@@ -51,14 +51,17 @@ Read this at the start of every Claude Code session to restore context. Update i
 - [x] **Phase 3 complete** — Doors & Interaction:
   - `GameState` class — door state (open/closed/locked), key inventory, lever/plate logic
   - Door-aware walkability — `isDoorOpen` callback in `isWalkable()` and `PlayerState`
-  - Interaction system — `interact()` via Space key: open/unlock doors, pull levers
-  - Door visuals — `doorRenderer.ts` with auto-orientation, visibility toggle, procedural textures (wood + locked iron-banded)
+  - Interaction system — `interact()` via Space key: open/close/unlock doors, pull levers
+  - Door visuals — 3D stone frames (pillars + lintel) with door panels, sliding animation on open/close
+  - Mechanical doors (lever/plate-controlled) — can't be opened/closed by player interaction
+  - Interactive doors have brass buttons on frame to visually distinguish them
+  - `D` cells without door entity auto-create a closed, non-mechanical door
   - Key system — auto-pickup on step, `keyRenderer.ts` billboard meshes
-  - Lever system — Space to activate, toggles linked door
-  - Pressure plates — auto-trigger on step, opens linked door (one-way)
-  - Entity validation in `levelLoader.ts` — doors, keys, levers, pressure plates
+  - Lever system — stand on lever cell, face the wall to pull; `wall` field (N/S/E/W) in entity
+  - Pressure plates — static stone slab visual, auto-trigger on step, opens linked door (one-way)
+  - Entity validation in `levelLoader.ts` — doors, keys, levers (incl. wall), pressure plates
   - Level 7 "The Locked Vault" — showcase level for all Phase 3 features
-  - 147 tests (71 new)
+  - 166 tests (90 new)
 
 ## Next Steps (Phase 4)
 
@@ -145,6 +148,20 @@ See PLAN.md Phase 4 for full details.
 - Level loader validates cellOverrides (bounds, known texture names, types) — 10 new tests
 - Created 3 new themed levels: level4 (Sunken Crypt), level5 (Winding Depths), level6 (Grand Hall)
 - Identified need to refactor cellOverrides model — current per-cell approach is too verbose for larger maps
+
+### Session 10 — Door system improvements
+- 3D door frames — stone pillars + lintel (always visible), door panel slides up/down via `DoorAnimator`
+- `D` cells without entity auto-create closed doors (no more empty doorways)
+- Doors re-closable with Space (non-mechanical only)
+- Mechanical flag — doors targeted by levers/plates can't be opened/closed by player
+- Interactive doors have brass buttons on frame to distinguish from mechanical
+- Lever interaction redesigned — player stands on `O` cell, faces the wall lever is mounted on
+- `wall` field (N/S/E/W) added to lever entity, auto-detected as fallback
+- Pressure plate and lever static visuals — `plateRenderer.ts` (stone slab), `leverRenderer.ts` (wall-mounted handle)
+- Door frame texture (`getDoorFrameTexture`) + `DoorAnimator` class (constant-speed slide)
+- `openDoor()` rejects mechanical doors; `activatePressurePlate` bypasses check
+- Entity validation for lever `wall` field
+- 166 tests (19 new), TypeScript compiles clean
 
 ### Session 9 — Phase 3 Complete: Test level + entity validation (Step 7)
 - Created `public/levels/level7.json` "The Locked Vault" — showcase level with all Phase 3 features

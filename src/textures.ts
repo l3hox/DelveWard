@@ -459,8 +459,39 @@ function generateLockedDoorTexture(): THREE.CanvasTexture {
   return makeTexture(canvas);
 }
 
+function generateDoorFrameTexture(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Grey stone base
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(110, 12);
+      const g = vary(105, 10);
+      const b = vary(100, 10);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Chisel marks — short dark scratches
+  ctx.strokeStyle = 'rgba(60, 55, 50, 0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 15; i++) {
+    const sx = Math.floor(Math.random() * SIZE);
+    const sy = Math.floor(Math.random() * SIZE);
+    const len = 2 + Math.floor(Math.random() * 4);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + vary(0, 2), sy + len);
+    ctx.stroke();
+  }
+
+  return makeTexture(canvas);
+}
+
 let doorTexCache: THREE.CanvasTexture | null = null;
 let lockedDoorTexCache: THREE.CanvasTexture | null = null;
+let doorFrameTexCache: THREE.CanvasTexture | null = null;
 
 export function getDoorTexture(): THREE.CanvasTexture {
   if (!doorTexCache) doorTexCache = generateDoorTexture();
@@ -470,4 +501,9 @@ export function getDoorTexture(): THREE.CanvasTexture {
 export function getLockedDoorTexture(): THREE.CanvasTexture {
   if (!lockedDoorTexCache) lockedDoorTexCache = generateLockedDoorTexture();
   return lockedDoorTexCache;
+}
+
+export function getDoorFrameTexture(): THREE.CanvasTexture {
+  if (!doorFrameTexCache) doorFrameTexCache = generateDoorFrameTexture();
+  return doorFrameTexCache;
 }

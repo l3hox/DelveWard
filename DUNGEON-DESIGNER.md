@@ -76,6 +76,64 @@ Array of entity objects placed on the grid. Can be empty (`[]`).
 
 Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 
+#### Entity types
+
+**Door** (`type: "door"`) — placed on `D` cells. Note: `D` cells without a door entity automatically get a closed, non-mechanical door.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `state` | string | No | `"closed"` (default), `"open"`, or `"locked"` |
+| `keyId` | string | No | Required if `state` is `"locked"`. Must match a key entity's `keyId`. |
+
+```json
+{ "col": 5, "row": 2, "type": "door", "state": "locked", "keyId": "gold_key" }
+```
+
+**Key** (`type: "key"`) — placed on walkable cells. Auto-picked up when player steps on it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `keyId` | string | Yes | Identifier matching a locked door's `keyId` |
+
+```json
+{ "col": 3, "row": 4, "type": "key", "keyId": "gold_key" }
+```
+
+**Lever** (`type: "lever"`) — placed on `O` cells. Player activates by standing on the cell and facing the wall the lever is mounted on.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targetDoor` | string | Yes | `"col,row"` of the door to toggle |
+| `wall` | string | No | Which wall the lever is on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
+
+The targeted door is marked **mechanical** — it cannot be opened or closed by player interaction (Space key). It can only be operated by the lever.
+
+```json
+{ "col": 7, "row": 8, "type": "lever", "targetDoor": "8,5", "wall": "E" }
+```
+
+**Pressure plate** (`type: "pressure_plate"`) — placed on walkable cells. Triggers automatically when player steps on it. One-way (stays open).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targetDoor` | string | Yes | `"col,row"` of the door to open |
+
+The targeted door is marked **mechanical** — same as lever-targeted doors.
+
+```json
+{ "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
+```
+
+#### Door behavior summary
+
+| Door type | Open with Space | Close with Space | Visual cue |
+|-----------|----------------|-----------------|------------|
+| Normal (no entity or plain door entity) | Yes | Yes | Brass button on frame |
+| Locked | Yes (with matching key) | Yes (after unlocking) | Iron-banded texture |
+| Mechanical (lever/plate target) | No | No | No button on frame |
+
+All doors have a 3D stone frame (pillars + lintel) that stays visible when open. Door panels slide up on open and down on close.
+
 ---
 
 ## Optional fields — texture theming
