@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 2 — Visual Polish** (in progress)
+**Phase 3 — Doors & Interaction** (not started)
 
 ---
 
@@ -36,24 +36,19 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ---
 
-## What's In Progress (Phase 2)
+- [x] **Phase 2 complete** — Visual Polish:
+  - Procedural pixelart textures (9 styles: 4 wall, 3 floor, 2 ceiling)
+  - Q/E key bindings for turning
+  - 4-layer texture resolution: hard-coded → defaults → charDefs → areas
+  - `CharDef` system — custom ASCII chars with solid/walkable + texture set
+  - 6 dungeon levels (levels 4–6 use charDefs for visual theming)
+  - `DUNGEON-DESIGNER.md` — full level JSON schema reference
+  - 76 tests
+  - Visual polish verified in-game
 
-- [x] Procedural pixelart textures for walls, floor, ceiling (`src/textures.ts` — Canvas2D, nearest-filter)
-- [x] Dungeon materials wired to new textures (replaced flat colors)
-- [x] Q/E key bindings for turning (alongside arrow keys)
-- [x] Texture variety — 9 texture styles across walls/floors/ceilings with cached registry
-- [x] `CellOverride` wired into dungeon builder — per-cell texture selection
-- [x] `cellOverrides` validation in level loader + 10 new tests (48 total)
-- [x] 3 new themed dungeon levels (level4–6) using cellOverrides for zone theming
-- [x] Replaced verbose cellOverrides with 4-layer texture system: defaults → charDefs → areas
-- [x] `CharDef` type — custom ASCII chars with solid/walkable + texture set, painted into grid
-- [x] Levels 4–6 rewritten with charDefs (removed areas, grid now shows texture themes visually)
-- [x] `DUNGEON-DESIGNER.md` — full level JSON schema reference for human and agent authors
-- [x] 76 tests (28 new: charDefs validation, buildWalkableSet, custom walkable movement)
+## Next Steps (Phase 3)
 
-## Next Steps (Phase 2)
-
-1. Visual polish pass — verify all texture transitions look good in-game
+See PLAN.md Phase 3 for full details.
 
 ---
 
@@ -62,7 +57,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 | Phase | Name | Status |
 |---|---|---|
 | 1 | Foundation Refactor | **Complete** |
-| 2 | Visual Polish (textures) | **In Progress** |
+| 2 | Visual Polish (textures) | **Complete** |
 | 3 | Doors & Interaction | Pending |
 | 4 | HUD | Pending |
 | 5 | Multi-Level Dungeons | Pending |
