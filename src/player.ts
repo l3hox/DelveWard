@@ -22,11 +22,12 @@ export class Player {
     grid: string[],
     startCol: number,
     startRow: number,
-    facing: Facing
+    facing: Facing,
+    walkable?: Set<string>,
   ) {
     this.camera = camera;
     this.grid = grid;
-    this.state = new PlayerState(startCol, startRow, facing);
+    this.state = new PlayerState(startCol, startRow, facing, walkable);
 
     const worldPos = this.gridToWorld(startCol, startRow);
     this.currentPos = worldPos.clone();

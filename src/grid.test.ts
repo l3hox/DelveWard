@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isWalkable,
+  buildWalkableSet,
   PlayerState,
   WALKABLE_CELLS,
   TURN_LEFT,
@@ -200,5 +201,68 @@ describe('PlayerState', () => {
     expect(p.moveForward(tinyGrid)).toBe(false);
     expect(p.gridX).toBe(0);
     expect(p.gridZ).toBe(0);
+  });
+
+  it('moves onto custom walkable chars when walkable set provided', () => {
+    const customGrid = [
+      '#####',
+      '#.b.#',
+      '#####',
+    ];
+    const walkable = buildWalkableSet([{ char: 'b', solid: false }]);
+    const p = new PlayerState(1, 1, 'E', walkable);
+    expect(p.moveForward(customGrid)).toBe(true);
+    expect(p.gridX).toBe(2);
+  });
+
+  it('cannot move onto solid charDef chars', () => {
+    const customGrid = [
+      '#####',
+      '#.@.#',
+      '#####',
+    ];
+    const walkable = buildWalkableSet([{ char: '@', solid: true }]);
+    const p = new PlayerState(1, 1, 'E', walkable);
+    expect(p.moveForward(customGrid)).toBe(false);
+    expect(p.gridX).toBe(1);
+  });
+});
+
+// --- buildWalkableSet ---
+
+describe('buildWalkableSet', () => {
+  it('returns WALKABLE_CELLS when no charDefs provided', () => {
+    expect(buildWalkableSet()).toBe(WALKABLE_CELLS);
+    expect(buildWalkableSet([])).toBe(WALKABLE_CELLS);
+  });
+
+  it('adds walkable charDef chars to the set', () => {
+    const set = buildWalkableSet([
+      { char: 'b', solid: false },
+      { char: 'm', solid: false },
+    ]);
+    expect(set.has('b')).toBe(true);
+    expect(set.has('m')).toBe(true);
+    expect(set.has('.')).toBe(true); // built-in still present
+  });
+
+  it('does not add solid charDef chars', () => {
+    const set = buildWalkableSet([
+      { char: '@', solid: true },
+      { char: 'b', solid: false },
+    ]);
+    expect(set.has('@')).toBe(false);
+    expect(set.has('b')).toBe(true);
+  });
+});
+
+// --- isWalkable with custom set ---
+
+describe('isWalkable with custom walkable set', () => {
+  it('uses custom set when provided', () => {
+    const customGrid = ['#b#'];
+    const walkable = new Set(['.', 'b']);
+    expect(isWalkable(customGrid, 1, 0, walkable)).toBe(true);
+    expect(isWalkable(customGrid, 0, 0, walkable)).toBe(false);
   });
 });

@@ -5,6 +5,23 @@ import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './text
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const KNOWN_CELLS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
+const BUILTIN_CHARS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
+
+function validateTextures(
+  entry: Record<string, unknown>,
+  label: string,
+  source: string,
+): void {
+  if (entry.wallTexture !== undefined && !WALL_TEXTURE_SET.has(entry.wallTexture as string)) {
+    throw new Error(`Level ${source}: ${label} has unknown wallTexture "${entry.wallTexture}"`);
+  }
+  if (entry.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(entry.floorTexture as string)) {
+    throw new Error(`Level ${source}: ${label} has unknown floorTexture "${entry.floorTexture}"`);
+  }
+  if (entry.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(entry.ceilingTexture as string)) {
+    throw new Error(`Level ${source}: ${label} has unknown ceilingTexture "${entry.ceilingTexture}"`);
+  }
+}
 
 export function validateLevel(data: unknown, source: string): DungeonLevel {
   if (typeof data !== 'object' || data === null) {
@@ -18,7 +35,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "name" must be a string`);
   }
 
-  // grid
+  // grid (basic structure — char validation happens after charDefs)
   if (!Array.isArray(obj.grid) || obj.grid.length === 0 || !obj.grid.every((r: unknown) => typeof r === 'string')) {
     throw new Error(`Level ${source}: "grid" must be a non-empty array of strings`);
   }
@@ -29,9 +46,56 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: all grid rows must be the same length`);
   }
 
+  // charDefs (optional — validate BEFORE grid chars so custom chars are known)
+  const charDefChars = new Set<string>();
+  const walkableChars = new Set(WALKABLE_CELLS);
+
+  if (obj.charDefs !== undefined) {
+    if (!Array.isArray(obj.charDefs)) {
+      throw new Error(`Level ${source}: "charDefs" must be an array`);
+    }
+
+    for (let i = 0; i < obj.charDefs.length; i++) {
+      const entry = obj.charDefs[i];
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        throw new Error(`Level ${source}: charDefs[${i}] must be an object`);
+      }
+
+      const def = entry as Record<string, unknown>;
+
+      // char
+      if (typeof def.char !== 'string' || def.char.length !== 1) {
+        throw new Error(`Level ${source}: charDefs[${i}].char must be a single character`);
+      }
+      if (BUILTIN_CHARS.has(def.char)) {
+        throw new Error(`Level ${source}: charDefs[${i}].char '${def.char}' conflicts with built-in character`);
+      }
+      if (charDefChars.has(def.char)) {
+        throw new Error(`Level ${source}: charDefs[${i}].char '${def.char}' is a duplicate`);
+      }
+      charDefChars.add(def.char);
+
+      // solid
+      if (typeof def.solid !== 'boolean') {
+        throw new Error(`Level ${source}: charDefs[${i}].solid must be a boolean`);
+      }
+
+      if (!def.solid) {
+        walkableChars.add(def.char);
+      }
+
+      // textures
+      validateTextures(def, `charDefs[${i}]`, source);
+    }
+  }
+
+  // grid char validation (now with extended known chars)
+  const extendedKnown = new Set(KNOWN_CELLS);
+  for (const ch of charDefChars) extendedKnown.add(ch);
+
   for (const row of grid) {
     for (const ch of row) {
-      if (!KNOWN_CELLS.has(ch)) {
+      if (!extendedKnown.has(ch)) {
         throw new Error(`Level ${source}: unknown cell character '${ch}'`);
       }
     }
@@ -55,7 +119,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   if (startRow < 0 || startRow >= grid.length || startCol < 0 || startCol >= rowLen) {
     throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is out of grid bounds`);
   }
-  if (!WALKABLE_CELLS.has(grid[startRow][startCol])) {
+  if (!walkableChars.has(grid[startRow][startCol])) {
     throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is not a walkable cell`);
   }
 
@@ -70,17 +134,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       throw new Error(`Level ${source}: "defaults" must be an object`);
     }
 
-    const def = obj.defaults as Record<string, unknown>;
-
-    if (def.wallTexture !== undefined && !WALL_TEXTURE_SET.has(def.wallTexture as string)) {
-      throw new Error(`Level ${source}: defaults has unknown wallTexture "${def.wallTexture}"`);
-    }
-    if (def.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(def.floorTexture as string)) {
-      throw new Error(`Level ${source}: defaults has unknown floorTexture "${def.floorTexture}"`);
-    }
-    if (def.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(def.ceilingTexture as string)) {
-      throw new Error(`Level ${source}: defaults has unknown ceilingTexture "${def.ceilingTexture}"`);
-    }
+    validateTextures(obj.defaults as Record<string, unknown>, 'defaults', source);
   }
 
   // areas (optional)
@@ -116,15 +170,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
         throw new Error(`Level ${source}: areas[${i}] must specify at least one texture`);
       }
 
-      if (entry.wallTexture !== undefined && !WALL_TEXTURE_SET.has(entry.wallTexture as string)) {
-        throw new Error(`Level ${source}: areas[${i}] has unknown wallTexture "${entry.wallTexture}"`);
-      }
-      if (entry.floorTexture !== undefined && !FLOOR_TEXTURE_SET.has(entry.floorTexture as string)) {
-        throw new Error(`Level ${source}: areas[${i}] has unknown floorTexture "${entry.floorTexture}"`);
-      }
-      if (entry.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(entry.ceilingTexture as string)) {
-        throw new Error(`Level ${source}: areas[${i}] has unknown ceilingTexture "${entry.ceilingTexture}"`);
-      }
+      validateTextures(entry, `areas[${i}]`, source);
     }
   }
 

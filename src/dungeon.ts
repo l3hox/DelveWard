@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { WALKABLE_CELLS } from './grid';
+import { WALKABLE_CELLS, buildWalkableSet } from './grid';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from './textures';
-import type { TextureSet, TextureArea } from './types';
+import type { TextureSet, TextureArea, CharDef } from './types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from './textureNames';
 
 export const CELL_SIZE = 2;
@@ -45,16 +45,18 @@ function getCeilingMaterial(name: CeilingTextureName = 'dark_rock'): THREE.MeshL
 
 // Rendering counterpart to isWalkable in grid.ts.
 // OOB cells are treated as solid (boundary walls) rather than non-walkable.
-function isSolid(grid: string[], col: number, row: number): boolean {
+function isSolid(grid: string[], col: number, row: number, walkable: Set<string> = WALKABLE_CELLS): boolean {
   if (row < 0 || row >= grid.length) return true;
   if (col < 0 || col >= grid[0].length) return true;
-  return !WALKABLE_CELLS.has(grid[row][col]);
+  return !walkable.has(grid[row][col]);
 }
 
 function resolveTextures(
   col: number,
   row: number,
+  char: string,
   defaults?: TextureSet,
+  charDefMap?: Map<string, CharDef>,
   areas?: TextureArea[],
 ): { wall: WallTextureName; floor: FloorTextureName; ceiling: CeilingTextureName } {
   let wall: string = 'stone';
@@ -68,7 +70,17 @@ function resolveTextures(
     if (defaults.ceilingTexture) ceiling = defaults.ceilingTexture;
   }
 
-  // Layer 3: areas (later entries win)
+  // Layer 3: charDefs — character-specific textures
+  if (charDefMap) {
+    const def = charDefMap.get(char);
+    if (def) {
+      if (def.wallTexture) wall = def.wallTexture;
+      if (def.floorTexture) floor = def.floorTexture;
+      if (def.ceilingTexture) ceiling = def.ceilingTexture;
+    }
+  }
+
+  // Layer 4: areas (later entries win)
   if (areas) {
     for (const area of areas) {
       if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
@@ -86,19 +98,47 @@ function resolveTextures(
   };
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[]): THREE.Group {
+// Resolve wall material for a face against a solid neighbor.
+// If the solid neighbor has a charDef with wallTexture, use that instead.
+function resolveWallMat(
+  grid: string[],
+  neighborCol: number,
+  neighborRow: number,
+  fallbackMat: THREE.MeshLambertMaterial,
+  charDefMap?: Map<string, CharDef>,
+): THREE.MeshLambertMaterial {
+  if (!charDefMap) return fallbackMat;
+  if (neighborRow < 0 || neighborRow >= grid.length) return fallbackMat;
+  if (neighborCol < 0 || neighborCol >= grid[0].length) return fallbackMat;
+  const neighborChar = grid[neighborRow][neighborCol];
+  const def = charDefMap.get(neighborChar);
+  if (def && def.solid && def.wallTexture) {
+    return getWallMaterial(def.wallTexture as WallTextureName);
+  }
+  return fallbackMat;
+}
+
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[]): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
 
+  // Build charDef lookup map and walkable set
+  const charDefMap = new Map<string, CharDef>();
+  if (charDefs) {
+    for (const def of charDefs) charDefMap.set(def.char, def);
+  }
+  const walkable = buildWalkableSet(charDefs);
+
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      if (!WALKABLE_CELLS.has(grid[row][col])) continue;
+      if (!walkable.has(grid[row][col])) continue;
 
       const cx = col * CELL_SIZE + CELL_SIZE / 2;
       const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
-      const tex = resolveTextures(col, row, defaults, areas);
+      const char = grid[row][col];
+      const tex = resolveTextures(col, row, char, defaults, charDefMap, areas);
       const cellWallMat = getWallMaterial(tex.wall);
       const cellFloorMat = getFloorMaterial(tex.floor);
       const cellCeilMat = getCeilingMaterial(tex.ceiling);
@@ -116,31 +156,35 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       group.add(ceil);
 
       // North wall
-      if (isSolid(grid, col, row - 1)) {
-        const wall = new THREE.Mesh(wallGeo, cellWallMat);
+      if (isSolid(grid, col, row - 1, walkable)) {
+        const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
+        const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.position.set(cx, WALL_HEIGHT / 2, cz - CELL_SIZE / 2);
         group.add(wall);
       }
 
       // South wall
-      if (isSolid(grid, col, row + 1)) {
-        const wall = new THREE.Mesh(wallGeo, cellWallMat);
+      if (isSolid(grid, col, row + 1, walkable)) {
+        const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
+        const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI;
         wall.position.set(cx, WALL_HEIGHT / 2, cz + CELL_SIZE / 2);
         group.add(wall);
       }
 
       // East wall
-      if (isSolid(grid, col + 1, row)) {
-        const wall = new THREE.Mesh(wallGeo, cellWallMat);
+      if (isSolid(grid, col + 1, row, walkable)) {
+        const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
+        const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = -Math.PI / 2;
         wall.position.set(cx + CELL_SIZE / 2, WALL_HEIGHT / 2, cz);
         group.add(wall);
       }
 
       // West wall
-      if (isSolid(grid, col - 1, row)) {
-        const wall = new THREE.Mesh(wallGeo, cellWallMat);
+      if (isSolid(grid, col - 1, row, walkable)) {
+        const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
+        const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI / 2;
         wall.position.set(cx - CELL_SIZE / 2, WALL_HEIGHT / 2, cz);
         group.add(wall);

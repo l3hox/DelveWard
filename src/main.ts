@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildDungeon } from './dungeon';
 import { Player } from './player';
 import { loadLevel } from './levelLoader';
+import { buildWalkableSet } from './grid';
 
 async function init(): Promise<void> {
   // --- Scene ---
@@ -32,8 +33,9 @@ async function init(): Promise<void> {
 
   // --- Level ---
   const level = await loadLevel('/levels/level6.json');
+  const walkable = buildWalkableSet(level.charDefs);
 
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas);
+  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs);
   scene.add(dungeonGroup);
 
   const player = new Player(
@@ -42,6 +44,7 @@ async function init(): Promise<void> {
     level.playerStart.col,
     level.playerStart.row,
     level.playerStart.facing,
+    walkable,
   );
 
   // --- Input ---

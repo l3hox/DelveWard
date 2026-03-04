@@ -45,11 +45,15 @@ Read this at the start of every Claude Code session to restore context. Update i
 - [x] `CellOverride` wired into dungeon builder — per-cell texture selection
 - [x] `cellOverrides` validation in level loader + 10 new tests (48 total)
 - [x] 3 new themed dungeon levels (level4–6) using cellOverrides for zone theming
+- [x] Replaced verbose cellOverrides with 4-layer texture system: defaults → charDefs → areas
+- [x] `CharDef` type — custom ASCII chars with solid/walkable + texture set, painted into grid
+- [x] Levels 4–6 rewritten with charDefs (removed areas, grid now shows texture themes visually)
+- [x] `DUNGEON-DESIGNER.md` — full level JSON schema reference for human and agent authors
+- [x] 76 tests (28 new: charDefs validation, buildWalkableSet, custom walkable movement)
 
 ## Next Steps (Phase 2)
 
-1. Refactor cellOverrides model — replace verbose per-cell overrides with area-based overlays, level defaults, and special char definitions (current JSON is too verbose/cluttered)
-2. Visual polish pass — verify all texture transitions look good in-game
+1. Visual polish pass — verify all texture transitions look good in-game
 
 ---
 
@@ -78,7 +82,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Known Issues
 
-- cellOverrides JSON model is too verbose — each cell needs its own entry. Planned refactor: area-based overlays, level-wide defaults, and special char → texture mappings.
+(none)
 
 ---
 
@@ -111,6 +115,17 @@ Read this at the start of every Claude Code session to restore context. Update i
 - Extracted pure grid logic (`Facing`, direction tables, `isWalkable`, `PlayerState`) into `src/grid.ts`
 - Refactored `src/player.ts` to delegate to `PlayerState`, keeping only Three.js rendering
 - TypeScript compiles clean, no Three.js dependency in grid.ts
+
+### Session 7 — Phase 2: charDefs texture system + designer guide
+- Replaced verbose cellOverrides with 4-layer texture resolution: hard-coded → defaults → charDefs → areas
+- Added `CharDef` interface (extends TextureSet with char + solid) to types.ts
+- `buildWalkableSet()` in grid.ts merges walkable charDef chars into WALKABLE_CELLS
+- `isWalkable()` and `PlayerState` accept optional walkable set for custom chars
+- `buildDungeon()` resolves charDef textures (layer 3) and solid charDef wall textures for neighbor faces
+- Level loader validates charDefs before grid chars, extends known/walkable sets
+- Rewrote levels 4–6 JSON: replaced areas with charDefs, grids now use b/,/m/w characters
+- Created `DUNGEON-DESIGNER.md` — full level JSON schema reference
+- 76 tests pass (28 new), TypeScript compiles clean
 
 ### Session 6 — Phase 2: Texture variety + new dungeons
 - Added 6 new procedural texture generators: brick/mossy/wood walls, dirt/cobblestone floors, wooden beams ceiling

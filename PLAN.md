@@ -193,7 +193,7 @@ Objects like fountains, altars, bookshelves, thrones should be representable as 
 
 ### 3. Per-cell visual customization (ceiling heights, textures)
 
-Different areas of a level should support varied ceiling heights and wall/floor textures. The `CellOverride` interface already exists for this (`ceilingHeight`, `wallTexture`, `floorTexture`). Implementation deferred to Phase 2+ but the data model is ready. Could also be expressed as an overlay file alongside the grid for cleaner separation.
+Texture theming uses a 4-layer resolution system: hard-coded defaults → `defaults` (level-wide) → `charDefs` (per-character) → `areas` (rectangular overrides). Custom characters (`charDefs`) let level authors paint texture themes directly into the grid — each char maps to solid/walkable + texture set. Solid charDefs provide their `wallTexture` to adjacent walkable cells. See `DUNGEON-DESIGNER.md` for the full level schema reference.
 
 ### 4. True multi-level 3D scenes
 

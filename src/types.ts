@@ -6,6 +6,11 @@ export interface TextureSet {
   ceilingTexture?: string;
 }
 
+export interface CharDef extends TextureSet {
+  char: string;      // single ASCII character, not a built-in char
+  solid: boolean;    // true = wall-like, false = walkable
+}
+
 export interface TextureArea extends TextureSet {
   fromCol: number;
   toCol: number;
@@ -19,6 +24,7 @@ export interface DungeonLevel {
   playerStart: { col: number; row: number; facing: Facing };
   entities: Entity[];
   defaults?: TextureSet;
+  charDefs?: CharDef[];
   areas?: TextureArea[];
 }
 

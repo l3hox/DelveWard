@@ -4,6 +4,23 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-04 — Phase 2: charDefs texture system replaces verbose cellOverrides
+
+Replaced the per-cell `cellOverrides` model with a 4-layer texture resolution system. The key addition is `charDefs` — custom ASCII characters that carry texture information and can be painted directly into the grid.
+
+- **`src/types.ts`** — added `CharDef` interface (extends `TextureSet` with `char: string`, `solid: boolean`), added `charDefs?: CharDef[]` to `DungeonLevel`
+- **`src/grid.ts`** — added `buildWalkableSet(charDefs?)` that merges walkable charDef chars into `WALKABLE_CELLS`; `isWalkable()` and `PlayerState` now accept optional walkable set
+- **`src/dungeon.ts`** — texture resolution now 4 layers: hard-coded → defaults → charDefs → areas; added `resolveWallMat()` for solid charDef neighbor wall textures; `buildDungeon()` accepts `charDefs` param
+- **`src/player.ts`** / **`src/main.ts`** — wired walkable set through Player to PlayerState
+- **`src/levelLoader.ts`** — charDefs validated before grid chars (so custom chars are known); validates char (single, not built-in, no duplicates), solid (boolean), texture names; grid and playerStart validation use extended known/walkable sets
+- **Levels 4–6** — rewritten with `charDefs`, areas removed; grids now use `b`/`,`/`m`/`w` to visually show texture themes
+- **`DUNGEON-DESIGNER.md`** (new) — full level JSON schema reference for human and agent authors
+- **Tests** — 76 total (28 new): charDefs validation (15), buildWalkableSet (3), isWalkable with custom set (1), PlayerState with custom walkable (2), plus grid.test.ts additions
+
+**Design decision**: charDefs are layer 3 (between defaults and areas). Solid charDefs provide `wallTexture` to adjacent walkable cells' wall faces. The `areas` system remains available as layer 4 for rectangular overrides.
+
+---
+
 ## 2026-03-03 — Phase 2: Texture variety, per-cell overrides, 3 new levels
 
 Added multiple texture styles and wired the `CellOverride` mechanism so levels can assign different textures per cell:

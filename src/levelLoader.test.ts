@@ -202,4 +202,127 @@ describe('validateLevel', () => {
       areas: [{ fromCol: 1, toCol: 1, fromRow: 1, toRow: 1, ceilingTexture: 'glass' }],
     }), 'test')).toThrow('unknown ceilingTexture "glass"');
   });
+
+  // --- charDefs validation ---
+
+  it('accepts valid walkable charDef', () => {
+    const level = validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false, wallTexture: 'brick', floorTexture: 'stone_tile' }],
+      grid: ['###', '#b#', '###'],
+    }), 'test');
+    expect(level.charDefs).toHaveLength(1);
+  });
+
+  it('accepts valid solid charDef', () => {
+    const level = validateLevel(validLevel({
+      charDefs: [{ char: '@', solid: true, wallTexture: 'wood' }],
+      grid: ['###', '#.#', '###'],
+    }), 'test');
+    expect(level.charDefs).toHaveLength(1);
+  });
+
+  it('accepts missing charDefs (backward compat)', () => {
+    const level = validateLevel(validLevel(), 'test');
+    expect(level.charDefs).toBeUndefined();
+  });
+
+  it('rejects non-array charDefs', () => {
+    expect(() => validateLevel(validLevel({ charDefs: 'bad' }), 'test'))
+      .toThrow('"charDefs" must be an array');
+    expect(() => validateLevel(validLevel({ charDefs: {} }), 'test'))
+      .toThrow('"charDefs" must be an array');
+  });
+
+  it('rejects non-object charDefs entry', () => {
+    expect(() => validateLevel(validLevel({ charDefs: [42] }), 'test'))
+      .toThrow('charDefs[0] must be an object');
+    expect(() => validateLevel(validLevel({ charDefs: [null] }), 'test'))
+      .toThrow('charDefs[0] must be an object');
+    expect(() => validateLevel(validLevel({ charDefs: [['b']] }), 'test'))
+      .toThrow('charDefs[0] must be an object');
+  });
+
+  it('rejects multi-char char in charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'bb', solid: false }],
+    }), 'test')).toThrow('charDefs[0].char must be a single character');
+  });
+
+  it('rejects built-in char conflict in charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: '#', solid: true }],
+    }), 'test')).toThrow("charDefs[0].char '#' conflicts with built-in character");
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: '.', solid: false }],
+    }), 'test')).toThrow("charDefs[0].char '.' conflicts with built-in character");
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: ' ', solid: true }],
+    }), 'test')).toThrow("charDefs[0].char ' ' conflicts with built-in character");
+  });
+
+  it('rejects duplicate char in charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [
+        { char: 'b', solid: false },
+        { char: 'b', solid: true },
+      ],
+    }), 'test')).toThrow("charDefs[1].char 'b' is a duplicate");
+  });
+
+  it('rejects missing or non-boolean solid in charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b' }],
+    }), 'test')).toThrow('charDefs[0].solid must be a boolean');
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: 'yes' }],
+    }), 'test')).toThrow('charDefs[0].solid must be a boolean');
+  });
+
+  it('rejects unknown texture names in charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false, wallTexture: 'marble' }],
+    }), 'test')).toThrow('charDefs[0] has unknown wallTexture "marble"');
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false, floorTexture: 'lava' }],
+    }), 'test')).toThrow('charDefs[0] has unknown floorTexture "lava"');
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false, ceilingTexture: 'glass' }],
+    }), 'test')).toThrow('charDefs[0] has unknown ceilingTexture "glass"');
+  });
+
+  it('accepts grid with charDef characters', () => {
+    const level = validateLevel(validLevel({
+      charDefs: [
+        { char: 'b', solid: false, wallTexture: 'brick' },
+        { char: '@', solid: true, wallTexture: 'wood' },
+      ],
+      grid: ['#@#', '#b#', '###'],
+      playerStart: { col: 1, row: 1, facing: 'N' },
+    }), 'test');
+    expect(level.grid[0]).toBe('#@#');
+  });
+
+  it('rejects unknown chars in grid even with charDefs', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false }],
+      grid: ['###', '#X#', '###'],
+    }), 'test')).toThrow("unknown cell character 'X'");
+  });
+
+  it('accepts playerStart on walkable charDef cell', () => {
+    const level = validateLevel(validLevel({
+      charDefs: [{ char: 'b', solid: false, wallTexture: 'brick' }],
+      grid: ['###', '#b#', '###'],
+      playerStart: { col: 1, row: 1, facing: 'N' },
+    }), 'test');
+    expect(level.playerStart.col).toBe(1);
+  });
+
+  it('rejects playerStart on solid charDef cell', () => {
+    expect(() => validateLevel(validLevel({
+      charDefs: [{ char: '@', solid: true, wallTexture: 'wood' }],
+      grid: ['###', '#@#', '###'],
+      playerStart: { col: 1, row: 1, facing: 'N' },
+    }), 'test')).toThrow('is not a walkable cell');
+  });
 });
