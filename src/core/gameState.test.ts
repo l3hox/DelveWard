@@ -399,4 +399,74 @@ describe('GameState', () => {
       expect(gs.isDoorOpen(4, 2)).toBe(true);
     });
   });
+
+  // --- toggleDoor edge cases ---
+
+  describe('toggleDoor', () => {
+    it('does nothing for non-existent door', () => {
+      const gs = new GameState([]);
+      // Should not throw
+      gs.toggleDoor(99, 99);
+    });
+  });
+
+  // --- autoDetectLeverWall ---
+
+  describe('autoDetectLeverWall', () => {
+    // Auto-detection checks N, S, E, W in priority order, falls back to N
+    const grid = [
+      '#####',
+      '#...#',
+      '#...#',
+      '#...#',
+      '#####',
+    ];
+
+    it('detects N wall when wall is to the north', () => {
+      // Cell (2,1) has wall at row 0 to the north
+      const gs = new GameState([
+        { col: 2, row: 1, type: 'lever', targetDoor: '1,1' },
+      ], grid);
+      expect(gs.levers.get('2,1')!.wall).toBe('N');
+    });
+
+    it('detects S wall when wall is to the south', () => {
+      // Cell (2,3) has wall at row 4 to the south
+      const gs = new GameState([
+        { col: 2, row: 3, type: 'lever', targetDoor: '1,1' },
+      ], grid);
+      expect(gs.levers.get('2,3')!.wall).toBe('S');
+    });
+
+    it('detects E wall when wall is to the east', () => {
+      // Cell (3,2) has wall at col 4 to the east, no wall N or S
+      const gs = new GameState([
+        { col: 3, row: 2, type: 'lever', targetDoor: '1,1' },
+      ], grid);
+      expect(gs.levers.get('3,2')!.wall).toBe('E');
+    });
+
+    it('detects W wall when wall is to the west', () => {
+      // Cell (1,2) has wall at col 0 to the west, no wall N or S
+      const gs = new GameState([
+        { col: 1, row: 2, type: 'lever', targetDoor: '1,1' },
+      ], grid);
+      expect(gs.levers.get('1,2')!.wall).toBe('W');
+    });
+
+    it('falls back to N when no adjacent walls', () => {
+      // Cell (2,2) is surrounded by floor on all sides
+      const gs = new GameState([
+        { col: 2, row: 2, type: 'lever', targetDoor: '1,1' },
+      ], grid);
+      expect(gs.levers.get('2,2')!.wall).toBe('N');
+    });
+
+    it('falls back to N when no grid provided', () => {
+      const gs = new GameState([
+        { col: 2, row: 2, type: 'lever', targetDoor: '1,1' },
+      ]);
+      expect(gs.levers.get('2,2')!.wall).toBe('N');
+    });
+  });
 });

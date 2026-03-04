@@ -3,13 +3,25 @@ import { buildDungeon } from './rendering/dungeon';
 import { Player } from './rendering/player';
 import { loadLevel } from './core/levelLoader';
 import { buildWalkableSet, getFacingCell } from './core/grid';
-import { GameState } from './core/gameState';
+import { GameState, doorKey, parseDoorKey } from './core/gameState';
 import { interact } from './core/interaction';
 import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
-import { buildLeverMeshes, LeverAnimator } from './rendering/leverRenderer';
+import { buildLeverMeshes } from './rendering/leverRenderer';
+import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
+
+// Cap delta to prevent physics jumps when tab is backgrounded
+const MAX_FRAME_DELTA = 0.1;
+
+// Torch flicker parameters
+const TORCH_OFFSET_Y = 0.3;
+const FLICKER_BASE = 2.6;
+const FLICKER_RANGE = 0.6;
+const FLICKER_MIN_INTERVAL = 0.08;
+const FLICKER_INTERVAL_RANGE = 0.25;
+const FLICKER_LERP = 0.15;
 
 async function init(): Promise<void> {
   // --- Scene ---
@@ -95,7 +107,7 @@ async function init(): Promise<void> {
     const plateTarget = gameState.activatePressurePlate(col, row);
     if (plateTarget) {
       console.log('Pressure plate activated.');
-      const [dc, dr] = plateTarget.split(',').map(Number);
+      const [dc, dr] = parseDoorKey(plateTarget);
       updateDoorMesh(doorMeshes.panelMap, dc, dr, true, doorAnimator);
       pressPlate(plateMeshes.meshMap, col, row);
     }
@@ -134,10 +146,10 @@ async function init(): Promise<void> {
             updateDoorMesh(doorMeshes.panelMap, facing.col, facing.row, false, doorAnimator);
           }
           if (result.type === 'lever_activated' && result.targetDoor) {
-            const [dc, dr] = result.targetDoor.split(',').map(Number);
+            const [dc, dr] = parseDoorKey(result.targetDoor);
             updateDoorMesh(doorMeshes.panelMap, dc, dr, gameState.isDoorOpen(dc, dr), doorAnimator);
             // Animate lever handle
-            const leverKey = `${player.getState().gridX},${player.getState().gridZ}`;
+            const leverKey = doorKey(player.getState().col, player.getState().row);
             const lever = gameState.levers.get(leverKey);
             if (lever) leverAnimator.setState(leverKey, lever.state);
           }
@@ -167,7 +179,7 @@ async function init(): Promise<void> {
   let lastTime = 0;
 
   function animate(time: number): void {
-    const delta = Math.min((time - lastTime) / 1000, 0.1);
+    const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
     player.update(delta);
@@ -176,13 +188,13 @@ async function init(): Promise<void> {
 
     // Torch follows player with variable flicker
     const pos = player.getWorldPosition();
-    torchLight.position.set(pos.x, pos.y + 0.3, pos.z);
+    torchLight.position.set(pos.x, pos.y + TORCH_OFFSET_Y, pos.z);
     flickerTimer -= delta;
     if (flickerTimer <= 0) {
-      flickerTarget = 2.6 + Math.random() * 0.6;
-      flickerTimer = 0.08 + Math.random() * 0.25; // variable interval
+      flickerTarget = FLICKER_BASE + Math.random() * FLICKER_RANGE;
+      flickerTimer = FLICKER_MIN_INTERVAL + Math.random() * FLICKER_INTERVAL_RANGE;
     }
-    torchLight.intensity += (flickerTarget - torchLight.intensity) * 0.15;
+    torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
 
     renderer.render(scene, camera);
     requestAnimationFrame(animate);

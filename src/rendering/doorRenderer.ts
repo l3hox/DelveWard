@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 import { getDoorTexture, getLockedDoorTexture, getDoorFrameTexture } from './textures';
-import type { GameState } from '../core/gameState';
+import { doorKey, type GameState } from '../core/gameState';
 import type { DoorAnimator } from './doorAnimator';
 
 export type DoorOrientation = 'NS' | 'EW'; // NS = door faces N-S (blocks E-W passage), EW = door faces E-W (blocks N-S passage)
@@ -157,7 +157,7 @@ export function updateDoorMesh(
   isOpen: boolean,
   animator?: DoorAnimator,
 ): void {
-  const key = `${col},${row}`;
+  const key = doorKey(col, row);
   if (animator) {
     animator.setOpen(key, isOpen);
   } else {

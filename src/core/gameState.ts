@@ -35,10 +35,16 @@ export interface PlateInstance {
   activated: boolean;
 }
 
-function doorKey(col: number, row: number): string {
+export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
 
+export function parseDoorKey(key: string): [number, number] {
+  const [col, row] = key.split(',').map(Number);
+  return [col, row];
+}
+
+// Scans adjacent cells in N→S→E→W priority order. Falls back to N if no wall found.
 function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing {
   if (!grid) return 'N';
   const rows = grid.length;
@@ -203,7 +209,7 @@ export class GameState {
     const lever = this.levers.get(doorKey(col, row));
     if (!lever) return undefined;
     lever.state = lever.state === 'up' ? 'down' : 'up';
-    const [dc, dr] = lever.targetDoor.split(',').map(Number);
+    const [dc, dr] = parseDoorKey(lever.targetDoor);
     this.toggleDoor(dc, dr);
     return lever.targetDoor;
   }
@@ -212,7 +218,7 @@ export class GameState {
     const plate = this.plates.get(doorKey(col, row));
     if (!plate || plate.activated) return undefined;
     plate.activated = true;
-    const [dc, dr] = plate.targetDoor.split(',').map(Number);
+    const [dc, dr] = parseDoorKey(plate.targetDoor);
     // Bypass openDoor check — mechanisms can always operate their doors
     const door = this.getDoor(dc, dr);
     if (door && door.state === 'closed') {

@@ -2,9 +2,9 @@ import type { DungeonLevel } from './types';
 import type { Facing } from './grid';
 import { WALKABLE_CELLS } from './grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './textureNames';
+import { parseDoorKey } from './gameState';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
-const KNOWN_CELLS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
 const BUILTIN_CHARS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
 
 function validateTextures(
@@ -90,7 +90,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   }
 
   // grid char validation (now with extended known chars)
-  const extendedKnown = new Set(KNOWN_CELLS);
+  const extendedKnown = new Set(BUILTIN_CHARS);
   for (const ch of charDefChars) extendedKnown.add(ch);
 
   for (const row of grid) {
@@ -172,7 +172,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever must have targetDoor in "col,row" format`);
       }
-      const [tc, tr] = (e.targetDoor as string).split(',').map(Number);
+      const [tc, tr] = parseDoorKey(e.targetDoor as string);
       if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
         throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a 'D' cell`);
       }
@@ -185,7 +185,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must have targetDoor in "col,row" format`);
       }
-      const [tc, tr] = (e.targetDoor as string).split(',').map(Number);
+      const [tc, tr] = parseDoorKey(e.targetDoor as string);
       if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate targetDoor must reference a 'D' cell`);
       }

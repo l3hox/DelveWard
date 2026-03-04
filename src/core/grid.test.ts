@@ -116,73 +116,73 @@ describe('FACING_DELTA', () => {
 describe('PlayerState', () => {
   it('initializes at given position and facing', () => {
     const p = new PlayerState(2, 3, 'S');
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(3);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(3);
     expect(p.facing).toBe('S');
   });
 
   it('moveForward into open cell succeeds', () => {
     const p = new PlayerState(2, 2, 'N');
     expect(p.moveForward(GRID)).toBe(true);
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(1);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(1);
   });
 
   it('moveForward into wall fails and position unchanged', () => {
     const p = new PlayerState(1, 1, 'N');
     expect(p.moveForward(GRID)).toBe(false);
-    expect(p.gridX).toBe(1);
-    expect(p.gridZ).toBe(1);
+    expect(p.col).toBe(1);
+    expect(p.row).toBe(1);
   });
 
   it('moveBack into open cell succeeds', () => {
     const p = new PlayerState(2, 2, 'N');
     expect(p.moveBack(GRID)).toBe(true);
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(3);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(3);
   });
 
   it('moveBack into wall fails', () => {
     const p = new PlayerState(1, 3, 'N');
     expect(p.moveBack(GRID)).toBe(false);
-    expect(p.gridZ).toBe(3);
+    expect(p.row).toBe(3);
   });
 
   it('strafeLeft moves perpendicular', () => {
     const p = new PlayerState(2, 2, 'N'); // left of N is W → col-1
     expect(p.strafeLeft(GRID)).toBe(true);
-    expect(p.gridX).toBe(1);
-    expect(p.gridZ).toBe(2);
+    expect(p.col).toBe(1);
+    expect(p.row).toBe(2);
   });
 
   it('strafeRight moves perpendicular', () => {
     const p = new PlayerState(2, 2, 'N'); // right of N is E → col+1
     expect(p.strafeRight(GRID)).toBe(true);
-    expect(p.gridX).toBe(3);
-    expect(p.gridZ).toBe(2);
+    expect(p.col).toBe(3);
+    expect(p.row).toBe(2);
   });
 
   it('strafe into wall fails', () => {
     const p = new PlayerState(1, 1, 'S'); // left of S is E → col+1 = 2 (ok), right of S is W → col 0 (wall)
     expect(p.strafeRight(GRID)).toBe(false);
-    expect(p.gridX).toBe(1);
-    expect(p.gridZ).toBe(1);
+    expect(p.col).toBe(1);
+    expect(p.row).toBe(1);
   });
 
   it('turnLeft changes facing without moving', () => {
     const p = new PlayerState(2, 2, 'N');
     p.turnLeft();
     expect(p.facing).toBe('W');
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(2);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(2);
   });
 
   it('turnRight changes facing without moving', () => {
     const p = new PlayerState(2, 2, 'N');
     p.turnRight();
     expect(p.facing).toBe('E');
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(2);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(2);
   });
 
   it('walk a path: forward, turn right, forward', () => {
@@ -190,8 +190,8 @@ describe('PlayerState', () => {
     expect(p.moveForward(GRID)).toBe(true); // (1,2)
     p.turnRight();                           // facing E
     expect(p.moveForward(GRID)).toBe(true); // (2,2)
-    expect(p.gridX).toBe(2);
-    expect(p.gridZ).toBe(2);
+    expect(p.col).toBe(2);
+    expect(p.row).toBe(2);
     expect(p.facing).toBe('E');
   });
 
@@ -200,8 +200,8 @@ describe('PlayerState', () => {
     const tinyGrid = ['.'];
     const p = new PlayerState(0, 0, 'N');
     expect(p.moveForward(tinyGrid)).toBe(false);
-    expect(p.gridX).toBe(0);
-    expect(p.gridZ).toBe(0);
+    expect(p.col).toBe(0);
+    expect(p.row).toBe(0);
   });
 
   it('moves onto custom walkable chars when walkable set provided', () => {
@@ -213,7 +213,7 @@ describe('PlayerState', () => {
     const walkable = buildWalkableSet([{ char: 'b', solid: false }]);
     const p = new PlayerState(1, 1, 'E', walkable);
     expect(p.moveForward(customGrid)).toBe(true);
-    expect(p.gridX).toBe(2);
+    expect(p.col).toBe(2);
   });
 
   it('cannot move onto solid charDef chars', () => {
@@ -225,7 +225,7 @@ describe('PlayerState', () => {
     const walkable = buildWalkableSet([{ char: '@', solid: true }]);
     const p = new PlayerState(1, 1, 'E', walkable);
     expect(p.moveForward(customGrid)).toBe(false);
-    expect(p.gridX).toBe(1);
+    expect(p.col).toBe(1);
   });
 });
 
@@ -303,13 +303,13 @@ describe('PlayerState with isDoorOpen', () => {
   it('can walk through open door', () => {
     const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => true);
     expect(p.moveForward(DOOR_GRID)).toBe(true);
-    expect(p.gridX).toBe(2);
+    expect(p.col).toBe(2);
   });
 
   it('cannot walk through closed door', () => {
     const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => false);
     expect(p.moveForward(DOOR_GRID)).toBe(false);
-    expect(p.gridX).toBe(1);
+    expect(p.col).toBe(1);
   });
 });
 

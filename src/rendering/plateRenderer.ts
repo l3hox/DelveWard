@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import type { GameState } from '../core/gameState';
+import { doorKey, type GameState } from '../core/gameState';
 
 const PLATE_SIZE = 0.8;
 const PLATE_HEIGHT = 0.02;
@@ -84,7 +84,7 @@ export function pressPlate(
   col: number,
   row: number,
 ): void {
-  const key = `${col},${row}`;
+  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (!mesh) return;
   if (!pressedMat) pressedMat = new THREE.MeshLambertMaterial({ map: generatePlateTexture(true) });

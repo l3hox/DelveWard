@@ -176,7 +176,7 @@ Game Loop → player.update(delta)
 - **Animator pattern**: `register()` → `setState/setOpen()` → `update(delta)` per frame
 - **Texture caching**: Generate once, cache by name, return cached on subsequent calls
 - **Grid constants**: `CELL_SIZE`, `WALL_HEIGHT`, `EYE_HEIGHT` exported from `dungeon.ts`
-- **Tests**: Co-located in `src/core/`, run with `npx vitest run`, 167 tests
+- **Tests**: Co-located in `src/core/`, run with `npx vitest run`
 
 ---
 

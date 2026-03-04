@@ -55,11 +55,11 @@ export function interact(
   }
 
   // Lever interaction — player stands on lever cell, faces the wall
-  const playerCell = grid[playerState.gridZ]?.[playerState.gridX];
+  const playerCell = grid[playerState.row]?.[playerState.col];
   if (playerCell === 'O') {
-    const lever = gameState.getLever(playerState.gridX, playerState.gridZ);
+    const lever = gameState.getLever(playerState.col, playerState.row);
     if (lever && lever.wall === playerState.facing) {
-      const targetDoor = gameState.activateLever(playerState.gridX, playerState.gridZ);
+      const targetDoor = gameState.activateLever(playerState.col, playerState.row);
       if (targetDoor) {
         return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
       }

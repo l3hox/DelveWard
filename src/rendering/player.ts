@@ -70,32 +70,32 @@ export class Player {
   moveForward(): void {
     if (this.isAnimating()) return;
     if (this.state.moveForward(this.grid)) {
-      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
-      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
+      this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
 
   moveBack(): void {
     if (this.isAnimating()) return;
     if (this.state.moveBack(this.grid)) {
-      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
-      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
+      this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
 
   strafeLeft(): void {
     if (this.isAnimating()) return;
     if (this.state.strafeLeft(this.grid)) {
-      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
-      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
+      this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
 
   strafeRight(): void {
     if (this.isAnimating()) return;
     if (this.state.strafeRight(this.grid)) {
-      this.targetPos.copy(this.gridToWorld(this.state.gridX, this.state.gridZ));
-      this.onMoveCallback?.(this.state.gridX, this.state.gridZ);
+      this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
 

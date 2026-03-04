@@ -51,8 +51,8 @@ export function isWalkable(
 }
 
 export class PlayerState {
-  gridX: number;
-  gridZ: number;
+  col: number;
+  row: number;
   facing: Facing;
   private walkable: Set<string>;
   private isDoorOpen?: (col: number, row: number) => boolean;
@@ -64,8 +64,8 @@ export class PlayerState {
     walkable?: Set<string>,
     isDoorOpen?: (col: number, row: number) => boolean,
   ) {
-    this.gridX = col;
-    this.gridZ = row;
+    this.col = col;
+    this.row = row;
     this.facing = facing;
     this.walkable = walkable ?? WALKABLE_CELLS;
     this.isDoorOpen = isDoorOpen;
@@ -73,41 +73,41 @@ export class PlayerState {
 
   moveForward(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!isWalkable(grid, nx, nz, this.walkable, this.isDoorOpen)) return false;
-    this.gridX = nx;
-    this.gridZ = nz;
+    const nc = this.col + dc;
+    const nr = this.row + dr;
+    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen)) return false;
+    this.col = nc;
+    this.row = nr;
     return true;
   }
 
   moveBack(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
-    const nx = this.gridX - dc;
-    const nz = this.gridZ - dr;
-    if (!isWalkable(grid, nx, nz, this.walkable, this.isDoorOpen)) return false;
-    this.gridX = nx;
-    this.gridZ = nz;
+    const nc = this.col - dc;
+    const nr = this.row - dr;
+    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen)) return false;
+    this.col = nc;
+    this.row = nr;
     return true;
   }
 
   strafeLeft(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[TURN_LEFT[this.facing]];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!isWalkable(grid, nx, nz, this.walkable, this.isDoorOpen)) return false;
-    this.gridX = nx;
-    this.gridZ = nz;
+    const nc = this.col + dc;
+    const nr = this.row + dr;
+    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen)) return false;
+    this.col = nc;
+    this.row = nr;
     return true;
   }
 
   strafeRight(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[TURN_RIGHT[this.facing]];
-    const nx = this.gridX + dc;
-    const nz = this.gridZ + dr;
-    if (!isWalkable(grid, nx, nz, this.walkable, this.isDoorOpen)) return false;
-    this.gridX = nx;
-    this.gridZ = nz;
+    const nc = this.col + dc;
+    const nr = this.row + dr;
+    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen)) return false;
+    this.col = nc;
+    this.row = nr;
     return true;
   }
 
@@ -122,5 +122,5 @@ export class PlayerState {
 
 export function getFacingCell(state: PlayerState): { col: number; row: number } {
   const [dc, dr] = FACING_DELTA[state.facing];
-  return { col: state.gridX + dc, row: state.gridZ + dr };
+  return { col: state.col + dc, row: state.row + dr };
 }

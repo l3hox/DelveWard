@@ -59,6 +59,7 @@ function resolveTextures(
   charDefMap?: Map<string, CharDef>,
   areas?: TextureArea[],
 ): { wall: WallTextureName; floor: FloorTextureName; ceiling: CeilingTextureName } {
+  // Layer 1: hard-coded defaults
   let wall: string = 'stone';
   let floor: string = 'stone_tile';
   let ceiling: string = 'dark_rock';
