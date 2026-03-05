@@ -18,6 +18,8 @@ import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 
+const CAMERA_FOV = 80;
+
 // Cap delta to prevent physics jumps when tab is backgrounded
 const MAX_FRAME_DELTA = 0.1;
 
@@ -140,7 +142,7 @@ async function init(): Promise<void> {
 
   // --- Camera ---
   const camera = new THREE.PerspectiveCamera(
-    75,
+    CAMERA_FOV,
     window.innerWidth / window.innerHeight,
     0.1,
     100

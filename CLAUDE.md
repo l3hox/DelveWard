@@ -132,6 +132,16 @@ Every session follows this protocol:
 
 ---
 
+## Agent & Model Preferences
+
+- **Planning**: Use **Opus** (high capability) for creating plans and architectural decisions
+- **Implementation**: Use **Opus** (medium) for code implementation subagents
+- **Subagent usage**: Spawn subagents for implementation tasks. Use the `SoftwareDeveloper` agent type for code work
+- **Parallelization**: Parallelize independent tasks (spawn multiple subagents in one message). Serialize tasks that depend on each other. Use your judgement on which approach fits
+- **Don't ask** — these preferences are standing instructions, not per-session choices
+
+---
+
 ## Working Style Notes
 
 - Keep solutions simple — avoid over-engineering

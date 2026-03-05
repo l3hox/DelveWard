@@ -9,6 +9,42 @@ export type DoorOrientation = 'NS' | 'EW'; // NS = door faces N-S (blocks E-W pa
 const FRAME_DEPTH = 0.15;
 const FRAME_WIDTH = 0.15;
 
+/**
+ * Scale BoxGeometry UVs so each face samples proportional texture,
+ * preventing squeeze on thin dimensions.
+ * refSize = the size the texture looks correct at (CELL_SIZE).
+ */
+function fixBoxUVs(geo: THREE.BoxGeometry, w: number, h: number, d: number, refSize: number): void {
+  const uv = geo.getAttribute('uv');
+  const sw = w / refSize;
+  const sh = h / refSize;
+  const sd = d / refSize;
+
+  // Face order: +x(0-3), -x(4-7), +y(8-11), -y(12-15), +z(16-19), -z(20-23)
+  // ±x: U across depth, V across height
+  for (const s of [0, 4]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setX(s + j, uv.getX(s + j) * sd);
+      uv.setY(s + j, uv.getY(s + j) * sh);
+    }
+  }
+  // ±y: U across width, V across depth
+  for (const s of [8, 12]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setX(s + j, uv.getX(s + j) * sw);
+      uv.setY(s + j, uv.getY(s + j) * sd);
+    }
+  }
+  // ±z: U across width, V across height
+  for (const s of [16, 20]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setX(s + j, uv.getX(s + j) * sw);
+      uv.setY(s + j, uv.getY(s + j) * sh);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
 export function detectDoorOrientation(
   grid: string[],
   col: number,
@@ -70,6 +106,7 @@ function buildDoorFrame(orientation: DoorOrientation, cx: number, cz: number, fr
 
   // Left pillar
   const pillarGeo = new THREE.BoxGeometry(FRAME_WIDTH, WALL_HEIGHT, FRAME_DEPTH);
+  fixBoxUVs(pillarGeo, FRAME_WIDTH, WALL_HEIGHT, FRAME_DEPTH, CELL_SIZE);
   const leftPillar = new THREE.Mesh(pillarGeo, frameMat);
   leftPillar.position.set(-panelWidth / 2 - FRAME_WIDTH / 2, WALL_HEIGHT / 2, 0);
   frame.add(leftPillar);
@@ -81,6 +118,7 @@ function buildDoorFrame(orientation: DoorOrientation, cx: number, cz: number, fr
 
   // Lintel (top beam)
   const lintelGeo = new THREE.BoxGeometry(CELL_SIZE, FRAME_WIDTH, FRAME_DEPTH);
+  fixBoxUVs(lintelGeo, CELL_SIZE, FRAME_WIDTH, FRAME_DEPTH, CELL_SIZE);
   const lintel = new THREE.Mesh(lintelGeo, frameMat);
   lintel.position.set(0, WALL_HEIGHT - FRAME_WIDTH / 2, 0);
   frame.add(lintel);
@@ -113,8 +151,11 @@ export function buildDoorMeshes(
     map: getLockedDoorTexture(),
     side: THREE.DoubleSide,
   });
+  const frameTex = getDoorFrameTexture();
+  frameTex.wrapS = THREE.RepeatWrapping;
+  frameTex.wrapT = THREE.RepeatWrapping;
   const frameMat = new THREE.MeshLambertMaterial({
-    map: getDoorFrameTexture(),
+    map: frameTex,
   });
   const buttonMat = new THREE.MeshLambertMaterial({ color: 0xcc8833 });
 

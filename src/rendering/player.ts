@@ -4,6 +4,7 @@ import { PlayerState, Facing, FACING_ANGLE } from '../core/grid';
 
 const TWEEN_SPEED = 20;
 const ANIM_THRESHOLD = 0.05;
+const CAMERA_BACK_OFFSET = 0.4; // pull camera back from cell center to see tile edges
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
@@ -132,6 +133,9 @@ export class Player {
     }
 
     this.camera.position.copy(this.currentPos);
+    // Pull camera back from cell center along facing direction
+    this.camera.position.x += Math.sin(this.currentAngle) * CAMERA_BACK_OFFSET;
+    this.camera.position.z += Math.cos(this.currentAngle) * CAMERA_BACK_OFFSET;
     this.camera.rotation.y = this.currentAngle;
   }
 
