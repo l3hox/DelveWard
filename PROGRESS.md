@@ -104,6 +104,14 @@ Read this at the start of every Claude Code session to restore context. Update i
   - `dungeon.ts` skips floor, ceiling, and wall rendering for stair cells
   - Stair facing auto-detected from adjacent walkable neighbor
 - [x] **Debug fullbright toggle** — `L` key toggles bright ambient light + disables fog
+- [x] **Camera viewport tuning**:
+  - Asymmetric frustum crop via `setViewOffset` — crop top 15%, expand bottom 20%
+  - Side crop auto-derived from top+bottom to preserve 1:1 aspect ratio
+  - Camera pitch tilt on stair cells (look down on S, look up on U) with smooth lerp
+  - Camera back offset increased to 0.95 — telephoto effect flattens perspective
+  - `EYE_HEIGHT` set to 65% of `WALL_HEIGHT`
+  - FOV tuned to 75
+  - Fixed stair target coordinates in `dungeon1.json`
 
 ## Next Steps (Phase 6)
 
@@ -142,7 +150,23 @@ See PLAN.md Phase 6 for full details.
 
 ## Session Log
 
-### Session 13 — 3D Stair Geometry, Visual Polish, Camera Tuning
+### Session 14 — Camera Viewport Tuning
+- Asymmetric frustum crop via `setViewOffset` in `main.ts`:
+  - `CAMERA_CROP_TOP = 0.15` (cut 15% from top — claustrophobic ceiling)
+  - `CAMERA_CROP_BOTTOM = -0.2` (expand 20% downward — more visible floor)
+  - `CAMERA_CROP_SIDE` auto-derived from top+bottom to preserve 1:1 aspect ratio
+  - Applied on init and on window resize
+- Camera pitch tilt on stair cells in `player.ts`:
+  - `STAIR_PITCH = 0.15` rad (~8.5°) — look down on S cells, look up on U cells
+  - `STAIR_Y_OFFSET = 0.35` — camera dips/rises on stairs
+  - Pitch lerped smoothly like position and angle
+- `CAMERA_BACK_OFFSET` increased from 0.4 to 0.95 — telephoto effect flattens perspective
+- `EYE_HEIGHT` changed from 1.0 to `WALL_HEIGHT * 0.65` in `dungeon.ts`
+- `CAMERA_FOV` tuned from 80 to 75
+- Fixed stair target coordinates in `dungeon1.json`
+- Tried and discarded depth Z-scaling (projection matrix column 2 scaling) — same visual result as FOV change, not useful
+
+### Session 13 — 3D Stair Geometry, Visual Polish
 - Created `src/rendering/stairRenderer.ts` — 3D stair steps for S/U cells
   - `detectStairFacing()` finds walkable neighbor for approach direction
   - `buildStairGroup()` creates 4 floor steps, 4 ceiling steps, 2 side walls, 1 black back wall
@@ -154,11 +178,10 @@ See PLAN.md Phase 6 for full details.
   - Vertex color depth fade: all geometry fades to black toward the back wall
 - Modified `src/rendering/dungeon.ts` — skip floor, ceiling, and all walls for S/U cells
 - Modified `src/rendering/doorRenderer.ts` — fixed squeezed textures on door frame pillars/lintel with proportional UV scaling
-- Modified `src/rendering/player.ts` — added `CAMERA_BACK_OFFSET` (0.4) to pull camera behind cell center
 - Modified `src/main.ts`:
   - Integrated `stairMeshes` into `LevelScene`, `buildLevelScene()`, `teardownLevelScene()`
   - Added `L` key debug fullbright toggle (bright ambient light + fog disable)
-  - Extracted `CAMERA_FOV` as named constant (set to 100)
+  - Extracted `CAMERA_FOV` as named constant
 - Updated `CLAUDE.md` — added Agent & Model Preferences section (standing instructions)
 - TypeScript compiles clean
 

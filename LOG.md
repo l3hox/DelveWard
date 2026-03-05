@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-05 — Camera Viewport Tuning
+
+Iterative camera feel tuning — asymmetric frustum crop, stair pitch, telephoto effect.
+
+**Changes:**
+- **Asymmetric frustum crop** via `camera.setViewOffset()` in `main.ts` — crop top 15%, expand bottom 20%. Side crop auto-derived to preserve 1:1 aspect ratio. Applied on init + resize.
+- **Camera pitch on stairs** in `player.ts` — `STAIR_PITCH = 0.15` rad. Camera tilts down on S cells, up on U cells. Smoothly lerped alongside position and angle.
+- **Camera back offset** increased from 0.4 to 0.95 — pulls camera toward cell edge behind player. Combined with FOV 75 this creates a telephoto effect that flattens perspective, making distant objects look closer.
+- **EYE_HEIGHT** changed from fixed 1.0 to `WALL_HEIGHT * 0.65` — lower eye height for claustrophobic feel.
+
+**Discarded approaches:**
+- Projection matrix Z-column scaling (CAMERA_DEPTH_SCALE) — mathematically equivalent to FOV change, no practical benefit over camera back offset + FOV reduction.
+- Camera pitch offset (constant downward tilt) — felt unnatural, reverted.
+
+---
+
 ## 2026-03-05 — 3D Stair Geometry + Debug Fullbright
 
 Visual stair steps for S/U cells and a debug lighting toggle.
