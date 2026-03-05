@@ -6,7 +6,7 @@ import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../c
 
 export const CELL_SIZE = 2;
 export const WALL_HEIGHT = 2.5;
-export const EYE_HEIGHT = 1.0;
+export const EYE_HEIGHT = WALL_HEIGHT * 0.65;
 
 const wallGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
 const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);

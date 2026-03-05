@@ -18,7 +18,13 @@ import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 
-const CAMERA_FOV = 80;
+// Camera viewport tuning — asymmetric frustum crop via setViewOffset.
+// Positive = cut pixels, negative = expand view beyond default frustum.
+// CAMERA_CROP_SIDE is derived to keep the aspect ratio square.
+const CAMERA_FOV = 75;
+const CAMERA_CROP_TOP = 0.15;     // cut 15% from top — hides ceiling for claustrophobic feel
+const CAMERA_CROP_BOTTOM = -0.2;  // expand 20% downward — reveals more floor
+const CAMERA_CROP_SIDE = (CAMERA_CROP_TOP + CAMERA_CROP_BOTTOM) / 2; // auto: preserves 1:1 aspect ratio
 
 // Cap delta to prevent physics jumps when tab is backgrounded
 const MAX_FRAME_DELTA = 0.1;
@@ -147,6 +153,16 @@ async function init(): Promise<void> {
     0.1,
     100
   );
+
+  function applyCameraViewCrop(): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const cropTop = Math.floor(h * CAMERA_CROP_TOP);
+    const cropBottom = Math.floor(h * CAMERA_CROP_BOTTOM);
+    const cropX = Math.floor(w * CAMERA_CROP_SIDE);
+    camera.setViewOffset(w, h, cropX, cropTop, w - cropX * 2, h - cropTop - cropBottom);
+  }
+  applyCameraViewCrop();
 
   // --- Renderer ---
   const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -335,6 +351,7 @@ async function init(): Promise<void> {
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+    applyCameraViewCrop();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 

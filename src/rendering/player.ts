@@ -4,7 +4,9 @@ import { PlayerState, Facing, FACING_ANGLE } from '../core/grid';
 
 const TWEEN_SPEED = 20;
 const ANIM_THRESHOLD = 0.05;
-const CAMERA_BACK_OFFSET = 0.4; // pull camera back from cell center to see tile edges
+const CAMERA_BACK_OFFSET = 0.95; // pull camera back from cell center to see tile edges
+const STAIR_Y_OFFSET = 0.35; // camera dips/rises when stepping onto stairs
+const STAIR_PITCH = 0.15; // camera tilts down/up on stairs (radians, ~8.5°)
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
@@ -17,6 +19,9 @@ export class Player {
   // Continuous angle accumulation avoids wrap-around issues on repeated turns
   private currentAngle: number;
   private targetAngle: number;
+
+  private currentPitch: number;
+  private targetPitch: number;
 
   private onMoveCallback?: (col: number, row: number) => void;
   private onTurnCallback?: () => void;
@@ -41,17 +46,32 @@ export class Player {
     this.currentAngle = FACING_ANGLE[facing];
     this.targetAngle = this.currentAngle;
 
+    this.currentPitch = this.pitchForCell(startCol, startRow);
+    this.targetPitch = this.currentPitch;
+
     camera.rotation.order = 'YXZ';
     camera.position.copy(this.currentPos);
     camera.rotation.y = this.currentAngle;
+    camera.rotation.x = this.currentPitch;
   }
 
   private gridToWorld(col: number, row: number): THREE.Vector3 {
+    let y = EYE_HEIGHT;
+    const cell = this.grid[row]?.[col];
+    if (cell === 'S') y -= STAIR_Y_OFFSET;
+    if (cell === 'U') y += STAIR_Y_OFFSET;
     return new THREE.Vector3(
       col * CELL_SIZE + CELL_SIZE / 2,
-      EYE_HEIGHT,
+      y,
       row * CELL_SIZE + CELL_SIZE / 2
     );
+  }
+
+  private pitchForCell(col: number, row: number): number {
+    const cell = this.grid[row]?.[col];
+    if (cell === 'S') return -STAIR_PITCH;  // look down
+    if (cell === 'U') return STAIR_PITCH;   // look up
+    return 0;
   }
 
   private isAnimating(): boolean {
@@ -77,6 +97,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.moveForward(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -85,6 +106,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.moveBack(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -93,6 +115,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.strafeLeft(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -101,6 +124,7 @@ export class Player {
     if (this.isAnimating()) return;
     if (this.state.strafeRight(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
+      this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -132,11 +156,17 @@ export class Player {
       this.currentAngle = this.targetAngle;
     }
 
+    this.currentPitch += (this.targetPitch - this.currentPitch) * alpha;
+    if (Math.abs(this.currentPitch - this.targetPitch) < 0.005) {
+      this.currentPitch = this.targetPitch;
+    }
+
     this.camera.position.copy(this.currentPos);
     // Pull camera back from cell center along facing direction
     this.camera.position.x += Math.sin(this.currentAngle) * CAMERA_BACK_OFFSET;
     this.camera.position.z += Math.cos(this.currentAngle) * CAMERA_BACK_OFFSET;
     this.camera.rotation.y = this.currentAngle;
+    this.camera.rotation.x = this.currentPitch;
   }
 
   getWorldPosition(): THREE.Vector3 {
