@@ -7,6 +7,7 @@ const ANIM_THRESHOLD = 0.05;
 const CAMERA_BACK_OFFSET = 0.95; // pull camera back from cell center to see tile edges
 const STAIR_Y_OFFSET = 0.35; // camera dips/rises when stepping onto stairs
 const STAIR_PITCH = 0.15; // camera tilts down/up on stairs (radians, ~8.5°)
+const MAX_QUEUED_COMMANDS = 3;
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
@@ -25,6 +26,7 @@ export class Player {
 
   private onMoveCallback?: (col: number, row: number) => void;
   private onTurnCallback?: () => void;
+  private commandQueue: Array<() => void> = [];
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -94,7 +96,7 @@ export class Player {
   }
 
   moveForward(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.moveForward()); return; }
     if (this.state.moveForward(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
@@ -103,7 +105,7 @@ export class Player {
   }
 
   moveBack(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.moveBack()); return; }
     if (this.state.moveBack(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
@@ -112,7 +114,7 @@ export class Player {
   }
 
   strafeLeft(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.strafeLeft()); return; }
     if (this.state.strafeLeft(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
@@ -121,7 +123,7 @@ export class Player {
   }
 
   strafeRight(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.strafeRight()); return; }
     if (this.state.strafeRight(this.grid)) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
@@ -130,17 +132,23 @@ export class Player {
   }
 
   turnLeft(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.turnLeft()); return; }
     this.state.turnLeft();
     this.targetAngle += Math.PI / 2;
     this.onTurnCallback?.();
   }
 
   turnRight(): void {
-    if (this.isAnimating()) return;
+    if (this.isAnimating()) { this.enqueue(() => this.turnRight()); return; }
     this.state.turnRight();
     this.targetAngle -= Math.PI / 2;
     this.onTurnCallback?.();
+  }
+
+  private enqueue(cmd: () => void): void {
+    if (this.commandQueue.length < MAX_QUEUED_COMMANDS) {
+      this.commandQueue.push(cmd);
+    }
   }
 
   update(delta: number): void {
@@ -167,6 +175,12 @@ export class Player {
     this.camera.position.z += Math.cos(this.currentAngle) * CAMERA_BACK_OFFSET;
     this.camera.rotation.y = this.currentAngle;
     this.camera.rotation.x = this.currentPitch;
+
+    // Drain one queued command per frame when animation completes
+    if (!this.isAnimating() && this.commandQueue.length > 0) {
+      const next = this.commandQueue.shift()!;
+      next();
+    }
   }
 
   getWorldPosition(): THREE.Vector3 {
