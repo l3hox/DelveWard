@@ -19,6 +19,9 @@ Visual stair steps for S/U cells and a debug lighting toggle.
 - Stair cells fully owned by stairRenderer — dungeon.ts renders nothing for S/U cells
 - Back wall pure black (MeshBasicMaterial) to simulate darkness beyond the stairwell
 - Side walls extend 2×WALL_HEIGHT to cover one extra floor in the stair direction
+- Side wall thickness computed as `(CELL_SIZE - STEP_WIDTH) / 2` — flush with cell edge, no gaps
+- Side wall UVs corrected: thin faces scaled proportionally, tall faces repeat texture vertically (RepeatWrapping)
+- Vertex color depth fade: all stair geometry fades to black toward the back wall (`applyDepthFade` via vertex colors multiplied with texture)
 - Debug fullbright is a runtime toggle (L key), not persisted
 
 ---

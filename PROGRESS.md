@@ -97,8 +97,10 @@ Read this at the start of every Claude Code session to restore context. Update i
 - [x] **3D Stair Geometry** — visual stair steps for S/U cells:
   - `stairRenderer.ts` — 4 floor steps + 4 ceiling steps + side walls + black back wall per stair cell
   - Floor/ceiling/wall textures resolved per cell (defaults → areas)
-  - Side walls extend one extra floor height (no black holes)
+  - Side walls flush with cell edges, extend one extra floor height (no gaps or black holes)
+  - Side wall UV correction: thin faces proportional, tall faces repeat with `RepeatWrapping`
   - Back wall pure black (`MeshBasicMaterial`) — darkness beyond the stairwell
+  - Vertex color depth fade: all geometry fades to black toward the back wall
   - `dungeon.ts` skips floor, ceiling, and wall rendering for stair cells
   - Stair facing auto-detected from adjacent walkable neighbor
 - [x] **Debug fullbright toggle** — `L` key toggles bright ambient light + disables fog

@@ -9,7 +9,7 @@ const STEP_COUNT = 4;
 const STEP_HEIGHT = 0.25;
 const STEP_DEPTH = CELL_SIZE / STEP_COUNT;
 const STEP_WIDTH = CELL_SIZE * 0.85;
-const SIDE_WALL_THICKNESS = 0.06;
+const SIDE_WALL_THICKNESS = (CELL_SIZE - STEP_WIDTH) / 2; // fills gap from step edge to cell edge
 
 // Pure black unlit material for the back wall (darkness beyond the stairwell)
 const backWallMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -22,7 +22,7 @@ const stairCeilMats = new Map<string, THREE.MeshLambertMaterial>();
 function getStairStepMaterial(name: FloorTextureName): THREE.MeshLambertMaterial {
   let mat = stairStepMats.get(name);
   if (!mat) {
-    mat = new THREE.MeshLambertMaterial({ map: getFloorTexture(name) });
+    mat = new THREE.MeshLambertMaterial({ map: getFloorTexture(name), vertexColors: true });
     stairStepMats.set(name, mat);
   }
   return mat;
@@ -31,7 +31,10 @@ function getStairStepMaterial(name: FloorTextureName): THREE.MeshLambertMaterial
 function getStairSideMaterial(name: WallTextureName): THREE.MeshLambertMaterial {
   let mat = stairSideMats.get(name);
   if (!mat) {
-    mat = new THREE.MeshLambertMaterial({ map: getWallTexture(name) });
+    const tex = getWallTexture(name);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    mat = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true });
     stairSideMats.set(name, mat);
   }
   return mat;
@@ -40,10 +43,33 @@ function getStairSideMaterial(name: WallTextureName): THREE.MeshLambertMaterial 
 function getStairCeilingMaterial(name: CeilingTextureName): THREE.MeshLambertMaterial {
   let mat = stairCeilMats.get(name);
   if (!mat) {
-    mat = new THREE.MeshLambertMaterial({ map: getCeilingTexture(name) });
+    mat = new THREE.MeshLambertMaterial({ map: getCeilingTexture(name), vertexColors: true });
     stairCeilMats.set(name, mat);
   }
   return mat;
+}
+
+/**
+ * Add vertex colors that fade to black based on depth.
+ * In canonical orientation, Z goes from +CELL_SIZE/2 (approach, bright) to -CELL_SIZE/2 (far, dark).
+ * meshZ is the mesh's position in group-local Z so we compute the world-relative fade.
+ */
+function applyDepthFade(geo: THREE.BufferGeometry, meshZ: number): void {
+  const pos = geo.getAttribute('position');
+  const count = pos.count;
+  const colors = new Float32Array(count * 3);
+  const halfCell = CELL_SIZE / 2;
+
+  for (let i = 0; i < count; i++) {
+    const z = meshZ + pos.getZ(i);
+    const t = (z + halfCell) / CELL_SIZE; // 0 at far end, 1 at approach
+    const brightness = Math.max(0, Math.min(1, t));
+    colors[i * 3] = brightness;
+    colors[i * 3 + 1] = brightness;
+    colors[i * 3 + 2] = brightness;
+  }
+
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
 /**
@@ -149,6 +175,7 @@ function buildStairGroup(
       // Descending: step 0 top at Y=0, step 1 top at Y=-0.25, etc.
       const topY = -i * STEP_HEIGHT;
       const geo = new THREE.BoxGeometry(STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
+      applyDepthFade(geo, z);
       const mesh = new THREE.Mesh(geo, stepMaterial);
       mesh.position.set(0, topY - STEP_HEIGHT / 2, z);
       group.add(mesh);
@@ -156,6 +183,7 @@ function buildStairGroup(
       // Ascending: step 0 top at Y=0.25, step 1 top at Y=0.50, etc.
       const stepHeight = (i + 1) * STEP_HEIGHT;
       const geo = new THREE.BoxGeometry(STEP_WIDTH, stepHeight, STEP_DEPTH);
+      applyDepthFade(geo, z);
       const mesh = new THREE.Mesh(geo, stepMaterial);
       mesh.position.set(0, stepHeight / 2, z);
       group.add(mesh);
@@ -176,6 +204,7 @@ function buildStairGroup(
     }
 
     const geo = new THREE.BoxGeometry(STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
+    applyDepthFade(geo, z);
     const mesh = new THREE.Mesh(geo, ceilingMaterial);
     mesh.position.set(0, bottomY + STEP_HEIGHT / 2, z);
     group.add(mesh);
@@ -184,6 +213,34 @@ function buildStairGroup(
   // Side walls — extend one extra floor in the stair direction
   const sideWallHeight = WALL_HEIGHT * 2;
   const sideGeo = new THREE.BoxGeometry(SIDE_WALL_THICKNESS, sideWallHeight, CELL_SIZE);
+
+  // Fix UVs so textures aren't squeezed or stretched.
+  // BoxGeometry face order: +x(0-3), -x(4-7), +y(8-11), -y(12-15), +z(16-19), -z(20-23)
+  const uRatio = SIDE_WALL_THICKNESS / CELL_SIZE;
+  const vRatio = sideWallHeight / WALL_HEIGHT;
+  const uv = sideGeo.getAttribute('uv');
+  // ±x faces (large inner/outer): V spans sideWallHeight, scale to repeat
+  for (const faceStart of [0, 4]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
+    }
+  }
+  // ±y faces (top/bottom): U spans thin width, scale down
+  for (const faceStart of [8, 12]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
+    }
+  }
+  // ±z faces (front/back): U spans thin width, V spans tall height
+  for (const faceStart of [16, 20]) {
+    for (let j = 0; j < 4; j++) {
+      uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
+      uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
+    }
+  }
+  uv.needsUpdate = true;
+
+  applyDepthFade(sideGeo, 0);
 
   const leftWall = new THREE.Mesh(sideGeo, sideMaterial);
   leftWall.position.set(
