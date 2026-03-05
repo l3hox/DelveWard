@@ -94,6 +94,14 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Minimap renders S/U cells in distinct teal color
   - Input blocked during transitions via `transition.isActive`
   - 215 tests (28 new), TypeScript compiles clean
+- [x] **3D Stair Geometry** — visual stair steps for S/U cells:
+  - `stairRenderer.ts` — 4 floor steps + 4 ceiling steps + side walls + black back wall per stair cell
+  - Floor/ceiling/wall textures resolved per cell (defaults → areas)
+  - Side walls extend one extra floor height (no black holes)
+  - Back wall pure black (`MeshBasicMaterial`) — darkness beyond the stairwell
+  - `dungeon.ts` skips floor, ceiling, and wall rendering for stair cells
+  - Stair facing auto-detected from adjacent walkable neighbor
+- [x] **Debug fullbright toggle** — `L` key toggles bright ambient light + disables fog
 
 ## Next Steps (Phase 6)
 
@@ -131,6 +139,20 @@ See PLAN.md Phase 6 for full details.
 ---
 
 ## Session Log
+
+### Session 13 — 3D Stair Geometry + Debug Fullbright
+- Created `src/rendering/stairRenderer.ts` — 3D stair steps for S/U cells
+  - `detectStairFacing()` finds walkable neighbor for approach direction
+  - `buildStairGroup()` creates 4 floor steps, 4 ceiling steps, 2 side walls, 1 black back wall
+  - Floor steps use cell's floor texture, sides use wall texture, ceiling uses ceiling texture
+  - Texture resolution: defaults → areas (same layer logic as dungeon.ts)
+  - Side walls extend 2×WALL_HEIGHT to cover one extra floor (no black holes)
+  - Back wall: `MeshBasicMaterial({ color: 0x000000 })` — pure darkness, unaffected by lighting
+- Modified `src/rendering/dungeon.ts` — skip floor, ceiling, and all walls for S/U cells
+- Modified `src/main.ts`:
+  - Integrated `stairMeshes` into `LevelScene`, `buildLevelScene()`, `teardownLevelScene()`
+  - Added `L` key debug fullbright toggle (bright ambient light + fog disable)
+- TypeScript compiles clean
 
 ### Session 12 — Phase 5 Complete: Multi-Level Dungeons
 - Added `Dungeon` type, `LevelSnapshot`, `saveLevelState()`/`loadLevelState()`/`loadNewLevel()`/`drainTorchFuel()` to GameState

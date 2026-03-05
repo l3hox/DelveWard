@@ -9,6 +9,7 @@ import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
+import { buildStairMeshes } from './rendering/stairRenderer';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
@@ -39,6 +40,7 @@ interface LevelScene {
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   leverMeshes: { group: THREE.Group; handleMap: Map<string, THREE.Group> };
   leverAnimator: LeverAnimator;
+  stairMeshes: { group: THREE.Group };
   player: Player;
 }
 
@@ -80,6 +82,9 @@ function buildLevelScene(
     leverAnimator.register(key, pivot, lever ? lever.state : 'up');
   }
 
+  const stairMeshes = buildStairMeshes(level, walkable);
+  scene.add(stairMeshes.group);
+
   const player = new Player(
     camera,
     level.grid,
@@ -100,6 +105,7 @@ function buildLevelScene(
     plateMeshes,
     leverMeshes,
     leverAnimator,
+    stairMeshes,
     player,
   };
 }
@@ -111,6 +117,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.keyMeshes.group,
     ls.plateMeshes.group,
     ls.leverMeshes.group,
+    ls.stairMeshes.group,
   ];
   for (const group of groups) {
     scene.remove(group);
@@ -153,6 +160,10 @@ async function init(): Promise<void> {
   let flickerTarget = 2.8;
   let flickerTimer = 0;
   scene.add(torchLight);
+
+  // Debug: fullbright toggle
+  let debugFullbright = false;
+  const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon1.json');
@@ -301,6 +312,17 @@ async function init(): Promise<void> {
             if (lever) ls.leverAnimator.setState(leverKey, lever.state);
           }
         }
+        break;
+      case 'KeyL':
+        debugFullbright = !debugFullbright;
+        if (debugFullbright) {
+          scene.add(debugLight);
+          scene.fog = null;
+        } else {
+          scene.remove(debugLight);
+          scene.fog = new THREE.Fog(0x000000, 4, 20);
+        }
+        console.log(`Debug fullbright: ${debugFullbright ? 'ON' : 'OFF'}`);
         break;
     }
   });

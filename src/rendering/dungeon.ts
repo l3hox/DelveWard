@@ -144,20 +144,27 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const cellFloorMat = getFloorMaterial(tex.floor);
       const cellCeilMat = getCeilingMaterial(tex.ceiling);
 
-      // Floor
-      const floor = new THREE.Mesh(tileGeo, cellFloorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.set(cx, 0, cz);
-      group.add(floor);
+      // Floor (skip for stair cells — stairRenderer provides the geometry)
+      if (char !== 'S' && char !== 'U') {
+        const floor = new THREE.Mesh(tileGeo, cellFloorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(cx, 0, cz);
+        group.add(floor);
+      }
 
-      // Ceiling
-      const ceil = new THREE.Mesh(tileGeo, cellCeilMat);
-      ceil.rotation.x = Math.PI / 2;
-      ceil.position.set(cx, WALL_HEIGHT, cz);
-      group.add(ceil);
+      // Ceiling (skip for stair cells — stairRenderer provides the geometry)
+      if (char !== 'S' && char !== 'U') {
+        const ceil = new THREE.Mesh(tileGeo, cellCeilMat);
+        ceil.rotation.x = Math.PI / 2;
+        ceil.position.set(cx, WALL_HEIGHT, cz);
+        group.add(ceil);
+      }
+
+      // Walls (skip for stair cells — stairRenderer owns the entire cell)
+      const isStair = char === 'S' || char === 'U';
 
       // North wall
-      if (isSolid(grid, col, row - 1, walkable)) {
+      if (!isStair && isSolid(grid, col, row - 1, walkable)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.position.set(cx, WALL_HEIGHT / 2, cz - CELL_SIZE / 2);
@@ -165,7 +172,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // South wall
-      if (isSolid(grid, col, row + 1, walkable)) {
+      if (!isStair && isSolid(grid, col, row + 1, walkable)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI;
@@ -174,7 +181,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // East wall
-      if (isSolid(grid, col + 1, row, walkable)) {
+      if (!isStair && isSolid(grid, col + 1, row, walkable)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = -Math.PI / 2;
@@ -183,7 +190,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // West wall
-      if (isSolid(grid, col - 1, row, walkable)) {
+      if (!isStair && isSolid(grid, col - 1, row, walkable)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
         const wall = new THREE.Mesh(wallGeo, wallMat);
         wall.rotation.y = Math.PI / 2;

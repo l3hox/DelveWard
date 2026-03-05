@@ -4,6 +4,25 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-05 — 3D Stair Geometry + Debug Fullbright
+
+Visual stair steps for S/U cells and a debug lighting toggle.
+
+**New modules:**
+- **`src/rendering/stairRenderer.ts`** — builds 3D stair geometry per stair cell. 4 floor steps + 4 ceiling steps (thin slabs at correct Y), 2 side walls (2×WALL_HEIGHT tall), 1 black back wall. Auto-detects approach direction from adjacent walkable neighbor. Textured: floor texture on steps, wall texture on sides, ceiling texture on ceiling steps. Back wall uses `MeshBasicMaterial({ color: 0x000000 })` — pure black regardless of lighting. Materials cached per texture name.
+
+**Modified modules:**
+- **`src/rendering/dungeon.ts`** — floor, ceiling, and all 4 wall faces skipped for S/U cells (stairRenderer owns the entire cell geometry).
+- **`src/main.ts`** — `stairMeshes` added to `LevelScene`, built in `buildLevelScene()`, cleaned up in `teardownLevelScene()`. Debug fullbright toggle on `L` key: adds bright ambient light + disables fog, toggles off to restore.
+
+**Design decisions:**
+- Stair cells fully owned by stairRenderer — dungeon.ts renders nothing for S/U cells
+- Back wall pure black (MeshBasicMaterial) to simulate darkness beyond the stairwell
+- Side walls extend 2×WALL_HEIGHT to cover one extra floor in the stair direction
+- Debug fullbright is a runtime toggle (L key), not persisted
+
+---
+
 ## 2026-03-05 — Phase 5: Multi-Level Dungeons
 
 Multi-level dungeon support with stair transitions, per-level state persistence, and torch fuel drain.
