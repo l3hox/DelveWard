@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLevel } from './levelLoader';
+import { validateLevel, validateDungeon } from './levelLoader';
 
 function validLevel(overrides: Record<string, unknown> = {}) {
   return {
@@ -434,5 +434,193 @@ describe('validateLevel', () => {
   it('rejects non-object entity', () => {
     expect(() => validateLevel(doorLevel([42]), 'test'))
       .toThrow('entities[0] must be an object');
+  });
+});
+
+// --- stair entity validation ---
+
+describe('stair entity validation', () => {
+  function stairLevel(entities: unknown[]) {
+    return validLevel({
+      grid: ['#####', '#.S.#', '#...#', '#.U.#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities,
+    });
+  }
+
+  it('accepts valid stairs-down entity', () => {
+    const level = validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('accepts valid stairs-up entity', () => {
+    const level = validateLevel(stairLevel([
+      { col: 2, row: 3, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 1, targetRow: 1 },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('rejects stairs without direction', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+    ]), 'test')).toThrow('stairs must have direction "up" or "down"');
+  });
+
+  it('rejects stairs with invalid direction', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'left', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+    ]), 'test')).toThrow('stairs must have direction "up" or "down"');
+  });
+
+  it('rejects stairs-down on U cell (wrong cell type)', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 3, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+    ]), 'test')).toThrow("stairs direction=\"down\" must be on 'S' cell");
+  });
+
+  it('rejects stairs-up on S cell (wrong cell type)', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 1, targetRow: 1 },
+    ]), 'test')).toThrow("stairs direction=\"up\" must be on 'U' cell");
+  });
+
+  it('rejects stairs without targetLevel', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'down', targetCol: 1, targetRow: 3 },
+    ]), 'test')).toThrow('stairs must have a string targetLevel');
+  });
+
+  it('rejects stairs without targetCol/targetRow', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2' },
+    ]), 'test')).toThrow('stairs must have numeric targetCol and targetRow');
+  });
+});
+
+// --- validateDungeon ---
+
+function validDungeonLevel(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: `Level ${id}`,
+    grid: ['#####', '#.S.#', '#...#', '#.U.#', '#####'],
+    playerStart: { col: 1, row: 1, facing: 'S' },
+    entities: [],
+    ...overrides,
+  };
+}
+
+describe('validateDungeon', () => {
+  function validDungeon(overrides: Record<string, unknown> = {}) {
+    return {
+      name: 'Test Dungeon',
+      levels: [
+        validDungeonLevel('level1'),
+        validDungeonLevel('level2'),
+      ],
+      ...overrides,
+    };
+  }
+
+  it('accepts valid dungeon', () => {
+    const dungeon = validateDungeon(validDungeon(), 'test');
+    expect(dungeon.name).toBe('Test Dungeon');
+    expect(dungeon.levels).toHaveLength(2);
+    expect(dungeon.levels[0].id).toBe('level1');
+  });
+
+  it('rejects non-object data', () => {
+    expect(() => validateDungeon(null, 'test')).toThrow('is not an object');
+    expect(() => validateDungeon('string', 'test')).toThrow('is not an object');
+    expect(() => validateDungeon(42, 'test')).toThrow('is not an object');
+  });
+
+  it('rejects missing name', () => {
+    expect(() => validateDungeon(validDungeon({ name: undefined }), 'test'))
+      .toThrow('"name" must be a string');
+    expect(() => validateDungeon(validDungeon({ name: 123 }), 'test'))
+      .toThrow('"name" must be a string');
+  });
+
+  it('rejects missing or empty levels array', () => {
+    expect(() => validateDungeon(validDungeon({ levels: undefined }), 'test'))
+      .toThrow('"levels" must be a non-empty array');
+    expect(() => validateDungeon(validDungeon({ levels: [] }), 'test'))
+      .toThrow('"levels" must be a non-empty array');
+    expect(() => validateDungeon(validDungeon({ levels: 'bad' }), 'test'))
+      .toThrow('"levels" must be a non-empty array');
+  });
+
+  it('rejects duplicate level ids', () => {
+    expect(() => validateDungeon(validDungeon({
+      levels: [validDungeonLevel('level1'), validDungeonLevel('level1')],
+    }), 'test')).toThrow('duplicate level id "level1"');
+  });
+
+  it('rejects level without id', () => {
+    const levelNoId = { ...validDungeonLevel('level1'), id: undefined };
+    expect(() => validateDungeon(validDungeon({
+      levels: [levelNoId, validDungeonLevel('level2')],
+    }), 'test')).toThrow('must have a non-empty string "id"');
+  });
+
+  it('rejects stair with invalid targetLevel', () => {
+    expect(() => validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'nonexistent', targetCol: 1, targetRow: 1 },
+          ],
+        }),
+        validDungeonLevel('level2'),
+      ],
+    }), 'test')).toThrow('stairs targetLevel "nonexistent" does not match any level id');
+  });
+
+  it('rejects stair targeting non-walkable cell', () => {
+    expect(() => validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 0, targetRow: 0 },
+          ],
+        }),
+        validDungeonLevel('level2'),
+      ],
+    }), 'test')).toThrow('is not walkable on level "level2"');
+  });
+
+  it('rejects stair targeting out-of-bounds position', () => {
+    expect(() => validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 99, targetRow: 99 },
+          ],
+        }),
+        validDungeonLevel('level2'),
+      ],
+    }), 'test')).toThrow('is out of bounds on level "level2"');
+  });
+
+  it('accepts stairs with valid cross-references', () => {
+    const dungeon = validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 2, targetRow: 3 },
+          ],
+        }),
+        validDungeonLevel('level2', {
+          entities: [
+            { col: 2, row: 3, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 2, targetRow: 1 },
+          ],
+        }),
+      ],
+    }), 'test');
+    expect(dungeon.levels[0].entities).toHaveLength(1);
+    expect(dungeon.levels[1].entities).toHaveLength(1);
   });
 });

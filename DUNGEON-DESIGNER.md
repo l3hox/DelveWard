@@ -4,8 +4,40 @@ How to build a level for DelveWard. This guide covers the full JSON schema, all 
 
 ---
 
-## File format
+## Coordinate system — IMPORTANT
 
+All coordinates are **0-based**. The top-left corner of the grid is `(col: 0, row: 0)`.
+
+- **col** = character position within a row string (X axis, left-to-right, starting at 0)
+- **row** = index in the grid array (Z axis, top-to-bottom, starting at 0)
+
+To find the coordinate of a cell, count characters from the left starting at 0 (col) and rows from the top starting at 0 (row).
+
+**Example** — finding coordinates in this grid:
+```
+row 0:  "#########"
+row 1:  "#.......#"
+row 2:  "#.#.#.#.#"
+row 3:  "#.......#"
+row 4:  "####S####"
+         0123456789
+              ^col
+```
+
+The `S` cell is at **col 4, row 4** (count: `#`=0, `#`=1, `#`=2, `#`=3, `S`=4).
+
+**Common mistake**: When a row has a pattern like `#.#.#.#.#`, the `.` cells are at cols 1, 3, 5, 7 and the `#` cells are at cols 0, 2, 4, 6, 8. Do not place entities or playerStart on a `#` col when you want a walkable cell.
+
+**Verification checklist** for every coordinate you write:
+1. Count the row index from the top (0-based) — that's `row`
+2. Count the character position from the left (0-based) — that's `col`
+3. Check that `grid[row][col]` is the expected character (walkable for playerStart/keys/plates, `D` for doors, `S`/`U` for stairs)
+
+---
+
+## File formats
+
+### Single level
 Levels are JSON files stored in `public/levels/`. Each file defines one dungeon floor.
 
 ```json
@@ -20,9 +52,40 @@ Levels are JSON files stored in `public/levels/`. Each file defines one dungeon 
 }
 ```
 
+### Multi-level dungeon
+
+A dungeon file wraps multiple levels with stair connections between them.
+
+```json
+{
+  "name": "My Dungeon",
+  "levels": [
+    {
+      "id": "level_1",
+      "name": "First Floor",
+      "grid": [ ... ],
+      "playerStart": { "col": 1, "row": 1, "facing": "S" },
+      "entities": [ ... ]
+    },
+    {
+      "id": "level_2",
+      "name": "Second Floor",
+      "grid": [ ... ],
+      "playerStart": { "col": 1, "row": 1, "facing": "N" },
+      "entities": [ ... ]
+    }
+  ]
+}
+```
+
+- Each level must have a unique `id` (non-empty string)
+- The first level in the array is loaded on game start
+- `playerStart` is used only when loading the level directly (not when arriving via stairs)
+- Stairs entities connect levels — see the Stairs entity type below
+
 ---
 
-## Required fields
+## Required fields (per level)
 
 ### `name` (string)
 
@@ -123,6 +186,23 @@ The targeted door is marked **mechanical** — same as lever-targeted doors.
 ```json
 { "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
 ```
+
+**Stairs** (`type: "stairs"`) — placed on `S` (stairs down) or `U` (stairs up) cells. Triggers automatically when player steps on the cell (not via Space).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `direction` | string | Yes | `"down"` (must be on `S` cell) or `"up"` (must be on `U` cell) |
+| `targetLevel` | string | Yes | `id` of the destination level |
+| `targetCol` | number | Yes | Column on the destination level where player arrives |
+| `targetRow` | number | Yes | Row on the destination level where player arrives |
+
+The target position must be a walkable cell on the target level. Typically, stairs down target a `U` cell on the lower level and vice versa.
+
+```json
+{ "col": 4, "row": 8, "type": "stairs", "direction": "down", "targetLevel": "lower_vault", "targetCol": 4, "targetRow": 0 }
+```
+
+**Verification**: Use the coordinate counting method above to confirm that `targetCol`/`targetRow` land on the expected cell in the target level's grid.
 
 #### Door behavior summary
 

@@ -4,6 +4,32 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-05 — Phase 5: Multi-Level Dungeons
+
+Multi-level dungeon support with stair transitions, per-level state persistence, and torch fuel drain.
+
+**Design decisions:**
+- **Dungeon format**: Single JSON file with `levels[]` array, each level has unique `id`. Stair entities reference `targetLevel` (id), `targetCol`, `targetRow`.
+- **Level state persistence**: `saveLevelState()`/`loadLevelState()` deep-copy snapshots of doors/keys/levers/plates/exploredCells. Revisiting a floor restores its state.
+- **GameState split**: `loadNewLevel()` resets level-specific maps but preserves player-global state (hp, torchFuel, inventory).
+- **Transition**: Fade-to-black DOM overlay (not Three.js). Blocks input during transition. No camera animation.
+- **Stair trigger**: On step (in onMove callback), not on Space interaction.
+- **Torch fuel**: Drains 1 per step. Light distance (3–8) and flicker intensity scale with fuel ratio. Ambient prevents total blackout.
+
+**New modules:**
+- **`src/core/types.ts`** — `Dungeon` interface, `id` on `DungeonLevel`
+- **`src/core/gameState.ts`** — `LevelSnapshot`, `saveLevelState()`, `loadLevelState()`, `loadNewLevel()`, `drainTorchFuel()`, extracted `_parseEntities()`
+- **`src/core/levelLoader.ts`** — `validateDungeon()`, `loadDungeon()`, stair entity validation with cross-level reference checks
+- **`src/rendering/transitionOverlay.ts`** — `TransitionOverlay` class: pure DOM, fade-to-black, midpoint callback pattern
+- **`public/levels/dungeon1.json`** — two-level test dungeon ("Entry Hall" with key puzzle, "Lower Vault")
+
+**Modified modules:**
+- **`src/main.ts`** — major restructure: `LevelScene` interface, `buildLevelScene()`/`teardownLevelScene()`, `wireCallbacks()`, `triggerLevelTransition()`. Loads dungeon instead of single level. Torch fuel scales light.
+- **`src/hud/hudColors.ts`** — `minimapStairs: '#44aacc'` (teal)
+- **`src/hud/minimapRenderer.ts`** — S/U cells rendered with stair color
+
+---
+
 ## 2026-03-04 — Door system improvements + lever/plate polish (post Phase 3)
 
 Door improvements, repeatable lever with animation, pressure plate pressed state.

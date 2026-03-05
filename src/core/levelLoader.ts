@@ -1,4 +1,4 @@
-import type { DungeonLevel } from './types';
+import type { DungeonLevel, Dungeon } from './types';
 import type { Facing } from './grid';
 import { WALKABLE_CELLS } from './grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './textureNames';
@@ -193,6 +193,22 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
       }
     }
+
+    if (e.type === 'stairs') {
+      if (e.direction !== 'up' && e.direction !== 'down') {
+        throw new Error(`Level ${source}: entities[${i}] stairs must have direction "up" or "down"`);
+      }
+      const expectedCell = (e.direction as string) === 'down' ? 'S' : 'U';
+      if (cellAtEntity !== expectedCell) {
+        throw new Error(`Level ${source}: entities[${i}] stairs direction="${e.direction}" must be on '${expectedCell}' cell, found '${cellAtEntity}'`);
+      }
+      if (typeof e.targetLevel !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] stairs must have a string targetLevel`);
+      }
+      if (typeof e.targetCol !== 'number' || typeof e.targetRow !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] stairs must have numeric targetCol and targetRow`);
+      }
+    }
   }
 
   // defaults (optional)
@@ -252,4 +268,79 @@ export async function loadLevel(url: string): Promise<DungeonLevel> {
 
   const data: unknown = await res.json();
   return validateLevel(data, url);
+}
+
+export function validateDungeon(data: unknown, source: string): Dungeon {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error(`Dungeon data from ${source} is not an object`);
+  }
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.name !== 'string') {
+    throw new Error(`Dungeon ${source}: "name" must be a string`);
+  }
+
+  if (!Array.isArray(obj.levels) || obj.levels.length === 0) {
+    throw new Error(`Dungeon ${source}: "levels" must be a non-empty array`);
+  }
+
+  // Validate each level and collect IDs
+  const levelIds = new Set<string>();
+  const levels: DungeonLevel[] = [];
+
+  for (let i = 0; i < obj.levels.length; i++) {
+    const level = validateLevel(obj.levels[i], `${source} levels[${i}]`);
+
+    // Each level must have a unique id
+    if (typeof level.id !== 'string' || level.id.length === 0) {
+      throw new Error(`Dungeon ${source}: levels[${i}] must have a non-empty string "id"`);
+    }
+    if (levelIds.has(level.id)) {
+      throw new Error(`Dungeon ${source}: duplicate level id "${level.id}"`);
+    }
+    levelIds.add(level.id);
+    levels.push(level);
+  }
+
+  // Cross-level validation: stairs entities must reference valid levels and walkable positions
+  for (let i = 0; i < levels.length; i++) {
+    const level = levels[i];
+    for (let j = 0; j < level.entities.length; j++) {
+      const e = level.entities[j];
+      if (e.type === 'stairs') {
+        const targetId = e.targetLevel as string;
+        if (!levelIds.has(targetId)) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs targetLevel "${targetId}" does not match any level id`);
+        }
+        // Find target level and check if target position is walkable
+        const targetLevel = levels.find(l => l.id === targetId)!;
+        const tc = e.targetCol as number;
+        const tr = e.targetRow as number;
+        if (tr < 0 || tr >= targetLevel.grid.length || tc < 0 || tc >= targetLevel.grid[0].length) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target position (${tc},${tr}) is out of bounds on level "${targetId}"`);
+        }
+        // Build walkable set for target level
+        const walkableChars = new Set(WALKABLE_CELLS);
+        if (targetLevel.charDefs) {
+          for (const def of targetLevel.charDefs) {
+            if (!def.solid) walkableChars.add(def.char);
+          }
+        }
+        if (!walkableChars.has(targetLevel.grid[tr][tc])) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target position (${tc},${tr}) is not walkable on level "${targetId}"`);
+        }
+      }
+    }
+  }
+
+  return { name: obj.name as string, levels };
+}
+
+export async function loadDungeon(url: string): Promise<Dungeon> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to load dungeon from ${url}: ${res.status} ${res.statusText}`);
+  }
+  const data: unknown = await res.json();
+  return validateDungeon(data, url);
 }

@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 5 — Multi-Level Dungeons** (not started)
+**Phase 6 — Entities & Enemy System** (not started)
 
 ---
 
@@ -79,9 +79,25 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Removed controls hint div (HUD replaces it)
   - 187 tests (20 new)
 
-## Next Steps (Phase 5)
+- [x] **Phase 5 complete** — Multi-Level Dungeons:
+  - `Dungeon` type with `levels[]` array, each level has unique `id`
+  - `LevelSnapshot` + `saveLevelState()` / `loadLevelState()` for per-level state persistence
+  - `loadNewLevel()` resets level maps but preserves hp/torchFuel/inventory
+  - `drainTorchFuel()` — torch fuel drains 1 per step
+  - `loadDungeon()` / `validateDungeon()` — multi-level JSON loading with cross-level stair validation
+  - Stair entity validation: direction (up/down), targetLevel, targetCol/targetRow, cell type matching
+  - `TransitionOverlay` — fade-to-black DOM overlay for level transitions
+  - `main.ts` restructured: `LevelScene` interface, `buildLevelScene()` / `teardownLevelScene()`
+  - Stair detection in onMove callback triggers `triggerLevelTransition()`
+  - Torch light distance (3–8) and flicker intensity scale with fuel ratio
+  - `dungeon1.json` — two-level test dungeon ("Entry Hall" + "Lower Vault")
+  - Minimap renders S/U cells in distinct teal color
+  - Input blocked during transitions via `transition.isActive`
+  - 215 tests (28 new), TypeScript compiles clean
 
-See PLAN.md Phase 5 for full details.
+## Next Steps (Phase 6)
+
+See PLAN.md Phase 6 for full details.
 
 ---
 
@@ -93,7 +109,7 @@ See PLAN.md Phase 5 for full details.
 | 2 | Visual Polish (textures) | **Complete** |
 | 3 | Doors & Interaction | **Complete** |
 | 4 | HUD | **Complete** |
-| 5 | Multi-Level Dungeons | Pending |
+| 5 | Multi-Level Dungeons | **Complete** |
 | 6 | Entities & Enemy System | Pending |
 | 7 | Combat | Pending |
 | 8 | Later Resources & Polish | Pending |
@@ -115,6 +131,20 @@ See PLAN.md Phase 5 for full details.
 ---
 
 ## Session Log
+
+### Session 12 — Phase 5 Complete: Multi-Level Dungeons
+- Added `Dungeon` type, `LevelSnapshot`, `saveLevelState()`/`loadLevelState()`/`loadNewLevel()`/`drainTorchFuel()` to GameState
+- Extracted `_parseEntities()` from constructor for reuse by `loadNewLevel()`
+- Added `loadDungeon()`/`validateDungeon()` with stair entity validation and cross-level reference checks
+- Created `TransitionOverlay` — pure DOM fade-to-black overlay
+- Restructured `main.ts`: `LevelScene` interface, `buildLevelScene()`/`teardownLevelScene()`, `wireCallbacks()`, `triggerLevelTransition()`
+- Stair detection on step triggers fade transition → level swap → fade in
+- Torch fuel drains per step, light scales with fuel ratio
+- Created `dungeon1.json` — two-level test dungeon with key puzzle
+- Minimap shows stairs in teal (`#44aacc`)
+- Updated ARCHITECTURE.md with dungeon format, transition overlay, snapshot methods
+- 215 tests (28 new), TypeScript compiles clean
+- Phase 5 complete
 
 ### Session 11 — Phase 4 Complete: HUD overlay
 - Created `src/hud/` folder with 9 files: canvas setup, layout, colors, pixel font, compass, minimap, health bar, torch indicator, inventory panel

@@ -19,6 +19,7 @@ export interface TextureArea extends TextureSet {
 }
 
 export interface DungeonLevel {
+  id?: string;               // optional stable identifier for save/load keying
   name: string;
   grid: string[];            // each string = one row of chars
   playerStart: { col: number; row: number; facing: Facing };
@@ -26,6 +27,11 @@ export interface DungeonLevel {
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];
+}
+
+export interface Dungeon {
+  name: string;
+  levels: DungeonLevel[];
 }
 
 // Grid char legend:

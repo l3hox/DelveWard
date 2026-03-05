@@ -590,4 +590,138 @@ describe('GameState', () => {
       expect(gs.exploredCells.has('0,2')).toBe(true);
     });
   });
+
+  // --- saveLevelState ---
+
+  describe('saveLevelState', () => {
+    it('captures doors, keys, levers, plates, exploredCells', () => {
+      const gs = new GameState([
+        doorEntity(1, 1, 'closed'),
+        { col: 2, row: 2, type: 'key', keyId: 'gold_key' },
+        { col: 3, row: 3, type: 'lever', targetDoor: '1,1' },
+        { col: 4, row: 4, type: 'pressure_plate', targetDoor: '1,1' },
+      ]);
+      gs.exploredCells.add('0,0');
+      gs.exploredCells.add('1,0');
+
+      const snap = gs.saveLevelState();
+
+      expect(snap.doors.size).toBe(1);
+      expect(snap.keys.size).toBe(1);
+      expect(snap.levers.size).toBe(1);
+      expect(snap.plates.size).toBe(1);
+      expect(snap.exploredCells.size).toBe(2);
+      expect(snap.exploredCells.has('0,0')).toBe(true);
+    });
+
+    it('snapshot is a deep copy — mutating GameState after save does not affect snapshot', () => {
+      const gs = new GameState([doorEntity(1, 1, 'closed')]);
+      gs.exploredCells.add('1,1');
+
+      const snap = gs.saveLevelState();
+
+      // Mutate the live state
+      gs.openDoor(1, 1);
+      gs.exploredCells.add('2,2');
+
+      // Snapshot should be unchanged
+      expect(snap.doors.get('1,1')!.state).toBe('closed');
+      expect(snap.exploredCells.has('2,2')).toBe(false);
+    });
+  });
+
+  // --- loadLevelState ---
+
+  describe('loadLevelState', () => {
+    it('restores doors, keys, levers, plates, exploredCells from snapshot', () => {
+      const gs = new GameState([doorEntity(5, 5, 'open')]);
+      gs.exploredCells.add('5,5');
+      const snap = gs.saveLevelState();
+
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+
+      expect(gs2.doors.size).toBe(1);
+      expect(gs2.getDoor(5, 5)!.state).toBe('open');
+      expect(gs2.exploredCells.has('5,5')).toBe(true);
+    });
+
+    it('restored state is a deep copy — mutating snapshot after load does not affect GameState', () => {
+      const gs = new GameState([doorEntity(1, 1, 'closed')]);
+      const snap = gs.saveLevelState();
+
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+
+      // Mutate the snapshot directly
+      snap.doors.get('1,1')!.state = 'open';
+      snap.exploredCells.add('9,9');
+
+      // gs2 should be unaffected
+      expect(gs2.getDoor(1, 1)!.state).toBe('closed');
+      expect(gs2.exploredCells.has('9,9')).toBe(false);
+    });
+  });
+
+  // --- loadNewLevel ---
+
+  describe('loadNewLevel', () => {
+    it('resets doors, keys, levers, plates, exploredCells', () => {
+      const gs = new GameState([
+        doorEntity(1, 1, 'closed'),
+        { col: 2, row: 2, type: 'key', keyId: 'gold_key' },
+      ]);
+      gs.exploredCells.add('1,1');
+
+      gs.loadNewLevel([]);
+
+      expect(gs.doors.size).toBe(0);
+      expect(gs.keys.size).toBe(0);
+      expect(gs.exploredCells.size).toBe(0);
+    });
+
+    it('parses new entities correctly after reset', () => {
+      const gs = new GameState([doorEntity(1, 1, 'closed')]);
+      gs.loadNewLevel([doorEntity(9, 9, 'open')]);
+
+      expect(gs.getDoor(1, 1)).toBeUndefined();
+      expect(gs.getDoor(9, 9)).toBeDefined();
+      expect(gs.getDoor(9, 9)!.state).toBe('open');
+    });
+
+    it('preserves hp, torchFuel, and inventory across level load', () => {
+      const gs = new GameState([]);
+      gs.hp = 15;
+      gs.torchFuel = 50;
+      gs.addKey('iron_key');
+
+      gs.loadNewLevel([doorEntity(3, 3, 'closed')]);
+
+      expect(gs.hp).toBe(15);
+      expect(gs.torchFuel).toBe(50);
+      expect(gs.hasKey('iron_key')).toBe(true);
+    });
+  });
+
+  // --- drainTorchFuel ---
+
+  describe('drainTorchFuel', () => {
+    it('drains the correct amount', () => {
+      const gs = new GameState([]);
+      gs.drainTorchFuel(10);
+      expect(gs.torchFuel).toBe(90);
+    });
+
+    it('clamps at 0 when draining more than available', () => {
+      const gs = new GameState([]);
+      gs.drainTorchFuel(200);
+      expect(gs.torchFuel).toBe(0);
+    });
+
+    it('draining 0 does nothing', () => {
+      const gs = new GameState([]);
+      gs.drainTorchFuel(0);
+      expect(gs.torchFuel).toBe(100);
+    });
+  });
 });

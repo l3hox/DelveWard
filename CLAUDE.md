@@ -99,6 +99,7 @@ Every session follows this protocol:
 ### During the session
 - Work on the current phase's next steps as listed in PROGRESS.md
 - If a task is ambiguous, check PLAN.md for the design decision
+- **When creating or editing level/dungeon JSON**, read `DUNGEON-DESIGNER.md` first — it has the coordinate system, entity schemas, and texture names. Always verify coordinates by counting grid characters (0-based).
 
 ### On session end (when asked)
 - **Update PROGRESS.md**:
@@ -118,6 +119,7 @@ Every session follows this protocol:
 | `PROGRESS.md` | Session-to-session state: what's done, what's next, session log | Every session end |
 | `LOG.md` | Decision & change log — design decisions, architecture changes, significant code changes, with dates | When decisions or significant code changes land |
 | `DESIGN.md` | Original motivation and vision | Never (historical document) |
+| `DUNGEON-DESIGNER.md` | Level/dungeon JSON schema, coordinate system, texture reference | When level format changes |
 
 ---
 

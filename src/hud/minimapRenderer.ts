@@ -40,6 +40,8 @@ export function drawMinimap(
         ctx.fillStyle = HUD_COLORS.minimapWall;
       } else if (cell === 'D') {
         ctx.fillStyle = HUD_COLORS.minimapDoor;
+      } else if (cell === 'S' || cell === 'U') {
+        ctx.fillStyle = HUD_COLORS.minimapStairs;
       } else {
         ctx.fillStyle = HUD_COLORS.minimapFloor;
       }

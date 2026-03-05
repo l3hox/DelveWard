@@ -57,6 +57,14 @@ function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing 
   return 'N';
 }
 
+export interface LevelSnapshot {
+  doors: Map<string, DoorInstance>;
+  keys: Map<string, KeyInstance>;
+  levers: Map<string, LeverInstance>;
+  plates: Map<string, PlateInstance>;
+  exploredCells: Set<string>;
+}
+
 export class GameState {
   doors: Map<string, DoorInstance>;
   keys: Map<string, KeyInstance>;
@@ -83,6 +91,10 @@ export class GameState {
     this.maxTorchFuel = 100;
     this.exploredCells = new Set();
 
+    this._parseEntities(entities, grid);
+  }
+
+  private _parseEntities(entities: Entity[], grid?: string[]): void {
     for (const e of entities) {
       if (e.type === 'door') {
         const state = (e.state as DoorState) ?? 'closed';
@@ -149,6 +161,60 @@ export class GameState {
         }
       }
     }
+  }
+
+  saveLevelState(): LevelSnapshot {
+    const doors = new Map<string, DoorInstance>();
+    for (const [k, v] of this.doors) {
+      doors.set(k, { ...v });
+    }
+    const keys = new Map<string, KeyInstance>();
+    for (const [k, v] of this.keys) {
+      keys.set(k, { ...v });
+    }
+    const levers = new Map<string, LeverInstance>();
+    for (const [k, v] of this.levers) {
+      levers.set(k, { ...v });
+    }
+    const plates = new Map<string, PlateInstance>();
+    for (const [k, v] of this.plates) {
+      plates.set(k, { ...v });
+    }
+    const exploredCells = new Set<string>(this.exploredCells);
+    return { doors, keys, levers, plates, exploredCells };
+  }
+
+  loadLevelState(snapshot: LevelSnapshot): void {
+    this.doors = new Map<string, DoorInstance>();
+    for (const [k, v] of snapshot.doors) {
+      this.doors.set(k, { ...v });
+    }
+    this.keys = new Map<string, KeyInstance>();
+    for (const [k, v] of snapshot.keys) {
+      this.keys.set(k, { ...v });
+    }
+    this.levers = new Map<string, LeverInstance>();
+    for (const [k, v] of snapshot.levers) {
+      this.levers.set(k, { ...v });
+    }
+    this.plates = new Map<string, PlateInstance>();
+    for (const [k, v] of snapshot.plates) {
+      this.plates.set(k, { ...v });
+    }
+    this.exploredCells = new Set<string>(snapshot.exploredCells);
+  }
+
+  loadNewLevel(entities: Entity[], grid?: string[]): void {
+    this.doors = new Map();
+    this.keys = new Map();
+    this.levers = new Map();
+    this.plates = new Map();
+    this.exploredCells = new Set();
+    this._parseEntities(entities, grid);
+  }
+
+  drainTorchFuel(amount: number): void {
+    this.torchFuel = Math.max(0, this.torchFuel - amount);
   }
 
   getDoor(col: number, row: number): DoorInstance | undefined {

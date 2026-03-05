@@ -23,6 +23,7 @@ export const HUD_COLORS = {
   minimapWall: '#5a5060',
   minimapFloor: '#2a2530',
   minimapDoor: '#886644',
+  minimapStairs: '#44aacc',
   minimapPlayer: '#e8c84a',
   minimapBg: 'rgba(10, 8, 12, 0.8)',
 

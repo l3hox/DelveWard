@@ -35,9 +35,10 @@ src/
 │   ├── doorAnimator.ts      # Sliding door panel animation
 │   ├── keyRenderer.ts       # Gold key billboard sprites
 │   ├── leverRenderer.ts     # Wall levers + LeverAnimator
-│   └── plateRenderer.ts     # Pressure plate meshes + press state
+│   ├── plateRenderer.ts     # Pressure plate meshes + press state
+│   └── transitionOverlay.ts # Fade-to-black overlay for level transitions
 public/
-└── levels/                  # Level JSON files (level1.json – level7.json)
+└── levels/                  # Level JSON files (level1–7.json) + dungeon1.json (multi-level)
 ```
 
 ---
@@ -47,7 +48,8 @@ public/
 Zero Three.js imports. Safe for unit testing and pure logic.
 
 ### types.ts
-- `DungeonLevel` — top-level level structure (grid, entities, playerStart, textures)
+- `DungeonLevel` — single level structure (grid, entities, playerStart, textures, optional `id`)
+- `Dungeon` — multi-level container: `{ name, levels: DungeonLevel[] }`
 - `Entity` — generic entity with col/row/type + arbitrary props
 - `TextureSet`, `CharDef`, `TextureArea` — texture configuration types
 
@@ -72,6 +74,10 @@ Zero Three.js imports. Safe for unit testing and pure logic.
   - `exploredCells: Set<string>` — explored minimap cells, `"col,row"` keys
 - Auto-creates doors for `D` cells with no entity
 - Marks doors as `mechanical` when targeted by levers/plates
+- `LevelSnapshot` — snapshot of level-specific state (doors, keys, levers, plates, exploredCells)
+- `saveLevelState()` / `loadLevelState(snapshot)` — deep-copy save/restore for level transitions
+- `loadNewLevel(entities, grid)` — resets level maps, re-parses entities, preserves hp/torchFuel/inventory
+- `drainTorchFuel(amount)` — reduces torchFuel, clamps at 0
 - Key methods: `isDoorOpen()`, `openDoor()`, `closeDoor()`, `toggleDoor()`, `activateLever()`, `activatePressurePlate()`, `pickupKeyAt()`, `revealAround()`
 
 ### interaction.ts
@@ -80,9 +86,11 @@ Zero Three.js imports. Safe for unit testing and pure logic.
 - Returns type + message + optional targetDoor for mesh updates
 
 ### levelLoader.ts
-- `loadLevel(url)` — fetch + validate → `DungeonLevel`
+- `loadLevel(url)` — fetch + validate → `DungeonLevel` (single-level backward compat)
+- `loadDungeon(url)` — fetch + validate → `Dungeon` (multi-level)
 - `validateLevel(data, source)` — comprehensive validation: grid, charDefs, entities, textures, bounds
-- Entity-specific validation: doors on `D` cells, key keyIds, lever targetDoor format, plate on walkable
+- `validateDungeon(data, source)` — validates dungeon wrapper, unique level ids, cross-level stair references
+- Entity-specific validation: doors on `D` cells, key keyIds, lever targetDoor format, plate on walkable, stairs direction/targetLevel/targetCol/targetRow
 
 ### textureNames.ts
 - Constant arrays + Sets for wall/floor/ceiling texture names
@@ -172,41 +180,61 @@ Separate 2D canvas overlay on top of the Three.js canvas. Fixed 640x360 internal
 
 ---
 
+### transitionOverlay.ts
+- `TransitionOverlay` — full-screen black `<div>` overlay (z-index 20, above HUD at 10)
+- `startTransition(onMidpoint?, onComplete?)` — fade to black → call onMidpoint → fade back in → call onComplete
+- `update(delta)` — drives opacity tween from game loop
+- `isActive` getter — blocks input during transitions
+
+---
+
 ## main.ts — Entry Point
 
-Orchestrates everything:
-1. Creates scene, camera, renderer, lighting (ambient + torch with variable flicker)
-2. Loads level JSON → builds dungeon geometry + all entity meshes
-3. Constructs `GameState` from entities
-4. Creates `Player` with door-aware walkability
-5. Creates `HudOverlay` — 2D canvas overlay for compass, minimap, bars, inventory
-6. Wires input (WASD/arrows/QE for movement, Space for interact)
-7. Wires `onMove` callback for key pickup, pressure plate activation, and map exploration
-8. Wires `onTurn` callback for map exploration on facing change
-9. Runs animation loop: player tween, door/lever animation, torch flicker, HUD draw, render
+Orchestrates everything with multi-level dungeon support:
+1. Creates scene, camera, renderer, lighting (ambient + torch with fuel-scaled flicker)
+2. Loads dungeon JSON → builds first level scene
+3. Constructs `GameState` from first level entities
+4. Creates `HudOverlay` + `TransitionOverlay`
+5. `LevelScene` interface groups level-specific objects (dungeon geometry, entity meshes, animators, player)
+6. `buildLevelScene()` / `teardownLevelScene()` — construct/destroy level-specific Three.js objects
+7. Wires input (WASD/arrows/QE for movement, Space for interact), blocked during transitions
+8. `wireCallbacks()` — sets up onMove (key pickup, plates, torch drain, stair detection) + onTurn (exploration)
+9. `triggerLevelTransition()` — saves level snapshot, fades to black, swaps level scene, restores/parses new level
+10. Torch fuel drains 1 per step; light distance (3–8) and flicker intensity scale with fuel ratio
+11. Runs animation loop: player tween, door/lever animation, transition overlay, torch flicker, HUD draw, render
 
 ---
 
 ## Data Flow
 
 ```
-Level JSON → loadLevel() → DungeonLevel
-                              ├→ buildDungeon(grid) → THREE.Group (walls/floors/ceilings)
-                              ├→ GameState(entities, grid)
-                              │    ├→ buildDoorMeshes() → door visuals
-                              │    ├→ buildKeyMeshes() → key sprites
-                              │    ├→ buildLeverMeshes() → lever visuals
-                              │    └→ buildPlateMeshes() → plate visuals
-                              └→ Player(camera, grid, start)
+Dungeon JSON → loadDungeon() → Dungeon { levels[] }
+                                  └→ per level: buildLevelScene()
+                                       ├→ buildDungeon(grid) → THREE.Group
+                                       ├→ buildDoorMeshes() → door visuals
+                                       ├→ buildKeyMeshes() → key sprites
+                                       ├→ buildLeverMeshes() → lever visuals
+                                       ├→ buildPlateMeshes() → plate visuals
+                                       └→ Player(camera, grid, start)
+
+GameState (persists across levels)
+  ├→ saveLevelState() → LevelSnapshot (stored in levelSnapshots Map)
+  ├→ loadLevelState(snapshot) ← on revisiting a level
+  └→ loadNewLevel(entities, grid) ← on first visit to a level
 
 Input → Player movement / interact()
          ├→ GameState mutation (door/lever/key state)
-         └→ Mesh updates (animator.setOpen, hideKey, pressPlate)
+         ├→ Mesh updates (animator.setOpen, hideKey, pressPlate)
+         └→ Stair detection → triggerLevelTransition()
+
+Level Transition → save snapshot → fade to black → teardown old scene
+                 → load/restore level state → build new scene → fade in
 
 Game Loop → player.update(delta)
           → doorAnimator.update(delta)
           → leverAnimator.update(delta)
-          → torch flicker
+          → transition.update(delta)
+          → torch flicker (fuel-scaled)
           → hud.draw(gameState, playerState, grid, delta)
           → renderer.render()
 ```
@@ -224,11 +252,14 @@ Game Loop → player.update(delta)
 
 ---
 
-## Level JSON Format
+## Dungeon JSON Format
 
-See `DUNGEON-DESIGNER.md` for full schema. Key points:
+Multi-level dungeon: `{ name, levels: DungeonLevel[] }`. Each level has a unique `id`.
+
+Single level: see `DUNGEON-DESIGNER.md` for full schema. Key points:
 - `grid: string[]` — each string is a row, each char is a cell
 - Cell chars: `#` wall, `.` floor, `D` door, `S` stairs down, `U` stairs up, `O` object, ` ` void
 - `entities: Entity[]` — typed objects with col/row/type + type-specific props
+- Stairs entity: `{ type: "stairs", direction: "up"|"down", targetLevel, targetCol, targetRow }`
 - `charDefs` — custom single-char cell types with solid flag + textures
 - `defaults` / `areas` — texture overrides at level or region scope

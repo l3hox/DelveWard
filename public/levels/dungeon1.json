@@ -1,0 +1,55 @@
+{
+  "name": "The Descent",
+  "levels": [
+    {
+      "id": "entry_hall",
+      "name": "Entry Hall",
+      "grid": [
+        "#########",
+        "#.......#",
+        "#.#.#.#.#",
+        "#.......#",
+        "##.#D#.##",
+        "#.......#",
+        "#.#...#.#",
+        "#.......#",
+        "####S####"
+      ],
+      "playerStart": { "col": 4, "row": 1, "facing": "S" },
+      "entities": [
+        { "col": 1, "row": 5, "type": "key", "keyId": "vault_key" },
+        { "col": 4, "row": 4, "type": "door", "state": "locked", "keyId": "vault_key" },
+        { "col": 4, "row": 8, "type": "stairs", "direction": "down", "targetLevel": "lower_vault", "targetCol": 4, "targetRow": 0 }
+      ],
+      "defaults": {
+        "wallTexture": "stone",
+        "floorTexture": "stone_tile",
+        "ceilingTexture": "dark_rock"
+      }
+    },
+    {
+      "id": "lower_vault",
+      "name": "Lower Vault",
+      "grid": [
+        "####U####",
+        "#.......#",
+        "#.#.#.#.#",
+        "#.......#",
+        "#.......#",
+        "#.#...#.#",
+        "#.......#",
+        "#.......#",
+        "#########"
+      ],
+      "playerStart": { "col": 3, "row": 1, "facing": "S" },
+      "entities": [
+        { "col": 4, "row": 0, "type": "stairs", "direction": "up", "targetLevel": "entry_hall", "targetCol": 4, "targetRow": 8 }
+      ],
+      "defaults": {
+        "wallTexture": "brick",
+        "floorTexture": "dirt",
+        "ceilingTexture": "wooden_beams"
+      }
+    }
+  ]
+}
