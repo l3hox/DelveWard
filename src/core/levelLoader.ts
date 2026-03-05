@@ -3,6 +3,7 @@ import type { Facing } from './grid';
 import { WALKABLE_CELLS } from './grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './textureNames';
 import { parseDoorKey } from './gameState';
+import { ENEMY_DEFS } from './enemyTypes';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const BUILTIN_CHARS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
@@ -191,6 +192,18 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
+      }
+    }
+
+    if (e.type === 'enemy') {
+      if (typeof e.enemyType !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] enemy must have a string enemyType`);
+      }
+      if (!ENEMY_DEFS[e.enemyType as string]) {
+        throw new Error(`Level ${source}: entities[${i}] enemy has unknown enemyType "${e.enemyType}"`);
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] enemy must be on a walkable cell`);
       }
     }
 

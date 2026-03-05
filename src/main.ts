@@ -10,6 +10,9 @@ import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
+import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
+import { EnemyAnimator } from './rendering/enemyAnimator';
+import { executeEnemyTurns } from './core/enemyAI';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
@@ -49,6 +52,8 @@ interface LevelScene {
   leverMeshes: { group: THREE.Group; handleMap: Map<string, THREE.Group> };
   leverAnimator: LeverAnimator;
   stairMeshes: { group: THREE.Group };
+  enemyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  enemyAnimator: EnemyAnimator;
   player: Player;
 }
 
@@ -93,6 +98,15 @@ function buildLevelScene(
   const stairMeshes = buildStairMeshes(level, walkable);
   scene.add(stairMeshes.group);
 
+  const enemyMeshes = buildEnemyMeshes(gameState);
+  scene.add(enemyMeshes.group);
+
+  const enemyAnimator = new EnemyAnimator();
+  for (const [key, mesh] of enemyMeshes.meshMap) {
+    const enemy = gameState.enemies.get(key);
+    if (enemy) enemyAnimator.register(key, mesh, enemy.col, enemy.row);
+  }
+
   const player = new Player(
     camera,
     level.grid,
@@ -114,6 +128,8 @@ function buildLevelScene(
     leverMeshes,
     leverAnimator,
     stairMeshes,
+    enemyMeshes,
+    enemyAnimator,
     player,
   };
 }
@@ -126,6 +142,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.plateMeshes.group,
     ls.leverMeshes.group,
     ls.stairMeshes.group,
+    ls.enemyMeshes.group,
   ];
   for (const group of groups) {
     scene.remove(group);
@@ -243,6 +260,26 @@ async function init(): Promise<void> {
         );
         if (stair) {
           triggerLevelTransition(stair);
+          return; // don't run enemy turns during level transition
+        }
+      }
+
+      // Enemy turns (after player moves)
+      const actions = executeEnemyTurns(
+        gameState, col, row, ls.level.grid, ls.walkable,
+        gameState.isDoorOpen.bind(gameState),
+      );
+      for (const action of actions) {
+        if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
+          const newKey = doorKey(action.toCol, action.toRow);
+          updateEnemyMeshPosition(ls.enemyMeshes.meshMap, action.enemyKey, action.toCol, action.toRow);
+          ls.enemyAnimator.moveTo(action.enemyKey, action.toCol, action.toRow, newKey);
+        } else if (action.type === 'attack') {
+          // Phase 7 will add damage; for now just log
+          const enemy = gameState.enemies.get(action.enemyKey);
+          if (enemy) {
+            console.log(`${enemy.type} attacks!`);
+          }
         }
       }
     });
@@ -365,7 +402,11 @@ async function init(): Promise<void> {
     ls.player.update(delta);
     ls.doorAnimator.update(delta);
     ls.leverAnimator.update(delta);
+    ls.enemyAnimator.update(delta);
     transition.update(delta);
+
+    // Billboard enemy sprites toward camera
+    updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
 
     // Torch follows player with variable flicker, scaled by fuel
     const pos = ls.player.getWorldPosition();

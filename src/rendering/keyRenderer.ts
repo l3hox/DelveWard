@@ -50,7 +50,8 @@ export function buildKeyMeshes(gameState: GameState): KeyMeshes {
 
   const keyGeo = new THREE.PlaneGeometry(KEY_SIZE, KEY_SIZE);
   const keyTex = generateKeyTexture();
-  const keyMat = new THREE.MeshBasicMaterial({
+  // Lambert so keys are affected by torch/ambient lighting
+  const keyMat = new THREE.MeshLambertMaterial({
     map: keyTex,
     transparent: true,
     side: THREE.DoubleSide,

@@ -1,6 +1,8 @@
 import type { Entity } from './types';
 import type { Facing } from './grid';
 import { FACING_DELTA } from './grid';
+import { createEnemyInstance, ENEMY_DEFS } from './enemyTypes';
+import type { EnemyInstance } from './enemyTypes';
 
 export type DoorState = 'open' | 'closed' | 'locked';
 
@@ -62,6 +64,7 @@ export interface LevelSnapshot {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
 }
 
@@ -70,6 +73,7 @@ export class GameState {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
 
   hp: number;
@@ -83,6 +87,7 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.enemies = new Map();
     this.inventory = new Set();
 
     this.hp = 20;
@@ -130,6 +135,12 @@ export class GameState {
           targetDoor: e.targetDoor as string,
           activated: false,
         });
+      } else if (e.type === 'enemy') {
+        const enemyType = e.enemyType as string;
+        if (ENEMY_DEFS[enemyType]) {
+          const instance = createEnemyInstance(e.col, e.row, enemyType);
+          this.enemies.set(doorKey(e.col, e.row), instance);
+        }
       }
     }
 
@@ -180,8 +191,12 @@ export class GameState {
     for (const [k, v] of this.plates) {
       plates.set(k, { ...v });
     }
+    const enemies = new Map<string, EnemyInstance>();
+    for (const [k, v] of this.enemies) {
+      enemies.set(k, { ...v });
+    }
     const exploredCells = new Set<string>(this.exploredCells);
-    return { doors, keys, levers, plates, exploredCells };
+    return { doors, keys, levers, plates, enemies, exploredCells };
   }
 
   loadLevelState(snapshot: LevelSnapshot): void {
@@ -201,6 +216,10 @@ export class GameState {
     for (const [k, v] of snapshot.plates) {
       this.plates.set(k, { ...v });
     }
+    this.enemies = new Map<string, EnemyInstance>();
+    for (const [k, v] of snapshot.enemies) {
+      this.enemies.set(k, { ...v });
+    }
     this.exploredCells = new Set<string>(snapshot.exploredCells);
   }
 
@@ -209,6 +228,7 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.enemies = new Map();
     this.exploredCells = new Set();
     this._parseEntities(entities, grid);
   }
@@ -304,6 +324,37 @@ export class GameState {
       door.state = 'open';
     }
     return plate.targetDoor;
+  }
+
+  // --- Enemy helpers ---
+
+  getEnemy(col: number, row: number): EnemyInstance | undefined {
+    return this.enemies.get(doorKey(col, row));
+  }
+
+  isEnemyAt(col: number, row: number): boolean {
+    return this.enemies.has(doorKey(col, row));
+  }
+
+  moveEnemy(fromCol: number, fromRow: number, toCol: number, toRow: number): void {
+    const key = doorKey(fromCol, fromRow);
+    const enemy = this.enemies.get(key);
+    if (!enemy) return;
+    this.enemies.delete(key);
+    enemy.col = toCol;
+    enemy.row = toRow;
+    this.enemies.set(doorKey(toCol, toRow), enemy);
+  }
+
+  damageEnemy(col: number, row: number, amount: number): boolean {
+    const enemy = this.getEnemy(col, row);
+    if (!enemy) return false;
+    enemy.hp -= amount;
+    if (enemy.hp <= 0) {
+      this.enemies.delete(doorKey(col, row));
+      return true; // killed
+    }
+    return false;
   }
 
   /** Mark current cell + 4 adjacent + line-of-sight forward as explored */

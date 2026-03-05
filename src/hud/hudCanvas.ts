@@ -40,7 +40,7 @@ export class HudOverlay {
     drawCompass(this.ctx, playerState.facing);
     drawHealthBar(this.ctx, gameState.hp, gameState.maxHp, this.time);
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
-    drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing);
+    drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies);
     drawInventoryPanel(this.ctx, gameState.inventory.size);
   }
 }

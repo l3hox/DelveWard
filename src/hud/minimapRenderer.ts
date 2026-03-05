@@ -1,6 +1,7 @@
 import { MINIMAP } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { FACING_DELTA, type Facing } from '../core/grid';
+import type { EnemyInstance } from '../core/enemyTypes';
 
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,
@@ -9,6 +10,7 @@ export function drawMinimap(
   playerCol: number,
   playerRow: number,
   facing: Facing,
+  enemies?: Map<string, EnemyInstance>,
 ): void {
   const { x, y, w, h, cellSize } = MINIMAP;
 
@@ -46,6 +48,18 @@ export function drawMinimap(
         ctx.fillStyle = HUD_COLORS.minimapFloor;
       }
       ctx.fillRect(px, py, cellSize, cellSize);
+    }
+  }
+
+  // Enemy dots (red)
+  if (enemies) {
+    ctx.fillStyle = '#cc3333';
+    for (const enemy of enemies.values()) {
+      const key = `${enemy.col},${enemy.row}`;
+      if (!exploredCells.has(key)) continue;
+      const ex = x + (enemy.col - startCol) * cellSize + cellSize / 2;
+      const ey = y + (enemy.row - startRow) * cellSize + cellSize / 2;
+      ctx.fillRect(ex - 1, ey - 1, 3, 3);
     }
   }
 
