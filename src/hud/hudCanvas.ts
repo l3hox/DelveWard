@@ -6,6 +6,7 @@ import { drawMinimap } from './minimapRenderer';
 import { drawInventoryPanel } from './inventoryPanel';
 import type { GameState } from '../core/gameState';
 import type { PlayerState } from '../core/grid';
+import type { SwordSwingAnimator } from '../rendering/swordSwing';
 
 export class HudOverlay {
   private canvas: HTMLCanvasElement;
@@ -40,6 +41,7 @@ export class HudOverlay {
     grid: string[],
     delta: number = 0,
     damageFlashAlpha: number = 0,
+    swordSwing?: SwordSwingAnimator,
   ): void {
     this.time += delta;
     this.ctx.clearRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
@@ -48,6 +50,11 @@ export class HudOverlay {
     if (damageFlashAlpha > 0) {
       this.ctx.fillStyle = `rgba(180, 0, 0, ${damageFlashAlpha * 0.4})`;
       this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+    }
+
+    // Sword swing overlay
+    if (swordSwing?.isActive) {
+      swordSwing.draw(this.ctx, HUD_WIDTH, HUD_HEIGHT);
     }
 
     drawCompass(this.ctx, playerState.facing);

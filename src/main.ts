@@ -18,6 +18,8 @@ import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
 import { TransitionOverlay } from './rendering/transitionOverlay';
+import { DamageNumberManager } from './rendering/damageNumbers';
+import { SwordSwingAnimator } from './rendering/swordSwing';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
@@ -222,6 +224,9 @@ async function init(): Promise<void> {
 
   // --- Combat state ---
   let playerDamageFlashTimer = 0;
+  const damageNumbers = new DamageNumberManager();
+  scene.add(damageNumbers.getGroup());
+  const swordSwing = new SwordSwingAnimator();
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
@@ -402,13 +407,19 @@ async function init(): Promise<void> {
       case 'KeyF':
         {
           const result = playerAttack(ls.player.getState(), gameState);
+          if (result.type !== 'cooldown') {
+            swordSwing.trigger();
+          }
           if (result.type === 'hit' || result.type === 'kill') {
+            if (result.targetCol !== undefined && result.targetRow !== undefined) {
+              enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+              if (result.damage !== undefined) {
+                damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+              }
+            }
             if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
               hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
               ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
-            }
-            if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
             }
           }
         }
@@ -449,6 +460,8 @@ async function init(): Promise<void> {
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
     transition.update(delta);
+    damageNumbers.update(delta);
+    swordSwing.update(delta);
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
@@ -506,7 +519,7 @@ async function init(): Promise<void> {
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
-    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha);
+    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing);
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
