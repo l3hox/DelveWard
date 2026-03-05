@@ -1,7 +1,7 @@
 import { MINIMAP } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { FACING_DELTA, type Facing } from '../core/grid';
-import type { EnemyInstance } from '../core/enemyTypes';
+import type { EnemyInstance } from '../enemies/enemyTypes';
 
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,

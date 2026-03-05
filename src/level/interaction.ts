@@ -1,6 +1,6 @@
-import type { PlayerState } from './grid';
-import { getFacingCell } from './grid';
-import type { GameState } from './gameState';
+import type { PlayerState } from '../core/grid';
+import { getFacingCell } from '../core/grid';
+import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
   type: 'door_opened' | 'door_closed' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'nothing';

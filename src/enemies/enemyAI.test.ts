@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { executeEnemyTurns } from './enemyAI';
-import { GameState, doorKey } from './gameState';
-import { WALKABLE_CELLS } from './grid';
-import type { Entity } from './types';
+import { GameState, doorKey } from '../core/gameState';
+import { WALKABLE_CELLS } from '../core/grid';
+import type { Entity } from '../core/types';
 
 const grid = [
   '#######',

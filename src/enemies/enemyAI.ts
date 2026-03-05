@@ -1,10 +1,10 @@
 // Enemy AI turn execution — pure logic, no Three.js
 
 import type { EnemyInstance } from './enemyTypes';
-import type { GameState } from './gameState';
-import { doorKey } from './gameState';
+import type { GameState } from '../core/gameState';
+import { doorKey } from '../core/gameState';
 import { findPath, manhattanDistance } from './pathfinding';
-import { isWalkable } from './grid';
+import { isWalkable } from '../core/grid';
 
 export type EnemyActionType = 'idle' | 'move' | 'attack';
 

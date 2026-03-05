@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { interact } from './interaction';
-import { PlayerState } from './grid';
-import { GameState } from './gameState';
-import type { Entity } from './types';
+import { PlayerState } from '../core/grid';
+import { GameState } from '../core/gameState';
+import type { Entity } from '../core/types';
 
 // Grid layout (col, row):
 //   01234

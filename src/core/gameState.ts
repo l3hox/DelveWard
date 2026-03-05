@@ -1,8 +1,8 @@
 import type { Entity } from './types';
 import type { Facing } from './grid';
 import { FACING_DELTA } from './grid';
-import { createEnemyInstance, ENEMY_DEFS } from './enemyTypes';
-import type { EnemyInstance } from './enemyTypes';
+import { createEnemyInstance, ENEMY_DEFS } from '../enemies/enemyTypes';
+import type { EnemyInstance } from '../enemies/enemyTypes';
 
 export type DoorState = 'open' | 'closed' | 'locked';
 

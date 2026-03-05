@@ -1,9 +1,9 @@
-import type { DungeonLevel, Dungeon } from './types';
-import type { Facing } from './grid';
-import { WALKABLE_CELLS } from './grid';
-import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from './textureNames';
-import { parseDoorKey } from './gameState';
-import { ENEMY_DEFS } from './enemyTypes';
+import type { DungeonLevel, Dungeon } from '../core/types';
+import type { Facing } from '../core/grid';
+import { WALKABLE_CELLS } from '../core/grid';
+import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from '../core/textureNames';
+import { parseDoorKey } from '../core/gameState';
+import { ENEMY_DEFS } from '../enemies/enemyTypes';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const BUILTIN_CHARS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
