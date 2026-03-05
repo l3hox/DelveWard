@@ -26,9 +26,9 @@ describe('ENEMY_DEFS', () => {
     }
   });
 
-  it('each def has speed >= 1', () => {
+  it('each def has positive moveInterval', () => {
     for (const def of Object.values(ENEMY_DEFS)) {
-      expect(def.speed).toBeGreaterThanOrEqual(1);
+      expect(def.moveInterval).toBeGreaterThan(0);
     }
   });
 });
@@ -42,7 +42,7 @@ describe('createEnemyInstance', () => {
     expect(enemy.maxHp).toBe(ENEMY_DEFS.rat.maxHp);
     expect(enemy.damage).toBe(ENEMY_DEFS.rat.damage);
     expect(enemy.aggroRange).toBe(ENEMY_DEFS.rat.aggroRange);
-    expect(enemy.speed).toBe(ENEMY_DEFS.rat.speed);
+    expect(enemy.moveInterval).toBe(ENEMY_DEFS.rat.moveInterval);
   });
 
   it('starts with hp equal to maxHp', () => {
@@ -50,10 +50,10 @@ describe('createEnemyInstance', () => {
     expect(enemy.hp).toBe(enemy.maxHp);
   });
 
-  it('starts with aiState idle and turnCounter 0', () => {
+  it('starts with aiState idle and moveTimer 0', () => {
     const enemy = createEnemyInstance(1, 1, 'orc');
     expect(enemy.aiState).toBe('idle');
-    expect(enemy.turnCounter).toBe(0);
+    expect(enemy.moveTimer).toBe(0);
   });
 
   it('throws for unknown enemy type', () => {

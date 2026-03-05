@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { executeEnemyTurns } from './enemyAI';
+import { updateEnemies } from './enemyAI';
 import { GameState, doorKey } from '../core/gameState';
 import { WALKABLE_CELLS } from '../core/grid';
 import type { Entity } from '../core/types';
@@ -22,6 +22,11 @@ function makeState(entities: Entity[]): GameState {
 
 function enemyEntity(col: number, row: number, enemyType: string): Entity {
   return { col, row, type: 'enemy', enemyType };
+}
+
+// Helper: tick enemies with enough delta to trigger an action
+function tickAction(gs: GameState, playerCol: number, playerRow: number, delta = 2.5): ReturnType<typeof updateEnemies> {
+  return updateEnemies(gs, playerCol, playerRow, grid, WALKABLE_CELLS, isDoorOpen, delta);
 }
 
 // --- GameState enemy helpers ---
@@ -75,19 +80,18 @@ describe('GameState enemy support', () => {
 
 // --- Enemy AI ---
 
-describe('executeEnemyTurns', () => {
-  it('idle enemy stays idle when player is far away', () => {
+describe('updateEnemies', () => {
+  it('idle enemy produces no action when player is far away', () => {
     const gs = makeState([enemyEntity(1, 1, 'rat')]); // aggroRange 3
     // Player at (5, 5), distance = 8
-    const actions = executeEnemyTurns(gs, 5, 5, grid, WALKABLE_CELLS, isDoorOpen);
-    expect(actions.length).toBe(1);
-    expect(actions[0].type).toBe('idle');
+    const actions = tickAction(gs, 5, 5);
+    expect(actions.length).toBe(0);
   });
 
   it('enemy transitions to chase when player within aggro range', () => {
     const gs = makeState([enemyEntity(3, 3, 'rat')]); // aggroRange 3
     // Player at (3, 1), distance = 2
-    const actions = executeEnemyTurns(gs, 3, 1, grid, WALKABLE_CELLS, isDoorOpen);
+    const actions = tickAction(gs, 3, 1);
     expect(actions[0].type).toBe('move');
     const enemy = gs.getEnemy(actions[0].toCol!, actions[0].toRow!);
     expect(enemy).toBeDefined();
@@ -97,46 +101,44 @@ describe('executeEnemyTurns', () => {
   it('enemy moves toward player during chase', () => {
     const gs = makeState([enemyEntity(1, 3, 'rat')]); // aggroRange 3
     // Player at (1, 1), distance = 2
-    const actions = executeEnemyTurns(gs, 1, 1, grid, WALKABLE_CELLS, isDoorOpen);
+    const actions = tickAction(gs, 1, 1);
     expect(actions[0].type).toBe('move');
-    // Should move closer to player
     expect(actions[0].toRow!).toBeLessThan(3);
   });
 
   it('enemy attacks when adjacent to player', () => {
     const gs = makeState([enemyEntity(2, 1, 'rat')]); // aggroRange 3
     // Player at (1, 1), distance = 1
-    const actions = executeEnemyTurns(gs, 1, 1, grid, WALKABLE_CELLS, isDoorOpen);
+    const actions = tickAction(gs, 1, 1);
     expect(actions[0].type).toBe('attack');
   });
 
   it('enemy returns to idle when player moves out of aggro + buffer range', () => {
     const gs = makeState([enemyEntity(1, 1, 'rat')]); // aggroRange 3, DEAGGRO_BUFFER = 2
 
-    // First turn: player in range, enemy chases
-    executeEnemyTurns(gs, 1, 3, grid, WALKABLE_CELLS, isDoorOpen);
-    // Get the enemy wherever it moved
+    // First tick: player in range, enemy chases
+    tickAction(gs, 1, 3);
     const enemies = [...gs.enemies.values()];
     expect(enemies[0].aiState).toBe('chase');
 
     // Now player far away: distance > aggroRange + DEAGGRO_BUFFER (3 + 2 = 5)
-    // Enemy is around (1,2), player at (5,5): distance ~7, which is > 5
-    executeEnemyTurns(gs, 5, 5, grid, WALKABLE_CELLS, isDoorOpen);
+    tickAction(gs, 5, 5);
     const enemyAfter = [...gs.enemies.values()][0];
     expect(enemyAfter.aiState).toBe('idle');
   });
 
-  it('speed gating: skeleton only acts on even turns', () => {
-    const gs = makeState([enemyEntity(3, 3, 'skeleton')]); // speed 2
+  it('timer gating: no action before moveInterval elapsed', () => {
+    const gs = makeState([enemyEntity(3, 3, 'skeleton')]); // moveInterval 1.5s
     // Player at (3, 1), distance = 2, within aggroRange 4
 
-    // Turn 1: turnCounter becomes 1, 1 % 2 !== 0, should idle
-    const actions1 = executeEnemyTurns(gs, 3, 1, grid, WALKABLE_CELLS, isDoorOpen);
-    expect(actions1[0].type).toBe('idle');
+    // Tick with 0.5s — not enough time
+    const actions1 = updateEnemies(gs, 3, 1, grid, WALKABLE_CELLS, isDoorOpen, 0.5);
+    expect(actions1.length).toBe(0);
 
-    // Turn 2: turnCounter becomes 2, 2 % 2 === 0, should act
-    const actions2 = executeEnemyTurns(gs, 3, 1, grid, WALKABLE_CELLS, isDoorOpen);
-    expect(actions2[0].type).not.toBe('idle');
+    // Tick with another 1.1s — total 1.6s, now exceeds 1.5s interval
+    const actions2 = updateEnemies(gs, 3, 1, grid, WALKABLE_CELLS, isDoorOpen, 1.1);
+    expect(actions2.length).toBe(1);
+    expect(actions2[0].type).toBe('move');
   });
 
   it('two enemies do not stack on the same cell', () => {
@@ -145,7 +147,7 @@ describe('executeEnemyTurns', () => {
       enemyEntity(1, 3, 'rat'),
     ]);
     // Player at (1, 2), both rats will want to move toward row 2
-    executeEnemyTurns(gs, 1, 2, grid, WALKABLE_CELLS, isDoorOpen);
+    tickAction(gs, 1, 2);
 
     const positions = [...gs.enemies.values()].map(
       (e) => doorKey(e.col, e.row),
@@ -155,12 +157,9 @@ describe('executeEnemyTurns', () => {
   });
 
   it('enemy does not move onto player cell', () => {
-    const gs = makeState([enemyEntity(2, 1, 'rat')]); // aggroRange 3
-    // Player at (1, 1), distance = 1 -> attack, not move
-    // But also test with distance 2 where path goes through player
-    const gs2 = makeState([enemyEntity(3, 1, 'rat')]);
+    const gs = makeState([enemyEntity(3, 1, 'rat')]); // aggroRange 3
     // Player at (1, 1), distance = 2
-    const actions = executeEnemyTurns(gs2, 1, 1, grid, WALKABLE_CELLS, isDoorOpen);
+    const actions = tickAction(gs, 1, 1);
 
     if (actions[0].type === 'move') {
       const movedTo = doorKey(actions[0].toCol!, actions[0].toRow!);

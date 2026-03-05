@@ -6,8 +6,8 @@ export interface EnemyDef {
   type: string;
   maxHp: number;
   damage: number;
-  aggroRange: number;   // Manhattan distance to notice player
-  speed: number;        // moves every N player turns (1 = every turn, 2 = every other)
+  aggroRange: number;     // Manhattan distance to notice player
+  moveInterval: number;   // seconds between actions
 }
 
 export interface EnemyInstance {
@@ -18,9 +18,9 @@ export interface EnemyInstance {
   maxHp: number;
   damage: number;
   aggroRange: number;
-  speed: number;
+  moveInterval: number;
   aiState: EnemyAIState;
-  turnCounter: number;
+  moveTimer: number;      // accumulates delta, resets on action
 }
 
 export const ENEMY_DEFS: Record<string, EnemyDef> = {
@@ -29,21 +29,21 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     maxHp: 4,
     damage: 2,
     aggroRange: 3,
-    speed: 1,
+    moveInterval: 0.8,
   },
   skeleton: {
     type: 'skeleton',
     maxHp: 8,
     damage: 3,
     aggroRange: 4,
-    speed: 2,
+    moveInterval: 1.5,
   },
   orc: {
     type: 'orc',
     maxHp: 15,
     damage: 5,
     aggroRange: 5,
-    speed: 2,
+    moveInterval: 2.0,
   },
 };
 
@@ -62,8 +62,8 @@ export function createEnemyInstance(
     maxHp: def.maxHp,
     damage: def.damage,
     aggroRange: def.aggroRange,
-    speed: def.speed,
+    moveInterval: def.moveInterval,
     aiState: 'idle',
-    turnCounter: 0,
+    moveTimer: 0,
   };
 }

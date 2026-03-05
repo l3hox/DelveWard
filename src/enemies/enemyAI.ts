@@ -1,6 +1,5 @@
-// Enemy AI turn execution — pure logic, no Three.js
+// Real-time enemy AI — pure logic, no Three.js
 
-import type { EnemyInstance } from './enemyTypes';
 import type { GameState } from '../core/gameState';
 import { doorKey } from '../core/gameState';
 import { findPath, manhattanDistance } from './pathfinding';
@@ -19,13 +18,18 @@ export interface EnemyAction {
 
 const DEAGGRO_BUFFER = 2;
 
-export function executeEnemyTurns(
+/**
+ * Tick all enemies by delta seconds. Each enemy accumulates time
+ * and acts when its moveTimer reaches moveInterval.
+ */
+export function updateEnemies(
   gameState: GameState,
   playerCol: number,
   playerRow: number,
   grid: string[],
   walkable: Set<string>,
   isDoorOpen: (col: number, row: number) => boolean,
+  delta: number,
 ): EnemyAction[] {
   const actions: EnemyAction[] = [];
 
@@ -40,34 +44,26 @@ export function executeEnemyTurns(
 
   for (const key of sortedKeys) {
     const enemy = gameState.enemies.get(key)!;
-    enemy.turnCounter++;
 
     const dist = manhattanDistance(enemy.col, enemy.row, playerCol, playerRow);
 
-    // State transitions
+    // State transitions (always evaluated, not gated by timer)
     if (enemy.aiState === 'idle' && dist <= enemy.aggroRange) {
       enemy.aiState = 'chase';
     } else if (enemy.aiState === 'chase' && dist > enemy.aggroRange + DEAGGRO_BUFFER) {
       enemy.aiState = 'idle';
     }
 
-    // Attack if adjacent
     if (enemy.aiState === 'chase' && dist <= 1) {
       enemy.aiState = 'attack';
     } else if (enemy.aiState === 'attack' && dist > 1) {
       enemy.aiState = 'chase';
     }
 
-    // Skip turn if speed gating
-    if (enemy.turnCounter % enemy.speed !== 0) {
-      actions.push({
-        enemyKey: key,
-        type: 'idle',
-        fromCol: enemy.col,
-        fromRow: enemy.row,
-      });
-      continue;
-    }
+    // Accumulate timer
+    enemy.moveTimer += delta;
+    if (enemy.moveTimer < enemy.moveInterval) continue;
+    enemy.moveTimer = 0;
 
     if (enemy.aiState === 'attack') {
       actions.push({
@@ -95,7 +91,6 @@ export function executeEnemyTurns(
       );
 
       if (path && path.length > 1) {
-        // Don't step onto player's cell
         const step = path[0];
         const stepKey = doorKey(step.col, step.row);
         if (stepKey !== doorKey(playerCol, playerRow) && !occupied.has(stepKey)) {
@@ -117,12 +112,7 @@ export function executeEnemyTurns(
       }
     }
 
-    actions.push({
-      enemyKey: key,
-      type: 'idle',
-      fromCol: enemy.col,
-      fromRow: enemy.row,
-    });
+    // Idle or couldn't move — no action emitted
   }
 
   return actions;

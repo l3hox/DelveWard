@@ -12,7 +12,7 @@ import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
-import { executeEnemyTurns } from './enemies/enemyAI';
+import { updateEnemies } from './enemies/enemyAI';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
@@ -260,26 +260,6 @@ async function init(): Promise<void> {
         );
         if (stair) {
           triggerLevelTransition(stair);
-          return; // don't run enemy turns during level transition
-        }
-      }
-
-      // Enemy turns (after player moves)
-      const actions = executeEnemyTurns(
-        gameState, col, row, ls.level.grid, ls.walkable,
-        gameState.isDoorOpen.bind(gameState),
-      );
-      for (const action of actions) {
-        if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
-          const newKey = doorKey(action.toCol, action.toRow);
-          updateEnemyMeshPosition(ls.enemyMeshes.meshMap, action.enemyKey, action.toCol, action.toRow);
-          ls.enemyAnimator.moveTo(action.enemyKey, action.toCol, action.toRow, newKey);
-        } else if (action.type === 'attack') {
-          // Phase 7 will add damage; for now just log
-          const enemy = gameState.enemies.get(action.enemyKey);
-          if (enemy) {
-            console.log(`${enemy.type} attacks!`);
-          }
         }
       }
     });
@@ -407,6 +387,27 @@ async function init(): Promise<void> {
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
+
+    // Real-time enemy AI tick
+    if (!transition.isActive) {
+      const ps = ls.player.getState();
+      const actions = updateEnemies(
+        gameState, ps.col, ps.row, ls.level.grid, ls.walkable,
+        gameState.isDoorOpen.bind(gameState), delta,
+      );
+      for (const action of actions) {
+        if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
+          const newKey = doorKey(action.toCol, action.toRow);
+          updateEnemyMeshPosition(ls.enemyMeshes.meshMap, action.enemyKey, action.toCol, action.toRow);
+          ls.enemyAnimator.moveTo(action.enemyKey, action.toCol, action.toRow, newKey);
+        } else if (action.type === 'attack') {
+          const enemy = gameState.enemies.get(action.enemyKey);
+          if (enemy) {
+            console.log(`${enemy.type} attacks!`);
+          }
+        }
+      }
+    }
 
     // Torch follows player with variable flicker, scaled by fuel
     const pos = ls.player.getWorldPosition();
