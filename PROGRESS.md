@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 7 — Combat** (in progress)
+**Phase 8 — Later Resources & Polish** (pending)
 
 ---
 
@@ -125,23 +125,23 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Refactored `src/core/` into `core/`, `enemies/`, `level/` directories
   - 248 tests (33 new)
 
-## What's Done (Phase 7 — in progress)
+- [x] **Phase 7 complete** — Combat:
+  - Combat stats: player ATK/DEF on GameState, enemy ATK/DEF — `src/core/combat.ts`
+  - Damage formula: `max(1, ATK - DEF + random(-1..+1))`
+  - Player attack: F key swings at facing cell, 0.8s cooldown
+  - Enemy attack: AI attack actions deal damage via `enemyAttackPlayer()`
+  - Combat feedback: enemy flash red on hit, player red overlay on HUD, weapon slot cooldown fill
+  - Floating damage numbers — 3D billboard sprites float up and fade out from hit enemies
+  - Sword swing animation — pixelart sword arc on HUD canvas when player attacks
+  - Death/restart: HP <= 0 fades to black and restarts current level (full reset, enemies respawn)
+  - 258 tests
 
-- [x] Combat stats: player ATK/DEF on GameState, enemy ATK/DEF (renamed from `damage`)
-- [x] Damage formula: `max(1, ATK - DEF + random(-1..+1))` in `src/core/combat.ts`
-- [x] Player attack: F key swings at facing cell, 0.8s cooldown
-- [x] Enemy attack: AI attack actions now deal damage to player via `enemyAttackPlayer()`
-- [x] Combat feedback: enemy flash red on hit, player red overlay on HUD, weapon slot cooldown fill
-- [x] Death/restart: HP <= 0 fades to black and restarts current level (full reset)
-- [x] 258 tests (10 new)
-
-## Next Steps (Phase 7)
+## Next Steps (Phase 8 — deferred)
 
 - [ ] Player equipment affecting ATK/DEF stats
 - [ ] Consumable items (health potions, torch oil)
-- [ ] Combat feedback: floating damage numbers
 - [ ] Sprite animation on hit (bob/shake)
-- [ ] Stats model (deferred — player will introduce later)
+- [ ] Stats model
 
 ---
 
@@ -155,7 +155,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 | 4 | HUD | **Complete** |
 | 5 | Multi-Level Dungeons | **Complete** |
 | 6 | Entities & Enemy System | **Complete** |
-| 7 | Combat | **In Progress** |
+| 7 | Combat | **Complete** |
 | 8 | Later Resources & Polish | Pending |
 
 ---
@@ -163,8 +163,8 @@ Read this at the start of every Claude Code session to restore context. Update i
 ## Open Questions
 
 - ~~Minimap — render in 3D scene or as 2D canvas overlay?~~ → Resolved: 2D canvas overlay
-- Combat interaction model — deferred to Phase 7
-- Death/respawn behavior — deferred to Phase 7
+- ~~Combat interaction model~~ → Resolved: F key melee attack, real-time with cooldown
+- ~~Death/respawn behavior~~ → Resolved: fade-to-black, full level restart, enemies respawn
 
 ---
 
@@ -175,6 +175,13 @@ Read this at the start of every Claude Code session to restore context. Update i
 ---
 
 ## Session Log
+
+### Session 16 — Phase 7 complete
+- Floating damage numbers: `src/rendering/damageNumbers.ts` — 3D billboard sprites with canvas-rendered white text + black outline, float up and fade out over 0.7s
+- Sword swing animation: `src/rendering/swordSwing.ts` — pixelart sword drawn on HUD canvas, sweeps from lower-right to upper-left over 0.25s with easeOutQuad
+- Wired both into `main.ts` (game loop + F key handler) and `hudCanvas.ts`
+- Marked Phase 7 complete, resolved all open questions
+- 258 tests, TypeScript compiles clean
 
 ### Session 15 — Phase 6 complete, Phase 7 combat foundation
 - Marked Phase 6 complete (enemy system was already implemented in prior sessions but PROGRESS.md wasn't updated)
