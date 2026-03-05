@@ -5,7 +5,8 @@ export type EnemyAIState = 'idle' | 'chase' | 'attack';
 export interface EnemyDef {
   type: string;
   maxHp: number;
-  damage: number;
+  atk: number;
+  def: number;
   aggroRange: number;     // Manhattan distance to notice player
   moveInterval: number;   // seconds between actions
 }
@@ -16,7 +17,8 @@ export interface EnemyInstance {
   type: string;
   hp: number;
   maxHp: number;
-  damage: number;
+  atk: number;
+  def: number;
   aggroRange: number;
   moveInterval: number;
   aiState: EnemyAIState;
@@ -27,21 +29,24 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
   rat: {
     type: 'rat',
     maxHp: 4,
-    damage: 2,
+    atk: 2,
+    def: 0,
     aggroRange: 3,
     moveInterval: 0.8,
   },
   skeleton: {
     type: 'skeleton',
     maxHp: 8,
-    damage: 3,
+    atk: 3,
+    def: 1,
     aggroRange: 4,
     moveInterval: 1.5,
   },
   orc: {
     type: 'orc',
     maxHp: 15,
-    damage: 5,
+    atk: 5,
+    def: 2,
     aggroRange: 5,
     moveInterval: 2.0,
   },
@@ -60,7 +65,8 @@ export function createEnemyInstance(
     type: def.type,
     hp: def.maxHp,
     maxHp: def.maxHp,
-    damage: def.damage,
+    atk: def.atk,
+    def: def.def,
     aggroRange: def.aggroRange,
     moveInterval: def.moveInterval,
     aiState: 'idle',

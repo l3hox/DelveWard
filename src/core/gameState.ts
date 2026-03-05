@@ -78,6 +78,9 @@ export class GameState {
 
   hp: number;
   maxHp: number;
+  atk: number;
+  def: number;
+  attackCooldown: number;
   torchFuel: number;
   maxTorchFuel: number;
   exploredCells: Set<string>;
@@ -92,6 +95,9 @@ export class GameState {
 
     this.hp = 20;
     this.maxHp = 20;
+    this.atk = 3;
+    this.def = 1;
+    this.attackCooldown = 0;
     this.torchFuel = 100;
     this.maxTorchFuel = 100;
     this.exploredCells = new Set();

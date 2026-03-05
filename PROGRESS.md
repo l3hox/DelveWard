@@ -8,7 +8,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Current Phase
 
-**Phase 6 — Entities & Enemy System** (not started)
+**Phase 7 — Combat** (in progress)
 
 ---
 
@@ -113,9 +113,35 @@ Read this at the start of every Claude Code session to restore context. Update i
   - FOV tuned to 75
   - Fixed stair target coordinates in `dungeon1.json`
 
-## Next Steps (Phase 6)
+- [x] **Phase 6 complete** — Entities & Enemy System:
+  - 3 enemy types: rat (fast/weak), skeleton (medium), orc (slow/strong) — `src/enemies/enemyTypes.ts`
+  - Enemy AI state machine: idle → chase → attack — `src/enemies/enemyAI.ts`
+  - BFS grid pathfinding with collision avoidance — `src/enemies/pathfinding.ts`
+  - Billboard sprites with pixelart textures (rat, skeleton, orc) — `src/rendering/enemyRenderer.ts`
+  - Smooth enemy movement animation via lerp — `src/rendering/enemyAnimator.ts`
+  - Real-time timers (each enemy has own `moveInterval`), not turn-based
+  - Enemies respect occupied cells (no stacking), door walkability
+  - Aggro/deaggro based on Manhattan distance with hysteresis buffer
+  - Refactored `src/core/` into `core/`, `enemies/`, `level/` directories
+  - 248 tests (33 new)
 
-See PLAN.md Phase 6 for full details.
+## What's Done (Phase 7 — in progress)
+
+- [x] Combat stats: player ATK/DEF on GameState, enemy ATK/DEF (renamed from `damage`)
+- [x] Damage formula: `max(1, ATK - DEF + random(-1..+1))` in `src/core/combat.ts`
+- [x] Player attack: F key swings at facing cell, 0.8s cooldown
+- [x] Enemy attack: AI attack actions now deal damage to player via `enemyAttackPlayer()`
+- [x] Combat feedback: enemy flash red on hit, player red overlay on HUD, weapon slot cooldown fill
+- [x] Death/restart: HP <= 0 fades to black and restarts current level (full reset)
+- [x] 258 tests (10 new)
+
+## Next Steps (Phase 7)
+
+- [ ] Player equipment affecting ATK/DEF stats
+- [ ] Consumable items (health potions, torch oil)
+- [ ] Combat feedback: floating damage numbers
+- [ ] Sprite animation on hit (bob/shake)
+- [ ] Stats model (deferred — player will introduce later)
 
 ---
 
@@ -128,8 +154,8 @@ See PLAN.md Phase 6 for full details.
 | 3 | Doors & Interaction | **Complete** |
 | 4 | HUD | **Complete** |
 | 5 | Multi-Level Dungeons | **Complete** |
-| 6 | Entities & Enemy System | Pending |
-| 7 | Combat | Pending |
+| 6 | Entities & Enemy System | **Complete** |
+| 7 | Combat | **In Progress** |
 | 8 | Later Resources & Polish | Pending |
 
 ---
@@ -149,6 +175,18 @@ See PLAN.md Phase 6 for full details.
 ---
 
 ## Session Log
+
+### Session 15 — Phase 6 complete, Phase 7 combat foundation
+- Marked Phase 6 complete (enemy system was already implemented in prior sessions but PROGRESS.md wasn't updated)
+- Created `src/core/combat.ts` — pure combat logic: `calculateDamage()`, `playerAttack()`, `enemyAttackPlayer()`
+- Damage formula: `max(1, ATK - DEF + random(-1..+1))` — always deals at least 1
+- Added `atk`, `def`, `attackCooldown` to `GameState` (player: ATK 3, DEF 1)
+- Renamed enemy `damage` to `atk` + added `def`: rat (2/0), skeleton (3/1), orc (5/2)
+- F key attacks facing cell with 0.8s cooldown
+- Enemy AI attack actions now call `enemyAttackPlayer()` with real damage
+- Combat feedback: enemy mesh flashes red on hit, HUD red overlay on player damage, weapon slot cooldown fill overlay
+- Death: HP <= 0 triggers fade-to-black → full level restart (reset state, player start, full HP/torch)
+- 258 tests (10 new), TypeScript compiles clean
 
 ### Session 14 — Camera Viewport Tuning
 - Asymmetric frustum crop via `setViewOffset` in `main.ts`:

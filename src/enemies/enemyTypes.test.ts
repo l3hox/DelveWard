@@ -14,9 +14,15 @@ describe('ENEMY_DEFS', () => {
     }
   });
 
-  it('each def has positive damage', () => {
+  it('each def has positive atk', () => {
     for (const def of Object.values(ENEMY_DEFS)) {
-      expect(def.damage).toBeGreaterThan(0);
+      expect(def.atk).toBeGreaterThan(0);
+    }
+  });
+
+  it('each def has non-negative def', () => {
+    for (const def of Object.values(ENEMY_DEFS)) {
+      expect(def.def).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -40,7 +46,8 @@ describe('createEnemyInstance', () => {
     expect(enemy.row).toBe(5);
     expect(enemy.type).toBe('rat');
     expect(enemy.maxHp).toBe(ENEMY_DEFS.rat.maxHp);
-    expect(enemy.damage).toBe(ENEMY_DEFS.rat.damage);
+    expect(enemy.atk).toBe(ENEMY_DEFS.rat.atk);
+    expect(enemy.def).toBe(ENEMY_DEFS.rat.def);
     expect(enemy.aggroRange).toBe(ENEMY_DEFS.rat.aggroRange);
     expect(enemy.moveInterval).toBe(ENEMY_DEFS.rat.moveInterval);
   });

@@ -1,6 +1,7 @@
 import { INVENTORY } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { drawPixelText } from './hudFont';
+import { PLAYER_ATTACK_COOLDOWN } from '../core/combat';
 
 const SLOT_SIZE = 24;
 const SLOT_GAP = 4;
@@ -9,6 +10,7 @@ const EQUIP_LABELS = ['W', 'A', 'R']; // Weapon, Armor, Ring
 export function drawInventoryPanel(
   ctx: CanvasRenderingContext2D,
   keyCount: number,
+  attackCooldown: number = 0,
 ): void {
   const { x, y, w, h } = INVENTORY;
 
@@ -25,6 +27,15 @@ export function drawInventoryPanel(
   for (let i = 0; i < 3; i++) {
     const sx = x + 6 + i * (SLOT_SIZE + SLOT_GAP);
     drawSlot(ctx, sx, equipY, EQUIP_LABELS[i]);
+  }
+
+  // Weapon cooldown overlay on W slot
+  if (attackCooldown > 0) {
+    const cooldownRatio = attackCooldown / PLAYER_ATTACK_COOLDOWN;
+    const wx = x + 6;
+    const fillH = Math.ceil(SLOT_SIZE * cooldownRatio);
+    ctx.fillStyle = 'rgba(200, 60, 60, 0.45)';
+    ctx.fillRect(wx, equipY + (SLOT_SIZE - fillH), SLOT_SIZE, fillH);
   }
 
   // Backpack slots (2 rows of 4)

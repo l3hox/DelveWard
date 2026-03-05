@@ -34,13 +34,26 @@ export class HudOverlay {
     parent.appendChild(this.canvas);
   }
 
-  draw(gameState: GameState, playerState: PlayerState, grid: string[], delta: number = 0): void {
+  draw(
+    gameState: GameState,
+    playerState: PlayerState,
+    grid: string[],
+    delta: number = 0,
+    damageFlashAlpha: number = 0,
+  ): void {
     this.time += delta;
     this.ctx.clearRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+
+    // Player damage flash — red overlay
+    if (damageFlashAlpha > 0) {
+      this.ctx.fillStyle = `rgba(180, 0, 0, ${damageFlashAlpha * 0.4})`;
+      this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+    }
+
     drawCompass(this.ctx, playerState.facing);
     drawHealthBar(this.ctx, gameState.hp, gameState.maxHp, this.time);
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
     drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies);
-    drawInventoryPanel(this.ctx, gameState.inventory.size);
+    drawInventoryPanel(this.ctx, gameState.inventory.size, gameState.attackCooldown);
   }
 }

@@ -13,6 +13,7 @@ import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
+import { playerAttack, enemyAttackPlayer } from './core/combat';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
@@ -31,6 +32,10 @@ const CAMERA_CROP_SIDE = (CAMERA_CROP_TOP + CAMERA_CROP_BOTTOM) / 2; // auto: pr
 
 // Cap delta to prevent physics jumps when tab is backgrounded
 const MAX_FRAME_DELTA = 0.1;
+
+// Combat feedback
+const PLAYER_DAMAGE_FLASH_DURATION = 0.15;
+const ENEMY_DAMAGE_FLASH_DURATION = 0.12;
 
 // Torch flicker parameters
 const TORCH_OFFSET_Y = 0.3;
@@ -215,6 +220,52 @@ async function init(): Promise<void> {
   const transition = new TransitionOverlay();
   transition.attach();
 
+  // --- Combat state ---
+  let playerDamageFlashTimer = 0;
+
+  function enemyDamageFlash(
+    meshMap: Map<string, THREE.Mesh>,
+    col: number,
+    row: number,
+  ): void {
+    const key = doorKey(col, row);
+    const mesh = meshMap.get(key);
+    if (!mesh) return;
+    const mat = mesh.material as THREE.MeshPhongMaterial;
+    const originalColor = mat.color.clone();
+    mat.color.set(0xff0000);
+    setTimeout(() => {
+      mat.color.copy(originalColor);
+    }, ENEMY_DAMAGE_FLASH_DURATION * 1000);
+  }
+
+  function restartLevel(): void {
+    transition.startTransition(() => {
+      teardownLevelScene(ls, scene);
+
+      // Reset GameState for current level
+      const currentLevel = dungeon.levels.find((l) => l.id === currentLevelId)!;
+      gameState.loadNewLevel(currentLevel.entities, currentLevel.grid);
+      gameState.hp = gameState.maxHp;
+      gameState.torchFuel = gameState.maxTorchFuel;
+      gameState.attackCooldown = 0;
+
+      ls = buildLevelScene(
+        currentLevel, gameState, camera, scene,
+        currentLevel.playerStart.col,
+        currentLevel.playerStart.row,
+        currentLevel.playerStart.facing,
+      );
+      wireCallbacks();
+      gameState.revealAround(
+        currentLevel.playerStart.col,
+        currentLevel.playerStart.row,
+        currentLevel.playerStart.facing,
+        currentLevel.grid,
+      );
+    });
+  }
+
   // --- First level scene ---
   let ls = buildLevelScene(
     firstLevel,
@@ -348,6 +399,20 @@ async function init(): Promise<void> {
           }
         }
         break;
+      case 'KeyF':
+        {
+          const result = playerAttack(ls.player.getState(), gameState);
+          if (result.type === 'hit' || result.type === 'kill') {
+            if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
+              hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+              ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
+            }
+            if (result.targetCol !== undefined && result.targetRow !== undefined) {
+              enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+            }
+          }
+        }
+        break;
       case 'KeyL':
         debugFullbright = !debugFullbright;
         if (debugFullbright) {
@@ -388,6 +453,16 @@ async function init(): Promise<void> {
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
 
+    // Attack cooldown tick
+    if (gameState.attackCooldown > 0) {
+      gameState.attackCooldown = Math.max(0, gameState.attackCooldown - delta);
+    }
+
+    // Player damage flash tick
+    if (playerDamageFlashTimer > 0) {
+      playerDamageFlashTimer = Math.max(0, playerDamageFlashTimer - delta);
+    }
+
     // Real-time enemy AI tick
     if (!transition.isActive) {
       const ps = ls.player.getState();
@@ -403,9 +478,15 @@ async function init(): Promise<void> {
         } else if (action.type === 'attack') {
           const enemy = gameState.enemies.get(action.enemyKey);
           if (enemy) {
-            console.log(`${enemy.type} attacks!`);
+            enemyAttackPlayer(gameState, enemy.atk, gameState.def);
+            playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
           }
         }
+      }
+
+      // Death — restart current level
+      if (gameState.hp <= 0) {
+        restartLevel();
       }
     }
 
@@ -424,7 +505,8 @@ async function init(): Promise<void> {
     }
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
 
-    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta);
+    const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
+    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha);
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
