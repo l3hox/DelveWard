@@ -142,18 +142,24 @@ See PLAN.md Phase 6 for full details.
 
 ## Session Log
 
-### Session 13 — 3D Stair Geometry + Debug Fullbright
+### Session 13 — 3D Stair Geometry, Visual Polish, Camera Tuning
 - Created `src/rendering/stairRenderer.ts` — 3D stair steps for S/U cells
   - `detectStairFacing()` finds walkable neighbor for approach direction
   - `buildStairGroup()` creates 4 floor steps, 4 ceiling steps, 2 side walls, 1 black back wall
   - Floor steps use cell's floor texture, sides use wall texture, ceiling uses ceiling texture
   - Texture resolution: defaults → areas (same layer logic as dungeon.ts)
-  - Side walls extend 2×WALL_HEIGHT to cover one extra floor (no black holes)
+  - Side walls flush with cell edges, extend 2×WALL_HEIGHT (no gaps or black holes)
+  - Side wall UV correction: thin faces proportional, tall faces repeat with RepeatWrapping
   - Back wall: `MeshBasicMaterial({ color: 0x000000 })` — pure darkness, unaffected by lighting
+  - Vertex color depth fade: all geometry fades to black toward the back wall
 - Modified `src/rendering/dungeon.ts` — skip floor, ceiling, and all walls for S/U cells
+- Modified `src/rendering/doorRenderer.ts` — fixed squeezed textures on door frame pillars/lintel with proportional UV scaling
+- Modified `src/rendering/player.ts` — added `CAMERA_BACK_OFFSET` (0.4) to pull camera behind cell center
 - Modified `src/main.ts`:
   - Integrated `stairMeshes` into `LevelScene`, `buildLevelScene()`, `teardownLevelScene()`
   - Added `L` key debug fullbright toggle (bright ambient light + fog disable)
+  - Extracted `CAMERA_FOV` as named constant (set to 100)
+- Updated `CLAUDE.md` — added Agent & Model Preferences section (standing instructions)
 - TypeScript compiles clean
 
 ### Session 12 — Phase 5 Complete: Multi-Level Dungeons
