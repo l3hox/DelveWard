@@ -5,8 +5,8 @@ import type { Facing } from '../core/grid';
 
 const SCONCE_HEIGHT = 1.4;
 const TORCH_COLOR = 0xff994d;
-const TORCH_INTENSITY = 1.5;
-const TORCH_DISTANCE = 6;
+const TORCH_INTENSITY = 2.5;
+const TORCH_DISTANCE = 12;
 
 // Rotations face the sconce INTO the room (away from the wall).
 // Opposite of leverRenderer's WALL_DIR which faces geometry toward the wall.
@@ -45,7 +45,7 @@ export function buildSconceMeshes(gameState: GameState): SconceMeshes {
   const bracketMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
   const armMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
   const torchHandleMat = new THREE.MeshLambertMaterial({ color: 0x664422 });
-  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa44 });
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa44, fog: false });
   const deadFlameMat = new THREE.MeshLambertMaterial({ color: 0x332211 });
 
   for (const [key, sconce] of gameState.sconces) {

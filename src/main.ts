@@ -230,7 +230,7 @@ async function init(): Promise<void> {
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon1.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon3.json');
   const firstLevel = dungeon.levels[0];
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
