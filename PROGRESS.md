@@ -149,9 +149,9 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
   - 281 tests (23 new)
 
-## Next Steps (Phase 8 — remaining)
+## Next Steps
 
-- [ ] Stats model
+(none — all phases complete)
 
 ---
 
@@ -166,7 +166,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 | 5 | Multi-Level Dungeons | **Complete** |
 | 6 | Entities & Enemy System | **Complete** |
 | 7 | Combat | **Complete** |
-| 8 | Later Resources & Polish | **In Progress** |
+| 8 | Later Resources & Polish | **Complete** |
 
 ---
 
@@ -373,7 +373,26 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Ideas Parking Lot
 
-- Procedural dungeon generation (post v1)
+- Stats model (fuller character stats system)
+- Animated water + lava tiles with lowered floor
+- Outdoor sections — no ceiling, skybox, fullbright lighting only for outdoor tiles; indoor/outdoor boundary wall acts as strong light source; day/night cycle affects outdoor light level
+- Multiple dungeon layers visible at once (vertical openness)
+- Particle effects — dust motes in torchlight, embers near sconces, dripping water from ceiling
+- Footstep screen bob — subtle camera vertical bounce on each step
+- Damage directional indicator — brief red arrow on HUD showing attack direction
+- Enemy health bars — small floating bar above enemy sprites
+- Breakable / cracked walls — attack to reveal hidden rooms
+- Trap tiles — spikes, darts triggered by stepping on a cell
+- Message popups — stone tablets / signs showing lore/hints on interact
+- Minimap fog-of-war fade — explored but not visible cells draw dimmer
+- Procedural dungeon generation
 - Ambient sound — dripping water, distant echoes
 - Secret walls that push open
-- Day/night cycle for outdoor sections
+- Throwing items — toss potions/rocks at enemies from range with arc animation
+- Environmental hazards — poison gas clouds draining HP while standing in them
+- Treasure chests — interact to open, drop random loot, animated lid
+- Enemy drops — killed enemies leave items on the ground, loot table per type
+- Torch wall shadows — dynamic shadow planes behind pillars/door frames
+- Status effects — poison (tick damage), slow (longer tween), blind (reduced torch range)
+- Pushable blocks — grid-aligned blocks for dungeon puzzles
+- Thin walls — walls between two walkable cells (edge walls, not cell walls), including thin wall doors; enables villages and walk-in houses
