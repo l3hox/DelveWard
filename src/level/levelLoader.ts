@@ -207,6 +207,15 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       }
     }
 
+    if (e.type === 'torch_sconce') {
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] torch_sconce must be on a walkable cell`);
+      }
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
+        throw new Error(`Level ${source}: entities[${i}] torch_sconce wall must be N, S, E, or W`);
+      }
+    }
+
     if (e.type === 'stairs') {
       if (e.direction !== 'up' && e.direction !== 'down') {
         throw new Error(`Level ${source}: entities[${i}] stairs must have direction "up" or "down"`);

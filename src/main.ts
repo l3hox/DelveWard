@@ -9,6 +9,7 @@ import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
+import { buildSconceMeshes, extinguishSconce } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
@@ -58,6 +59,7 @@ interface LevelScene {
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   leverMeshes: { group: THREE.Group; handleMap: Map<string, THREE.Group> };
   leverAnimator: LeverAnimator;
+  sconceMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group>; lightMap: Map<string, THREE.PointLight> };
   stairMeshes: { group: THREE.Group };
   enemyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   enemyAnimator: EnemyAnimator;
@@ -102,6 +104,9 @@ function buildLevelScene(
     leverAnimator.register(key, pivot, lever ? lever.state : 'up');
   }
 
+  const sconceMeshes = buildSconceMeshes(gameState);
+  scene.add(sconceMeshes.group);
+
   const stairMeshes = buildStairMeshes(level, walkable);
   scene.add(stairMeshes.group);
 
@@ -134,6 +139,7 @@ function buildLevelScene(
     plateMeshes,
     leverMeshes,
     leverAnimator,
+    sconceMeshes,
     stairMeshes,
     enemyMeshes,
     enemyAnimator,
@@ -148,6 +154,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.keyMeshes.group,
     ls.plateMeshes.group,
     ls.leverMeshes.group,
+    ls.sconceMeshes.group,
     ls.stairMeshes.group,
     ls.enemyMeshes.group,
   ];
@@ -198,7 +205,7 @@ async function init(): Promise<void> {
   const ambient = new THREE.AmbientLight(0x111111);
   scene.add(ambient);
 
-  const torchLight = new THREE.PointLight(0xffaa66, 3, 8);
+  const torchLight = new THREE.PointLight(0xff994d, 3, 8);
   let flickerTarget = 2.8;
   let flickerTimer = 0;
   scene.add(torchLight);
@@ -401,6 +408,10 @@ async function init(): Promise<void> {
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);
             if (lever) ls.leverAnimator.setState(leverKey, lever.state);
+          }
+          if (result.type === 'sconce_taken') {
+            const ps = ls.player.getState();
+            extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, ps.col, ps.row);
           }
         }
         break;

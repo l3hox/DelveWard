@@ -3,7 +3,7 @@ import { getFacingCell } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
   message?: string;
   targetDoor?: string; // "col,row" of affected door (for mesh updates)
 }
@@ -63,6 +63,14 @@ export function interact(
       if (targetDoor) {
         return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
       }
+    }
+  }
+
+  // Sconce interaction — player stands on sconce cell, faces wall with sconce
+  const sconce = gameState.getSconce(playerState.col, playerState.row);
+  if (sconce && sconce.lit && sconce.wall === playerState.facing) {
+    if (gameState.takeSconceTorch(playerState.col, playerState.row)) {
+      return { type: 'sconce_taken', message: 'Torch taken. Fuel replenished.' };
     }
   }
 

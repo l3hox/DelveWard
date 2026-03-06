@@ -38,6 +38,13 @@ export interface PlateInstance {
   activated: boolean;
 }
 
+export interface SconceInstance {
+  col: number;
+  row: number;
+  wall: Facing;
+  lit: boolean;
+}
+
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -64,6 +71,7 @@ export interface LevelSnapshot {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  sconces: Map<string, SconceInstance>;
   enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
 }
@@ -73,6 +81,7 @@ export class GameState {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  sconces: Map<string, SconceInstance>;
   enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
 
@@ -90,6 +99,7 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.sconces = new Map();
     this.enemies = new Map();
     this.inventory = new Set();
 
@@ -140,6 +150,15 @@ export class GameState {
           row: e.row,
           targetDoor: e.targetDoor as string,
           activated: false,
+        });
+      } else if (e.type === 'torch_sconce') {
+        const wall = (e.wall as Facing | undefined) ??
+          autoDetectLeverWall(e.col, e.row, grid);
+        this.sconces.set(doorKey(e.col, e.row), {
+          col: e.col,
+          row: e.row,
+          wall,
+          lit: true,
         });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
@@ -197,12 +216,16 @@ export class GameState {
     for (const [k, v] of this.plates) {
       plates.set(k, { ...v });
     }
+    const sconces = new Map<string, SconceInstance>();
+    for (const [k, v] of this.sconces) {
+      sconces.set(k, { ...v });
+    }
     const enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of this.enemies) {
       enemies.set(k, { ...v });
     }
     const exploredCells = new Set<string>(this.exploredCells);
-    return { doors, keys, levers, plates, enemies, exploredCells };
+    return { doors, keys, levers, plates, sconces, enemies, exploredCells };
   }
 
   loadLevelState(snapshot: LevelSnapshot): void {
@@ -222,6 +245,10 @@ export class GameState {
     for (const [k, v] of snapshot.plates) {
       this.plates.set(k, { ...v });
     }
+    this.sconces = new Map<string, SconceInstance>();
+    for (const [k, v] of snapshot.sconces) {
+      this.sconces.set(k, { ...v });
+    }
     this.enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of snapshot.enemies) {
       this.enemies.set(k, { ...v });
@@ -234,6 +261,7 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.sconces = new Map();
     this.enemies = new Map();
     this.exploredCells = new Set();
     this._parseEntities(entities, grid);
@@ -330,6 +358,18 @@ export class GameState {
       door.state = 'open';
     }
     return plate.targetDoor;
+  }
+
+  getSconce(col: number, row: number): SconceInstance | undefined {
+    return this.sconces.get(doorKey(col, row));
+  }
+
+  takeSconceTorch(col: number, row: number): boolean {
+    const sconce = this.sconces.get(doorKey(col, row));
+    if (!sconce || !sconce.lit) return false;
+    sconce.lit = false;
+    this.torchFuel = this.maxTorchFuel;
+    return true;
   }
 
   // --- Enemy helpers ---

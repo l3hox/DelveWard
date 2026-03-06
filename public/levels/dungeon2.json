@@ -1,0 +1,23 @@
+{
+  "name": "Sconce Test",
+  "levels": [
+    {
+      "id": "test_room",
+      "name": "Sconce Test Room",
+      "grid": [
+        "#####",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#####"
+      ],
+      "playerStart": { "col": 2, "row": 2, "facing": "N" },
+      "entities": [
+        { "col": 2, "row": 1, "type": "torch_sconce", "wall": "N" },
+        { "col": 2, "row": 3, "type": "torch_sconce", "wall": "S" },
+        { "col": 1, "row": 2, "type": "torch_sconce", "wall": "W" },
+        { "col": 3, "row": 2, "type": "torch_sconce", "wall": "E" }
+      ]
+    }
+  ]
+}
