@@ -135,7 +135,7 @@ export class GameState {
     this.atk = 3;
     this.def = 1;
     this.attackCooldown = 0;
-    this.torchFuel = 100;
+    this.torchFuel = 10;
     this.maxTorchFuel = 100;
     this.exploredCells = new Set();
 

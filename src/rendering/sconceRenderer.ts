@@ -7,15 +7,8 @@ const SCONCE_HEIGHT = 1.4;
 const TORCH_COLOR = 0xff994d;
 const TORCH_INTENSITY = 2.5;
 const TORCH_DISTANCE = 12;
-
-// Rotations face the sconce INTO the room (away from the wall).
-// Opposite of leverRenderer's WALL_DIR which faces geometry toward the wall.
-// const WALL_DIR: Record<Facing, { dx: number; dz: number; rotY: number }> = {
-//   N: { dx: 0, dz: 1, rotY: Math.PI },
-//   S: { dx: 0, dz: -1, rotY: 0 },
-//   E: { dx: 1, dz: 0, rotY: -Math.PI / 2 },
-//   W: { dx: -1, dz: 0, rotY: Math.PI / 2 },
-// };
+const SCONCE_FLICKER_RANGE = 0.8;
+const SCONCE_FLICKER_SPEED = 0.25;
 
 const WALL_DIR: Record<Facing, { dx: number; dz: number; rotY: number }> = {
   N: { dx: 0, dz: -1, rotY: 0 },     // N wall -> face south
@@ -122,5 +115,31 @@ export function extinguishSconce(
   const light = lightMap.get(key);
   if (light) {
     light.intensity = 0;
+  }
+}
+
+// Per-light flicker state, seeded with random phase offsets so they don't flicker in sync
+const sconceFlickerState = new Map<string, { target: number; timer: number }>();
+
+export function updateSconceFlicker(
+  lightMap: Map<string, THREE.PointLight>,
+  delta: number,
+): void {
+  for (const [key, light] of lightMap) {
+    if (light.intensity === 0) continue;
+
+    let state = sconceFlickerState.get(key);
+    if (!state) {
+      state = { target: TORCH_INTENSITY, timer: Math.random() * SCONCE_FLICKER_SPEED };
+      sconceFlickerState.set(key, state);
+    }
+
+    state.timer -= delta;
+    if (state.timer <= 0) {
+      state.target = TORCH_INTENSITY + (Math.random() - 0.5) * SCONCE_FLICKER_RANGE * 2;
+      state.timer = 0.03 + Math.random() * SCONCE_FLICKER_SPEED;
+    }
+
+    light.intensity += (state.target - light.intensity) * 0.15;
   }
 }

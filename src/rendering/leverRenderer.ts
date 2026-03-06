@@ -13,11 +13,13 @@ const ANGLE_UP = -1.047;   // ~60° above horizontal
 const ANGLE_DOWN = 1.047;  // ~60° below horizontal
 
 const WALL_DIR: Record<Facing, { dx: number; dz: number; rotY: number }> = {
-  N: { dx: 0, dz: -1, rotY: Math.PI },     // N wall -> face south
-  S: { dx: 0, dz: 1, rotY: 0 },            // S wall -> face north
+  N: { dx: 0, dz: -1, rotY: 0 },     // N wall -> face south
+  S: { dx: 0, dz: 1, rotY: Math.PI },            // S wall -> face north
   E: { dx: 1, dz: 0, rotY: -Math.PI / 2 }, // E wall -> face west
   W: { dx: -1, dz: 0, rotY: Math.PI / 2 }, // W wall -> face east
 };
+
+
 
 export interface LeverMeshes {
   group: THREE.Group;

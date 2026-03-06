@@ -35,7 +35,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     def: 0,
     aggroRange: 3,
     moveInterval: 0.8,
-    blocksMovement: false,
+    blocksMovement: true,
   },
   skeleton: {
     type: 'skeleton',

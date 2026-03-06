@@ -9,7 +9,7 @@ import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
-import { buildSconceMeshes, extinguishSconce } from './rendering/sconceRenderer';
+import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh } from './rendering/itemRenderer';
@@ -44,10 +44,10 @@ const ENEMY_DAMAGE_FLASH_DURATION = 0.12;
 
 // Torch flicker parameters
 const TORCH_OFFSET_Y = 0.3;
-const FLICKER_RANGE = 0.6;
-const FLICKER_MIN_INTERVAL = 0.08;
-const FLICKER_INTERVAL_RANGE = 0.25;
-const FLICKER_LERP = 0.15;
+const FLICKER_RANGE = 1.2;
+const FLICKER_MIN_INTERVAL = 0.04;
+const FLICKER_INTERVAL_RANGE = 0.15;
+const FLICKER_LERP = 0.2;
 
 // ---
 
@@ -190,7 +190,7 @@ async function init(): Promise<void> {
   // --- Scene ---
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
-  scene.fog = new THREE.Fog(0x000000, 4, 20);
+  scene.fog = new THREE.Fog(0x000000, 6, 26);
 
   // --- Camera ---
   const camera = new THREE.PerspectiveCamera(
@@ -220,10 +220,12 @@ async function init(): Promise<void> {
   const ambient = new THREE.AmbientLight(0x111111);
   scene.add(ambient);
 
-  const torchLight = new THREE.PointLight(0xff994d, 3, 8);
-  let flickerTarget = 2.8;
+  const torchLight = new THREE.PointLight(0xff994d, 4, 10);
+  const torchFillLight = new THREE.PointLight(0xff994d, 2, 8);
+  let flickerTarget = 3.5;
   let flickerTimer = 0;
   scene.add(torchLight);
+  scene.add(torchFillLight);
 
   // Debug: fullbright toggle
   let debugFullbright = false;
@@ -482,7 +484,7 @@ async function init(): Promise<void> {
           scene.fog = null;
         } else {
           scene.remove(debugLight);
-          scene.fog = new THREE.Fog(0x000000, 4, 20);
+          scene.fog = new THREE.Fog(0x000000, 6, 26);
         }
         console.log(`Debug fullbright: ${debugFullbright ? 'ON' : 'OFF'}`);
         break;
@@ -516,6 +518,9 @@ async function init(): Promise<void> {
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
+
+    // Sconce torch flicker
+    updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
 
     // Attack cooldown tick
     if (gameState.attackCooldown > 0) {
@@ -556,19 +561,27 @@ async function init(): Promise<void> {
     }
 
     // Torch follows player with variable flicker, scaled by fuel
-    const pos = ls.player.getWorldPosition();
-    torchLight.position.set(pos.x, pos.y + TORCH_OFFSET_Y, pos.z);
+    const camPos = camera.position;
+    torchLight.position.set(camPos.x, camPos.y + TORCH_OFFSET_Y, camPos.z);
+
+    // Fill light pushed forward from cell center (opposite of camera back offset)
+    const angle = camera.rotation.y;
+    const fillX = camPos.x - Math.sin(angle) * 0.7 * 2;
+    const fillZ = camPos.z - Math.cos(angle) * 0.7 * 2;
+    torchFillLight.position.set(fillX, camPos.y + TORCH_OFFSET_Y, fillZ);
 
     const fuelRatio = gameState.torchFuel / gameState.maxTorchFuel;
     torchLight.distance = 3 + fuelRatio * 5;
+    torchFillLight.distance = 2 + fuelRatio * 4;
 
     flickerTimer -= delta;
     if (flickerTimer <= 0) {
-      const baseIntensity = 0.5 + fuelRatio * 2.1;
+      const baseIntensity = 0.8 + fuelRatio * 2.8;
       flickerTarget = baseIntensity + Math.random() * FLICKER_RANGE * fuelRatio;
       flickerTimer = FLICKER_MIN_INTERVAL + Math.random() * FLICKER_INTERVAL_RANGE;
     }
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
+    torchFillLight.intensity = torchLight.intensity * 0.6;
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
     hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing);
