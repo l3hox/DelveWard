@@ -137,6 +137,7 @@ function buildLevelScene(
     startFacing,
     walkable,
     gameState.isDoorOpen.bind(gameState),
+    gameState.isBlockedByEnemy.bind(gameState),
   );
 
   return {

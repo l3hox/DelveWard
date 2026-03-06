@@ -442,6 +442,12 @@ export class GameState {
     return this.enemies.has(doorKey(col, row));
   }
 
+  isBlockedByEnemy(col: number, row: number): boolean {
+    const enemy = this.enemies.get(doorKey(col, row));
+    if (!enemy) return false;
+    return enemy.blocksMovement;
+  }
+
   moveEnemy(fromCol: number, fromRow: number, toCol: number, toRow: number): void {
     const key = doorKey(fromCol, fromRow);
     const enemy = this.enemies.get(key);

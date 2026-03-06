@@ -9,6 +9,7 @@ export interface EnemyDef {
   def: number;
   aggroRange: number;     // Manhattan distance to notice player
   moveInterval: number;   // seconds between actions
+  blocksMovement: boolean;
 }
 
 export interface EnemyInstance {
@@ -21,6 +22,7 @@ export interface EnemyInstance {
   def: number;
   aggroRange: number;
   moveInterval: number;
+  blocksMovement: boolean;
   aiState: EnemyAIState;
   moveTimer: number;      // accumulates delta, resets on action
 }
@@ -33,6 +35,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     def: 0,
     aggroRange: 3,
     moveInterval: 0.8,
+    blocksMovement: false,
   },
   skeleton: {
     type: 'skeleton',
@@ -41,6 +44,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     def: 1,
     aggroRange: 4,
     moveInterval: 1.5,
+    blocksMovement: true,
   },
   orc: {
     type: 'orc',
@@ -49,6 +53,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     def: 2,
     aggroRange: 5,
     moveInterval: 2.0,
+    blocksMovement: true,
   },
 };
 
@@ -69,6 +74,7 @@ export function createEnemyInstance(
     def: def.def,
     aggroRange: def.aggroRange,
     moveInterval: def.moveInterval,
+    blocksMovement: def.blocksMovement,
     aiState: 'idle',
     moveTimer: 0,
   };

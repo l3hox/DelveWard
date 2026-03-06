@@ -36,10 +36,11 @@ export class Player {
     facing: Facing,
     walkable?: Set<string>,
     isDoorOpen?: (col: number, row: number) => boolean,
+    isBlocked?: (col: number, row: number) => boolean,
   ) {
     this.camera = camera;
     this.grid = grid;
-    this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen);
+    this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen, isBlocked);
 
     const worldPos = this.gridToWorld(startCol, startRow);
     this.currentPos = worldPos.clone();
