@@ -136,11 +136,21 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Death/restart: HP <= 0 fades to black and restarts current level (full reset, enemies respawn)
   - 258 tests
 
-## Next Steps (Phase 8 — deferred)
+- [x] **Phase 8 (partial)** — Equipment, Consumables, Enemy Animations:
+  - Equipment system: weapon/armor/ring slots with ATK/DEF bonuses, ground pickup + auto-equip
+  - `getEffectiveAtk()`/`getEffectiveDef()` on GameState, wired into combat
+  - Consumable items: health potions (restore HP) and torch oil (restore fuel)
+  - Backpack inventory (max 8 slots), use via number keys 1-8
+  - Item/consumable billboard renderers (pixelart icons on ground)
+  - HUD inventory panel shows equipped items and backpack contents
+  - Entity validation for equipment and consumable types in levelLoader
+  - Enemy hit shake animation (horizontal oscillation, 0.3s, decaying)
+  - Enemy attack lunge animation (forward-and-back toward player, 0.25s)
+  - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
+  - 281 tests (23 new)
 
-- [ ] Player equipment affecting ATK/DEF stats
-- [ ] Consumable items (health potions, torch oil)
-- [ ] Sprite animation on hit (bob/shake)
+## Next Steps (Phase 8 — remaining)
+
 - [ ] Stats model
 
 ---
@@ -156,7 +166,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 | 5 | Multi-Level Dungeons | **Complete** |
 | 6 | Entities & Enemy System | **Complete** |
 | 7 | Combat | **Complete** |
-| 8 | Later Resources & Polish | Pending |
+| 8 | Later Resources & Polish | **In Progress** |
 
 ---
 
@@ -175,6 +185,21 @@ Read this at the start of every Claude Code session to restore context. Update i
 ---
 
 ## Session Log
+
+### Session 17 — Phase 8: Equipment, consumables, enemy animations
+- Equipment system: `EquipSlot`, `EquipmentItem` types on GameState, weapon/armor/ring slots
+- `getEffectiveAtk()`/`getEffectiveDef()` replace raw stats in combat
+- `enemyAttackPlayer()` signature simplified (reads def from gameState internally)
+- Ground equipment pickup + auto-equip on step, `itemRenderer.ts` billboard sprites
+- Consumable items: `ConsumableItem` type, `health_potion` and `torch_oil` subtypes
+- Backpack array (max 8), use via Digit1-8 keys, persists across levels
+- `consumableRenderer.ts` — red flask (potion) / yellow flask (oil) billboard sprites
+- HUD inventory panel shows equipped item indicators and backpack contents
+- Entity validation for `equipment` and `consumable` types in levelLoader
+- Enemy hit shake: horizontal oscillation (sin-based, 0.3s, amplitude 0.25, decaying)
+- Enemy attack lunge: forward-and-back toward player (triangle wave, 0.25s, 0.6 units)
+- Items added to dungeon1.json: Rusty Sword, Iron Shield, Power Ring, potions, torch oil
+- 281 tests (23 new), TypeScript compiles clean
 
 ### Session 16 — Phase 7 complete
 - Floating damage numbers: `src/rendering/damageNumbers.ts` — 3D billboard sprites with canvas-rendered white text + black outline, float up and fade out over 0.7s

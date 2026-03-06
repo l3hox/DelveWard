@@ -45,6 +45,23 @@ export interface SconceInstance {
   lit: boolean;
 }
 
+export type EquipSlot = 'weapon' | 'armor' | 'ring';
+
+export interface EquipmentItem {
+  id: string;
+  name: string;
+  slot: EquipSlot;
+  atkBonus: number;
+  defBonus: number;
+}
+
+export interface ConsumableItem {
+  id: string;
+  name: string;
+  consumableType: 'health_potion' | 'torch_oil';
+  value: number;
+}
+
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -74,6 +91,8 @@ export interface LevelSnapshot {
   sconces: Map<string, SconceInstance>;
   enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
+  groundItems: Map<string, EquipmentItem>;
+  groundConsumables: Map<string, ConsumableItem>;
 }
 
 export class GameState {
@@ -84,6 +103,10 @@ export class GameState {
   sconces: Map<string, SconceInstance>;
   enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
+  equipment: Map<EquipSlot, EquipmentItem>;
+  backpack: ConsumableItem[];
+  groundItems: Map<string, EquipmentItem>;
+  groundConsumables: Map<string, ConsumableItem>;
 
   hp: number;
   maxHp: number;
@@ -102,6 +125,10 @@ export class GameState {
     this.sconces = new Map();
     this.enemies = new Map();
     this.inventory = new Set();
+    this.equipment = new Map();
+    this.backpack = [];
+    this.groundItems = new Map();
+    this.groundConsumables = new Map();
 
     this.hp = 20;
     this.maxHp = 20;
@@ -166,6 +193,21 @@ export class GameState {
           const instance = createEnemyInstance(e.col, e.row, enemyType);
           this.enemies.set(doorKey(e.col, e.row), instance);
         }
+      } else if (e.type === 'equipment') {
+        this.groundItems.set(doorKey(e.col, e.row), {
+          id: e.itemId as string,
+          name: e.name as string,
+          slot: e.slot as EquipSlot,
+          atkBonus: e.atkBonus as number,
+          defBonus: e.defBonus as number,
+        });
+      } else if (e.type === 'consumable') {
+        this.groundConsumables.set(doorKey(e.col, e.row), {
+          id: e.itemId as string,
+          name: e.name as string,
+          consumableType: e.consumableType as 'health_potion' | 'torch_oil',
+          value: e.value as number,
+        });
       }
     }
 
@@ -225,7 +267,15 @@ export class GameState {
       enemies.set(k, { ...v });
     }
     const exploredCells = new Set<string>(this.exploredCells);
-    return { doors, keys, levers, plates, sconces, enemies, exploredCells };
+    const groundItems = new Map<string, EquipmentItem>();
+    for (const [k, v] of this.groundItems) {
+      groundItems.set(k, { ...v });
+    }
+    const groundConsumables = new Map<string, ConsumableItem>();
+    for (const [k, v] of this.groundConsumables) {
+      groundConsumables.set(k, { ...v });
+    }
+    return { doors, keys, levers, plates, sconces, enemies, exploredCells, groundItems, groundConsumables };
   }
 
   loadLevelState(snapshot: LevelSnapshot): void {
@@ -254,6 +304,14 @@ export class GameState {
       this.enemies.set(k, { ...v });
     }
     this.exploredCells = new Set<string>(snapshot.exploredCells);
+    this.groundItems = new Map<string, EquipmentItem>();
+    for (const [k, v] of snapshot.groundItems) {
+      this.groundItems.set(k, { ...v });
+    }
+    this.groundConsumables = new Map<string, ConsumableItem>();
+    for (const [k, v] of snapshot.groundConsumables) {
+      this.groundConsumables.set(k, { ...v });
+    }
   }
 
   loadNewLevel(entities: Entity[], grid?: string[]): void {
@@ -264,6 +322,8 @@ export class GameState {
     this.sconces = new Map();
     this.enemies = new Map();
     this.exploredCells = new Set();
+    this.groundItems = new Map();
+    this.groundConsumables = new Map();
     this._parseEntities(entities, grid);
   }
 
@@ -401,6 +461,61 @@ export class GameState {
       return true; // killed
     }
     return false;
+  }
+
+  // --- Equipment & Consumable helpers ---
+
+  getEffectiveAtk(): number {
+    let total = this.atk;
+    for (const item of this.equipment.values()) {
+      total += item.atkBonus;
+    }
+    return total;
+  }
+
+  getEffectiveDef(): number {
+    let total = this.def;
+    for (const item of this.equipment.values()) {
+      total += item.defBonus;
+    }
+    return total;
+  }
+
+  equipItem(item: EquipmentItem): EquipmentItem | null {
+    const displaced = this.equipment.get(item.slot) ?? null;
+    this.equipment.set(item.slot, item);
+    return displaced;
+  }
+
+  pickupEquipmentAt(col: number, row: number): EquipmentItem | undefined {
+    const key = doorKey(col, row);
+    const item = this.groundItems.get(key);
+    if (!item) return undefined;
+    this.groundItems.delete(key);
+    this.equipItem(item);
+    return item;
+  }
+
+  pickupConsumableAt(col: number, row: number): ConsumableItem | undefined {
+    if (this.backpack.length >= 8) return undefined;
+    const key = doorKey(col, row);
+    const item = this.groundConsumables.get(key);
+    if (!item) return undefined;
+    this.groundConsumables.delete(key);
+    this.backpack.push(item);
+    return item;
+  }
+
+  useConsumable(index: number): boolean {
+    if (index < 0 || index >= this.backpack.length) return false;
+    const item = this.backpack[index];
+    if (item.consumableType === 'health_potion') {
+      this.hp = Math.min(this.maxHp, this.hp + item.value);
+    } else if (item.consumableType === 'torch_oil') {
+      this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + item.value);
+    }
+    this.backpack.splice(index, 1);
+    return true;
   }
 
   /** Mark current cell + 4 adjacent + line-of-sight forward as explored */

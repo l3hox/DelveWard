@@ -2,15 +2,31 @@ import { INVENTORY } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { drawPixelText } from './hudFont';
 import { PLAYER_ATTACK_COOLDOWN } from '../core/combat';
+import type { EquipSlot, EquipmentItem, ConsumableItem } from '../core/gameState';
 
 const SLOT_SIZE = 24;
 const SLOT_GAP = 4;
-const EQUIP_LABELS = ['W', 'A', 'R']; // Weapon, Armor, Ring
+const EQUIP_LABELS = ['W', 'A', 'R'] as const; // Weapon, Armor, Ring
+const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'ring'];
+
+// Colors for equipped item indicators
+const EQUIP_COLORS: Record<EquipSlot, string> = {
+  weapon: '#C0C0C0',
+  armor: '#4682B4',
+  ring: '#DAA520',
+};
+
+const CONSUMABLE_COLORS: Record<string, string> = {
+  health_potion: '#CC3333',
+  torch_oil: '#CC9900',
+};
 
 export function drawInventoryPanel(
   ctx: CanvasRenderingContext2D,
   keyCount: number,
   attackCooldown: number = 0,
+  equipment: Map<EquipSlot, EquipmentItem> = new Map(),
+  backpack: ConsumableItem[] = [],
 ): void {
   const { x, y, w, h } = INVENTORY;
 
@@ -26,7 +42,17 @@ export function drawInventoryPanel(
   const equipY = y + 28;
   for (let i = 0; i < 3; i++) {
     const sx = x + 6 + i * (SLOT_SIZE + SLOT_GAP);
+    const slot = EQUIP_SLOTS[i];
+    const equipped = equipment.get(slot);
     drawSlot(ctx, sx, equipY, EQUIP_LABELS[i]);
+
+    // Draw equipped item indicator
+    if (equipped) {
+      ctx.fillStyle = EQUIP_COLORS[slot];
+      ctx.fillRect(sx + 4, equipY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
+      // Draw label on top
+      drawPixelText(ctx, EQUIP_LABELS[i], sx + 8, equipY + 7, '#000', 2);
+    }
   }
 
   // Weapon cooldown overlay on W slot
@@ -42,9 +68,17 @@ export function drawInventoryPanel(
   const backpackY = equipY + SLOT_SIZE + SLOT_GAP + 4;
   for (let row = 0; row < 2; row++) {
     for (let col = 0; col < 4; col++) {
+      const slotIndex = row * 4 + col;
       const sx = x + 6 + col * (SLOT_SIZE + SLOT_GAP);
-      const sy = backpackY + row * (SLOT_SIZE + SLOT_GAP);
-      drawSlot(ctx, sx, sy);
+      const slotY = backpackY + row * (SLOT_SIZE + SLOT_GAP);
+      drawSlot(ctx, sx, slotY);
+
+      // Draw consumable indicator
+      if (slotIndex < backpack.length) {
+        const item = backpack[slotIndex];
+        ctx.fillStyle = CONSUMABLE_COLORS[item.consumableType] ?? '#888';
+        ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
+      }
     }
   }
 

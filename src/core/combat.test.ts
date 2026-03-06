@@ -89,7 +89,7 @@ describe('enemyAttackPlayer', () => {
   it('reduces player hp', () => {
     const gs = new GameState([], ['#.#']);
     const startHp = gs.hp;
-    const result = enemyAttackPlayer(gs, 3, gs.def);
+    const result = enemyAttackPlayer(gs, 3);
     expect(gs.hp).toBeLessThan(startHp);
     expect(result.damage).toBeGreaterThan(0);
   });
@@ -97,7 +97,7 @@ describe('enemyAttackPlayer', () => {
   it('does not reduce hp below 0', () => {
     const gs = new GameState([], ['#.#']);
     gs.hp = 1;
-    enemyAttackPlayer(gs, 100, 0);
+    enemyAttackPlayer(gs, 100);
     expect(gs.hp).toBe(0);
   });
 });

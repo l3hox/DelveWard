@@ -49,7 +49,7 @@ export function playerAttack(
     return { type: 'no_target' };
   }
 
-  const damage = calculateDamage(gameState.atk, enemy.def);
+  const damage = calculateDamage(gameState.getEffectiveAtk(), enemy.def);
   const killed = gameState.damageEnemy(col, row, damage);
 
   gameState.attackCooldown = PLAYER_ATTACK_COOLDOWN;
@@ -69,9 +69,8 @@ export function playerAttack(
 export function enemyAttackPlayer(
   gameState: GameState,
   enemyAtk: number,
-  playerDef: number,
 ): EnemyAttackResult {
-  const damage = calculateDamage(enemyAtk, playerDef);
+  const damage = calculateDamage(enemyAtk, gameState.getEffectiveDef());
   gameState.hp = Math.max(0, gameState.hp - damage);
   return { type: 'hit', damage, enemyType: '' };
 }

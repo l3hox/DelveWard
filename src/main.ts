@@ -12,6 +12,8 @@ import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
+import { buildItemMeshes, hideItemMesh } from './rendering/itemRenderer';
+import { buildConsumableMeshes, hideConsumableMesh } from './rendering/consumableRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
@@ -63,6 +65,8 @@ interface LevelScene {
   stairMeshes: { group: THREE.Group };
   enemyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   enemyAnimator: EnemyAnimator;
+  itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   player: Player;
 }
 
@@ -113,6 +117,12 @@ function buildLevelScene(
   const enemyMeshes = buildEnemyMeshes(gameState);
   scene.add(enemyMeshes.group);
 
+  const itemMeshes = buildItemMeshes(gameState);
+  scene.add(itemMeshes.group);
+
+  const consumableMeshes = buildConsumableMeshes(gameState);
+  scene.add(consumableMeshes.group);
+
   const enemyAnimator = new EnemyAnimator();
   for (const [key, mesh] of enemyMeshes.meshMap) {
     const enemy = gameState.enemies.get(key);
@@ -143,6 +153,8 @@ function buildLevelScene(
     stairMeshes,
     enemyMeshes,
     enemyAnimator,
+    itemMeshes,
+    consumableMeshes,
     player,
   };
 }
@@ -157,6 +169,8 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
     ls.enemyMeshes.group,
+    ls.itemMeshes.group,
+    ls.consumableMeshes.group,
   ];
   for (const group of groups) {
     scene.remove(group);
@@ -303,6 +317,20 @@ async function init(): Promise<void> {
         hideKeyMesh(ls.keyMeshes.meshMap, col, row);
       }
 
+      // Equipment pickup
+      const pickedUpEquip = gameState.pickupEquipmentAt(col, row);
+      if (pickedUpEquip) {
+        console.log(`Equipped: ${pickedUpEquip.name}`);
+        hideItemMesh(ls.itemMeshes.meshMap, col, row);
+      }
+
+      // Consumable pickup
+      const pickedUpConsumable = gameState.pickupConsumableAt(col, row);
+      if (pickedUpConsumable) {
+        console.log(`Picked up: ${pickedUpConsumable.name}`);
+        hideConsumableMesh(ls.consumableMeshes.meshMap, col, row);
+      }
+
       // Pressure plate activation
       const plateTarget = gameState.activatePressurePlate(col, row);
       if (plateTarget) {
@@ -424,6 +452,7 @@ async function init(): Promise<void> {
           if (result.type === 'hit' || result.type === 'kill') {
             if (result.targetCol !== undefined && result.targetRow !== undefined) {
               enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+              ls.enemyAnimator.triggerHit(doorKey(result.targetCol, result.targetRow));
               if (result.damage !== undefined) {
                 damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
               }
@@ -432,6 +461,16 @@ async function init(): Promise<void> {
               hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
               ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
             }
+          }
+        }
+        break;
+      case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4':
+      case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8':
+        {
+          const slotIndex = parseInt(e.code.charAt(5)) - 1;
+          const used = gameState.useConsumable(slotIndex);
+          if (used) {
+            console.log('Used consumable');
           }
         }
         break;
@@ -502,8 +541,9 @@ async function init(): Promise<void> {
         } else if (action.type === 'attack') {
           const enemy = gameState.enemies.get(action.enemyKey);
           if (enemy) {
-            enemyAttackPlayer(gameState, enemy.atk, gameState.def);
+            enemyAttackPlayer(gameState, enemy.atk);
             playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+            ls.enemyAnimator.triggerLunge(action.enemyKey, ps.col, ps.row);
           }
         }
       }

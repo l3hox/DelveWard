@@ -724,4 +724,210 @@ describe('GameState', () => {
       expect(gs.torchFuel).toBe(100);
     });
   });
+
+  // --- Equipment ---
+
+  describe('equipment', () => {
+    it('getEffectiveAtk returns base atk with no equipment', () => {
+      const gs = new GameState([]);
+      expect(gs.getEffectiveAtk()).toBe(3);
+    });
+
+    it('getEffectiveDef returns base def with no equipment', () => {
+      const gs = new GameState([]);
+      expect(gs.getEffectiveDef()).toBe(1);
+    });
+
+    it('equipItem equips to correct slot', () => {
+      const gs = new GameState([]);
+      const sword = { id: 'sword', name: 'Sword', slot: 'weapon' as const, atkBonus: 2, defBonus: 0 };
+      const displaced = gs.equipItem(sword);
+      expect(displaced).toBeNull();
+      expect(gs.equipment.get('weapon')).toBe(sword);
+    });
+
+    it('equipItem returns displaced item', () => {
+      const gs = new GameState([]);
+      const sword1 = { id: 'sword1', name: 'Sword 1', slot: 'weapon' as const, atkBonus: 2, defBonus: 0 };
+      const sword2 = { id: 'sword2', name: 'Sword 2', slot: 'weapon' as const, atkBonus: 5, defBonus: 0 };
+      gs.equipItem(sword1);
+      const displaced = gs.equipItem(sword2);
+      expect(displaced).toBe(sword1);
+      expect(gs.equipment.get('weapon')).toBe(sword2);
+    });
+
+    it('getEffectiveAtk includes weapon bonus', () => {
+      const gs = new GameState([]);
+      gs.equipItem({ id: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 3, defBonus: 0 });
+      expect(gs.getEffectiveAtk()).toBe(6);
+    });
+
+    it('getEffectiveDef includes armor and ring bonuses', () => {
+      const gs = new GameState([]);
+      gs.equipItem({ id: 'shield', name: 'Shield', slot: 'armor', atkBonus: 0, defBonus: 2 });
+      gs.equipItem({ id: 'ring', name: 'Ring', slot: 'ring', atkBonus: 0, defBonus: 1 });
+      expect(gs.getEffectiveDef()).toBe(4); // 1 base + 2 + 1
+    });
+
+    it('pickupEquipmentAt picks up and auto-equips', () => {
+      const gs = new GameState([
+        { col: 3, row: 3, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
+      ]);
+      const item = gs.pickupEquipmentAt(3, 3);
+      expect(item).toBeDefined();
+      expect(item!.id).toBe('sword');
+      expect(gs.equipment.get('weapon')).toBeDefined();
+      expect(gs.groundItems.size).toBe(0);
+    });
+
+    it('pickupEquipmentAt returns undefined for empty cell', () => {
+      const gs = new GameState([]);
+      expect(gs.pickupEquipmentAt(5, 5)).toBeUndefined();
+    });
+
+    it('equipment persists across loadNewLevel', () => {
+      const gs = new GameState([]);
+      gs.equipItem({ id: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 });
+      gs.loadNewLevel([]);
+      expect(gs.equipment.get('weapon')).toBeDefined();
+      expect(gs.equipment.get('weapon')!.id).toBe('sword');
+    });
+
+    it('groundItems are reset in loadNewLevel', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
+      ]);
+      expect(gs.groundItems.size).toBe(1);
+      gs.loadNewLevel([]);
+      expect(gs.groundItems.size).toBe(0);
+    });
+
+    it('constructor parses equipment entities', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'equipment', itemId: 'ring', name: 'Ring', slot: 'ring', atkBonus: 1, defBonus: 1 },
+      ]);
+      expect(gs.groundItems.size).toBe(1);
+      expect(gs.groundItems.get('1,1')!.id).toBe('ring');
+    });
+  });
+
+  // --- Consumables ---
+
+  describe('consumables', () => {
+    it('pickupConsumableAt picks up into backpack', () => {
+      const gs = new GameState([
+        { col: 2, row: 2, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
+      ]);
+      const item = gs.pickupConsumableAt(2, 2);
+      expect(item).toBeDefined();
+      expect(item!.id).toBe('hp1');
+      expect(gs.backpack.length).toBe(1);
+      expect(gs.groundConsumables.size).toBe(0);
+    });
+
+    it('pickupConsumableAt returns undefined when backpack is full', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'consumable', itemId: 'hp', name: 'Potion', consumableType: 'health_potion', value: 10 },
+      ]);
+      // Fill backpack
+      for (let i = 0; i < 8; i++) {
+        gs.backpack.push({ id: `fill${i}`, name: 'Fill', consumableType: 'health_potion', value: 1 });
+      }
+      const item = gs.pickupConsumableAt(1, 1);
+      expect(item).toBeUndefined();
+      expect(gs.groundConsumables.size).toBe(1); // still on ground
+    });
+
+    it('pickupConsumableAt returns undefined for empty cell', () => {
+      const gs = new GameState([]);
+      expect(gs.pickupConsumableAt(5, 5)).toBeUndefined();
+    });
+
+    it('useConsumable health_potion restores hp', () => {
+      const gs = new GameState([]);
+      gs.hp = 10;
+      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 5 });
+      const used = gs.useConsumable(0);
+      expect(used).toBe(true);
+      expect(gs.hp).toBe(15);
+      expect(gs.backpack.length).toBe(0);
+    });
+
+    it('useConsumable health_potion clamps at maxHp', () => {
+      const gs = new GameState([]);
+      gs.hp = 18;
+      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 });
+      gs.useConsumable(0);
+      expect(gs.hp).toBe(20);
+    });
+
+    it('useConsumable torch_oil restores torchFuel', () => {
+      const gs = new GameState([]);
+      gs.torchFuel = 50;
+      gs.backpack.push({ id: 'oil1', name: 'Oil', consumableType: 'torch_oil', value: 30 });
+      const used = gs.useConsumable(0);
+      expect(used).toBe(true);
+      expect(gs.torchFuel).toBe(80);
+      expect(gs.backpack.length).toBe(0);
+    });
+
+    it('useConsumable torch_oil clamps at maxTorchFuel', () => {
+      const gs = new GameState([]);
+      gs.torchFuel = 90;
+      gs.backpack.push({ id: 'oil1', name: 'Oil', consumableType: 'torch_oil', value: 30 });
+      gs.useConsumable(0);
+      expect(gs.torchFuel).toBe(100);
+    });
+
+    it('useConsumable returns false for invalid index', () => {
+      const gs = new GameState([]);
+      expect(gs.useConsumable(0)).toBe(false);
+      expect(gs.useConsumable(-1)).toBe(false);
+      expect(gs.useConsumable(10)).toBe(false);
+    });
+
+    it('backpack persists across loadNewLevel', () => {
+      const gs = new GameState([]);
+      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 });
+      gs.loadNewLevel([]);
+      expect(gs.backpack.length).toBe(1);
+      expect(gs.backpack[0].id).toBe('hp1');
+    });
+
+    it('groundConsumables are reset in loadNewLevel', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
+      ]);
+      expect(gs.groundConsumables.size).toBe(1);
+      gs.loadNewLevel([]);
+      expect(gs.groundConsumables.size).toBe(0);
+    });
+
+    it('groundItems and groundConsumables are saved/restored in level snapshots', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
+        { col: 2, row: 2, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
+      ]);
+      const snap = gs.saveLevelState();
+      expect(snap.groundItems.size).toBe(1);
+      expect(snap.groundConsumables.size).toBe(1);
+
+      // Load into fresh state
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+      expect(gs2.groundItems.size).toBe(1);
+      expect(gs2.groundConsumables.size).toBe(1);
+      expect(gs2.groundItems.get('1,1')!.id).toBe('sword');
+      expect(gs2.groundConsumables.get('2,2')!.id).toBe('hp1');
+    });
+
+    it('snapshot groundItems is a deep copy', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
+      ]);
+      const snap = gs.saveLevelState();
+      gs.groundItems.delete('1,1');
+      expect(snap.groundItems.size).toBe(1);
+    });
+  });
 });
