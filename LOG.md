@@ -4,6 +4,19 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-07 — Particle Effects
+
+Added three particle effect systems for atmosphere.
+
+**New file:** `src/rendering/particles.ts`
+- **DustMotes** — warm-tinted Points floating near ceiling around player. Additive blending, frustum culling disabled. Configurable per level.
+- **SconceEmbers** — orange sparks rising from lit sconce flame meshes. Uses `getWorldPosition()` on flame mesh (child[3]) for accurate spawn position.
+- **WaterDrips** — full drop lifecycle: slow formation on ceiling → gravity fall with stretch → expanding ring splash on floor. Spawns at random walkable cells near player, 10-30s interval per cell.
+
+**Type change:** `DungeonLevel` gains `dustMotes?: boolean` (default true) and `waterDrips?: boolean` (default false) for per-level control.
+
+---
+
 ## 2026-03-05 — Camera Viewport Tuning
 
 Iterative camera feel tuning — asymmetric frustum crop, stair pitch, telephoto effect.

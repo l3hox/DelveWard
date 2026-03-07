@@ -4,7 +4,6 @@
     {
       "id": "wooden_corridor",
       "name": "Wooden Corridor",
-      "waterDrips": true,
       "grid": [
         "###############",
         "#.............#",
@@ -48,6 +47,7 @@
     {
       "id": "dark_cellar",
       "name": "Dark Cellar",
+      "waterDrips": true,
       "grid": [
         "###############",
         "#U#...........#",

@@ -36,6 +36,7 @@ src/
 │   ├── keyRenderer.ts       # Gold key billboard sprites
 │   ├── leverRenderer.ts     # Wall levers + LeverAnimator
 │   ├── plateRenderer.ts     # Pressure plate meshes + press state
+│   ├── particles.ts         # Particle effects: DustMotes, SconceEmbers, WaterDrips
 │   └── transitionOverlay.ts # Fade-to-black overlay for level transitions
 public/
 └── levels/                  # Level JSON files (level1–7.json) + dungeon1.json (multi-level)

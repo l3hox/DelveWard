@@ -149,6 +149,14 @@ Read this at the start of every Claude Code session to restore context. Update i
   - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
   - 281 tests (23 new)
 
+- [x] **Particle Effects** — Atmosphere & visual polish:
+  - Dust motes: warm-tinted particles floating near ceiling, spawn around player, per-level toggle (`dustMotes`, default true)
+  - Sconce embers: orange sparks rising from lit sconce flame meshes, additive blending
+  - Water drips: drops form slowly on ceiling, fall with gravity + stretch, splash rings on floor, per-level toggle (`waterDrips`, default false)
+  - All use Three.js Points/Sprites with additive blending, frustum culling disabled
+  - `src/rendering/particles.ts` — `DustMotes`, `SconceEmbers`, `WaterDrips` classes
+  - `dustMotes` and `waterDrips` boolean flags on `DungeonLevel` type
+
 ## Next Steps
 
 (none — all phases complete)
@@ -185,6 +193,17 @@ Read this at the start of every Claude Code session to restore context. Update i
 ---
 
 ## Session Log
+
+### Session 18 — Particle Effects
+- Created `src/rendering/particles.ts` with three particle classes:
+  - `DustMotes` — warm-tinted Points near ceiling, spawn around player, gentle drift, fade by distance
+  - `SconceEmbers` — orange sparks rising from lit sconce flame meshes (child[3] world position)
+  - `WaterDrips` — full lifecycle: form on ceiling (1.5s grow), fall with gravity + stretch, 4-ring splash on floor
+- All use BufferGeometry Points or Sprites with additive blending, `frustumCulled = false`
+- Per-level flags on `DungeonLevel`: `dustMotes` (default true), `waterDrips` (default false)
+- Wired into `main.ts` game loop, level transitions, and death restart
+- Enabled `waterDrips` on dungeon3 "Dark Cellar" level
+- TypeScript compiles clean
 
 ### Session 17 — Phase 8: Equipment, consumables, enemy animations
 - Equipment system: `EquipSlot`, `EquipmentItem` types on GameState, weapon/armor/ring slots

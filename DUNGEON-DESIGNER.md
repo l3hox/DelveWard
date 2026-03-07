@@ -48,7 +48,9 @@ Levels are JSON files stored in `public/levels/`. Each file defines one dungeon 
   "entities": [],
   "defaults": { ... },
   "charDefs": [ ... ],
-  "areas": [ ... ]
+  "areas": [ ... ],
+  "dustMotes": true,
+  "waterDrips": false
 }
 ```
 
@@ -367,6 +369,26 @@ For any walkable cell, textures are resolved bottom-up. Each layer only override
 4. **`areas`**: rectangular region overrides (later entries win on overlap)
 
 For wall faces specifically: if the solid neighbor is a solid charDef with `wallTexture`, that texture is used for the wall face, regardless of the walkable cell's own wall texture.
+
+---
+
+## Particle effects (optional booleans)
+
+| Field | Default | Effect |
+|---|---|---|
+| `dustMotes` | `true` | Warm-tinted particles floating near the ceiling around the player |
+| `waterDrips` | `false` | Water drops form on ceiling, fall, and splash on the floor |
+
+Set these at the level object root:
+
+```json
+{
+  "name": "Damp Cavern",
+  "dustMotes": true,
+  "waterDrips": true,
+  "grid": [ ... ]
+}
+```
 
 ---
 
