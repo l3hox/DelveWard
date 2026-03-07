@@ -25,6 +25,7 @@ export interface DungeonLevel {
   playerStart: { col: number; row: number; facing: Facing };
   entities: Entity[];
   dustMotes?: boolean;           // enable floating dust particles (default: true)
+  waterDrips?: boolean;          // enable ceiling water drip effect (default: false)
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];

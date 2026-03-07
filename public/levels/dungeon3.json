@@ -4,6 +4,7 @@
     {
       "id": "wooden_corridor",
       "name": "Wooden Corridor",
+      "waterDrips": true,
       "grid": [
         "###############",
         "#.............#",

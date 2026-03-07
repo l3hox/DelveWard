@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
+import { WALKABLE_CELLS, buildWalkableSet } from '../core/grid';
+import type { CharDef } from '../core/types';
 
 // --- Dust motes: warm-tinted particles drifting lazily near the player torch ---
 
@@ -280,5 +282,319 @@ export class SconceEmbers {
       this.geometry.attributes.position.needsUpdate = true;
       this.geometry.attributes.opacity.needsUpdate = true;
     }
+  }
+}
+
+// --- Water drips: drops form on ceiling, fall, splash on floor ---
+
+const DRIP_FORM_TIME = 1.5;       // seconds to grow on ceiling
+const DRIP_FALL_SPEED = 6;        // units/sec downward
+const DRIP_GRAVITY = 8;           // acceleration
+const SPLASH_LIFETIME = 0.35;     // seconds for splash to fade
+const SPLASH_RING_COUNT = 4;      // splash ring particles
+const DRIP_MIN_INTERVAL = 2;      // min seconds between drips at a source
+const DRIP_MAX_INTERVAL = 6;      // max seconds between drips
+const DRIP_COLOR = 0x6699cc;
+const DRIP_MAX_SOURCES = 8;       // max simultaneous drip points near player
+const DRIP_SPAWN_RADIUS = 5;      // world units — pick cells within this range
+
+type DripPhase = 'forming' | 'falling' | 'splash';
+
+interface Drip {
+  x: number;
+  z: number;
+  y: number;
+  vy: number;
+  phase: DripPhase;
+  age: number;
+  formDuration: number;
+}
+
+// Elongated drop texture
+let dropTexture: THREE.Texture | null = null;
+function getDropTexture(): THREE.Texture {
+  if (dropTexture) return dropTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 8;
+  canvas.height = 16;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, 8, 16);
+  // Teardrop shape
+  const grad = ctx.createRadialGradient(4, 10, 0, 4, 10, 5);
+  grad.addColorStop(0, 'rgba(150,200,255,0.9)');
+  grad.addColorStop(0.6, 'rgba(100,160,220,0.5)');
+  grad.addColorStop(1, 'rgba(100,160,220,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(4, 10, 3, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Bright top point
+  ctx.fillStyle = 'rgba(200,230,255,0.8)';
+  ctx.beginPath();
+  ctx.ellipse(4, 6, 1.5, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  dropTexture = new THREE.CanvasTexture(canvas);
+  dropTexture.magFilter = THREE.NearestFilter;
+  dropTexture.minFilter = THREE.NearestFilter;
+  return dropTexture;
+}
+
+// Small ring/splash texture
+let splashTexture: THREE.Texture | null = null;
+function getSplashTexture(): THREE.Texture {
+  if (splashTexture) return splashTexture;
+  const size = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, size, size);
+  // Ring
+  ctx.strokeStyle = 'rgba(150,200,255,0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, 5, 0, Math.PI * 2);
+  ctx.stroke();
+  // Center dot
+  ctx.fillStyle = 'rgba(180,220,255,0.6)';
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, 2, 0, Math.PI * 2);
+  ctx.fill();
+  splashTexture = new THREE.CanvasTexture(canvas);
+  return splashTexture;
+}
+
+export class WaterDrips {
+  private group = new THREE.Group();
+  private drips: Drip[] = [];
+  private dropSprites: THREE.Sprite[] = [];
+  private splashSprites: THREE.Sprite[] = [];
+  private dropMaterial: THREE.SpriteMaterial;
+  private splashMaterial: THREE.SpriteMaterial;
+  private walkableCells: { x: number; z: number }[] = [];
+  private sourceTimers: Map<string, number> = new Map();
+
+  constructor() {
+    this.dropMaterial = new THREE.SpriteMaterial({
+      map: getDropTexture(),
+      transparent: true,
+      color: DRIP_COLOR,
+      fog: true,
+      depthWrite: false,
+    });
+    this.splashMaterial = new THREE.SpriteMaterial({
+      map: getSplashTexture(),
+      transparent: true,
+      color: DRIP_COLOR,
+      fog: true,
+      depthWrite: false,
+    });
+  }
+
+  getObject(): THREE.Group {
+    return this.group;
+  }
+
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
+  }
+
+  setLevel(grid: string[], charDefs?: CharDef[]): void {
+    // Clear existing
+    this.clear();
+    this.walkableCells = [];
+    this.sourceTimers.clear();
+
+    const walkable = buildWalkableSet(charDefs);
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid[0].length; col++) {
+        const ch = grid[row][col];
+        if (walkable.has(ch) && ch !== 'S' && ch !== 'U' && ch !== 'D') {
+          this.walkableCells.push({
+            x: col * CELL_SIZE + CELL_SIZE / 2,
+            z: row * CELL_SIZE + CELL_SIZE / 2,
+          });
+        }
+      }
+    }
+  }
+
+  private clear(): void {
+    for (const s of this.dropSprites) {
+      this.group.remove(s);
+      s.material.dispose();
+    }
+    for (const s of this.splashSprites) {
+      this.group.remove(s);
+      s.material.dispose();
+    }
+    this.dropSprites = [];
+    this.splashSprites = [];
+    this.drips = [];
+  }
+
+  update(delta: number, playerX: number, playerZ: number): void {
+    if (this.walkableCells.length === 0) return;
+
+    // Try to spawn new drips at nearby cells
+    this.trySpawn(delta, playerX, playerZ);
+
+    // Update existing drips
+    for (let i = this.drips.length - 1; i >= 0; i--) {
+      const drip = this.drips[i];
+      drip.age += delta;
+
+      if (drip.phase === 'forming') {
+        // Grow on ceiling
+        const t = drip.age / drip.formDuration;
+        const sprite = this.dropSprites[i];
+        const scale = 0.02 + t * 0.06;
+        sprite.scale.set(scale, scale * 2, 1);
+        sprite.material.opacity = 0.3 + t * 0.5;
+        // Slowly sag
+        sprite.position.y = WALL_HEIGHT - 0.02 - t * 0.04;
+
+        if (drip.age >= drip.formDuration) {
+          drip.phase = 'falling';
+          drip.age = 0;
+          drip.y = sprite.position.y;
+          drip.vy = 0;
+        }
+      } else if (drip.phase === 'falling') {
+        // Accelerate downward
+        drip.vy += DRIP_GRAVITY * delta;
+        drip.y -= drip.vy * delta;
+
+        const sprite = this.dropSprites[i];
+        sprite.position.y = drip.y;
+        // Stretch as it falls
+        const speed = drip.vy;
+        const stretch = Math.min(3, 1 + speed * 0.15);
+        sprite.scale.set(0.06, 0.06 * stretch, 1);
+        sprite.material.opacity = 0.8;
+
+        // Hit the floor
+        if (drip.y <= 0.01) {
+          drip.phase = 'splash';
+          drip.age = 0;
+          // Hide drop sprite
+          sprite.visible = false;
+          // Create splash
+          this.createSplash(i, drip.x, drip.z);
+        }
+      } else if (drip.phase === 'splash') {
+        const t = drip.age / SPLASH_LIFETIME;
+        if (t >= 1) {
+          // Remove drip and its sprites
+          this.removeDrip(i);
+          continue;
+        }
+        // Expand and fade splash rings
+        const splashStart = i * SPLASH_RING_COUNT;
+        for (let r = 0; r < SPLASH_RING_COUNT; r++) {
+          const si = splashStart + r;
+          if (si >= this.splashSprites.length) break;
+          const sprite = this.splashSprites[si];
+          const ringDelay = r * 0.06;
+          const rt = Math.max(0, (drip.age - ringDelay) / (SPLASH_LIFETIME - ringDelay));
+          const scale = 0.03 + rt * 0.15;
+          sprite.scale.set(scale, scale * 0.3, 1);
+          sprite.material.opacity = (1 - rt) * 0.6;
+        }
+      }
+    }
+  }
+
+  private trySpawn(delta: number, playerX: number, playerZ: number): void {
+    // Find walkable cells near player
+    const nearbyCells: { x: number; z: number }[] = [];
+    for (const cell of this.walkableCells) {
+      const dx = cell.x - playerX;
+      const dz = cell.z - playerZ;
+      if (dx * dx + dz * dz <= DRIP_SPAWN_RADIUS * DRIP_SPAWN_RADIUS) {
+        nearbyCells.push(cell);
+      }
+    }
+    if (nearbyCells.length === 0) return;
+
+    // Update timers and spawn
+    for (const cell of nearbyCells) {
+      const key = `${cell.x},${cell.z}`;
+      let timer = this.sourceTimers.get(key);
+      if (timer === undefined) {
+        // Initialize with random delay
+        timer = DRIP_MIN_INTERVAL + Math.random() * (DRIP_MAX_INTERVAL - DRIP_MIN_INTERVAL);
+        this.sourceTimers.set(key, timer);
+      }
+      timer -= delta;
+      if (timer <= 0 && this.drips.length < DRIP_MAX_SOURCES) {
+        this.spawnDrip(cell.x, cell.z);
+        timer = DRIP_MIN_INTERVAL + Math.random() * (DRIP_MAX_INTERVAL - DRIP_MIN_INTERVAL);
+      }
+      this.sourceTimers.set(key, timer);
+    }
+  }
+
+  private spawnDrip(x: number, z: number): void {
+    // Random offset within cell
+    const ox = (Math.random() - 0.5) * CELL_SIZE * 0.6;
+    const oz = (Math.random() - 0.5) * CELL_SIZE * 0.6;
+    const dx = x + ox;
+    const dz = z + oz;
+
+    const drip: Drip = {
+      x: dx, z: dz,
+      y: WALL_HEIGHT,
+      vy: 0,
+      phase: 'forming',
+      age: 0,
+      formDuration: DRIP_FORM_TIME * (0.7 + Math.random() * 0.6),
+    };
+    this.drips.push(drip);
+
+    const sprite = new THREE.Sprite(this.dropMaterial.clone());
+    sprite.position.set(dx, WALL_HEIGHT - 0.02, dz);
+    sprite.scale.set(0.02, 0.04, 1);
+    this.group.add(sprite);
+    this.dropSprites.push(sprite);
+  }
+
+  private createSplash(dripIndex: number, x: number, z: number): void {
+    // Insert splash sprites — we maintain a parallel array
+    // For simplicity, add at end (splash indices tracked by dripIndex * SPLASH_RING_COUNT)
+    // Since we remove in order, we rebuild splash array each time
+    for (let r = 0; r < SPLASH_RING_COUNT; r++) {
+      const sprite = new THREE.Sprite(this.splashMaterial.clone());
+      sprite.position.set(x, 0.02, z);
+      sprite.scale.set(0.03, 0.01, 1);
+      this.group.add(sprite);
+      this.splashSprites.push(sprite);
+    }
+  }
+
+  private removeDrip(index: number): void {
+    // Remove drop sprite
+    const dropSprite = this.dropSprites[index];
+    this.group.remove(dropSprite);
+    dropSprite.material.dispose();
+    this.dropSprites.splice(index, 1);
+
+    // Remove splash sprites (last SPLASH_RING_COUNT added for this drip)
+    // Splash sprites are appended in order, so for drip at `index`,
+    // its splashes are the last ones added when it entered splash phase.
+    // Since only one drip enters splash at a time and we remove immediately
+    // after lifetime, we remove from the end.
+    const splashEnd = this.splashSprites.length;
+    const splashStart = splashEnd - SPLASH_RING_COUNT;
+    for (let r = splashStart; r < splashEnd; r++) {
+      const s = this.splashSprites[r];
+      if (s) {
+        this.group.remove(s);
+        s.material.dispose();
+      }
+    }
+    this.splashSprites.splice(splashStart, SPLASH_RING_COUNT);
+
+    this.drips.splice(index, 1);
   }
 }

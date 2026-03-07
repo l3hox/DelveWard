@@ -23,7 +23,7 @@ import { HudOverlay } from './hud/hudCanvas';
 import { TransitionOverlay } from './rendering/transitionOverlay';
 import { DamageNumberManager } from './rendering/damageNumbers';
 import { SwordSwingAnimator } from './rendering/swordSwing';
-import { DustMotes, SconceEmbers } from './rendering/particles';
+import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
@@ -258,6 +258,8 @@ async function init(): Promise<void> {
   scene.add(dustMotes.getObject());
   const sconceEmbers = new SconceEmbers();
   scene.add(sconceEmbers.getObject());
+  const waterDrips = new WaterDrips();
+  scene.add(waterDrips.getObject());
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
@@ -295,6 +297,8 @@ async function init(): Promise<void> {
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(currentLevel.dustMotes !== false);
+      waterDrips.setLevel(currentLevel.grid, currentLevel.charDefs);
+      waterDrips.setVisible(currentLevel.waterDrips === true);
       gameState.revealAround(
         currentLevel.playerStart.col,
         currentLevel.playerStart.row,
@@ -399,6 +403,8 @@ async function init(): Promise<void> {
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(targetLevel.dustMotes !== false);
+      waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
+      waterDrips.setVisible(targetLevel.waterDrips === true);
 
       gameState.revealAround(targetCol, targetRow, targetFacing, targetLevel.grid);
     });
@@ -408,6 +414,8 @@ async function init(): Promise<void> {
   wireCallbacks();
   sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
   dustMotes.setVisible(ls.level.dustMotes !== false);
+  waterDrips.setLevel(ls.level.grid, ls.level.charDefs);
+  waterDrips.setVisible(ls.level.waterDrips === true);
 
   // Reveal initial position
   const ps = ls.player.getState();
@@ -539,6 +547,7 @@ async function init(): Promise<void> {
     const camPos2 = torchFillLight.position;
     dustMotes.update(delta, camPos2.x, camPos2.y, camPos2.z);
     sconceEmbers.update(delta);
+    waterDrips.update(delta, camPos2.x, camPos2.z);
 
     // Attack cooldown tick
     if (gameState.attackCooldown > 0) {
