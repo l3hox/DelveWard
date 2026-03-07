@@ -41,7 +41,8 @@
         "wallTexture": "wood",
         "floorTexture": "cobblestone",
         "ceilingTexture": "wooden_beams"
-      }
+      },
+      "dustMotes": false
     },
     {
       "id": "dark_cellar",

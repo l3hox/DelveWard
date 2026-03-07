@@ -24,6 +24,7 @@ export interface DungeonLevel {
   grid: string[];            // each string = one row of chars
   playerStart: { col: number; row: number; facing: Facing };
   entities: Entity[];
+  dustMotes?: boolean;           // enable floating dust particles (default: true)
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];

@@ -23,6 +23,7 @@ import { HudOverlay } from './hud/hudCanvas';
 import { TransitionOverlay } from './rendering/transitionOverlay';
 import { DamageNumberManager } from './rendering/damageNumbers';
 import { SwordSwingAnimator } from './rendering/swordSwing';
+import { DustMotes, SconceEmbers } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
@@ -252,6 +253,12 @@ async function init(): Promise<void> {
   scene.add(damageNumbers.getGroup());
   const swordSwing = new SwordSwingAnimator();
 
+  // Particle effects
+  const dustMotes = new DustMotes();
+  scene.add(dustMotes.getObject());
+  const sconceEmbers = new SconceEmbers();
+  scene.add(sconceEmbers.getObject());
+
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
     col: number,
@@ -286,6 +293,8 @@ async function init(): Promise<void> {
         currentLevel.playerStart.facing,
       );
       wireCallbacks();
+      sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
+      dustMotes.setVisible(currentLevel.dustMotes !== false);
       gameState.revealAround(
         currentLevel.playerStart.col,
         currentLevel.playerStart.row,
@@ -388,6 +397,8 @@ async function init(): Promise<void> {
       currentLevelId = targetId;
       ls = buildLevelScene(targetLevel, gameState, camera, scene, targetCol, targetRow, targetFacing);
       wireCallbacks();
+      sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
+      dustMotes.setVisible(targetLevel.dustMotes !== false);
 
       gameState.revealAround(targetCol, targetRow, targetFacing, targetLevel.grid);
     });
@@ -395,6 +406,8 @@ async function init(): Promise<void> {
 
   // Wire up initial level
   wireCallbacks();
+  sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
+  dustMotes.setVisible(ls.level.dustMotes !== false);
 
   // Reveal initial position
   const ps = ls.player.getState();
@@ -521,6 +534,11 @@ async function init(): Promise<void> {
 
     // Sconce torch flicker
     updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
+
+    // Particle effects
+    const camPos2 = torchFillLight.position;
+    dustMotes.update(delta, camPos2.x, camPos2.y, camPos2.z);
+    sconceEmbers.update(delta);
 
     // Attack cooldown tick
     if (gameState.attackCooldown > 0) {

@@ -31,7 +31,8 @@
         "wallTexture": "stone",
         "floorTexture": "stone_tile",
         "ceilingTexture": "dark_rock"
-      }
+      },
+      "dustMotes": false
     },
     {
       "id": "lower_vault",
