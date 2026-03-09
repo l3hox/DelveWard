@@ -4,8 +4,8 @@ import { doorKey, type GameState } from '../core/gameState';
 
 const SPRITE_SIZES: Record<string, number> = {
   rat: 1.2,
-  skeleton: 2.4,
-  orc: 2.4,
+  skeleton: 2.0,
+  orc: 0.8,
 };
 const DEFAULT_SPRITE_SIZE = 1.2;
 
@@ -30,6 +30,77 @@ function getEnemyTexture(type: string): THREE.Texture {
   return tex;
 }
 
+// Custom billboard shader: distance-only lighting (no NdotL angle dependence).
+// Computes light in view space so brightness is stable regardless of camera rotation.
+// Uses Three.js light uniforms via `lights: true` and built-in fog chunks.
+function createNeutralLitMaterial(map: THREE.Texture): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.lights,
+      THREE.UniformsLib.fog,
+      { map: { value: map }, tint: { value: new THREE.Color(0xffffff) } },
+    ]),
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vViewCenter;
+      #include <fog_pars_vertex>
+      void main() {
+        vUv = uv;
+        // Compute object center in VIEW space (same space as Three.js light positions)
+        // so lighting is consistent regardless of camera rotation.
+        vViewCenter = (viewMatrix * vec4(modelMatrix[3].xyz, 1.0)).xyz;
+        vec4 mvPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D map;
+      uniform vec3 tint;
+      varying vec2 vUv;
+      varying vec3 vViewCenter;
+
+      // Three.js injects these structs with lights: true
+      #include <common>
+      #include <lights_pars_begin>
+      #include <fog_pars_fragment>
+
+      void main() {
+        vec4 texColor = texture2D(map, vUv);
+        if (texColor.a < 0.1) discard;
+
+        // Accumulate light intensity (luminance only, no color).
+        // Billboard uses object center for lighting — no NdotL, no per-vertex variation.
+        float intensity = 0.0;
+
+        // Point lights — positions are in view space, matching vViewCenter
+        #if NUM_POINT_LIGHTS > 0
+        for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
+          float dist = length(vViewCenter - pointLights[i].position);
+          float atten = getDistanceAttenuation(dist, pointLights[i].distance, pointLights[i].decay);
+          float lum = dot(pointLights[i].color, vec3(0.299, 0.587, 0.114));
+          intensity += lum * atten;
+        }
+        #endif
+
+        // Ambient light
+        intensity += dot(ambientLightColor, vec3(0.299, 0.587, 0.114));
+
+        // Clamp to avoid overexposure near light sources
+        intensity = min(intensity, 1.2);
+
+        gl_FragColor = vec4(texColor.rgb * tint * intensity, texColor.a);
+        #include <fog_fragment>
+      }
+    `,
+    lights: true,
+    fog: true,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+}
+
 export interface EnemyMeshes {
   group: THREE.Group;
   meshMap: Map<string, THREE.Mesh>;
@@ -43,13 +114,7 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
     const size = SPRITE_SIZES[enemy.type] ?? DEFAULT_SPRITE_SIZE;
     const geo = new THREE.PlaneGeometry(size, size);
     const tex = getEnemyTexture(enemy.type);
-    const mat = new THREE.MeshPhongMaterial({
-      map: tex,
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      shininess: 0,
-    });
+    const mat = createNeutralLitMaterial(tex);
 
     const mesh = new THREE.Mesh(geo, mat);
     const cx = enemy.col * CELL_SIZE + CELL_SIZE / 2;
@@ -67,12 +132,11 @@ export function updateEnemyBillboards(
   meshMap: Map<string, THREE.Mesh>,
   camera: THREE.Camera,
 ): void {
+  // All sprites face the camera's view plane (not the camera point)
+  const facing = camera.rotation.y;
   for (const mesh of meshMap.values()) {
     if (!mesh.visible) continue;
-    // Only rotate around Y axis to face camera (no tilt)
-    const dx = camera.position.x - mesh.position.x;
-    const dz = camera.position.z - mesh.position.z;
-    mesh.rotation.y = Math.atan2(dx, dz);
+    mesh.rotation.y = facing;
   }
 }
 

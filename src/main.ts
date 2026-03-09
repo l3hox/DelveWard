@@ -269,11 +269,12 @@ async function init(): Promise<void> {
     const key = doorKey(col, row);
     const mesh = meshMap.get(key);
     if (!mesh) return;
-    const mat = mesh.material as THREE.MeshPhongMaterial;
-    const originalColor = mat.color.clone();
-    mat.color.set(0xff0000);
+    const mat = mesh.material as THREE.ShaderMaterial;
+    const tint = mat.uniforms.tint;
+    if (!tint) return;
+    tint.value.set(0xff0000);
     setTimeout(() => {
-      mat.color.copy(originalColor);
+      tint.value.set(0xffffff);
     }, ENEMY_DAMAGE_FLASH_DURATION * 1000);
   }
 

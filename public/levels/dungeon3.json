@@ -8,8 +8,8 @@
         "###############",
         "#.............#",
         "#.............#",
-        "####.######D###",
-        "####.#####...##",
+        "#........##D###",
+        "#........#...##",
         "####.#####...##",
         "####.##########",
         "####.##########",
@@ -35,7 +35,11 @@
         { "col": 9, "row": 2, "type": "torch_sconce", "wall": "S" },
         { "col": 13, "row": 2, "type": "torch_sconce", "wall": "S" },        
         { "col": 4, "row": 7, "type": "torch_sconce", "wall": "E" },
-        { "col": 4, "row": 10, "type": "torch_sconce", "wall": "E" }
+        { "col": 4, "row": 10, "type": "torch_sconce", "wall": "E" },
+        { "col": 10, "row": 1, "type": "enemy", "enemyType": "rat" },
+        { "col": 10, "row": 2, "type": "enemy", "enemyType": "skeleton" },
+        { "col": 11, "row": 2, "type": "enemy", "enemyType": "orc" }
+
       ],
       "defaults": {
         "wallTexture": "wood",
