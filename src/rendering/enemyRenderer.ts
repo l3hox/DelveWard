@@ -5,7 +5,7 @@ import { doorKey, type GameState } from '../core/gameState';
 const SPRITE_SIZES: Record<string, number> = {
   rat: 1.2,
   skeleton: 2.0,
-  orc: 0.8,
+  orc: 2.0,
 };
 const DEFAULT_SPRITE_SIZE = 1.2;
 
@@ -119,7 +119,8 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
     const mesh = new THREE.Mesh(geo, mat);
     const cx = enemy.col * CELL_SIZE + CELL_SIZE / 2;
     const cz = enemy.row * CELL_SIZE + CELL_SIZE / 2;
-    mesh.position.set(cx, size * 0.4, cz);
+    // Place sprite so bottom edge sits at floor level (PlaneGeometry is center-anchored)
+    mesh.position.set(cx, size * 0.5, cz);
 
     group.add(mesh);
     meshMap.set(mapKey, mesh);
