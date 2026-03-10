@@ -159,7 +159,7 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ## Next Steps
 
-(none — all phases complete)
+**Milestone 1: The Loot Game** — design entity + item data model (M1 scope only), then implement. See `MILESTONES-V2.md`.
 
 ---
 
@@ -193,6 +193,20 @@ Read this at the start of every Claude Code session to restore context. Update i
 ---
 
 ## Session Log
+
+### Session 19 — Billboard Fix + V2 Design Sprint
+- Fixed billboard sprite lighting: view-space distance-only shader (no NdotL), clamped intensity
+- Fixed sprite positioning: feet at ground level (size * 0.5)
+- Updated orc sprite size to 2.0
+- Created v2 design documents:
+  - `DESIGN-V2.md` — full feature brainstorm (vertical world, signals, editor, scripting, NPCs, quests, items, magic, RPG)
+  - `STORY-IDEAS.md` — narrative and atmosphere ideas
+  - `ART-GUIDE.md` — art/audio production guide with prompt templates and pipeline
+  - `FEATURES-V2.md` — 87 features categorized into 4 tiers, 8 open TBDs
+  - `MILESTONES-V2.md` — 9 playable milestones with anti-burnout rules
+  - `DESIGN-DISCUSSION.md` — session summary
+- Key decisions: agile data model approach (design per milestone, refactor as needed), unified decorative 3D mesh system
+- Next: Milestone 1 — The Loot Game
 
 ### Session 18 — Particle Effects
 - Created `src/rendering/particles.ts` with three particle classes:
