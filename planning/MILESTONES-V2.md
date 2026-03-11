@@ -63,6 +63,7 @@ The dungeon fights back. Traps, secrets, environmental hazards. Exploration beco
 | V6 | Treasure chests (with loot tables) | T2 |
 | V7 | Message signs / tablets | T2 |
 | C2 | Status effects (poison, slow, burning) | T2 |
+| E6 | Sub-grid entity positioning | T1 |
 | E7 | Save/load system | T1 |
 
 **Playable moment:** Walk down a corridor, hear a click, dodge a dart. Find a cracked wall, smash it open, discover a hidden treasure room. Pull levers in the right order to open a vault. Save your progress.

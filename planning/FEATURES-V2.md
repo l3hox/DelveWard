@@ -38,6 +38,7 @@ These are architectural. Everything else is built on top of them.
 | E3 | Outdoor cells | No ceiling, skybox, different ambient lighting model |
 | E4 | Decorative 3D meshes | Load external .glb/.gltf static meshes anywhere in the scene — cavern ceilings, backdrops, set pieces, architectural details. No collision, purely visual. Replaces flat ceilings, skybox, and distant scenery with custom geometry. |
 | E5 | Thin walls (edge walls) | Walls on cell edges (between two walkable cells), not full-cell walls |
+| E6 | Sub-grid entity positioning | Divide each grid cell into a 4×4 sub-grid for positioning small/medium entities. Small enemies (rat, goblin, bat, spider) can share a cell — up to 4 per cell using sub-positions. Medium enemies (skeleton, orc, zombie) occupy 2×2 sub-positions (up to 2 per cell). Huge enemies (troll, future boss types) occupy the full 4×4 (1 per cell, current behavior). Affects pathfinding (sub-cell BFS), collision, and billboard placement. Not needed until multi-enemy rooms become a design goal. |
 | E7 | Save/load system | Serialize full game state (all levels, inventory, stats, flags, quest state) to JSON |
 | E8 | Projectile system | Moving objects on the grid — arrows, fireballs, boulders, thrown items with travel time |
 
@@ -297,6 +298,7 @@ T4 Polish (builds on T3)
 ## Notes
 
 - N1 (entity-component model) is the single most important architectural decision — it's the foundation for items, enemies, NPCs, traps, doors, chests, spawners, and everything scriptable
+- E6 (sub-grid positioning) is post-M1 but should be designed before any milestone that introduces dense enemy rooms or swarm encounters — it touches pathfinding, collision, and rendering
 - The editor (T4) is listed last because the engine must exist first, but it will likely be built incrementally alongside T2/T3 features
 - Audio (T4) can be integrated at any point — it's independent of gameplay architecture
 - Story/narrative content (STORY-IDEAS.md) layers on top of all tiers — it's content, not engine

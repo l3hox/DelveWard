@@ -166,7 +166,21 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 
 ## Next Steps
 
-**Milestone 1: The Loot Game** — design entity + item data model (M1 scope only), then implement. See `MILESTONES-V2.md`.
+**Milestone 1: The Loot Game** — data foundation done, next: implement entity registry + item loader, then stats/leveling.
+
+### M1 Design & Data (done)
+- [x] `planning/m1/DESIGN.md` — full M1 design doc: scope, decisions, architecture, data model, implementation order
+- [x] `planning/m1/ENEMIES.md` — full 9-enemy roster with stats, behaviors, new mechanics (flee, erratic, regen)
+- [x] `public/data/items.json` — central item database: 57 items (22 weapons, 20 armor, 10 accessories, 5 consumables)
+- [x] `public/data/loot-tables.json` — per-enemy loot tables with XP, gold ranges, drop chances for all 9 enemies
+
+### M1 Implementation (next)
+- [ ] Phase A: Entity registry + item loader (`src/core/entities.ts`, `src/core/itemDatabase.ts`)
+- [ ] Phase B: Stats & leveling (STR/DEX/VIT/WIS on GameState, XP, level-up, character creation screen)
+- [ ] Phase C: Equipment expansion (10 slots, weapon subtypes, item requirements)
+- [ ] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
+- [ ] Phase E: UI (enemy health bars, paper doll, tooltips, level-up popup)
+- [ ] Phase F: Content (M1 test dungeon — 3 levels)
 
 ---
 
@@ -200,6 +214,20 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 ---
 
 ## Session Log
+
+### Session 20 — M1 Design & Data Foundation
+- Created versioning scheme: `0.milestone` (v0.1 = M1 done, etc.)
+- Created `CHANGELOG.md` with v0.0.9 entry covering all 8 phases
+- Tagged `v0.0.9` on current HEAD
+- Added versioning note to `PROGRESS.md` and `MILESTONES-V2.md`
+- Created `planning/m1/` folder with full M1 design:
+  - `DESIGN.md` — scope, 6 open TBDs resolved, architecture, data model, item system, stats, XP/leveling, gold, loot tables, paper doll UI, implementation order
+  - `ENEMIES.md` — 9-enemy roster (rat/skeleton/orc + goblin/giant bat/spider/kobold/zombie/troll) with stats, behaviors, new mechanics
+- Enemy quality tier: added `poor` (10%), rebalanced `common` to 50%
+- Added per-entity drops override schema to DESIGN.md
+- Added E6 (sub-grid entity positioning) to FEATURES-V2.md, slotted into M2
+- Created `public/data/items.json` — 57 items across weapons/armor/accessories/consumables
+- Created `public/data/loot-tables.json` — loot tables for all 9 enemies with XP, gold, drop chances
 
 ### Session 19 — Billboard Fix + V2 Design Sprint
 - Fixed billboard sprite lighting: view-space distance-only shader (no NdotL), clamped intensity
