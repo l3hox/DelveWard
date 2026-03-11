@@ -36,21 +36,23 @@ The game currently renders one level at a time. v2 breaks that barrier — multi
 - Battlements, arrow slits, courtyards visible from the walls
 - Gate houses, portcullises, drawbridges
 
-### Backdrop Scenes — Custom 3D Beyond the Grid
-- Seamless integration of the grid-based dungeon with **inaccessible custom 3D scenes** created in an external 3D editor (Blender, etc.)
-- Backdrop scenes are loaded as static meshes and placed around/beyond the grid boundary — visible but not reachable by grid movement
+### Decorative 3D Meshes — Custom Geometry Beyond the Grid
+- Seamless integration of the grid-based dungeon with **inaccessible custom 3D geometry** created in an external 3D editor (Blender, etc.)
+- Static meshes loaded and placed anywhere in the scene — visible but not interactable, no collision, no pathfinding, no entities
+- The grid stays flat and simple. All visual complexity beyond the grid lives in these decorative meshes.
 - Use cases:
+  - **Cavern ceilings** — organic rock mesh high above, replaces flat ceiling tiles with dramatic stalactite formations, vaulted natural stone
   - **Mountain ranges** visible from castle walls or cliff edges — massive sense of scale
   - **Distant cities, forests, coastlines** seen from outdoor areas — the world feels bigger than the playable space
   - **Underground vistas** — vast cavern backdrops with glowing lava rivers, crystal formations, or subterranean lakes far below
   - **Sky and horizon** — replaces flat skybox with actual 3D geometry for parallax depth
-  - **Set pieces** — a dragon perched on a distant peak, a ruined tower across a chasm, a ship at anchor in a harbor below
-- The grid world blends into the backdrop at boundary cells — no visible seam between walkable geometry and backdrop mesh
-- Backdrops are purely visual — no collision, no pathfinding, no entities
-- Lighting and fog matched between grid scene and backdrop for seamless feel
-- Per-level backdrop reference in dungeon JSON: `"backdrop": "mountains-east.glb"` or similar
-- Multiple backdrops per level possible (different directions)
-- LOD (level of detail) — backdrops can be low-poly since they're always at a distance
+  - **Set pieces** — a dragon perched on a distant peak, a ruined tower across a chasm, a ship at anchor in a harbor below, a massive statue in a cavern, a hanging chandelier, collapsed pillars
+  - **Architectural details** — arched ceilings, domed roofs, ornate column capitals — things that don't fit the grid but sell the space
+- The grid world blends into the decorative mesh seamlessly — no visible seam between walkable geometry and custom mesh
+- Lighting and fog matched between grid scene and decorative meshes
+- Per-level mesh references in dungeon JSON: `"meshes": [{ "src": "cavern-ceiling.glb", "position": [0, 8, 0] }, ...]`
+- Multiple meshes per level, each with position/rotation/scale
+- LOD (level of detail) — distant meshes can be low-poly
 
 ---
 

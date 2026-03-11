@@ -92,34 +92,36 @@ Developer background: Jakub is a senior backend/cloud engineer (20 years), VR/AR
 Every session follows this protocol:
 
 ### On session start
-1. **Read PROGRESS.md** — this tells you where the project is: current phase, what's done, what's next, known issues
-2. **Read PLAN.md only if needed** — PROGRESS.md references the current phase by name. Only open PLAN.md if you need the full phase details, architecture decisions, or design context
+1. **Read `planning/PROGRESS.md`** — this tells you where the project is: current milestone, what's done, what's next, known issues
+2. **Read `planning/MILESTONES-V2.md` only if needed** — for milestone scope and feature breakdown
 3. **Do NOT re-read CLAUDE.md** — it's already auto-loaded
 
 ### During the session
-- Work on the current phase's next steps as listed in PROGRESS.md
-- If a task is ambiguous, check PLAN.md for the design decision
+- Work on the current milestone's next steps as listed in `planning/PROGRESS.md`
+- If a task is ambiguous, check `planning/FEATURES-V2.md` or `planning/DESIGN-V2.md` for context
 - **When creating or editing level/dungeon JSON**, read `DUNGEON-DESIGNER.md` first — it has the coordinate system, entity schemas, and texture names. Always verify coordinates by counting grid characters (0-based).
 
 ### On session end (when asked)
-- **Update PROGRESS.md**:
+- **Update `planning/PROGRESS.md`**:
   - Move completed items from "Next Steps" to "What's Done"
-  - Add new next steps if the phase progressed
-  - If a phase is fully complete, update "Current Phase" to the next one
+  - Add new next steps if the milestone progressed
+  - If a milestone is complete, update to the next one
   - Log the session in the session log
   - Add any new known issues or open questions
-- **Do NOT update PLAN.md** — it's the stable reference. Only update if a design decision is explicitly changed
-- **Update LOG.md** when design decisions are made/changed or significant code changes land — add a dated entry summarizing what and why
+- **Update `planning/LOG.md`** when design decisions are made/changed or significant code changes land — add a dated entry summarizing what and why
 
 ### File roles
 | File | Role | Updates |
 |---|---|---|
 | `CLAUDE.md` | Project identity, tech stack, pillars, workflow rules | Rarely — only for structural project changes |
-| `PLAN.md` | Full implementation plan, all design decisions, phase definitions | Only when design decisions change |
-| `PROGRESS.md` | Session-to-session state: what's done, what's next, session log | Every session end |
-| `LOG.md` | Decision & change log — design decisions, architecture changes, significant code changes, with dates | When decisions or significant code changes land |
-| `DESIGN.md` | Original motivation and vision | Never (historical document) |
 | `DUNGEON-DESIGNER.md` | Level/dungeon JSON schema, coordinate system, texture reference | When level format changes |
+| `planning/PROGRESS.md` | Session-to-session state: what's done, what's next, session log | Every session end |
+| `planning/LOG.md` | Decision & change log — design decisions, architecture changes, significant code changes, with dates | When decisions or significant code changes land |
+| `planning/MILESTONES-V2.md` | Playable milestone breakdown | When milestones are restructured |
+| `planning/FEATURES-V2.md` | Categorized feature list with tiers and dependencies | When features are added/resolved |
+| `planning/DESIGN-V2.md` | V2 feature brainstorm — the idea pool | When new ideas are added |
+| `planning/PLAN.md` | V1 implementation plan (historical) | Rarely |
+| `planning/DESIGN.md` | Original motivation and vision (historical) | Never |
 
 ---
 

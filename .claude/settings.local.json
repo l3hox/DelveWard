@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(python3:*)",
+      "Bash(npm test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(node:*)",
+      "Bash(npx vitest:*)",
+      "Bash(git mv:*)",
+      "WebSearch",
+      "Read(//mnt/c/Users/**)",
+      "Read(//mnt/c/Users/jlehotsky/**)",
+      "Read(//home/jlehotsky/**)",
+      "Read(//home/jlehotsky/.claude/plugins/**)",
+      "Bash(npm list -g ccstatusline)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(timeout 5 npx vite:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:eupl.eu)",
+      "Bash(curl:*)",
+      "Bash(npx vite:*)",
+      "Bash(ls:*)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "npx -y ccstatusline@latest",
+    "padding": 0
+  }
+}
