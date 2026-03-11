@@ -6,6 +6,13 @@ Read this at the start of every Claude Code session to restore context. Update i
 
 ---
 
+## Versioning
+
+`0.milestone` — e.g. `0.1` when Milestone 1 ships, `0.2` for Milestone 2, etc.
+Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0.9**.
+
+---
+
 ## Current Phase
 
 **Phase 8 — Later Resources & Polish** (pending)

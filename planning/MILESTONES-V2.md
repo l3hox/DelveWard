@@ -1,5 +1,7 @@
 # DelveWard v2 — Playable Milestones
 
+**Versioning:** `0.milestone` — v0.1 ships when Milestone 1 is complete, v0.2 for Milestone 2, etc. The prototype period (Milestone 0) accumulated as `0.0.x` patches, tagged at **v0.0.9**.
+
 Each milestone is a **playable, demonstrable game** you can show someone and feel good about. Not a checklist of engine internals — a thing you can *play*.
 
 The rule: after each milestone, you could stop and have a complete game at that level of depth. No milestone leaves the game broken or half-baked.
