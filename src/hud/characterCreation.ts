@@ -33,8 +33,8 @@ const STARTING_POINTS = 5;
 const MIN_STAT = 1;
 
 // Layout
-const PANEL_W = 320;
-const PANEL_H = 240;
+const PANEL_W = 420;
+const PANEL_H = 270;
 const PANEL_X = Math.floor((HUD_WIDTH - PANEL_W) / 2);
 const PANEL_Y = Math.floor((HUD_HEIGHT - PANEL_H) / 2);
 
@@ -168,18 +168,18 @@ export class CharacterCreationScreen {
       ctx.textAlign = 'left';
       ctx.font = '10px monospace';
       ctx.fillStyle = isSelected ? HUD_COLORS.compassActive : HUD_COLORS.textPrimary;
-      ctx.fillText(STAT_DISPLAY[key], PANEL_X + 16, rowY + 10);
+      ctx.fillText(STAT_DISPLAY[key], PANEL_X + 48, rowY + 10);
 
       ctx.font = '9px monospace';
       ctx.fillStyle = HUD_COLORS.textDim;
-      ctx.fillText(STAT_DESC[key], PANEL_X + 20, rowY + 22);
+      ctx.fillText(STAT_DESC[key], PANEL_X + 52, rowY + 22);
 
       // Value with [-] [+] controls
       const val = this.setup[key];
       const valStr = String(val);
       const valScale = 2;
       const valW = measurePixelText(valStr, valScale);
-      const controlsX = PANEL_X + PANEL_W - 68;
+      const controlsX = PANEL_X + PANEL_W - 96;
       const valY = rowY + 6;
 
       // [-] button
@@ -213,7 +213,7 @@ export class CharacterCreationScreen {
     ctx.fillText(`Points remaining: ${this.pointsRemaining}`, HUD_WIDTH / 2, pointsY);
 
     // Instructions
-    const instrY = PANEL_Y + PANEL_H - 14;
+    const instrY = PANEL_Y + PANEL_H - 22;
     ctx.font = '9px monospace';
     ctx.fillStyle = HUD_COLORS.textDim;
     ctx.textAlign = 'center';
