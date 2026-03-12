@@ -40,7 +40,7 @@ export const TORCH_BAR = {
 // Inventory panel — bottom-right
 export const INVENTORY = {
   w: 144,
-  h: 120,
+  h: 176,
   get x() { return HUD_WIDTH - MARGIN - this.w; },
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
