@@ -10,6 +10,7 @@ export interface EnemyDef {
   aggroRange: number;     // Manhattan distance to notice player
   moveInterval: number;   // seconds between actions
   blocksMovement: boolean;
+  xp: number;             // XP awarded to player on kill
 }
 
 export interface EnemyInstance {
@@ -36,6 +37,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     aggroRange: 3,
     moveInterval: 0.8,
     blocksMovement: true,
+    xp: 10,
   },
   skeleton: {
     type: 'skeleton',
@@ -45,6 +47,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     aggroRange: 4,
     moveInterval: 1.5,
     blocksMovement: true,
+    xp: 25,
   },
   orc: {
     type: 'orc',
@@ -54,6 +57,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     aggroRange: 5,
     moveInterval: 2.0,
     blocksMovement: true,
+    xp: 50,
   },
 };
 

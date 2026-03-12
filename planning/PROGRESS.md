@@ -176,7 +176,7 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 
 ### M1 Implementation
 - [x] Phase A: Entity registry + item loader (`src/core/entities.ts`, `src/core/itemDatabase.ts`, GameState migration, renderer re-wire, 67 new tests)
-- [ ] Phase B: Stats & leveling (STR/DEX/VIT/WIS on GameState, XP, level-up, character creation screen)
+- [x] Phase B: Stats & leveling (STR/DEX/VIT/WIS on GameState, XP, level-up, character creation screen, 21 new tests)
 - [ ] Phase C: Equipment expansion (10 slots, weapon subtypes, item requirements)
 - [ ] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
 - [ ] Phase E: UI (enemy health bars, paper doll, tooltips, level-up popup)
@@ -214,6 +214,18 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 ---
 
 ## Session Log
+
+### Session 22 — M1 Phase B: Stats & Leveling
+- `GameState`: str/dex/vit/wis/xp/level/attributePoints/playerName fields
+- maxHp formula: `40 + VIT × 5` (was hard-coded 20)
+- `getEffectiveStats()` aggregates derived stats (atk/def/maxHp/crit/dodge) from attributes + equipped items
+- `getEffectiveAtk()`/`getEffectiveDef()` delegate to `getEffectiveStats()`
+- `xpForLevel()`, `addXp()`, `allocatePoint()`, `applyCharacterSetup()`
+- `EnemyDef.xp` field: rat=10, skeleton=25, orc=50
+- `CharacterCreationScreen` — 5-point stat allocation canvas overlay before dungeon loads
+- `LevelUpNotification` — 3s gold flash, 2s fade-out, centered top-center
+- XP awarded on kill in `main.ts`; level-up triggers notification
+- 669 tests (348 + 21 new Phase B tests)
 
 ### Session 21 — M1 Phase A: Entity Registry + Item Database
 - Created `planning/m1/PLAN.md` — full M1 implementation plan (Phases A–F with swarm structure)

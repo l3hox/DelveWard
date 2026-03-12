@@ -4,6 +4,7 @@ import { drawHealthBar } from './healthBar';
 import { drawTorchIndicator } from './torchIndicator';
 import { drawMinimap } from './minimapRenderer';
 import { drawInventoryPanel } from './inventoryPanel';
+import type { LevelUpNotification } from './levelUpNotification';
 import type { GameState } from '../core/gameState';
 import type { PlayerState } from '../core/grid';
 import type { SwordSwingAnimator } from '../rendering/swordSwing';
@@ -35,6 +36,11 @@ export class HudOverlay {
     parent.appendChild(this.canvas);
   }
 
+  /** Expose the underlying canvas element for overlays that share the HUD surface. */
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
   draw(
     gameState: GameState,
     playerState: PlayerState,
@@ -42,6 +48,7 @@ export class HudOverlay {
     delta: number = 0,
     damageFlashAlpha: number = 0,
     swordSwing?: SwordSwingAnimator,
+    levelUpNotification?: LevelUpNotification,
   ): void {
     this.time += delta;
     this.ctx.clearRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
@@ -62,5 +69,10 @@ export class HudOverlay {
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
     drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies);
     drawInventoryPanel(this.ctx, gameState);
+
+    // Level-up notification (drawn last so it appears on top)
+    if (levelUpNotification?.isActive()) {
+      levelUpNotification.draw(this.ctx);
+    }
   }
 }

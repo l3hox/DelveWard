@@ -473,10 +473,10 @@ describe('GameState', () => {
   // --- HP and torch fuel ---
 
   describe('hp and torchFuel defaults', () => {
-    it('hp defaults to 20/20', () => {
+    it('hp defaults to 65/65 (40 + VIT(5) * 5)', () => {
       const gs = new GameState([]);
-      expect(gs.hp).toBe(20);
-      expect(gs.maxHp).toBe(20);
+      expect(gs.hp).toBe(65);
+      expect(gs.maxHp).toBe(65);
     });
 
     it('torchFuel defaults to 100/100', () => {
@@ -728,14 +728,16 @@ describe('GameState', () => {
   // --- Equipment ---
 
   describe('equipment', () => {
-    it('getEffectiveAtk returns base atk with no equipment', () => {
+    it('getEffectiveAtk returns base atk + STR bonus with no equipment', () => {
       const gs = new GameState([]);
-      expect(gs.getEffectiveAtk()).toBe(3);
+      // atk = this.atk(3) + floor(STR(5)/2) = 3 + 2 = 5
+      expect(gs.getEffectiveAtk()).toBe(5);
     });
 
-    it('getEffectiveDef returns base def with no equipment', () => {
+    it('getEffectiveDef returns base def + VIT bonus with no equipment', () => {
       const gs = new GameState([]);
-      expect(gs.getEffectiveDef()).toBe(1);
+      // def = this.def(1) + floor(VIT(5)/4) = 1 + 1 = 2
+      expect(gs.getEffectiveDef()).toBe(2);
     });
 
     it('equipItem equips to correct slot', () => {
@@ -756,17 +758,19 @@ describe('GameState', () => {
       expect(gs.equipment.get('weapon')).toBe(sword2);
     });
 
-    it('getEffectiveAtk includes weapon bonus', () => {
+    it('getEffectiveAtk includes weapon bonus and STR bonus', () => {
       const gs = new GameState([]);
       gs.equipItem({ id: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 3, defBonus: 0 });
-      expect(gs.getEffectiveAtk()).toBe(6);
+      // atk = this.atk(3) + floor(STR(5)/2) + atkBonus(3) = 3 + 2 + 3 = 8
+      expect(gs.getEffectiveAtk()).toBe(8);
     });
 
-    it('getEffectiveDef includes armor and ring bonuses', () => {
+    it('getEffectiveDef includes armor, ring bonuses, and VIT bonus', () => {
       const gs = new GameState([]);
       gs.equipItem({ id: 'shield', name: 'Shield', slot: 'chest', atkBonus: 0, defBonus: 2 });
       gs.equipItem({ id: 'ring', name: 'Ring', slot: 'ring1', atkBonus: 0, defBonus: 1 });
-      expect(gs.getEffectiveDef()).toBe(4); // 1 base + 2 + 1
+      // def = this.def(1) + floor(VIT(5)/4) + 2 + 1 = 1 + 1 + 2 + 1 = 5
+      expect(gs.getEffectiveDef()).toBe(5);
     });
 
     it('pickupEquipmentAt picks up and auto-equips', () => {
@@ -855,10 +859,10 @@ describe('GameState', () => {
 
     it('useConsumable health_potion clamps at maxHp', () => {
       const gs = new GameState([]);
-      gs.hp = 18;
+      gs.hp = gs.maxHp - 5; // 5 below max
       gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 });
       gs.useConsumable(0);
-      expect(gs.hp).toBe(20);
+      expect(gs.hp).toBe(gs.maxHp);
     });
 
     it('useConsumable torch_oil restores torchFuel', () => {
@@ -928,6 +932,154 @@ describe('GameState', () => {
       const snap = gs.saveLevelState();
       gs.groundItems.delete('1,1');
       expect(snap.groundItems.size).toBe(1);
+    });
+  });
+
+  // --- Stats & Leveling (Phase B) ---
+
+  describe('xpForLevel', () => {
+    it('returns 100 for level 1', () => {
+      const gs = new GameState([]);
+      expect(gs.xpForLevel(1)).toBe(100);
+    });
+
+    it('returns 300 for level 2', () => {
+      const gs = new GameState([]);
+      expect(gs.xpForLevel(2)).toBe(300);
+    });
+
+    it('returns 600 for level 3', () => {
+      const gs = new GameState([]);
+      expect(gs.xpForLevel(3)).toBe(600);
+    });
+
+    it('returns 1000 for level 4', () => {
+      const gs = new GameState([]);
+      expect(gs.xpForLevel(4)).toBe(1000);
+    });
+
+    it('returns 1500 for level 5', () => {
+      const gs = new GameState([]);
+      expect(gs.xpForLevel(5)).toBe(1500);
+    });
+  });
+
+  describe('addXp', () => {
+    it('accumulates XP without levelling up', () => {
+      const gs = new GameState([]);
+      const result = gs.addXp(50);
+      expect(result).toBe(false);
+      expect(gs.xp).toBe(50);
+      expect(gs.level).toBe(1);
+    });
+
+    it('returns true and increments level when threshold crossed', () => {
+      const gs = new GameState([]);
+      const result = gs.addXp(100);
+      expect(result).toBe(true);
+      expect(gs.level).toBe(2);
+    });
+
+    it('grants +3 attributePoints on level-up', () => {
+      const gs = new GameState([]);
+      gs.addXp(100);
+      expect(gs.attributePoints).toBe(3);
+    });
+
+    it('can level up multiple times from a single addXp call', () => {
+      const gs = new GameState([]);
+      gs.addXp(600); // enough for levels 1, 2, and 3
+      expect(gs.level).toBe(4);
+      expect(gs.attributePoints).toBe(9); // 3 per level-up x3
+    });
+
+    it('caps at level 15 and returns false at cap', () => {
+      const gs = new GameState([]);
+      // xpForLevel(15) = 100 * 15 * 16 / 2 = 12000
+      gs.addXp(12000);
+      expect(gs.level).toBe(15);
+      const result = gs.addXp(99999);
+      expect(result).toBe(false);
+      expect(gs.level).toBe(15);
+    });
+  });
+
+  describe('allocatePoint', () => {
+    it('decrements attributePoints and increments the given stat', () => {
+      const gs = new GameState([]);
+      gs.attributePoints = 3;
+      const result = gs.allocatePoint('str');
+      expect(result).toBe(true);
+      expect(gs.attributePoints).toBe(2);
+      expect(gs.str).toBe(6);
+    });
+
+    it('returns false when no points remain', () => {
+      const gs = new GameState([]);
+      const result = gs.allocatePoint('dex');
+      expect(result).toBe(false);
+      expect(gs.dex).toBe(5); // unchanged
+    });
+
+    it('VIT allocation recalculates maxHp', () => {
+      const gs = new GameState([]);
+      gs.attributePoints = 1;
+      const prevMax = gs.maxHp;
+      gs.allocatePoint('vit');
+      expect(gs.maxHp).toBe(prevMax + 5); // +5 per VIT point
+    });
+
+    it('VIT allocation restores hp to new max when hp was at old max', () => {
+      const gs = new GameState([]);
+      gs.attributePoints = 1;
+      // hp starts at maxHp
+      expect(gs.hp).toBe(gs.maxHp);
+      gs.allocatePoint('vit');
+      expect(gs.hp).toBe(gs.maxHp);
+    });
+
+    it('VIT allocation does not change hp when hp was below max', () => {
+      const gs = new GameState([]);
+      gs.attributePoints = 1;
+      gs.hp = 30;
+      gs.allocatePoint('vit');
+      expect(gs.hp).toBe(30); // unchanged
+    });
+  });
+
+  describe('getEffectiveStats', () => {
+    it('maxHp equals 40 + VIT * 5 with default stats and no equipment', () => {
+      const gs = new GameState([]);
+      const stats = gs.getEffectiveStats();
+      expect(stats.maxHp).toBe(40 + 5 * 5); // 65
+    });
+
+    it('critChance base is 5 + floor(DEX / 3)', () => {
+      const gs = new GameState([]);
+      // DEX=5: 5 + floor(5/3) = 5 + 1 = 6
+      const stats = gs.getEffectiveStats();
+      expect(stats.critChance).toBe(6);
+    });
+
+    it('dodgeChance is 0 when DEX equals 5', () => {
+      const gs = new GameState([]);
+      const stats = gs.getEffectiveStats();
+      expect(stats.dodgeChance).toBe(0);
+    });
+
+    it('dodgeChance increases with DEX above 5', () => {
+      const gs = new GameState([]);
+      gs.dex = 9;
+      const stats = gs.getEffectiveStats();
+      // floor((9-5)/4) = floor(1) = 1
+      expect(stats.dodgeChance).toBe(1);
+    });
+
+    it('dodgeChance is capped at 25', () => {
+      const gs = new GameState([]);
+      gs.dex = 200;
+      const stats = gs.getEffectiveStats();
+      expect(stats.dodgeChance).toBe(25);
     });
   });
 });

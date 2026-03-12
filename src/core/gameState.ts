@@ -140,6 +140,19 @@ export class GameState {
   maxTorchFuel: number;
   exploredCells: Set<string>;
 
+  // Core RPG attributes (M1).
+  // WIS has no mechanical effect in M1 — reserved for M4 mana.
+  str: number;
+  dex: number;
+  vit: number;
+  wis: number;
+
+  // Progression
+  xp: number;
+  level: number;
+  attributePoints: number;  // unspent points to allocate
+  playerName: string;
+
   constructor(entities: Entity[], grid?: string[], levelId: string = 'default') {
     this.doors = new Map();
     this.keys = new Map();
@@ -156,14 +169,27 @@ export class GameState {
     this.entityRegistry = new EntityRegistry();
     this.currentLevelId = levelId;
 
-    this.hp = 20;
-    this.maxHp = 20;
+    // Base attributes default to 5
+    this.str = 5;
+    this.dex = 5;
+    this.vit = 5;
+    this.wis = 5;
+
+    this.xp = 0;
+    this.level = 1;
+    this.attributePoints = 0;
+    this.playerName = 'Adventurer';
+
     this.atk = 3;
     this.def = 1;
     this.attackCooldown = 0;
     this.torchFuel = 100;
     this.maxTorchFuel = 100;
     this.exploredCells = new Set();
+
+    // maxHp derived from VIT: 40 + VIT * 5
+    this.maxHp = 40 + this.vit * 5;
+    this.hp = this.maxHp;
 
     this._parseEntities(entities, grid);
   }
@@ -533,37 +559,153 @@ export class GameState {
 
   // --- Equipment & Consumable helpers ---
 
-  getEffectiveAtk(): number {
-    let total = this.atk;
-    // Prefer DB-sourced stats when available.
+  /**
+   * Aggregate all derived stats from base attributes + equipped items.
+   *
+   * Derived formulas (M1):
+   *   atk        = weapon.stats.atk + floor(STR / 2)
+   *   def        = sum(equipped armor def) + floor(VIT / 4)
+   *   maxHp      = 40 + VIT * 5 + sum(equipped items hp bonus)
+   *   critChance = 5 + floor(DEX / 3) + weapon critChance bonus    [percentage]
+   *   dodgeChance= floor((DEX - 5) / 4)  [min 0, cap 25]           [percentage]
+   *
+   * Falls back to legacy equipment map when itemDatabase is not loaded.
+   */
+  getEffectiveStats(): {
+    atk: number;
+    def: number;
+    maxHp: number;
+    critChance: number;
+    dodgeChance: number;
+  } {
+    const strBonus = Math.floor(this.str / 2);
+    const vitDefBonus = Math.floor(this.vit / 4);
+    const baseCrit = 5 + Math.floor(this.dex / 3);
+    const dodge = Math.max(0, Math.min(25, Math.floor((this.dex - 5) / 4)));
+
     if (itemDatabase.isLoaded()) {
+      let weaponAtk = 0;
+      let armorDef = 0;
+      let hpBonus = 0;
+      let weaponCrit = 0;
+
       for (const [, entity] of this.entityRegistry.getAllEquipped()) {
-        const def = itemDatabase.getItem(entity.itemId);
-        if (def?.stats.atk) total += def.stats.atk;
+        const itemDef = itemDatabase.getItem(entity.itemId);
+        if (!itemDef) continue;
+        if (itemDef.stats.atk) weaponAtk += itemDef.stats.atk;
+        if (itemDef.stats.def) armorDef += itemDef.stats.def;
+        if (itemDef.stats.hp) hpBonus += itemDef.stats.hp;
+        if (itemDef.stats.critChance) weaponCrit += itemDef.stats.critChance;
       }
-    } else {
-      // Fallback to legacy equipment map when DB is not loaded.
-      for (const item of this.equipment.values()) {
-        total += item.atkBonus;
-      }
+
+      return {
+        atk: weaponAtk + strBonus,
+        def: armorDef + vitDefBonus,
+        maxHp: 40 + this.vit * 5 + hpBonus,
+        critChance: baseCrit + weaponCrit,
+        dodgeChance: dodge,
+      };
     }
-    return total;
+
+    // Fallback: use legacy equipment map + base atk/def fields
+    let legacyAtk = this.atk + strBonus;
+    let legacyDef = this.def + vitDefBonus;
+    for (const item of this.equipment.values()) {
+      legacyAtk += item.atkBonus;
+      legacyDef += item.defBonus;
+    }
+
+    return {
+      atk: legacyAtk,
+      def: legacyDef,
+      maxHp: 40 + this.vit * 5,
+      critChance: baseCrit,
+      dodgeChance: dodge,
+    };
+  }
+
+  getEffectiveAtk(): number {
+    return this.getEffectiveStats().atk;
   }
 
   getEffectiveDef(): number {
-    let total = this.def;
-    if (itemDatabase.isLoaded()) {
-      for (const [, entity] of this.entityRegistry.getAllEquipped()) {
-        const def = itemDatabase.getItem(entity.itemId);
-        if (def?.stats.def) total += def.stats.def;
-      }
-    } else {
-      // Fallback to legacy equipment map when DB is not loaded.
-      for (const item of this.equipment.values()) {
-        total += item.defBonus;
-      }
+    return this.getEffectiveStats().def;
+  }
+
+  // --- XP and leveling ---
+
+  /**
+   * Total XP required to reach level n.
+   * Formula: 100 * n * (n + 1) / 2
+   * L1: 100, L2: 300, L3: 600, L4: 1000, L5: 1500
+   */
+  xpForLevel(n: number): number {
+    return 100 * n * (n + 1) / 2;
+  }
+
+  /**
+   * Add XP and trigger level-ups if thresholds are crossed.
+   * Returns true if at least one level-up occurred.
+   * Level cap: 15.
+   */
+  addXp(amount: number): boolean {
+    const LEVEL_CAP = 15;
+    if (this.level >= LEVEL_CAP) return false;
+
+    this.xp += amount;
+    let levelled = false;
+
+    while (this.level < LEVEL_CAP && this.xp >= this.xpForLevel(this.level)) {
+      this.level++;
+      this.attributePoints += 3;
+      // Recalculate maxHp on level-up — attribute points may have been spent on VIT
+      this.maxHp = this.getEffectiveStats().maxHp;
+      levelled = true;
     }
-    return total;
+
+    return levelled;
+  }
+
+  /**
+   * Spend one attributePoint to increment the given stat.
+   * Returns false when no points remain.
+   * VIT allocation recalculates maxHp and restores HP to new max if HP was at old max.
+   */
+  allocatePoint(stat: 'str' | 'dex' | 'vit' | 'wis'): boolean {
+    if (this.attributePoints <= 0) return false;
+
+    this.attributePoints--;
+
+    if (stat === 'vit') {
+      const wasAtMax = this.hp === this.maxHp;
+      this.vit++;
+      this.maxHp = this.getEffectiveStats().maxHp;
+      if (wasAtMax) this.hp = this.maxHp;
+    } else if (stat === 'str') {
+      this.str++;
+    } else if (stat === 'dex') {
+      this.dex++;
+    } else {
+      // wis — no M1 mechanical effect, but still tracked
+      this.wis++;
+    }
+
+    return true;
+  }
+
+  /**
+   * Apply a pre-built attribute allocation from character creation.
+   * Sets str/dex/vit/wis directly and recalculates maxHp.
+   * Does not consume attributePoints.
+   */
+  applyCharacterSetup(str: number, dex: number, vit: number, wis: number, name: string): void {
+    this.str = str;
+    this.dex = dex;
+    this.vit = vit;
+    this.wis = wis;
+    this.playerName = name;
+    this.maxHp = this.getEffectiveStats().maxHp;
+    this.hp = this.maxHp;
   }
 
   equipItem(item: EquipmentItem): EquipmentItem | null {

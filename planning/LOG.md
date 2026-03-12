@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-12 — M1 Phase B: Stats & Leveling
+
+**New files:**
+- `src/hud/characterCreation.ts` — `CharacterCreationScreen`: 5-point stat allocation canvas overlay, shown before game loop starts. Arrow keys to navigate/adjust, Enter to confirm.
+- `src/hud/levelUpNotification.ts` — `LevelUpNotification`: 3s gold text flash centered top-center, 2s fade-out. Triggered on level-up.
+
+**Modified files:**
+- `src/core/gameState.ts` — Added str/dex/vit/wis (base 5), xp, level (base 1), attributePoints, playerName. `maxHp` now `40 + vit * 5`. New methods: `getEffectiveStats()`, `xpForLevel()`, `addXp()`, `allocatePoint()`, `applyCharacterSetup()`. `getEffectiveAtk/Def` delegate to `getEffectiveStats()`.
+- `src/enemies/enemyTypes.ts` — Added `xp` to `EnemyDef`: rat=10, skeleton=25, orc=50.
+- `src/hud/hudCanvas.ts` — Added `getCanvas()`, wired `levelUpNotification` into draw call.
+- `src/main.ts` — Character creation await block before game loop; XP award on kill; level-up notification update/draw in game loop.
+
+**Decisions:**
+- WIS has zero mechanical effect in M1 — shown in character creation with note "magic (not yet)". Reserved for M4 mana.
+- `getEffectiveStats()` fallback path (no DB loaded) includes legacy `this.atk`/`this.def` for backwards compat with combat tests.
+
+---
+
 ## 2026-03-12 — M1 Phase A: Entity Registry + Item Database
 
 Data foundation for Milestone 1. All Phase A tasks complete.

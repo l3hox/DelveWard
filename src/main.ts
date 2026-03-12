@@ -16,11 +16,14 @@ import { buildItemMeshes, hideItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh } from './rendering/consumableRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
+import { ENEMY_DEFS } from './enemies/enemyTypes';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
 import { TransitionOverlay } from './rendering/transitionOverlay';
+import { CharacterCreationScreen } from './hud/characterCreation';
+import { LevelUpNotification } from './hud/levelUpNotification';
 import { DamageNumberManager } from './rendering/damageNumbers';
 import { SwordSwingAnimator } from './rendering/swordSwing';
 import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
@@ -250,6 +253,20 @@ async function init(): Promise<void> {
 
   const transition = new TransitionOverlay();
   transition.attach();
+
+  // --- Character creation screen ---
+  // Shown before the game loop starts. The 3D scene is already loaded beneath it.
+  const hudCanvas = hud.getCanvas();
+  await new Promise<void>((resolve) => {
+    const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
+      gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
+      resolve();
+    });
+    charCreation.show();
+  });
+
+  // --- Level-up notification ---
+  const levelUpNotification = new LevelUpNotification();
 
   // --- Combat state ---
   let playerDamageFlashTimer = 0;
@@ -489,6 +506,16 @@ async function init(): Promise<void> {
             if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
               hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
               ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
+              // Award XP for the kill
+              if (result.enemyType) {
+                const enemyDef = ENEMY_DEFS[result.enemyType];
+                if (enemyDef) {
+                  const levelled = gameState.addXp(enemyDef.xp);
+                  if (levelled) {
+                    levelUpNotification.trigger(gameState.level);
+                  }
+                }
+              }
             }
           }
         }
@@ -615,8 +642,10 @@ async function init(): Promise<void> {
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
     torchFillLight.intensity = torchLight.intensity * 0.6;
 
+    levelUpNotification.update(delta);
+
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
-    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing);
+    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing, levelUpNotification);
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
