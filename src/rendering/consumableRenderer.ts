@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
+import { itemDatabase } from '../core/itemDatabase';
 
 const ITEM_SIZE = 0.3;
 const ITEM_HEIGHT = 0.15;
@@ -27,7 +28,7 @@ function generateConsumableTexture(consumableType: string): THREE.CanvasTexture 
     ctx.fillStyle = '#FF6666';
     ctx.fillRect(6, 7, 1, 2);
   } else {
-    // Yellow flask (torch oil)
+    // Yellow flask (torch oil / default consumable)
     ctx.fillStyle = '#CC9900';
     ctx.fillRect(6, 5, 4, 8);
     ctx.fillRect(5, 7, 6, 4);
@@ -55,32 +56,79 @@ export function buildConsumableMeshes(
   const meshMap = new Map<string, THREE.Mesh>();
   const geo = new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE);
 
-  // Cache textures per consumable type
+  // Cache textures per consumable subtype.
   const textures = new Map<string, THREE.CanvasTexture>();
 
-  for (const [mapKey, item] of gameState.groundConsumables) {
-    if (!textures.has(item.consumableType)) {
-      textures.set(item.consumableType, generateConsumableTexture(item.consumableType));
+  if (itemDatabase.isLoaded()) {
+    const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId);
+
+    for (const entity of groundEntities) {
+      const def = itemDatabase.getItem(entity.itemId);
+      let consumableType: string;
+      if (def && def.type === 'consumable') {
+        consumableType = def.subtype as string;
+      } else if (!def) {
+        // itemId not in DB — fall back to legacy groundConsumables entry.
+        const loc = entity.location;
+        if (loc.kind !== 'world') continue;
+        const legacyItem = gameState.groundConsumables.get(doorKey(loc.col, loc.row));
+        if (!legacyItem) continue; // not a consumable — skip
+        consumableType = legacyItem.consumableType;
+      } else {
+        continue; // equipment item — handled by itemRenderer
+      }
+
+      if (!textures.has(consumableType)) {
+        textures.set(consumableType, generateConsumableTexture(consumableType));
+      }
+
+      const mat = new THREE.MeshLambertMaterial({
+        map: textures.get(consumableType)!,
+        transparent: true,
+        side: THREE.DoubleSide,
+      });
+
+      const loc = entity.location;
+      if (loc.kind !== 'world') continue;
+      const col = loc.col;
+      const row = loc.row;
+      const mapKey = doorKey(col, row);
+      const cx = col * CELL_SIZE + CELL_SIZE / 2;
+      const cz = row * CELL_SIZE + CELL_SIZE / 2;
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(cx, ITEM_HEIGHT, cz);
+
+      group.add(mesh);
+      meshMap.set(mapKey, mesh);
     }
+  } else {
+    // Fallback: render from legacy groundConsumables map when DB is not loaded.
+    for (const [mapKey, item] of gameState.groundConsumables) {
+      if (!textures.has(item.consumableType)) {
+        textures.set(item.consumableType, generateConsumableTexture(item.consumableType));
+      }
 
-    const mat = new THREE.MeshLambertMaterial({
-      map: textures.get(item.consumableType)!,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
+      const mat = new THREE.MeshLambertMaterial({
+        map: textures.get(item.consumableType)!,
+        transparent: true,
+        side: THREE.DoubleSide,
+      });
 
-    const [colStr, rowStr] = mapKey.split(',');
-    const col = Number(colStr);
-    const row = Number(rowStr);
-    const cx = col * CELL_SIZE + CELL_SIZE / 2;
-    const cz = row * CELL_SIZE + CELL_SIZE / 2;
+      const [colStr, rowStr] = mapKey.split(',');
+      const col = Number(colStr);
+      const row = Number(rowStr);
+      const cx = col * CELL_SIZE + CELL_SIZE / 2;
+      const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(cx, ITEM_HEIGHT, cz);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(cx, ITEM_HEIGHT, cz);
 
-    group.add(mesh);
-    meshMap.set(mapKey, mesh);
+      group.add(mesh);
+      meshMap.set(mapKey, mesh);
+    }
   }
 
   return { group, meshMap };

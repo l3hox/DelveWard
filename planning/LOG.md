@@ -4,6 +4,34 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-12 — M1 Phase A: Entity Registry + Item Database
+
+Data foundation for Milestone 1. All Phase A tasks complete.
+
+**New files:**
+- `src/core/itemDatabase.ts` — `ItemDatabase` class + singleton. Loads `public/data/items.json`. Types: `ItemDef`, `ItemStats`, `ItemModifier`, quality/subtype enums. Query API: `getItem(id)`, `getItemsByType(type)`.
+- `src/core/entities.ts` — `EntityRegistry` class + `ItemLocation` discriminant union + `EquipSlot` (3→10 slots). Single source of truth for all item instances. Items move between world/backpack/equipped via `moveItem()`.
+- `src/core/itemDatabase.test.ts` — 67 new tests
+- `src/core/entities.test.ts` — (included in test count above)
+- `planning/m1/PLAN.md` — full M1 implementation plan (Phases A–F)
+
+**Modified files:**
+- `src/core/gameState.ts` — `EntityRegistry` added alongside legacy item maps (dual-write for backwards compat). `EquipSlot` re-exported from `entities.ts`. `currentLevelId` field added. `normalizeLegacySlot()` maps old `armor`→`chest`, `ring`→`ring1`. `getEffectiveAtk/Def` updated to query registry when DB loaded.
+- `src/rendering/itemRenderer.ts` + `consumableRenderer.ts` — query entity registry; fall back to legacy maps when itemId not in DB.
+- `src/hud/inventoryPanel.ts` — 10-slot equipment panel + 12-slot backpack.
+- `src/level/levelLoader.ts` — equipment slot validator updated to accept all 10 M1 slot names.
+- `src/rendering/enemyRenderer.ts` — added `preloadEnemyTextures()` so all sprites are loaded before scene build (fixes orc delayed appearance on level load).
+- `src/main.ts` — `itemDatabase.load()` + `preloadEnemyTextures()` called in parallel before level scene build.
+- `public/levels/dungeon1.json` + `dungeon3.json` — equipment slot names updated: `armor`→`chest`/`shield`, `ring`→`ring1`.
+
+**Decisions:**
+- Dual-write (legacy maps + registry) kept intentionally for Phase A to preserve backwards compat with tests and levelLoader. Legacy maps will be removed when Phase C (equipment expansion) lands.
+- itemIds in existing dungeon JSON don't match items.json (legacy naming). Renderers fall back to legacy map for visual category. Will be resolved when M1 dungeon content is authored in Phase F.
+
+**Test count:** 348 (281 existing + 67 new)
+
+---
+
 ## 2026-03-07 — Particle Effects
 
 Added three particle effect systems for atmosphere.

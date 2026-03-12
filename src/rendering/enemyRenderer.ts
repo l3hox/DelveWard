@@ -30,6 +30,19 @@ function getEnemyTexture(type: string): THREE.Texture {
   return tex;
 }
 
+/** Preload all known enemy textures so sprites appear immediately on scene build. */
+export async function preloadEnemyTextures(): Promise<void> {
+  await Promise.all(
+    Object.entries(SPRITE_PATHS).map(async ([type, path]) => {
+      if (textureCache.has(type)) return;
+      const tex = await loader.loadAsync(path);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      textureCache.set(type, tex);
+    })
+  );
+}
+
 // Custom billboard shader: distance-only lighting (no NdotL angle dependence).
 // Computes light in view space so brightness is stable regardless of camera rotation.
 // Uses Three.js light uniforms via `lights: true` and built-in fog chunks.

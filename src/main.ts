@@ -11,7 +11,7 @@ import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
-import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition } from './rendering/enemyRenderer';
+import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh } from './rendering/consumableRenderer';
 import { EnemyAnimator } from './rendering/enemyAnimator';
@@ -27,6 +27,7 @@ import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
+import { itemDatabase } from './core/itemDatabase';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -232,13 +233,16 @@ async function init(): Promise<void> {
   let debugFullbright = false;
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
+  // --- Item database + enemy textures (preload before scene build so sprites appear immediately) ---
+  await Promise.all([itemDatabase.load(), preloadEnemyTextures()]);
+
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon3.json');
   const firstLevel = dungeon.levels[0];
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
 
-  const gameState = new GameState(firstLevel.entities, firstLevel.grid);
+  const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
 
   // --- HUD + Transition ---
   const hud = new HudOverlay();
@@ -284,7 +288,7 @@ async function init(): Promise<void> {
 
       // Reset GameState for current level
       const currentLevel = dungeon.levels.find((l) => l.id === currentLevelId)!;
-      gameState.loadNewLevel(currentLevel.entities, currentLevel.grid);
+      gameState.loadNewLevel(currentLevel.entities, currentLevel.grid, currentLevel.id ?? currentLevel.name);
       gameState.hp = gameState.maxHp;
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
@@ -396,7 +400,7 @@ async function init(): Promise<void> {
       if (snapshot) {
         gameState.loadLevelState(snapshot);
       } else {
-        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid);
+        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevel.id ?? targetLevel.name);
       }
 
       currentLevelId = targetId;

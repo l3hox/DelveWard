@@ -764,8 +764,8 @@ describe('GameState', () => {
 
     it('getEffectiveDef includes armor and ring bonuses', () => {
       const gs = new GameState([]);
-      gs.equipItem({ id: 'shield', name: 'Shield', slot: 'armor', atkBonus: 0, defBonus: 2 });
-      gs.equipItem({ id: 'ring', name: 'Ring', slot: 'ring', atkBonus: 0, defBonus: 1 });
+      gs.equipItem({ id: 'shield', name: 'Shield', slot: 'chest', atkBonus: 0, defBonus: 2 });
+      gs.equipItem({ id: 'ring', name: 'Ring', slot: 'ring1', atkBonus: 0, defBonus: 1 });
       expect(gs.getEffectiveDef()).toBe(4); // 1 base + 2 + 1
     });
 

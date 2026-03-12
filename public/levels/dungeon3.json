@@ -76,7 +76,7 @@
         { "col": 3, "row": 7, "type": "enemy", "enemyType": "rat" },
         { "col": 11, "row": 11, "type": "enemy", "enemyType": "rat" },
         { "col": 7, "row": 1, "type": "equipment", "itemId": "iron_sword", "name": "Iron Sword", "slot": "weapon", "atkBonus": 3, "defBonus": 0 },
-        { "col": 1, "row": 11, "type": "equipment", "itemId": "leather_armor", "name": "Leather Armor", "slot": "armor", "atkBonus": 0, "defBonus": 2 },
+        { "col": 1, "row": 11, "type": "equipment", "itemId": "leather_armor", "name": "Leather Armor", "slot": "chest", "atkBonus": 0, "defBonus": 2 },
         { "col": 5, "row": 7, "type": "consumable", "itemId": "hp_pot_1", "name": "Health Potion", "consumableType": "health_potion", "value": 10 },
         { "col": 13, "row": 3, "type": "consumable", "itemId": "hp_pot_2", "name": "Health Potion", "consumableType": "health_potion", "value": 10 },
         { "col": 9, "row": 11, "type": "consumable", "itemId": "hp_pot_3", "name": "Health Potion", "consumableType": "health_potion", "value": 15 }
@@ -111,7 +111,7 @@
         { "col": 1, "row": 1, "type": "stairs", "direction": "up", "targetLevel": "dark_cellar", "targetCol": 13, "targetRow": 11 },
         { "col": 4, "row": 2, "type": "door" },
         { "col": 2, "row": 3, "type": "enemy", "enemyType": "orc" },
-        { "col": 5, "row": 2, "type": "equipment", "itemId": "gold_ring", "name": "Gold Ring", "slot": "ring", "atkBonus": 1, "defBonus": 1 },
+        { "col": 5, "row": 2, "type": "equipment", "itemId": "gold_ring", "name": "Gold Ring", "slot": "ring1", "atkBonus": 1, "defBonus": 1 },
         { "col": 7, "row": 5, "type": "enemy", "enemyType": "skeleton" },
         { "col": 11, "row": 8, "type": "enemy", "enemyType": "skeleton" },
         { "col": 3, "row": 10, "type": "enemy", "enemyType": "skeleton" },

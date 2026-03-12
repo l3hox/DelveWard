@@ -174,8 +174,8 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 - [x] `public/data/items.json` — central item database: 57 items (22 weapons, 20 armor, 10 accessories, 5 consumables)
 - [x] `public/data/loot-tables.json` — per-enemy loot tables with XP, gold ranges, drop chances for all 9 enemies
 
-### M1 Implementation (next)
-- [ ] Phase A: Entity registry + item loader (`src/core/entities.ts`, `src/core/itemDatabase.ts`)
+### M1 Implementation
+- [x] Phase A: Entity registry + item loader (`src/core/entities.ts`, `src/core/itemDatabase.ts`, GameState migration, renderer re-wire, 67 new tests)
 - [ ] Phase B: Stats & leveling (STR/DEX/VIT/WIS on GameState, XP, level-up, character creation screen)
 - [ ] Phase C: Equipment expansion (10 slots, weapon subtypes, item requirements)
 - [ ] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
@@ -214,6 +214,19 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 ---
 
 ## Session Log
+
+### Session 21 — M1 Phase A: Entity Registry + Item Database
+- Created `planning/m1/PLAN.md` — full M1 implementation plan (Phases A–F with swarm structure)
+- Created `src/core/itemDatabase.ts` — typed loader + query API for items.json
+- Created `src/core/entities.ts` — `EntityRegistry`, `ItemLocation` union, `EquipSlot` (10 slots)
+- Migrated `GameState` to dual-write: entity registry alongside legacy maps (backwards compat)
+- Updated renderers (`itemRenderer`, `consumableRenderer`) to query registry, fall back to legacy maps on DB miss
+- Updated `inventoryPanel.ts` to show 10-slot equipment + 12-slot backpack
+- Fixed equipment slot validator in `levelLoader.ts` (3→10 slots)
+- Fixed legacy slot names in dungeon JSON (`armor`→`chest`/`shield`, `ring`→`ring1`)
+- Added `preloadEnemyTextures()` — all sprites loaded before scene build; fixes orc delayed appearance
+- 348 tests (281 existing + 67 new), clean TypeScript build
+- Manual testing confirmed: game loads, movement/torch good, item pickup/equip/potion use working
 
 ### Session 20 — M1 Design & Data Foundation
 - Created versioning scheme: `0.milestone` (v0.1 = M1 done, etc.)

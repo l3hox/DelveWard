@@ -223,8 +223,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.name !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] equipment must have a string name`);
       }
-      if (!['weapon', 'armor', 'ring'].includes(e.slot as string)) {
-        throw new Error(`Level ${source}: entities[${i}] equipment slot must be weapon, armor, or ring`);
+      if (!['weapon', 'head', 'chest', 'legs', 'hands', 'feet', 'shield', 'ring1', 'ring2', 'amulet'].includes(e.slot as string)) {
+        throw new Error(`Level ${source}: entities[${i}] equipment slot must be one of: weapon, head, chest, legs, hands, feet, shield, ring1, ring2, amulet`);
       }
       if (typeof e.atkBonus !== 'number' || typeof e.defBonus !== 'number') {
         throw new Error(`Level ${source}: entities[${i}] equipment must have numeric atkBonus and defBonus`);

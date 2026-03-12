@@ -54,8 +54,8 @@
         { "col": 3, "row": 4, "type": "enemy", "enemyType": "skeleton" },
         { "col": 5, "row": 7, "type": "enemy", "enemyType": "orc" },
         { "col": 7, "row": 4, "type": "torch_sconce", "wall": "E" },
-        { "col": 7, "row": 7, "type": "equipment", "itemId": "iron_shield", "name": "Iron Shield", "slot": "armor", "atkBonus": 0, "defBonus": 2 },
-        { "col": 1, "row": 3, "type": "equipment", "itemId": "power_ring", "name": "Power Ring", "slot": "ring", "atkBonus": 1, "defBonus": 1 },
+        { "col": 7, "row": 7, "type": "equipment", "itemId": "iron_shield", "name": "Iron Shield", "slot": "shield", "atkBonus": 0, "defBonus": 2 },
+        { "col": 1, "row": 3, "type": "equipment", "itemId": "power_ring", "name": "Power Ring", "slot": "ring1", "atkBonus": 1, "defBonus": 1 },
         { "col": 1, "row": 7, "type": "consumable", "itemId": "torch_oil", "name": "Torch Oil", "consumableType": "torch_oil", "value": 30 },
         { "col": 3, "row": 7, "type": "consumable", "itemId": "health_potion_2", "name": "Health Potion", "consumableType": "health_potion", "value": 15 }
       ],
