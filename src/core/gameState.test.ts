@@ -777,16 +777,18 @@ describe('GameState', () => {
       const gs = new GameState([
         { col: 3, row: 3, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
       ]);
-      const item = gs.pickupEquipmentAt(3, 3);
-      expect(item).toBeDefined();
-      expect(item!.id).toBe('sword');
+      const result = gs.pickupEquipmentAt(3, 3);
+      expect(result.item).toBeDefined();
+      expect(result.item!.id).toBe('sword');
       expect(gs.equipment.get('weapon')).toBeDefined();
       expect(gs.groundItems.size).toBe(0);
     });
 
-    it('pickupEquipmentAt returns undefined for empty cell', () => {
+    it('pickupEquipmentAt returns empty object for empty cell', () => {
       const gs = new GameState([]);
-      expect(gs.pickupEquipmentAt(5, 5)).toBeUndefined();
+      const result = gs.pickupEquipmentAt(5, 5);
+      expect(result.item).toBeUndefined();
+      expect(result.denied).toBeUndefined();
     });
 
     it('equipment persists across loadNewLevel', () => {
@@ -1080,6 +1082,78 @@ describe('GameState', () => {
       gs.dex = 200;
       const stats = gs.getEffectiveStats();
       expect(stats.dodgeChance).toBe(25);
+    });
+
+    it('returns effective attribute values (base only, no DB)', () => {
+      const gs = new GameState([]);
+      const stats = gs.getEffectiveStats();
+      expect(stats.effectiveStr).toBe(5);
+      expect(stats.effectiveDex).toBe(5);
+      expect(stats.effectiveVit).toBe(5);
+      expect(stats.effectiveWis).toBe(5);
+    });
+  });
+
+  // --- C2: canEquipItem (no DB loaded — always allows, since requirements need DB) ---
+
+  describe('canEquipItem (no DB)', () => {
+    it('allows equip when item has no requirements', () => {
+      const gs = new GameState([]);
+      const mockItem = {
+        id: 'test', name: 'Test', type: 'weapon' as const, subtype: 'sword' as const,
+        quality: 'common' as const, icon: '', weight: 1, value: 1, description: '',
+        stats: {}, modifiers: [], requirements: {},
+      };
+      const result = gs.canEquipItem(mockItem);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('denies equip when STR requirement not met', () => {
+      const gs = new GameState([]);
+      gs.str = 3;
+      const mockItem = {
+        id: 'test', name: 'Test', type: 'weapon' as const, subtype: 'axe' as const,
+        quality: 'common' as const, icon: '', weight: 1, value: 1, description: '',
+        stats: {}, modifiers: [], requirements: { str: 6 },
+      };
+      const result = gs.canEquipItem(mockItem);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('STR');
+    });
+
+    it('denies equip when DEX requirement not met', () => {
+      const gs = new GameState([]);
+      gs.dex = 2;
+      const mockItem = {
+        id: 'test', name: 'Test', type: 'weapon' as const, subtype: 'dagger' as const,
+        quality: 'common' as const, icon: '', weight: 1, value: 1, description: '',
+        stats: {}, modifiers: [], requirements: { dex: 5 },
+      };
+      const result = gs.canEquipItem(mockItem);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('DEX');
+    });
+
+    it('allows equip when all requirements are met', () => {
+      const gs = new GameState([]);
+      gs.str = 10;
+      gs.dex = 8;
+      const mockItem = {
+        id: 'test', name: 'Test', type: 'weapon' as const, subtype: 'sword' as const,
+        quality: 'common' as const, icon: '', weight: 1, value: 1, description: '',
+        stats: {}, modifiers: [], requirements: { str: 5, dex: 5 },
+      };
+      const result = gs.canEquipItem(mockItem);
+      expect(result.allowed).toBe(true);
+    });
+  });
+
+  // --- C3: getEquippedWeaponDef ---
+
+  describe('getEquippedWeaponDef (no DB)', () => {
+    it('returns undefined when no DB loaded', () => {
+      const gs = new GameState([]);
+      expect(gs.getEquippedWeaponDef()).toBeUndefined();
     });
   });
 });

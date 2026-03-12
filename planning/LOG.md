@@ -4,6 +4,29 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-12 — M1 Phase C: Equipment Expansion
+
+**New files:**
+- `src/hud/xpBar.ts` — XP progress bar HUD widget (level label, blue fill bar, XP fraction, "MAX" at cap).
+- `src/hud/statsPanel.ts` — `StatsPanel` class: debug overlay toggled by T key. Base vs effective stats side-by-side with green/red diff coloring. Will be repurposed as a proper UI panel in Phase E.
+
+**Modified files:**
+- `src/core/combat.ts` — `WEAPON_BEHAVIOR` table with per-subtype cooldown + damage multiplier. `getWeaponCooldown()` reads equipped weapon via DB. `resolveWeaponEffect()` handles specials (axe: -1 DEF, dagger: 10% crit override, mace: +2 vs armored). `playerAttack()` now returns `CombatResult[]` and supports spear 2-cell range.
+- `src/core/gameState.ts` — `getEffectiveStats()` expanded: returns `effectiveStr/Dex/Vit/Wis` (base + item attribute bonuses). New methods: `getEquippedWeaponDef()`, `canEquipItem()` (STR/DEX/VIT/WIS requirement check). `pickupEquipmentAt()` returns `{ item?, denied? }` instead of bare item — blocks equip if requirements unmet.
+- `src/hud/hudCanvas.ts` — Wired XP bar, `showMessage()` for centered fade-out text, `StatsPanel` integration.
+- `src/hud/hudLayout.ts` — Added `XP_BAR` layout constant.
+- `src/main.ts` — Multi-result combat loop (spear), equipment pickup HUD message on success/denial, T key stats panel toggle with input blocking.
+- `public/levels/dungeon3.json` — Added test weapons (dagger, axe, spear, ring) for manual testing.
+
+**Decisions:**
+- `playerAttack()` return type changed from single `CombatResult` to `CombatResult[]` to support spear multi-target. All callers updated to loop.
+- Dagger crit is a flat 10% override (not additive with base crit chance) — keeps daggers viable at low DEX but doesn't stack with high DEX builds.
+- Stats panel created as debug tool now; will be integrated into Phase E UI.
+
+**Test count:** 689 (669 + 20 new)
+
+---
+
 ## 2026-03-12 — M1 Phase B: Stats & Leveling
 
 **New files:**

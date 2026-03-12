@@ -6,6 +6,7 @@ import type { EnemyInstance } from '../enemies/enemyTypes';
 import { EntityRegistry } from './entities';
 import type { ItemEntity, ItemLocation } from './entities';
 import { itemDatabase } from './itemDatabase';
+import type { ItemDef } from './itemDatabase';
 export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
 
@@ -577,13 +578,17 @@ export class GameState {
     maxHp: number;
     critChance: number;
     dodgeChance: number;
+    effectiveStr: number;
+    effectiveDex: number;
+    effectiveVit: number;
+    effectiveWis: number;
   } {
-    const strBonus = Math.floor(this.str / 2);
-    const vitDefBonus = Math.floor(this.vit / 4);
-    const baseCrit = 5 + Math.floor(this.dex / 3);
-    const dodge = Math.max(0, Math.min(25, Math.floor((this.dex - 5) / 4)));
-
     if (itemDatabase.isLoaded()) {
+      // C3: Compute effective attributes = base + item attribute bonuses
+      let bonusStr = 0;
+      let bonusDex = 0;
+      let bonusVit = 0;
+      let bonusWis = 0;
       let weaponAtk = 0;
       let armorDef = 0;
       let hpBonus = 0;
@@ -592,22 +597,45 @@ export class GameState {
       for (const [, entity] of this.entityRegistry.getAllEquipped()) {
         const itemDef = itemDatabase.getItem(entity.itemId);
         if (!itemDef) continue;
+        if (itemDef.stats.str) bonusStr += itemDef.stats.str;
+        if (itemDef.stats.dex) bonusDex += itemDef.stats.dex;
+        if (itemDef.stats.vit) bonusVit += itemDef.stats.vit;
+        if (itemDef.stats.wis) bonusWis += itemDef.stats.wis;
         if (itemDef.stats.atk) weaponAtk += itemDef.stats.atk;
         if (itemDef.stats.def) armorDef += itemDef.stats.def;
         if (itemDef.stats.hp) hpBonus += itemDef.stats.hp;
         if (itemDef.stats.critChance) weaponCrit += itemDef.stats.critChance;
       }
 
+      const effStr = this.str + bonusStr;
+      const effDex = this.dex + bonusDex;
+      const effVit = this.vit + bonusVit;
+      const effWis = this.wis + bonusWis;
+
+      const strBonus = Math.floor(effStr / 2);
+      const vitDefBonus = Math.floor(effVit / 4);
+      const baseCrit = 5 + Math.floor(effDex / 3);
+      const dodge = Math.max(0, Math.min(25, Math.floor((effDex - 5) / 4)));
+
       return {
         atk: weaponAtk + strBonus,
         def: armorDef + vitDefBonus,
-        maxHp: 40 + this.vit * 5 + hpBonus,
+        maxHp: 40 + effVit * 5 + hpBonus,
         critChance: baseCrit + weaponCrit,
         dodgeChance: dodge,
+        effectiveStr: effStr,
+        effectiveDex: effDex,
+        effectiveVit: effVit,
+        effectiveWis: effWis,
       };
     }
 
     // Fallback: use legacy equipment map + base atk/def fields
+    const strBonus = Math.floor(this.str / 2);
+    const vitDefBonus = Math.floor(this.vit / 4);
+    const baseCrit = 5 + Math.floor(this.dex / 3);
+    const dodge = Math.max(0, Math.min(25, Math.floor((this.dex - 5) / 4)));
+
     let legacyAtk = this.atk + strBonus;
     let legacyDef = this.def + vitDefBonus;
     for (const item of this.equipment.values()) {
@@ -621,6 +649,10 @@ export class GameState {
       maxHp: 40 + this.vit * 5,
       critChance: baseCrit,
       dodgeChance: dodge,
+      effectiveStr: this.str,
+      effectiveDex: this.dex,
+      effectiveVit: this.vit,
+      effectiveWis: this.wis,
     };
   }
 
@@ -630,6 +662,43 @@ export class GameState {
 
   getEffectiveDef(): number {
     return this.getEffectiveStats().def;
+  }
+
+  /**
+   * Return the ItemDef for the currently equipped weapon, or undefined if none/DB not loaded.
+   */
+  getEquippedWeaponDef(): ItemDef | undefined {
+    if (!itemDatabase.isLoaded()) return undefined;
+    const weaponEntity = this.entityRegistry.getEquipped('weapon');
+    if (!weaponEntity) return undefined;
+    return itemDatabase.getItem(weaponEntity.itemId);
+  }
+
+  /**
+   * Check if the player meets the requirements to equip an item.
+   * Uses effective attributes (base + item bonuses) for the check.
+   */
+  canEquipItem(itemDef: ItemDef): { allowed: boolean; reason?: string } {
+    const reqs = itemDef.requirements;
+    if (!reqs) return { allowed: true };
+
+    // Use effective stats (which include item attribute bonuses)
+    const stats = this.getEffectiveStats();
+
+    if (reqs.str && stats.effectiveStr < reqs.str) {
+      return { allowed: false, reason: `Requires ${reqs.str} STR (you have ${stats.effectiveStr})` };
+    }
+    if (reqs.dex && stats.effectiveDex < reqs.dex) {
+      return { allowed: false, reason: `Requires ${reqs.dex} DEX (you have ${stats.effectiveDex})` };
+    }
+    if (reqs.vit && stats.effectiveVit < reqs.vit) {
+      return { allowed: false, reason: `Requires ${reqs.vit} VIT (you have ${stats.effectiveVit})` };
+    }
+    if (reqs.wis && stats.effectiveWis < reqs.wis) {
+      return { allowed: false, reason: `Requires ${reqs.wis} WIS (you have ${stats.effectiveWis})` };
+    }
+
+    return { allowed: true };
   }
 
   // --- XP and leveling ---
@@ -714,10 +783,26 @@ export class GameState {
     return displaced;
   }
 
-  pickupEquipmentAt(col: number, row: number): EquipmentItem | undefined {
+  pickupEquipmentAt(col: number, row: number): { item?: EquipmentItem; denied?: string } {
     const key = doorKey(col, row);
     const item = this.groundItems.get(key);
-    if (!item) return undefined;
+    if (!item) return {};
+
+    // C2: Check item requirements before equipping
+    if (itemDatabase.isLoaded()) {
+      // Try to find a matching entity in the registry and look up its ItemDef
+      const worldEntities = this.entityRegistry.getGroundItems(this.currentLevelId, col, row);
+      if (worldEntities.length > 0) {
+        const itemDef = itemDatabase.getItem(worldEntities[0].itemId);
+        if (itemDef) {
+          const check = this.canEquipItem(itemDef);
+          if (!check.allowed) {
+            return { denied: check.reason };
+          }
+        }
+      }
+    }
+
     this.groundItems.delete(key);
 
     // Also remove the corresponding world entity from the registry.
@@ -726,11 +811,15 @@ export class GameState {
       // Move first matching entity to equipped slot (best-effort; no DB in tests).
       const entity = worldEntities[0];
       const slot = item.slot;
+      // Displace any existing registry entity in this slot so getEquipped() always
+      // returns the current item, not a stale entry from a prior pickup.
+      const existing = this.entityRegistry.getEquipped(slot);
+      if (existing) this.entityRegistry.removeItem(existing.instanceId);
       this.entityRegistry.moveItem(entity.instanceId, { kind: 'equipped', slot });
     }
 
     this.equipItem(item);
-    return item;
+    return { item };
   }
 
   pickupConsumableAt(col: number, row: number): ConsumableItem | undefined {

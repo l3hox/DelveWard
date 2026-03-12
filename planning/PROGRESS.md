@@ -177,7 +177,7 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 ### M1 Implementation
 - [x] Phase A: Entity registry + item loader (`src/core/entities.ts`, `src/core/itemDatabase.ts`, GameState migration, renderer re-wire, 67 new tests)
 - [x] Phase B: Stats & leveling (STR/DEX/VIT/WIS on GameState, XP, level-up, character creation screen, 21 new tests)
-- [ ] Phase C: Equipment expansion (10 slots, weapon subtypes, item requirements)
+- [x] Phase C: Equipment expansion (weapon subtypes, item requirements, effective stats, XP bar, stats panel, 20 new tests)
 - [ ] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
 - [ ] Phase E: UI (enemy health bars, paper doll, tooltips, level-up popup)
 - [ ] Phase F: Content (M1 test dungeon — 3 levels)
@@ -214,6 +214,26 @@ Pre-milestone prototype work accumulated as `0.0.x` patches. Current tag: **v0.0
 ---
 
 ## Session Log
+
+### Session 23 — M1 Phase C: Equipment Expansion + Debug Tooling
+
+**Phase C — complete (C1–C4):**
+- `src/core/combat.ts` — `WEAPON_BEHAVIOR` table (sword/axe/dagger/mace/spear/staff) with per-type cooldown + damage multiplier. `getWeaponCooldown()` reads equipped weapon from DB. `resolveWeaponEffect()` applies specials: axe ignores 1 DEF, dagger overrides crit to 10%, mace +2 vs armored. `playerAttack()` returns `CombatResult[]` (was single result), spear hits 2 cells deep.
+- `src/core/gameState.ts` — `getEffectiveStats()` now returns `effectiveStr/Dex/Vit/Wis` (base + item attribute bonuses). `getEquippedWeaponDef()` looks up weapon ItemDef from entity registry. `canEquipItem()` checks STR/DEX/VIT/WIS requirements. `pickupEquipmentAt()` returns `{ item?, denied? }` — blocks equip if requirements unmet, shows HUD denial message.
+- `src/main.ts` — `playerAttack()` result loop handles multi-target (spear). Equipment pickup shows HUD message on success/denial. T key toggles stats panel. Stats panel blocks game input while open.
+- `src/core/combat.test.ts` — 20 new tests: weapon behavior table values, `resolveWeaponEffect` specials (axe DEF ignore, dagger crit, mace armored bonus), spear table entries, min damage guarantee.
+- `src/core/gameState.test.ts` — Tests for `canEquipItem` (STR/DEX requirements, allow/deny), `getEquippedWeaponDef` (no DB), effective attribute return values.
+
+**HUD additions:**
+- `src/hud/xpBar.ts` — XP bar HUD widget: level label + blue progress bar + fraction text. Shows "MAX" at level cap (15).
+- `src/hud/hudLayout.ts` — `XP_BAR` layout constant (bottom-center, between torch and inventory).
+- `src/hud/hudCanvas.ts` — XP bar wired into draw loop. `showMessage()` method for centered fade-out text (2.5s). `StatsPanel` integrated.
+- `src/hud/statsPanel.ts` — Debug stats overlay (T key): base vs effective stats side-by-side, green/red coloring for diffs. Will be repurposed in Phase E.
+
+**Content:**
+- `public/levels/dungeon3.json` — Added test weapons (bent knife/dagger, battle axe, wooden spear, ring of power) for manual testing.
+
+**Test count:** 689 (669 + 20 new Phase C tests)
 
 ### Session 22 — M1 Phase B: Stats & Leveling
 - `GameState`: str/dex/vit/wis/xp/level/attributePoints/playerName fields

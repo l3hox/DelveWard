@@ -18,6 +18,7 @@ import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
 import { ENEMY_DEFS } from './enemies/enemyTypes';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
+import type { CombatResult } from './core/combat';
 import { LeverAnimator } from './rendering/leverAnimator';
 import { DoorAnimator } from './rendering/doorAnimator';
 import { HudOverlay } from './hud/hudCanvas';
@@ -356,9 +357,11 @@ async function init(): Promise<void> {
       }
 
       // Equipment pickup
-      const pickedUpEquip = gameState.pickupEquipmentAt(col, row);
-      if (pickedUpEquip) {
-        console.log(`Equipped: ${pickedUpEquip.name}`);
+      const equipResult = gameState.pickupEquipmentAt(col, row);
+      if (equipResult.denied) {
+        hud.showMessage(equipResult.denied);
+      } else if (equipResult.item) {
+        hud.showMessage(`Equipped: ${equipResult.item.name}`);
         hideItemMesh(ls.itemMeshes.meshMap, col, row);
       }
 
@@ -451,6 +454,9 @@ async function init(): Promise<void> {
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
+    // Stats panel blocks all input except T (to close)
+    if (hud.getStatsPanel().isOpen() && e.code !== 'KeyT') return;
+
     switch (e.code) {
       case 'ArrowUp':
       case 'KeyW': ls.player.moveForward(); break;
@@ -491,28 +497,30 @@ async function init(): Promise<void> {
         break;
       case 'KeyF':
         {
-          const result = playerAttack(ls.player.getState(), gameState);
-          if (result.type !== 'cooldown') {
+          const results = playerAttack(ls.player.getState(), gameState);
+          if (results[0]?.type !== 'cooldown') {
             swordSwing.trigger();
           }
-          if (result.type === 'hit' || result.type === 'kill') {
-            if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
-              ls.enemyAnimator.triggerHit(doorKey(result.targetCol, result.targetRow));
-              if (result.damage !== undefined) {
-                damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+          for (const result of results) {
+            if (result.type === 'hit' || result.type === 'kill') {
+              if (result.targetCol !== undefined && result.targetRow !== undefined) {
+                enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+                ls.enemyAnimator.triggerHit(doorKey(result.targetCol, result.targetRow));
+                if (result.damage !== undefined) {
+                  damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+                }
               }
-            }
-            if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
-              hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
-              ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
-              // Award XP for the kill
-              if (result.enemyType) {
-                const enemyDef = ENEMY_DEFS[result.enemyType];
-                if (enemyDef) {
-                  const levelled = gameState.addXp(enemyDef.xp);
-                  if (levelled) {
-                    levelUpNotification.trigger(gameState.level);
+              if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
+                hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+                ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
+                // Award XP for the kill
+                if (result.enemyType) {
+                  const enemyDef = ENEMY_DEFS[result.enemyType];
+                  if (enemyDef) {
+                    const levelled = gameState.addXp(enemyDef.xp);
+                    if (levelled) {
+                      levelUpNotification.trigger(gameState.level);
+                    }
                   }
                 }
               }
@@ -529,6 +537,9 @@ async function init(): Promise<void> {
             console.log('Used consumable');
           }
         }
+        break;
+      case 'KeyT':
+        hud.getStatsPanel().toggle();
         break;
       case 'KeyL':
         debugFullbright = !debugFullbright;

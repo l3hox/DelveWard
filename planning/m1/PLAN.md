@@ -1,7 +1,7 @@
 # Milestone 1 — Implementation Plan
 
 **Target version:** v0.1
-**Status:** Phase A — ready to implement
+**Status:** Phase C complete, Phase D next
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Phase | Name | Depends On | Status |
 |---|---|---|---|
-| A | Data Foundation | — | Next |
-| B | Stats & Leveling | A | Pending |
-| C | Equipment Expansion | A | Pending |
-| D | Loot & Drops | B, C | Pending |
+| A | Data Foundation | — | **Complete** |
+| B | Stats & Leveling | A | **Complete** |
+| C | Equipment Expansion | A | **Complete** |
+| D | Loot & Drops | B, C | Next |
 | E | UI | B, C, D | Pending |
 | F | Content | E | Pending |
 
@@ -124,6 +124,8 @@ Note: dropped item quality is rolled at death time and set on the `ItemEntity` i
 | E2 | Paper doll panel redesign in `src/hud/inventoryPanel.ts` — 10 equipment slots layout, 12-slot backpack grid (3×4), gold display |
 | E3 | Item tooltips + stat comparison — show on hover/selection: name, quality, stats, requirements, delta vs currently equipped (green/red) |
 | E4 | Gold display in HUD inventory area |
+| E5 | Attribute point allocation screen — Tab-openable panel (same style as character creation). `GameState.attributePoints` already accumulates since Phase B; only the UI was deferred from B4. |
+| E6 | **Legacy map removal** — delete `equipment`, `backpack`, `groundItems`, `groundConsumables` from `GameState` and all dual-write sync code. All consumers (renderers, HUD, combat, tests) must be fully migrated to `EntityRegistry` first. Do this as the final E task once E1–E5 are confirmed working. |
 
 **Inventory interaction model:**
 - `I` key toggles inventory open/closed

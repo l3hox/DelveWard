@@ -37,6 +37,14 @@ export const TORCH_BAR = {
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
 
+// XP bar — bottom-center (gap between torch and inventory)
+export const XP_BAR = {
+  w: 176,
+  h: 24,
+  get x() { return TORCH_BAR.x + TORCH_BAR.w + MARGIN; },
+  get y() { return HUD_HEIGHT - MARGIN - this.h; },
+} as const;
+
 // Inventory panel — bottom-right
 export const INVENTORY = {
   w: 144,
