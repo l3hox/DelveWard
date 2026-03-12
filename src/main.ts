@@ -12,8 +12,9 @@ import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
-import { buildItemMeshes, hideItemMesh } from './rendering/itemRenderer';
-import { buildConsumableMeshes, hideConsumableMesh } from './rendering/consumableRenderer';
+import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
+import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
+import { loadLootTables, rollLoot } from './core/lootTable';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
 import { ENEMY_DEFS } from './enemies/enemyTypes';
@@ -238,7 +239,7 @@ async function init(): Promise<void> {
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
   // --- Item database + enemy textures (preload before scene build so sprites appear immediately) ---
-  await Promise.all([itemDatabase.load(), preloadEnemyTextures()]);
+  await Promise.all([itemDatabase.load(), preloadEnemyTextures(), loadLootTables()]);
 
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon3.json');
@@ -310,6 +311,7 @@ async function init(): Promise<void> {
       gameState.hp = gameState.maxHp;
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
+      gameState.gold = 0;
 
       ls = buildLevelScene(
         currentLevel, gameState, camera, scene,
@@ -520,6 +522,57 @@ async function init(): Promise<void> {
                     const levelled = gameState.addXp(enemyDef.xp);
                     if (levelled) {
                       levelUpNotification.trigger(gameState.level);
+                    }
+                  }
+                }
+                // Loot roll
+                if (result.enemyType) {
+                  const lootResult = rollLoot(result.enemyType, result.dropsOverride);
+
+                  // Add gold
+                  gameState.gold += lootResult.gold;
+
+                  // Spawn dropped items on the ground
+                  for (const drop of lootResult.items) {
+                    const entity = gameState.entityRegistry.createItem(
+                      drop.itemId,
+                      drop.quality,
+                      {
+                        kind: 'world',
+                        levelId: gameState.currentLevelId,
+                        col: result.targetCol!,
+                        row: result.targetRow!,
+                      },
+                      drop.modifiers,
+                    );
+
+                    // Legacy dual-write + dynamic mesh creation
+                    const itemDef = itemDatabase.getItem(drop.itemId);
+                    if (itemDef && itemDef.type === 'consumable') {
+                      // Write to legacy groundConsumables + create mesh
+                      const key = doorKey(result.targetCol!, result.targetRow!);
+                      gameState.groundConsumables.set(key, {
+                        id: drop.itemId,
+                        name: itemDef.name,
+                        consumableType: itemDef.subtype as 'health_potion' | 'torch_oil',
+                        value: itemDef.effect?.torchFuel ?? itemDef.stats.hp ?? 0,
+                      });
+                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                    } else if (itemDef) {
+                      // Write to legacy groundItems + create mesh
+                      const key = doorKey(result.targetCol!, result.targetRow!);
+                      // Map item type to legacy slot
+                      let slot: string = 'weapon';
+                      if (itemDef.type === 'armor') slot = itemDef.subtype;
+                      else if (itemDef.type === 'accessory') slot = itemDef.subtype === 'ring' ? 'ring1' : itemDef.subtype;
+                      gameState.groundItems.set(key, {
+                        id: drop.itemId,
+                        name: itemDef.name,
+                        slot: slot as any,
+                        atkBonus: itemDef.stats.atk ?? 0,
+                        defBonus: itemDef.stats.def ?? 0,
+                      });
+                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
                     }
                   }
                 }

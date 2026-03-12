@@ -1,5 +1,7 @@
 // Enemy type definitions and registry — pure data, no Three.js
 
+import type { DropsOverride } from '../core/lootTable';
+
 export type EnemyAIState = 'idle' | 'chase' | 'attack';
 
 export interface EnemyDef {
@@ -26,6 +28,7 @@ export interface EnemyInstance {
   blocksMovement: boolean;
   aiState: EnemyAIState;
   moveTimer: number;      // accumulates delta, resets on action
+  drops?: DropsOverride;  // per-entity override from dungeon JSON
 }
 
 export const ENEMY_DEFS: Record<string, EnemyDef> = {

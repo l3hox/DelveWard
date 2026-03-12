@@ -1,6 +1,7 @@
 // Pure combat logic — no Three.js
 
 import type { GameState } from './gameState';
+import type { DropsOverride } from './lootTable';
 import type { PlayerState } from './grid';
 import { getFacingCell, FACING_DELTA } from './grid';
 import type { WeaponSubtype } from './itemDatabase';
@@ -40,6 +41,7 @@ export interface CombatResult {
   targetCol?: number;
   targetRow?: number;
   enemyType?: string;
+  dropsOverride?: DropsOverride;  // NEW
 }
 
 export interface EnemyAttackResult {
@@ -144,6 +146,7 @@ export function playerAttack(
       targetCol: cell.col,
       targetRow: cell.row,
       enemyType: enemy.type,
+      dropsOverride: killed ? enemy.drops : undefined,
     });
   }
 

@@ -1,5 +1,6 @@
 import type { Entity } from './types';
 import type { Facing } from './grid';
+import type { DropsOverride } from './lootTable';
 import { FACING_DELTA } from './grid';
 import { createEnemyInstance, ENEMY_DEFS } from '../enemies/enemyTypes';
 import type { EnemyInstance } from '../enemies/enemyTypes';
@@ -153,6 +154,7 @@ export class GameState {
   level: number;
   attributePoints: number;  // unspent points to allocate
   playerName: string;
+  gold: number;
 
   constructor(entities: Entity[], grid?: string[], levelId: string = 'default') {
     this.doors = new Map();
@@ -180,6 +182,7 @@ export class GameState {
     this.level = 1;
     this.attributePoints = 0;
     this.playerName = 'Adventurer';
+    this.gold = 0;
 
     this.atk = 3;
     this.def = 1;
@@ -244,6 +247,9 @@ export class GameState {
         const enemyType = e.enemyType as string;
         if (ENEMY_DEFS[enemyType]) {
           const instance = createEnemyInstance(e.col, e.row, enemyType);
+          if (e.drops) {
+            instance.drops = e.drops as DropsOverride;
+          }
           this.enemies.set(doorKey(e.col, e.row), instance);
         }
       } else if (e.type === 'equipment') {
