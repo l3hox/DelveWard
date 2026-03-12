@@ -4,6 +4,43 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-12 — M1 Phase D: Loot & Drops
+
+Enemy death loot rolls, ground item spawning, and gold counter.
+
+**New modules:**
+- **`src/core/lootTable.ts`** — loot roll system: loads `public/data/loot-tables.json`, rolls XP, gold (min-max range), and item drops (per-quality-tier chance). `rollLoot(enemyType)` returns `LootResult` with XP, gold, and item IDs.
+
+**Modified modules:**
+- **`src/core/gameState.ts`** — `gold` field added to GameState.
+- **`src/core/combat.ts`** — enemy death triggers loot roll.
+- **`src/enemies/enemyTypes.ts`** — enemy types wired to loot table keys.
+- **`src/main.ts`** — enemy death → loot roll → spawn ground items at death cell, gold counter update.
+- **`src/rendering/itemRenderer.ts`** + **`consumableRenderer.ts`** — support spawning new items at runtime (not just level-load time).
+
+**Tests:** 407 new tests in `lootTable.test.ts`.
+
+---
+
+## 2026-03-12 — M1 Design & Data Foundation
+
+Data files and design documents for Milestone 1.
+
+**New files:**
+- **`planning/m1/DESIGN.md`** — full M1 design doc: scope, 6 open TBDs resolved, architecture, data model, item system, stats, XP/leveling, gold, loot tables, paper doll UI, implementation order.
+- **`planning/m1/ENEMIES.md`** — 9-enemy roster (rat/skeleton/orc + goblin/giant bat/spider/kobold/zombie/troll) with stats, behaviors, new mechanics (flee, erratic, regen).
+- **`public/data/items.json`** — central item database: 57 items (22 weapons, 20 armor, 10 accessories, 5 consumables).
+- **`public/data/loot-tables.json`** — per-enemy loot tables with XP, gold ranges, drop chances for all 9 enemies.
+- **`CHANGELOG.md`** — v0.0.9 entry covering all 8 pre-M1 phases.
+
+**Decisions:**
+- Versioning scheme: `0.milestone` (v0.1 = M1 done). Tagged `v0.0.9` on current HEAD.
+- Enemy quality tier: added `poor` (10%), rebalanced `common` to 50%.
+- Per-entity drops override schema added to DESIGN.md (individual entities can override their type's loot table).
+- Agile data model: design per milestone, refactor as needed (not upfront schema for everything).
+
+---
+
 ## 2026-03-12 — M1 Phase C: Equipment Expansion
 
 **New files:**
@@ -83,6 +120,102 @@ Added three particle effect systems for atmosphere.
 - **WaterDrips** — full drop lifecycle: slow formation on ceiling → gravity fall with stretch → expanding ring splash on floor. Spawns at random walkable cells near player, 10-30s interval per cell.
 
 **Type change:** `DungeonLevel` gains `dustMotes?: boolean` (default true) and `waterDrips?: boolean` (default false) for per-level control.
+
+Enabled `waterDrips` on dungeon3 "Dark Cellar" level.
+
+---
+
+## 2026-03-07 — Phase 8: Equipment, Consumables, Enemy Animations
+
+Equipment system, consumable items, backpack inventory, and enemy combat animations.
+
+**New modules:**
+- **`src/rendering/itemRenderer.ts`** — billboard sprites for ground equipment items (weapon/armor/ring icons).
+- **`src/rendering/consumableRenderer.ts`** — billboard sprites for consumables: red flask (health potion), yellow flask (torch oil).
+
+**Modified modules:**
+- **`src/core/gameState.ts`** — `EquipSlot` type, `EquipmentItem` interface, weapon/armor/ring equipment slots with ATK/DEF bonuses. `getEffectiveAtk()`/`getEffectiveDef()` replace raw stats in combat formula. `ConsumableItem` type with `health_potion` and `torch_oil` subtypes. Backpack array (max 8 slots). `enemyAttackPlayer()` reads def from gameState internally.
+- **`src/rendering/enemyRenderer.ts`** — Enemy hit shake: horizontal sin-based oscillation (0.3s, amplitude 0.25, decaying). Enemy attack lunge: forward-and-back toward player (triangle wave, 0.25s, 0.6 units).
+- **`src/hud/inventoryPanel.ts`** — shows equipped item indicators and backpack contents.
+- **`src/level/levelLoader.ts`** — entity validation for `equipment` and `consumable` types.
+- **`src/main.ts`** — ground equipment auto-pickup on step, backpack use via Digit1-8 keys, enemy animation wiring.
+- **`public/levels/dungeon1.json`** — added items: Rusty Sword, Iron Shield, Power Ring, health potions, torch oil.
+
+**Design decisions:**
+- Equipment auto-equips on pickup (oldschool feel, same as keys).
+- Consumables go to backpack, used via number keys 1-8.
+- Backpack persists across levels.
+- Enemy animations are visual-only (don't affect combat timing).
+
+**Tests:** 281 total (23 new).
+
+---
+
+## 2026-03-06 — Phase 7 Complete: Combat
+
+Floating damage numbers and sword swing animation complete Phase 7.
+
+**New modules:**
+- **`src/rendering/damageNumbers.ts`** — 3D billboard sprites with canvas-rendered white text + black outline. Float up and fade out over 0.7s from hit enemy position.
+- **`src/rendering/swordSwing.ts`** — pixelart sword drawn on HUD canvas, sweeps from lower-right to upper-left over 0.25s with easeOutQuad.
+
+**Wired into:** `main.ts` (game loop + F key handler) and `hudCanvas.ts`.
+
+**Tests:** 258 total, TypeScript compiles clean.
+
+---
+
+## 2026-03-06 — Phase 6 Complete + Phase 7 Combat Foundation
+
+Enemy system marked complete, combat system built.
+
+**New modules:**
+- **`src/core/combat.ts`** — pure combat logic: `calculateDamage()`, `playerAttack()`, `enemyAttackPlayer()`. Damage formula: `max(1, ATK - DEF + random(-1..+1))` — always deals at least 1.
+
+**Modified modules:**
+- **`src/core/gameState.ts`** — added `atk` (3), `def` (1), `attackCooldown` to GameState.
+- **`src/enemies/enemyTypes.ts`** — renamed `damage` → `atk`, added `def`: rat (2/0), skeleton (3/1), orc (5/2).
+- **`src/main.ts`** — F key attacks facing cell with 0.8s cooldown. Enemy AI attack actions call `enemyAttackPlayer()`.
+
+**Combat feedback:**
+- Enemy mesh flashes red on hit.
+- HUD red overlay on player damage.
+- Weapon slot cooldown fill overlay.
+
+**Death:** HP <= 0 triggers fade-to-black → full level restart (reset state, player start, full HP/torch, enemies respawn).
+
+**Design decisions:**
+- F key melee attack, real-time with cooldown (not turn-based).
+- `max(1, ...)` ensures every hit deals damage.
+- Death fully resets current level (no save/checkpoint).
+
+**Tests:** 258 total (10 new).
+
+---
+
+## 2026-03-05 — Phase 4 Complete: HUD Overlay
+
+Full HUD system as 2D canvas overlay on top of Three.js viewport.
+
+**New modules (`src/hud/`):**
+- **`hudCanvas.ts`** — 640x360 internal resolution canvas with `image-rendering: pixelated`, overlaid on Three.js viewport.
+- **`hudLayout.ts`** — layout constants for all HUD elements.
+- **`hudColors.ts`** — color palette constants.
+- **`pixelFont.ts`** — bitmap font renderer for HUD text.
+- **`compassRenderer.ts`** — compass rose (top-left): N/E/S/W letters, active direction highlighted gold.
+- **`minimapRenderer.ts`** — minimap (top-right): explored-cell top-down grid, player dot + facing line, centered on player.
+- **`healthBar.ts`** — health bar (bottom-left): heart icon, HP fill bar, low-HP pulse effect.
+- **`torchIndicator.ts`** — torch indicator (bottom-center-left): flame icon, fuel fill bar, low-fuel flicker effect.
+- **`inventoryPanel.ts`** — inventory panel (bottom-right): key count with icon, 3 equipment slots (W/A/R), 8 backpack slots.
+
+**Modified modules:**
+- **`src/core/gameState.ts`** — gains `hp`/`maxHp`, `torchFuel`/`maxTorchFuel`, `exploredCells` Set, `revealAround()` method.
+- **`src/rendering/player.ts`** — gains `setOnTurn()` callback for exploration on facing change.
+- **`src/main.ts`** — wires exploration into initial position, onMove, and onTurn callbacks. Removed old controls hint div.
+
+**Exploration logic:** `revealAround()` marks current cell + 4 adjacent + line-of-sight forward until wall.
+
+**Tests:** 187 total (20 new).
 
 ---
 
