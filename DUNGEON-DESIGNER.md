@@ -218,11 +218,17 @@ The target position must be a walkable cell on the target level. Typically, stai
 
 Available enemy types:
 
-| Type | HP | ATK | DEF | Aggro range | Move interval | XP |
-|------|---:|----:|----:|------------:|--------------:|---:|
-| `rat` | 4 | 2 | 0 | 3 | 0.8s | 10 |
-| `skeleton` | 8 | 3 | 1 | 4 | 1.5s | 25 |
-| `orc` | 15 | 5 | 2 | 5 | 2.0s | 50 |
+| Type | HP | ATK | DEF | Aggro range | Move interval | XP | Special |
+|------|---:|----:|----:|------------:|--------------:|---:|---------|
+| `rat` | 8 | 2 | 0 | 3 | 0.6s | 10 | — |
+| `giant_bat` | 6 | 1 | 0 | 5 | 0.4s | 8 | Erratic movement |
+| `goblin` | 10 | 2 | 0 | 4 | 0.5s | 12 | — |
+| `spider` | 14 | 3 | 0 | 4 | 0.6s | 18 | Poison tag (M2) |
+| `kobold` | 12 | 2 | 1 | 4 | 0.7s | 20 | Flees below 30% HP |
+| `skeleton` | 20 | 3 | 1 | 4 | 1.0s | 25 | — |
+| `zombie` | 50 | 3 | 1 | 3 | 1.6s | 30 | — |
+| `orc` | 40 | 5 | 2 | 5 | 1.4s | 50 | — |
+| `troll` | 80 | 5 | 2 | 5 | 1.2s | 120 | HP regen (+2/2s) |
 
 Enemies drop loot on death (XP, gold, and items from loot tables in `public/data/loot-tables.json`).
 
