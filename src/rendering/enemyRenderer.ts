@@ -6,6 +6,12 @@ export const SPRITE_SIZES: Record<string, number> = {
   rat: 1.2,
   skeleton: 2.0,
   orc: 2.0,
+  giant_bat: 1.4,
+  goblin: 1.6,
+  spider: 1.8,
+  kobold: 1.6,
+  zombie: 2.0,
+  troll: 2.4,
 };
 export const DEFAULT_SPRITE_SIZE = 1.2;
 
@@ -13,6 +19,12 @@ const SPRITE_PATHS: Record<string, string> = {
   rat: '/sprites/rat.png',
   skeleton: '/sprites/skeleton.png',
   orc: '/sprites/orc.png',
+  goblin: '/sprites/goblin.png',
+  giant_bat: '/sprites/giant_bat.png',
+  spider: '/sprites/spider.png',
+  kobold: '/sprites/kobold.png',
+  zombie: '/sprites/zombie.png',
+  troll: '/sprites/troll.png',
 };
 
 const loader = new THREE.TextureLoader();

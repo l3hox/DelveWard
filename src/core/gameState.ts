@@ -476,6 +476,10 @@ export class GameState {
     const enemy = this.getEnemy(col, row);
     if (!enemy) return false;
     enemy.hp -= amount;
+    // Pause troll regen on hit
+    if (enemy.regenPauseTimer !== undefined) {
+      enemy.regenPauseTimer = 3;
+    }
     if (enemy.hp <= 0) {
       this.enemies.delete(doorKey(col, row));
       return true; // killed

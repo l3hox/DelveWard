@@ -64,14 +64,14 @@ describe('GameState enemy support', () => {
   });
 
   it('damageEnemy reduces HP and returns false when alive', () => {
-    const gs = makeState([enemyEntity(1, 1, 'orc')]); // orc has 15 HP
+    const gs = makeState([enemyEntity(1, 1, 'orc')]); // orc has 40 HP
     const killed = gs.damageEnemy(1, 1, 5);
     expect(killed).toBe(false);
-    expect(gs.getEnemy(1, 1)!.hp).toBe(10);
+    expect(gs.getEnemy(1, 1)!.hp).toBe(35);
   });
 
   it('damageEnemy returns true on kill and removes from map', () => {
-    const gs = makeState([enemyEntity(1, 1, 'rat')]); // rat has 4 HP
+    const gs = makeState([enemyEntity(1, 1, 'rat')]); // rat has 8 HP
     const killed = gs.damageEnemy(1, 1, 10);
     expect(killed).toBe(true);
     expect(gs.isEnemyAt(1, 1)).toBe(false);
