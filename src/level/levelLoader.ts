@@ -220,15 +220,6 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.itemId !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] equipment must have a string itemId`);
       }
-      if (typeof e.name !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] equipment must have a string name`);
-      }
-      if (!['weapon', 'head', 'chest', 'legs', 'hands', 'feet', 'shield', 'ring1', 'ring2', 'amulet'].includes(e.slot as string)) {
-        throw new Error(`Level ${source}: entities[${i}] equipment slot must be one of: weapon, head, chest, legs, hands, feet, shield, ring1, ring2, amulet`);
-      }
-      if (typeof e.atkBonus !== 'number' || typeof e.defBonus !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] equipment must have numeric atkBonus and defBonus`);
-      }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] equipment must be on a walkable cell`);
       }
@@ -237,15 +228,6 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     if (e.type === 'consumable') {
       if (typeof e.itemId !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] consumable must have a string itemId`);
-      }
-      if (typeof e.name !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] consumable must have a string name`);
-      }
-      if (!['health_potion', 'torch_oil'].includes(e.consumableType as string)) {
-        throw new Error(`Level ${source}: entities[${i}] consumable must have consumableType health_potion or torch_oil`);
-      }
-      if (typeof e.value !== 'number' || (e.value as number) <= 0) {
-        throw new Error(`Level ${source}: entities[${i}] consumable must have a positive numeric value`);
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] consumable must be on a walkable cell`);

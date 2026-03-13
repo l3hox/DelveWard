@@ -206,6 +206,58 @@ The target position must be a walkable cell on the target level. Typically, stai
 
 **Verification**: Use the coordinate counting method above to confirm that `targetCol`/`targetRow` land on the expected cell in the target level's grid.
 
+**Enemy** (`type: "enemy"`) — placed on walkable cells. Enemies are hostile — they pursue the player and attack in melee range.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enemyType` | string | Yes | One of the defined enemy types (see table below) |
+
+```json
+{ "col": 7, "row": 3, "type": "enemy", "enemyType": "rat" }
+```
+
+Available enemy types:
+
+| Type | HP | ATK | DEF | Aggro range | Move interval | XP |
+|------|---:|----:|----:|------------:|--------------:|---:|
+| `rat` | 4 | 2 | 0 | 3 | 0.8s | 10 |
+| `skeleton` | 8 | 3 | 1 | 4 | 1.5s | 25 |
+| `orc` | 15 | 5 | 2 | 5 | 2.0s | 50 |
+
+Enemies drop loot on death (XP, gold, and items from loot tables in `public/data/loot-tables.json`).
+
+**Torch sconce** (`type: "torch_sconce"`) — placed on walkable cells. Wall-mounted light source with flame and ember particles.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `wall` | string | No | Which wall to mount on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
+
+```json
+{ "col": 2, "row": 1, "type": "torch_sconce", "wall": "N" }
+```
+
+**Equipment** (`type: "equipment"`) — placed on walkable cells. Auto-picked up when player steps on it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `itemId` | string | Yes | Must match an item `id` in `public/data/items.json` |
+
+```json
+{ "col": 3, "row": 3, "type": "equipment", "itemId": "sword_iron" }
+```
+
+Item properties (name, stats, slot, requirements) are defined in the item database, not in the level JSON. See "Item database" section below for available IDs.
+
+**Consumable** (`type: "consumable"`) — placed on walkable cells. Auto-picked up when player steps on it, goes to backpack.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `itemId` | string | Yes | Must match a consumable item `id` in `public/data/items.json` |
+
+```json
+{ "col": 7, "row": 7, "type": "consumable", "itemId": "health_potion_small" }
+```
+
 #### Door behavior summary
 
 | Door type | Open with Space | Close with Space | Visual cue |
@@ -392,6 +444,88 @@ Set these at the level object root:
 
 ---
 
+## Item database
+
+Equipment and consumable entities reference items by `itemId`. All item definitions live in `public/data/items.json`. The database defines item name, type, subtype, stats, quality, equip slot, and stat requirements.
+
+### Weapons (type: `weapon`)
+
+| itemId | Name | Subtype |
+|--------|------|---------|
+| `sword_rusty` | Rusty Sword | sword |
+| `sword_iron` | Iron Sword | sword |
+| `sword_steel` | Steel Sword | sword |
+| `sword_knights_blade` | Knight's Blade | sword |
+| `sword_flamebrand` | Flamebrand | sword |
+| `axe_hand` | Hand Axe | axe |
+| `axe_battle` | Battle Axe | axe |
+| `axe_war` | War Axe | axe |
+| `axe_bloodcleaver` | Bloodcleaver | axe |
+| `dagger_bent_knife` | Bent Knife | dagger |
+| `dagger_iron` | Iron Dagger | dagger |
+| `dagger_steel` | Steel Dagger | dagger |
+| `dagger_shadow_blade` | Shadow Blade | dagger |
+| `dagger_vipers_fang` | Viper's Fang | dagger |
+| `mace_iron` | Iron Mace | mace |
+| `mace_spiked` | Spiked Mace | mace |
+| `mace_warhammer` | Warhammer | mace |
+| `mace_bonecrusher` | Bonecrusher | mace |
+| `spear_wooden` | Wooden Spear | spear |
+| `spear_iron` | Iron Spear | spear |
+| `spear_steel_pike` | Steel Pike | spear |
+| `spear_soldiers_pike` | Soldier's Pike | spear |
+| `spear_serpent` | Serpent Spear | spear |
+
+### Armor (type: `armor`)
+
+| itemId | Name | Slot |
+|--------|------|------|
+| `armor_leather_cap` | Leather Cap | head |
+| `armor_iron_helm` | Iron Helm | head |
+| `armor_steel_helm` | Steel Helm | head |
+| `armor_leather_vest` | Leather Vest | chest |
+| `armor_chainmail` | Chainmail | chest |
+| `armor_plate` | Plate Armor | chest |
+| `armor_dragonscale_vest` | Dragonscale Vest | chest |
+| `armor_leather_greaves` | Leather Greaves | legs |
+| `armor_iron_greaves` | Iron Greaves | legs |
+| `armor_steel_greaves` | Steel Greaves | legs |
+| `armor_leather_gloves` | Leather Gloves | hands |
+| `armor_iron_gauntlets` | Iron Gauntlets | hands |
+| `armor_steel_gauntlets` | Steel Gauntlets | hands |
+| `armor_leather_boots` | Leather Boots | feet |
+| `armor_iron_sabatons` | Iron Sabatons | feet |
+| `armor_steel_sabatons` | Steel Sabatons | feet |
+| `armor_cracked_shield` | Cracked Shield | shield |
+| `armor_wooden_buckler` | Wooden Buckler | shield |
+| `armor_iron_kite_shield` | Iron Kite Shield | shield |
+| `armor_tower_shield` | Tower Shield | shield |
+
+### Accessories (type: `accessory`)
+
+| itemId | Name | Slot |
+|--------|------|------|
+| `ring_of_power` | Ring of Power | ring |
+| `ring_of_the_fox` | Ring of the Fox | ring |
+| `ring_of_iron_skin` | Ring of Iron Skin | ring |
+| `ring_of_vitality` | Ring of Vitality | ring |
+| `ring_of_the_bear` | Ring of the Bear | ring |
+| `ring_of_shadows` | Ring of Shadows | ring |
+| `amulet_of_warding` | Amulet of Warding | amulet |
+| `amulet_of_fortitude` | Amulet of Fortitude | amulet |
+| `amulet_of_the_warrior` | Amulet of the Warrior | amulet |
+
+### Consumables (type: `consumable`)
+
+| itemId | Name | Effect |
+|--------|------|--------|
+| `health_potion_small` | Small Health Potion | Restores 15 HP |
+| `health_potion_medium` | Medium Health Potion | Restores 30 HP |
+| `health_potion_large` | Large Health Potion | Restores 50 HP |
+| `torch_oil` | Torch Oil | Restores 50 torch fuel |
+
+---
+
 ## Validation rules
 
 The level loader validates all of the above. Levels that fail validation will not load. Key rules:
@@ -404,6 +538,9 @@ The level loader validates all of the above. Levels that fail validation will no
 - All texture names must be from the available texture lists above
 - Area coordinates must be in bounds with `from` <= `to`
 - Areas must specify at least one texture
+- Enemy `enemyType` must be a known type (rat, skeleton, orc)
+- Equipment and consumable `itemId` must be a string (validated at load; the item database is checked at runtime)
+- Enemies, equipment, consumables, and torch sconces must be on walkable cells
 
 ---
 
@@ -427,6 +564,33 @@ The level loader validates all of the above. Levels that fail validation will no
 ```
 
 All cells use default textures (stone walls, stone tile floor, dark rock ceiling).
+
+### Level with enemies, items, and torches
+
+```json
+{
+  "name": "Guard Room",
+  "grid": [
+    "#########",
+    "#.......#",
+    "#.......#",
+    "#...D...#",
+    "#.......#",
+    "#.......#",
+    "#########"
+  ],
+  "playerStart": { "col": 1, "row": 5, "facing": "N" },
+  "entities": [
+    { "col": 4, "row": 3, "type": "door" },
+    { "col": 3, "row": 2, "type": "enemy", "enemyType": "skeleton" },
+    { "col": 6, "row": 4, "type": "enemy", "enemyType": "rat" },
+    { "col": 2, "row": 1, "type": "torch_sconce", "wall": "N" },
+    { "col": 6, "row": 1, "type": "torch_sconce", "wall": "N" },
+    { "col": 1, "row": 1, "type": "equipment", "itemId": "sword_iron" },
+    { "col": 7, "row": 5, "type": "consumable", "itemId": "health_potion_small" }
+  ]
+}
+```
 
 ### Level with defaults
 
