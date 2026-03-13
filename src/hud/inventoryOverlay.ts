@@ -4,6 +4,7 @@ import { drawPixelText, measurePixelText } from './hudFont';
 import { itemDatabase } from '../core/itemDatabase';
 import type { GameState } from '../core/gameState';
 import type { EquipSlot } from '../core/entities';
+import { drawItemTooltip } from './itemTooltip';
 
 type InventorySection = 'equipment' | 'backpack';
 
@@ -355,17 +356,30 @@ export class InventoryOverlay {
       }
     }
 
-    // --- Item name tooltip ---
+    // --- Item tooltip ---
     const hoveredEntity = _getCursorEntity(this.cursor, gameState);
-    if (hoveredEntity && itemDatabase.isLoaded()) {
-      const def = itemDatabase.getItem(hoveredEntity.itemId);
-      if (def) {
-        const nameY = bpStartY + 3 * (SLOT_SIZE + SLOT_GAP) + 8;
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = HUD_COLORS.textPrimary;
-        ctx.fillText(def.name, x + Math.floor(w / 2), nameY);
+    if (hoveredEntity) {
+      // Compute slot screen position so the tooltip anchors to the right of the cursor cell.
+      let slotScreenX: number;
+      let slotScreenY: number;
+
+      if (this.cursor.section === 'equipment') {
+        const col = this.cursor.index % EQUIP_COLS;
+        const row = Math.floor(this.cursor.index / EQUIP_COLS);
+        slotScreenX = equipStartX + col * (SLOT_SIZE + SLOT_GAP);
+        slotScreenY = equipStartY + row * (SLOT_SIZE + SLOT_GAP);
+      } else {
+        const col = this.cursor.index % BACKPACK_COLS;
+        const row = Math.floor(this.cursor.index / BACKPACK_COLS);
+        slotScreenX = bpStartX + col * (SLOT_SIZE + SLOT_GAP);
+        slotScreenY = bpStartY + row * (SLOT_SIZE + SLOT_GAP);
       }
+
+      // Position tooltip 4px to the right of the slot; drawItemTooltip handles right-edge flip.
+      const tooltipX = slotScreenX + SLOT_SIZE + 4;
+      const tooltipY = slotScreenY;
+
+      drawItemTooltip(ctx, hoveredEntity, gameState, tooltipX, tooltipY);
     }
 
     // --- Footer ---
