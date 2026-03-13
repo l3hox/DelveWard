@@ -44,10 +44,17 @@ export function drawInventoryPanel(
   ctx.fillStyle = HUD_COLORS.panelBg;
   ctx.fillRect(x, y, w, h);
 
-  // Key count (top row)
+  // Key count + gold (top row)
   const keyCount = gameState.inventory.size;
   drawKeyIcon(ctx, x + 6, y + 6, HUD_COLORS.keyIcon);
   drawPixelText(ctx, `x${keyCount}`, x + 20, y + 8, HUD_COLORS.textPrimary, 2);
+
+  // Gold — right side of top row
+  ctx.fillStyle = '#DAA520';
+  ctx.beginPath();
+  ctx.arc(x + w - 50, y + 11, 4, 0, Math.PI * 2);
+  ctx.fill();
+  drawPixelText(ctx, String(gameState.gold) + 'G', x + w - 42, y + 8, '#DAA520', 2);
 
   // Attack cooldown ratio — used to overlay the weapon slot.
   const attackCooldown = gameState.attackCooldown;
@@ -125,14 +132,6 @@ export function drawInventoryPanel(
       }
     }
   }
-
-  // Gold display — below the backpack grid
-  const goldY = backpackY + 3 * (SLOT_SIZE + SLOT_GAP) + 4;
-  ctx.fillStyle = '#DAA520';
-  ctx.beginPath();
-  ctx.arc(x + 12, goldY + 5, 4, 0, Math.PI * 2);
-  ctx.fill();
-  drawPixelText(ctx, String(gameState.gold) + 'G', x + 22, goldY + 1, '#DAA520', 2);
 
   // Border
   ctx.strokeStyle = HUD_COLORS.panelBorder;

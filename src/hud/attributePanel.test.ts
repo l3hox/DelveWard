@@ -9,56 +9,95 @@ function makeGameState(): GameState {
 
 function makeGameStateWithPoints(points: number): GameState {
   const gs = makeGameState();
-  // Inject points directly — allocatePoint guards against <= 0
   gs.attributePoints = points;
   return gs;
 }
 
 // ---------------------------------------------------------------------------
-// Toggle / isOpen
+// open / isOpen / tryClose
 // ---------------------------------------------------------------------------
 
-describe('AttributePanel.toggle', () => {
+describe('AttributePanel open/close', () => {
   it('starts closed', () => {
     const panel = new AttributePanel();
     expect(panel.isOpen()).toBe(false);
   });
 
-  it('toggle opens the panel', () => {
+  it('open() opens the panel', () => {
     const panel = new AttributePanel();
-    panel.toggle();
+    panel.open(makeGameState());
     expect(panel.isOpen()).toBe(true);
   });
 
-  it('toggle twice closes the panel', () => {
+  it('opens in stats mode when no points available', () => {
     const panel = new AttributePanel();
-    panel.toggle();
-    panel.toggle();
+    panel.open(makeGameState());
+    expect(panel.mode).toBe('stats');
+  });
+
+  it('opens in levelup mode when points are available', () => {
+    const panel = new AttributePanel();
+    panel.open(makeGameStateWithPoints(3));
+    expect(panel.mode).toBe('levelup');
+  });
+
+  it('tryClose succeeds in stats mode', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameState();
+    panel.open(gs);
+    expect(panel.tryClose(gs)).toBe(true);
+    expect(panel.isOpen()).toBe(false);
+  });
+
+  it('tryClose fails in levelup mode with unspent points', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameStateWithPoints(3);
+    panel.open(gs);
+    expect(panel.tryClose(gs)).toBe(false);
+    expect(panel.isOpen()).toBe(true);
+  });
+
+  it('tryClose succeeds in levelup mode when all points are spent', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameStateWithPoints(3);
+    panel.open(gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    expect(panel.tryClose(gs)).toBe(true);
     expect(panel.isOpen()).toBe(false);
   });
 
   it('resets selected stat to 0 on open', () => {
     const panel = new AttributePanel();
-    panel.toggle(); // open
-    const gs = makeGameStateWithPoints(3);
-    // Navigate down twice to select stat index 2
+    const gs = makeGameStateWithPoints(6);
+    panel.open(gs);
     panel.handleKey('ArrowDown', gs);
     panel.handleKey('ArrowDown', gs);
-    panel.toggle(); // close
-    panel.toggle(); // re-open — should reset selection
-    // Verify by pressing ArrowUp (which wraps at 0 -> 3), then checking allocation
-    // goes to stat 3 (wis), not stat 2
-    gs.attributePoints = 3;
-    const wisBefore = gs.wis;
-    // Wrap from 0 -> 3
-    panel.handleKey('ArrowUp', gs);
     panel.handleKey('ArrowRight', gs);
-    expect(gs.wis).toBe(wisBefore + 1);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+
+    // Re-open — should reset to first stat
+    gs.attributePoints = 3;
+    panel.open(gs);
+    const strBefore = gs.str;
+    panel.handleKey('ArrowRight', gs);
+    // Verify first stat (STR) was incremented, not VIT
+    // Close to apply
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 3);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Navigation — ArrowUp / ArrowDown wraps around 4 stats
+// Navigation
 // ---------------------------------------------------------------------------
 
 describe('AttributePanel navigation', () => {
@@ -67,46 +106,36 @@ describe('AttributePanel navigation', () => {
 
   beforeEach(() => {
     panel = new AttributePanel();
-    panel.toggle();
     gs = makeGameStateWithPoints(10);
+    panel.open(gs);
   });
 
-  it('ArrowDown advances selection', () => {
-    // Start at STR (0). Move to DEX (1), then allocate to verify.
+  it('ArrowDown advances selection (allocate to DEX to verify)', () => {
     panel.handleKey('ArrowDown', gs);
     const dexBefore = gs.dex;
-    panel.handleKey('ArrowRight', gs);
-    expect(gs.dex).toBe(dexBefore + 1);
+    // Allocate all 10 to DEX and close
+    for (let i = 0; i < 10; i++) panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.dex).toBe(dexBefore + 10);
   });
 
   it('ArrowDown wraps from last stat back to first', () => {
-    // Navigate to stat index 3 (WIS)
     panel.handleKey('ArrowDown', gs);
     panel.handleKey('ArrowDown', gs);
     panel.handleKey('ArrowDown', gs);
-    // One more down wraps back to index 0 (STR)
-    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowDown', gs); // wraps to STR
     const strBefore = gs.str;
-    panel.handleKey('ArrowRight', gs);
-    expect(gs.str).toBe(strBefore + 1);
+    for (let i = 0; i < 10; i++) panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 10);
   });
 
   it('ArrowUp wraps from first stat to last', () => {
-    // At index 0 (STR). ArrowUp wraps to index 3 (WIS).
-    panel.handleKey('ArrowUp', gs);
+    panel.handleKey('ArrowUp', gs); // wraps to WIS
     const wisBefore = gs.wis;
-    panel.handleKey('ArrowRight', gs);
-    expect(gs.wis).toBe(wisBefore + 1);
-  });
-
-  it('ArrowUp navigates backwards', () => {
-    // Go to index 2 (VIT), then ArrowUp -> index 1 (DEX)
-    panel.handleKey('ArrowDown', gs);
-    panel.handleKey('ArrowDown', gs);
-    panel.handleKey('ArrowUp', gs);
-    const dexBefore = gs.dex;
-    panel.handleKey('ArrowRight', gs);
-    expect(gs.dex).toBe(dexBefore + 1);
+    for (let i = 0; i < 10; i++) panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.wis).toBe(wisBefore + 10);
   });
 
   it('navigation keys return true (consumed)', () => {
@@ -116,7 +145,7 @@ describe('AttributePanel navigation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Allocation — ArrowRight / Enter
+// Allocation — ArrowRight / Enter add, ArrowLeft removes
 // ---------------------------------------------------------------------------
 
 describe('AttributePanel allocation', () => {
@@ -124,85 +153,190 @@ describe('AttributePanel allocation', () => {
 
   beforeEach(() => {
     panel = new AttributePanel();
-    panel.toggle();
   });
 
-  it('ArrowRight allocates a point to the selected stat when points available', () => {
+  it('ArrowRight adds a pending point', () => {
     const gs = makeGameStateWithPoints(3);
     const strBefore = gs.str;
+    panel.open(gs);
     panel.handleKey('ArrowRight', gs);
-    expect(gs.str).toBe(strBefore + 1);
-    expect(gs.attributePoints).toBe(2);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 3);
+    expect(gs.attributePoints).toBe(0);
   });
 
-  it('Enter allocates a point to the selected stat when points available', () => {
+  it('Enter adds a pending point', () => {
     const gs = makeGameStateWithPoints(2);
     const strBefore = gs.str;
+    panel.open(gs);
     panel.handleKey('Enter', gs);
-    expect(gs.str).toBe(strBefore + 1);
-    expect(gs.attributePoints).toBe(1);
+    panel.handleKey('Enter', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 2);
   });
 
-  it('allocates to the currently selected stat', () => {
-    const gs = makeGameStateWithPoints(5);
-    // Move to VIT (index 2)
-    panel.handleKey('ArrowDown', gs);
-    panel.handleKey('ArrowDown', gs);
-    const vitBefore = gs.vit;
+  it('ArrowLeft removes a pending point', () => {
+    const gs = makeGameStateWithPoints(3);
+    const strBefore = gs.str;
+    panel.open(gs);
+    // Add 2 to STR, remove 1, add 1 back → net +2 to STR
     panel.handleKey('ArrowRight', gs);
-    expect(gs.vit).toBe(vitBefore + 1);
-    // STR and DEX should be unchanged
-    expect(gs.str).toBe(5);
-    expect(gs.dex).toBe(5);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowLeft', gs);
+    // Move to DEX and add 1
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowRight', gs);
+    // Move to VIT and add 1
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 1);
+  });
+
+  it('ArrowLeft cannot go below zero pending (baseline is preserved)', () => {
+    const gs = makeGameStateWithPoints(3);
+    const strBefore = gs.str;
+    panel.open(gs);
+    panel.handleKey('ArrowLeft', gs); // no pending to remove
+    // Allocate all 3 to STR
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 3);
+  });
+
+  it('cannot add more points than remaining', () => {
+    const gs = makeGameStateWithPoints(2);
+    const strBefore = gs.str;
+    panel.open(gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs); // should do nothing — no points left
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore + 2);
+  });
+
+  it('does not modify gameState stats until tryClose', () => {
+    const gs = makeGameStateWithPoints(3);
+    const strBefore = gs.str;
+    panel.open(gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    // Stats unchanged while panel is open
+    expect(gs.str).toBe(strBefore);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    // Now applied
+    expect(gs.str).toBe(strBefore + 3);
+  });
+
+  it('spreads points across multiple stats', () => {
+    const gs = makeGameStateWithPoints(4);
+    panel.open(gs);
+    panel.handleKey('ArrowRight', gs);            // +1 STR
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowRight', gs);            // +1 DEX
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowRight', gs);            // +1 VIT
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowRight', gs);            // +1 WIS
+    const [strB, dexB, vitB, wisB] = [gs.str, gs.dex, gs.vit, gs.wis];
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strB + 1);
+    expect(gs.dex).toBe(dexB + 1);
+    expect(gs.vit).toBe(vitB + 1);
+    expect(gs.wis).toBe(wisB + 1);
   });
 
   it('allocation keys return true (consumed)', () => {
     const gs = makeGameStateWithPoints(3);
+    panel.open(gs);
     expect(panel.handleKey('ArrowRight', gs)).toBe(true);
+    expect(panel.handleKey('ArrowLeft', gs)).toBe(true);
     expect(panel.handleKey('Enter', gs)).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Disabled — no allocation when attributePoints is 0
+// Stats mode — read-only
 // ---------------------------------------------------------------------------
 
-describe('AttributePanel allocation when no points available', () => {
-  let panel: AttributePanel;
-
-  beforeEach(() => {
-    panel = new AttributePanel();
-    panel.toggle();
+describe('AttributePanel stats mode', () => {
+  it('ArrowRight does nothing in stats mode', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameState();
+    const strBefore = gs.str;
+    panel.open(gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+    expect(gs.str).toBe(strBefore);
   });
 
-  it('does not change stat when no points remain', () => {
-    const gs = makeGameState(); // attributePoints starts at 0
-    const strBefore = gs.str;
+  it('ArrowLeft does nothing in stats mode', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameState();
+    panel.open(gs);
+    expect(panel.handleKey('ArrowLeft', gs)).toBe(true);
+    // No crash, no state change
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VIT allocation recalculates maxHp
+// ---------------------------------------------------------------------------
+
+describe('AttributePanel VIT allocation', () => {
+  it('recalculates maxHp on close when VIT was increased', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameStateWithPoints(3);
+    const maxHpBefore = gs.maxHp;
+    gs.hp = gs.maxHp; // at full HP
+
+    panel.open(gs);
+    // Move to VIT (index 2)
+    panel.handleKey('ArrowDown', gs);
+    panel.handleKey('ArrowDown', gs);
     panel.handleKey('ArrowRight', gs);
-    expect(gs.str).toBe(strBefore);
+    panel.handleKey('ArrowRight', gs);
+    panel.handleKey('ArrowRight', gs);
+    panel.tryClose(gs);
+
+    expect(gs.maxHp).toBeGreaterThan(maxHpBefore);
+    expect(gs.hp).toBe(gs.maxHp); // was at full, should stay at full
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Point accumulation (multi-level)
+// ---------------------------------------------------------------------------
+
+describe('AttributePanel point accumulation', () => {
+  it('handles 6 accumulated points (2 level-ups)', () => {
+    const panel = new AttributePanel();
+    const gs = makeGameStateWithPoints(6);
+    panel.open(gs);
+
+    // Must allocate all 6
+    expect(panel.tryClose(gs)).toBe(false);
+
+    for (let i = 0; i < 6; i++) panel.handleKey('ArrowRight', gs);
+    expect(panel.tryClose(gs)).toBe(true);
     expect(gs.attributePoints).toBe(0);
   });
-
-  it('still returns true for ArrowRight (key was consumed by panel)', () => {
-    const gs = makeGameState();
-    expect(panel.handleKey('ArrowRight', gs)).toBe(true);
-  });
-
-  it('still returns true for Enter (key was consumed by panel)', () => {
-    const gs = makeGameState();
-    expect(panel.handleKey('Enter', gs)).toBe(true);
-  });
 });
 
 // ---------------------------------------------------------------------------
-// Unknown keys return false (not consumed)
+// Unknown keys
 // ---------------------------------------------------------------------------
 
 describe('AttributePanel unknown keys', () => {
   it('returns false for unrecognised key codes', () => {
     const panel = new AttributePanel();
-    panel.toggle();
     const gs = makeGameState();
+    panel.open(gs);
     expect(panel.handleKey('KeyZ', gs)).toBe(false);
     expect(panel.handleKey('Space', gs)).toBe(false);
     expect(panel.handleKey('Escape', gs)).toBe(false);

@@ -25,7 +25,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Phase B: Stats & leveling
 - [x] Phase C: Equipment expansion (weapon subtypes, item requirements, effective stats)
 - [x] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
-- [ ] Phase E: UI (enemy health bars, paper doll, tooltips, level-up popup)
+- [x] Phase E: UI (enemy health bars, inventory overlay, tooltips, attribute panel, legacy cleanup)
 - [ ] Phase F: Content (M1 test dungeon — 3 levels)
 
 ---

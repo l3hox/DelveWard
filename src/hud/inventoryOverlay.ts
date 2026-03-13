@@ -147,7 +147,12 @@ export class InventoryOverlay {
 
   private _moveUp(): void {
     if (this.cursor.section === 'equipment') {
-      // Already at top — no movement
+      const row = Math.floor(this.cursor.index / EQUIP_COLS);
+      const col = this.cursor.index % EQUIP_COLS;
+      if (row > 0) {
+        this.cursor = { section: 'equipment', index: col };
+      }
+      // Already at top row — no movement
       return;
     }
     // Backpack section

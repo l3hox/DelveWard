@@ -1,10 +1,11 @@
-import { HUD_WIDTH, HUD_HEIGHT } from './hudLayout';
+import { HUD_WIDTH, HUD_HEIGHT, XP_BAR } from './hudLayout';
 import { drawCompass } from './compassRose';
 import { drawHealthBar } from './healthBar';
 import { drawTorchIndicator } from './torchIndicator';
 import { drawMinimap } from './minimapRenderer';
 import { drawInventoryPanel } from './inventoryPanel';
 import { drawXpBar } from './xpBar';
+import { drawPixelText, measurePixelText } from './hudFont';
 import { StatsPanel } from './statsPanel';
 import { InventoryOverlay } from './inventoryOverlay';
 import { AttributePanel } from './attributePanel';
@@ -104,6 +105,15 @@ export class HudOverlay {
     const xpFloor = gameState.xpForLevel(lvl - 1);
     const xpNext  = gameState.xpForLevel(lvl);
     drawXpBar(this.ctx, gameState.xp, lvl, xpFloor, xpNext, atCap);
+
+    // "Press 'L' to level up" hint above XP bar
+    if (gameState.attributePoints > 0) {
+      const hint = "PRESS 'L' TO LEVEL UP";
+      const hintW = measurePixelText(hint, 2);
+      const hintX = XP_BAR.x + Math.floor((XP_BAR.w - hintW) / 2);
+      const hintY = XP_BAR.y - 12;
+      drawPixelText(this.ctx, hint, hintX, hintY, '#e8c84a', 2);
+    }
 
     // HUD message (e.g., equip denial)
     if (this.messageTimer > 0) {

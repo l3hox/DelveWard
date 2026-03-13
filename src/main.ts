@@ -11,7 +11,7 @@ import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
-import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
+import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, SPRITE_SIZES, DEFAULT_SPRITE_SIZE } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
 import { loadLootTables, rollLoot } from './core/lootTable';
@@ -142,7 +142,10 @@ function buildLevelScene(
   const healthBarManager = new EnemyHealthBarManager();
   for (const [key, enemy] of gameState.enemies) {
     const mesh = enemyMeshes.meshMap.get(key);
-    if (mesh) healthBarManager.create(key, mesh, enemy.maxHp);
+    if (mesh) {
+      const spriteHeight = SPRITE_SIZES[enemy.type] ?? DEFAULT_SPRITE_SIZE;
+      healthBarManager.create(key, mesh, enemy.maxHp, spriteHeight);
+    }
   }
   scene.add(healthBarManager.getGroup());
 
@@ -524,12 +527,11 @@ async function init(): Promise<void> {
       return;
     }
 
-    // Attribute panel routing — Tab closes, other keys are consumed by the panel
+    // Attribute panel routing — L closes (with tryClose guard), other keys consumed by panel
     const attributePanel = hud.getAttributePanel();
     if (attributePanel.isOpen()) {
-      if (e.code === 'Tab') {
-        e.preventDefault();
-        attributePanel.toggle();
+      if (e.code === 'KeyL') {
+        attributePanel.tryClose(gameState);
         return;
       }
       attributePanel.handleKey(e.code, gameState);
@@ -656,22 +658,20 @@ async function init(): Promise<void> {
           }
         }
         break;
-      case 'Tab':
-        e.preventDefault(); // prevent browser tab focus
-        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
-        if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
-        hud.getAttributePanel().toggle();
-        break;
       case 'KeyT':
         hud.getStatsPanel().toggle();
         break;
       case 'KeyI':
-        // Close stats panel and attribute panel if open, then open inventory overlay
+        // Close stats panel if open, then open inventory overlay
         if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
-        if (hud.getAttributePanel().isOpen()) hud.getAttributePanel().toggle();
         hud.getInventoryOverlay().toggle();
         break;
       case 'KeyL':
+        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
+        hud.getAttributePanel().open(gameState);
+        break;
+      case 'Backquote':
         debugFullbright = !debugFullbright;
         if (debugFullbright) {
           scene.add(debugLight);
@@ -750,6 +750,7 @@ async function init(): Promise<void> {
           const newKey = doorKey(action.toCol, action.toRow);
           updateEnemyMeshPosition(ls.enemyMeshes.meshMap, action.enemyKey, action.toCol, action.toRow);
           ls.enemyAnimator.moveTo(action.enemyKey, action.toCol, action.toRow, newKey);
+          ls.healthBarManager.rekey(action.enemyKey, newKey);
         } else if (action.type === 'attack') {
           const enemy = gameState.enemies.get(action.enemyKey);
           if (enemy) {
