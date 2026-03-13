@@ -116,29 +116,23 @@ export function drawInventoryPanel(
       if (slotIndex < backpackItems.length) {
         const entity = backpackItems[slotIndex];
         let color = '#888';
-        if (itemDatabase.isLoaded()) {
-          const def = itemDatabase.getItem(entity.itemId);
-          if (def?.type === 'consumable') {
-            color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
-          }
-        } else {
-          // Legacy fallback: look up legacy backpack by index position.
-          const legacyItem = gameState.backpack[slotIndex];
-          if (legacyItem) {
-            color = CONSUMABLE_COLORS[legacyItem.consumableType] ?? '#888';
-          }
+        const def = itemDatabase.getItem(entity.itemId);
+        if (def?.type === 'consumable') {
+          color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
         }
-        ctx.fillStyle = color;
-        ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-      } else if (slotIndex < gameState.backpack.length) {
-        // Legacy-only items not yet in registry (edge case during transition).
-        const legacyItem = gameState.backpack[slotIndex];
-        const color = CONSUMABLE_COLORS[legacyItem.consumableType] ?? '#888';
         ctx.fillStyle = color;
         ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
       }
     }
   }
+
+  // Gold display — below the backpack grid
+  const goldY = backpackY + 3 * (SLOT_SIZE + SLOT_GAP) + 4;
+  ctx.fillStyle = '#DAA520';
+  ctx.beginPath();
+  ctx.arc(x + 12, goldY + 5, 4, 0, Math.PI * 2);
+  ctx.fill();
+  drawPixelText(ctx, String(gameState.gold) + 'G', x + 22, goldY + 1, '#DAA520', 2);
 
   // Border
   ctx.strokeStyle = HUD_COLORS.panelBorder;

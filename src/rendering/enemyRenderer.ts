@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
 
-const SPRITE_SIZES: Record<string, number> = {
+export const SPRITE_SIZES: Record<string, number> = {
   rat: 1.2,
   skeleton: 2.0,
   orc: 2.0,
 };
-const DEFAULT_SPRITE_SIZE = 1.2;
+export const DEFAULT_SPRITE_SIZE = 1.2;
 
 const SPRITE_PATHS: Record<string, string> = {
   rat: '/sprites/rat.png',

@@ -6,6 +6,8 @@ import { drawMinimap } from './minimapRenderer';
 import { drawInventoryPanel } from './inventoryPanel';
 import { drawXpBar } from './xpBar';
 import { StatsPanel } from './statsPanel';
+import { InventoryOverlay } from './inventoryOverlay';
+import { AttributePanel } from './attributePanel';
 import type { LevelUpNotification } from './levelUpNotification';
 import type { GameState } from '../core/gameState';
 import type { PlayerState } from '../core/grid';
@@ -20,6 +22,8 @@ export class HudOverlay {
   private messageText: string = '';
   private messageTimer: number = 0;
   private statsPanel = new StatsPanel();
+  private inventoryOverlay = new InventoryOverlay();
+  private attributePanel = new AttributePanel();
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -50,6 +54,14 @@ export class HudOverlay {
 
   getStatsPanel(): StatsPanel {
     return this.statsPanel;
+  }
+
+  getInventoryOverlay(): InventoryOverlay {
+    return this.inventoryOverlay;
+  }
+
+  getAttributePanel(): AttributePanel {
+    return this.attributePanel;
   }
 
   /** Show a temporary text message centered on screen. */
@@ -111,6 +123,16 @@ export class HudOverlay {
     // Level-up notification (drawn last so it appears on top)
     if (levelUpNotification?.isActive()) {
       levelUpNotification.draw(this.ctx);
+    }
+
+    // Inventory overlay (drawn above normal HUD, below other overlays)
+    if (this.inventoryOverlay.isOpen()) {
+      this.inventoryOverlay.draw(this.ctx, gameState);
+    }
+
+    // Attribute panel overlay
+    if (this.attributePanel.isOpen()) {
+      this.attributePanel.draw(this.ctx, gameState);
     }
 
     // Stats panel overlay (drawn on top of everything)

@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GameState } from './gameState';
 import type { Entity } from './types';
+
+vi.mock('./itemDatabase', () => ({
+  itemDatabase: {
+    isLoaded: () => true,
+    getItem: (id: string) => {
+      const items: Record<string, object> = {
+        hp1:   { id: 'hp1',   name: 'Potion', type: 'consumable', subtype: 'health_potion', stats: { hp: 5 },  requirements: {}, effect: {} },
+        oil1:  { id: 'oil1',  name: 'Oil',    type: 'consumable', subtype: 'torch_oil',     stats: {},         requirements: {}, effect: { torchFuel: 30 } },
+        sword: { id: 'sword', name: 'Sword',  type: 'weapon',     subtype: 'sword',          stats: { atk: 2 }, requirements: {}, modifiers: [] },
+        ring:  { id: 'ring',  name: 'Ring',   type: 'accessory',  subtype: 'ring',           stats: { atk: 1, def: 1 }, requirements: {}, modifiers: [] },
+      };
+      return (items as Record<string, unknown>)[id];
+    },
+    getItemsByType: () => [],
+  },
+}));
 
 function doorEntity(
   col: number,
@@ -728,49 +744,16 @@ describe('GameState', () => {
   // --- Equipment ---
 
   describe('equipment', () => {
-    it('getEffectiveAtk returns base atk + STR bonus with no equipment', () => {
+    it('getEffectiveAtk returns STR bonus with no equipment (DB loaded, no items)', () => {
       const gs = new GameState([]);
-      // atk = this.atk(3) + floor(STR(5)/2) = 3 + 2 = 5
-      expect(gs.getEffectiveAtk()).toBe(5);
+      // atk = 0 (no weapon) + floor(STR(5)/2) = 2
+      expect(gs.getEffectiveAtk()).toBe(2);
     });
 
-    it('getEffectiveDef returns base def + VIT bonus with no equipment', () => {
+    it('getEffectiveDef returns VIT bonus with no equipment', () => {
       const gs = new GameState([]);
-      // def = this.def(1) + floor(VIT(5)/4) = 1 + 1 = 2
-      expect(gs.getEffectiveDef()).toBe(2);
-    });
-
-    it('equipItem equips to correct slot', () => {
-      const gs = new GameState([]);
-      const sword = { id: 'sword', name: 'Sword', slot: 'weapon' as const, atkBonus: 2, defBonus: 0 };
-      const displaced = gs.equipItem(sword);
-      expect(displaced).toBeNull();
-      expect(gs.equipment.get('weapon')).toBe(sword);
-    });
-
-    it('equipItem returns displaced item', () => {
-      const gs = new GameState([]);
-      const sword1 = { id: 'sword1', name: 'Sword 1', slot: 'weapon' as const, atkBonus: 2, defBonus: 0 };
-      const sword2 = { id: 'sword2', name: 'Sword 2', slot: 'weapon' as const, atkBonus: 5, defBonus: 0 };
-      gs.equipItem(sword1);
-      const displaced = gs.equipItem(sword2);
-      expect(displaced).toBe(sword1);
-      expect(gs.equipment.get('weapon')).toBe(sword2);
-    });
-
-    it('getEffectiveAtk includes weapon bonus and STR bonus', () => {
-      const gs = new GameState([]);
-      gs.equipItem({ id: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 3, defBonus: 0 });
-      // atk = this.atk(3) + floor(STR(5)/2) + atkBonus(3) = 3 + 2 + 3 = 8
-      expect(gs.getEffectiveAtk()).toBe(8);
-    });
-
-    it('getEffectiveDef includes armor, ring bonuses, and VIT bonus', () => {
-      const gs = new GameState([]);
-      gs.equipItem({ id: 'shield', name: 'Shield', slot: 'chest', atkBonus: 0, defBonus: 2 });
-      gs.equipItem({ id: 'ring', name: 'Ring', slot: 'ring1', atkBonus: 0, defBonus: 1 });
-      // def = this.def(1) + floor(VIT(5)/4) + 2 + 1 = 1 + 1 + 2 + 1 = 5
-      expect(gs.getEffectiveDef()).toBe(5);
+      // def = 0 (no armor) + floor(VIT(5)/4) = 1
+      expect(gs.getEffectiveDef()).toBe(1);
     });
 
     it('pickupEquipmentAt picks up and auto-equips', () => {
@@ -779,9 +762,9 @@ describe('GameState', () => {
       ]);
       const result = gs.pickupEquipmentAt(3, 3);
       expect(result.item).toBeDefined();
-      expect(result.item!.id).toBe('sword');
-      expect(gs.equipment.get('weapon')).toBeDefined();
-      expect(gs.groundItems.size).toBe(0);
+      expect(result.item!.name).toBe('Sword');
+      expect(gs.entityRegistry.getEquipped('weapon')).toBeDefined();
+      expect(gs.entityRegistry.getGroundItems(gs.currentLevelId, 3, 3).length).toBe(0);
     });
 
     it('pickupEquipmentAt returns empty object for empty cell', () => {
@@ -791,29 +774,30 @@ describe('GameState', () => {
       expect(result.denied).toBeUndefined();
     });
 
-    it('equipment persists across loadNewLevel', () => {
-      const gs = new GameState([]);
-      gs.equipItem({ id: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 });
-      gs.loadNewLevel([]);
-      expect(gs.equipment.get('weapon')).toBeDefined();
-      expect(gs.equipment.get('weapon')!.id).toBe('sword');
-    });
-
-    it('groundItems are reset in loadNewLevel', () => {
+    it('equipped item persists across loadNewLevel', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
-      ]);
-      expect(gs.groundItems.size).toBe(1);
+      ], undefined, 'test_level');
+      gs.pickupEquipmentAt(1, 1);
       gs.loadNewLevel([]);
-      expect(gs.groundItems.size).toBe(0);
+      expect(gs.entityRegistry.getEquipped('weapon')).toBeDefined();
     });
 
-    it('constructor parses equipment entities', () => {
+    it('ground equipment is cleared in loadNewLevel', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
+      ], undefined, 'test_level');
+      expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(1);
+      gs.loadNewLevel([]);
+      expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(0);
+    });
+
+    it('constructor parses equipment entities into registry', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'equipment', itemId: 'ring', name: 'Ring', slot: 'ring', atkBonus: 1, defBonus: 1 },
-      ]);
-      expect(gs.groundItems.size).toBe(1);
-      expect(gs.groundItems.get('1,1')!.id).toBe('ring');
+      ], undefined, 'test_level');
+      expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(1);
+      expect(gs.entityRegistry.getGroundItems('test_level', 1, 1)[0].itemId).toBe('ring');
     });
   });
 
@@ -823,25 +807,25 @@ describe('GameState', () => {
     it('pickupConsumableAt picks up into backpack', () => {
       const gs = new GameState([
         { col: 2, row: 2, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
-      ]);
+      ], undefined, 'test_level');
       const item = gs.pickupConsumableAt(2, 2);
       expect(item).toBeDefined();
-      expect(item!.id).toBe('hp1');
-      expect(gs.backpack.length).toBe(1);
-      expect(gs.groundConsumables.size).toBe(0);
+      expect(item!.name).toBe('Potion');
+      expect(gs.entityRegistry.getBackpackItems().length).toBe(1);
+      expect(gs.entityRegistry.getGroundItems('test_level', 2, 2).length).toBe(0);
     });
 
-    it('pickupConsumableAt returns undefined when backpack is full', () => {
+    it('pickupConsumableAt returns undefined when backpack is full (12 slots)', () => {
       const gs = new GameState([
-        { col: 1, row: 1, type: 'consumable', itemId: 'hp', name: 'Potion', consumableType: 'health_potion', value: 10 },
-      ]);
-      // Fill backpack
-      for (let i = 0; i < 8; i++) {
-        gs.backpack.push({ id: `fill${i}`, name: 'Fill', consumableType: 'health_potion', value: 1 });
+        { col: 1, row: 1, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
+      ], undefined, 'test_level');
+      // Fill all 12 backpack slots
+      for (let i = 0; i < 12; i++) {
+        gs.entityRegistry.createItem('hp1', 'common', { kind: 'backpack', slot: i });
       }
       const item = gs.pickupConsumableAt(1, 1);
       expect(item).toBeUndefined();
-      expect(gs.groundConsumables.size).toBe(1); // still on ground
+      expect(gs.entityRegistry.getGroundItems('test_level', 1, 1).length).toBe(1); // still on ground
     });
 
     it('pickupConsumableAt returns undefined for empty cell', () => {
@@ -852,17 +836,17 @@ describe('GameState', () => {
     it('useConsumable health_potion restores hp', () => {
       const gs = new GameState([]);
       gs.hp = 10;
-      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 5 });
+      gs.entityRegistry.createItem('hp1', 'common', { kind: 'backpack', slot: 0 });
       const used = gs.useConsumable(0);
       expect(used).toBe(true);
       expect(gs.hp).toBe(15);
-      expect(gs.backpack.length).toBe(0);
+      expect(gs.entityRegistry.getBackpackItems().length).toBe(0);
     });
 
     it('useConsumable health_potion clamps at maxHp', () => {
       const gs = new GameState([]);
-      gs.hp = gs.maxHp - 5; // 5 below max
-      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 });
+      gs.hp = gs.maxHp - 2;
+      gs.entityRegistry.createItem('hp1', 'common', { kind: 'backpack', slot: 0 });
       gs.useConsumable(0);
       expect(gs.hp).toBe(gs.maxHp);
     });
@@ -870,17 +854,17 @@ describe('GameState', () => {
     it('useConsumable torch_oil restores torchFuel', () => {
       const gs = new GameState([]);
       gs.torchFuel = 50;
-      gs.backpack.push({ id: 'oil1', name: 'Oil', consumableType: 'torch_oil', value: 30 });
+      gs.entityRegistry.createItem('oil1', 'common', { kind: 'backpack', slot: 0 });
       const used = gs.useConsumable(0);
       expect(used).toBe(true);
       expect(gs.torchFuel).toBe(80);
-      expect(gs.backpack.length).toBe(0);
+      expect(gs.entityRegistry.getBackpackItems().length).toBe(0);
     });
 
     it('useConsumable torch_oil clamps at maxTorchFuel', () => {
       const gs = new GameState([]);
       gs.torchFuel = 90;
-      gs.backpack.push({ id: 'oil1', name: 'Oil', consumableType: 'torch_oil', value: 30 });
+      gs.entityRegistry.createItem('oil1', 'common', { kind: 'backpack', slot: 0 });
       gs.useConsumable(0);
       expect(gs.torchFuel).toBe(100);
     });
@@ -892,48 +876,48 @@ describe('GameState', () => {
       expect(gs.useConsumable(10)).toBe(false);
     });
 
-    it('backpack persists across loadNewLevel', () => {
-      const gs = new GameState([]);
-      gs.backpack.push({ id: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 });
+    it('backpack items persist across loadNewLevel', () => {
+      const gs = new GameState([], undefined, 'test_level');
+      gs.entityRegistry.createItem('hp1', 'common', { kind: 'backpack', slot: 0 });
       gs.loadNewLevel([]);
-      expect(gs.backpack.length).toBe(1);
-      expect(gs.backpack[0].id).toBe('hp1');
+      expect(gs.entityRegistry.getBackpackItems().length).toBe(1);
+      expect(gs.entityRegistry.getBackpackItems()[0].itemId).toBe('hp1');
     });
 
-    it('groundConsumables are reset in loadNewLevel', () => {
+    it('ground consumables are cleared in loadNewLevel', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
-      ]);
-      expect(gs.groundConsumables.size).toBe(1);
+      ], undefined, 'test_level');
+      expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(1);
       gs.loadNewLevel([]);
-      expect(gs.groundConsumables.size).toBe(0);
+      expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(0);
     });
 
-    it('groundItems and groundConsumables are saved/restored in level snapshots', () => {
+    it('ground items are saved/restored in level snapshots via registry', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
         { col: 2, row: 2, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
-      ]);
+      ], undefined, 'test_level');
       const snap = gs.saveLevelState();
-      expect(snap.groundItems.size).toBe(1);
-      expect(snap.groundConsumables.size).toBe(1);
+      expect(snap.registrySnapshot.length).toBe(2);
 
-      // Load into fresh state
-      const gs2 = new GameState([]);
+      const gs2 = new GameState([], undefined, 'test_level');
       gs2.loadLevelState(snap);
-      expect(gs2.groundItems.size).toBe(1);
-      expect(gs2.groundConsumables.size).toBe(1);
-      expect(gs2.groundItems.get('1,1')!.id).toBe('sword');
-      expect(gs2.groundConsumables.get('2,2')!.id).toBe('hp1');
+      expect(gs2.entityRegistry.getGroundItems('test_level', 1, 1)[0].itemId).toBe('sword');
+      expect(gs2.entityRegistry.getGroundItems('test_level', 2, 2)[0].itemId).toBe('hp1');
     });
 
-    it('snapshot groundItems is a deep copy', () => {
+    it('registry snapshot is a deep copy — mutating state after save does not affect snapshot', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
-      ]);
+      ], undefined, 'test_level');
       const snap = gs.saveLevelState();
-      gs.groundItems.delete('1,1');
-      expect(snap.groundItems.size).toBe(1);
+      const snapLen = snap.registrySnapshot.length;
+      // Remove the entity from live state
+      const entities = gs.entityRegistry.getAllGroundItemsForLevel('test_level');
+      gs.entityRegistry.removeItem(entities[0].instanceId);
+      // Snapshot should be unaffected
+      expect(snap.registrySnapshot.length).toBe(snapLen);
     });
   });
 
@@ -1084,7 +1068,7 @@ describe('GameState', () => {
       expect(stats.dodgeChance).toBe(25);
     });
 
-    it('returns effective attribute values (base only, no DB)', () => {
+    it('returns effective attribute values (base only, no equipped items)', () => {
       const gs = new GameState([]);
       const stats = gs.getEffectiveStats();
       expect(stats.effectiveStr).toBe(5);
@@ -1094,9 +1078,9 @@ describe('GameState', () => {
     });
   });
 
-  // --- C2: canEquipItem (no DB loaded — always allows, since requirements need DB) ---
+  // --- C2: canEquipItem ---
 
-  describe('canEquipItem (no DB)', () => {
+  describe('canEquipItem', () => {
     it('allows equip when item has no requirements', () => {
       const gs = new GameState([]);
       const mockItem = {
@@ -1150,10 +1134,18 @@ describe('GameState', () => {
 
   // --- C3: getEquippedWeaponDef ---
 
-  describe('getEquippedWeaponDef (no DB)', () => {
-    it('returns undefined when no DB loaded', () => {
+  describe('getEquippedWeaponDef', () => {
+    it('returns undefined when no weapon is equipped', () => {
       const gs = new GameState([]);
       expect(gs.getEquippedWeaponDef()).toBeUndefined();
+    });
+
+    it('returns the item def when a weapon is equipped', () => {
+      const gs = new GameState([]);
+      gs.entityRegistry.createItem('sword', 'common', { kind: 'equipped', slot: 'weapon' });
+      const def = gs.getEquippedWeaponDef();
+      expect(def).toBeDefined();
+      expect(def!.name).toBe('Sword');
     });
   });
 });

@@ -52,3 +52,11 @@ export const INVENTORY = {
   get x() { return HUD_WIDTH - MARGIN - this.w; },
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
+
+// Inventory overlay — fullscreen panel centered on HUD
+export const INVENTORY_OVERLAY = {
+  w: 460,
+  h: 310,
+  get x() { return Math.floor((HUD_WIDTH - this.w) / 2); },
+  get y() { return Math.floor((HUD_HEIGHT - this.h) / 2); },
+} as const;

@@ -27,12 +27,14 @@ import { TransitionOverlay } from './rendering/transitionOverlay';
 import { CharacterCreationScreen } from './hud/characterCreation';
 import { LevelUpNotification } from './hud/levelUpNotification';
 import { DamageNumberManager } from './rendering/damageNumbers';
+import { EnemyHealthBarManager } from './rendering/enemyHealthBar';
 import { SwordSwingAnimator } from './rendering/swordSwing';
 import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
+import type { InventoryAction } from './hud/inventoryOverlay';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -72,6 +74,7 @@ interface LevelScene {
   stairMeshes: { group: THREE.Group };
   enemyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   enemyAnimator: EnemyAnimator;
+  healthBarManager: EnemyHealthBarManager;
   itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   player: Player;
@@ -136,6 +139,13 @@ function buildLevelScene(
     if (enemy) enemyAnimator.register(key, mesh, enemy.col, enemy.row);
   }
 
+  const healthBarManager = new EnemyHealthBarManager();
+  for (const [key, enemy] of gameState.enemies) {
+    const mesh = enemyMeshes.meshMap.get(key);
+    if (mesh) healthBarManager.create(key, mesh, enemy.maxHp);
+  }
+  scene.add(healthBarManager.getGroup());
+
   const player = new Player(
     camera,
     level.grid,
@@ -161,6 +171,7 @@ function buildLevelScene(
     stairMeshes,
     enemyMeshes,
     enemyAnimator,
+    healthBarManager,
     itemMeshes,
     consumableMeshes,
     player,
@@ -177,6 +188,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
     ls.enemyMeshes.group,
+    ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
     ls.consumableMeshes.group,
   ];
@@ -451,10 +463,78 @@ async function init(): Promise<void> {
   // --- Input ---
   const pressedKeys = new Set<string>();
 
+  function processInventoryAction(action: InventoryAction): void {
+    switch (action.type) {
+      case 'equip':
+        gameState.equipFromBackpack(action.backpackSlot);
+        break;
+      case 'unequip':
+        gameState.unequipToBackpack(action.equipSlot);
+        break;
+      case 'use':
+        {
+          const backpackItems = gameState.entityRegistry.getBackpackItems();
+          if (action.backpackSlot < backpackItems.length) {
+            gameState.useConsumableFromRegistry(backpackItems[action.backpackSlot].instanceId);
+          }
+        }
+        break;
+      case 'drop':
+        {
+          const entity = gameState.entityRegistry.getItem(action.instanceId);
+          if (entity) {
+            gameState.dropItem(action.instanceId, action.col, action.row);
+            const def = itemDatabase.getItem(entity.itemId);
+            if (def) {
+              const updatedEntity = gameState.entityRegistry.getItem(action.instanceId);
+              if (updatedEntity) {
+                if (def.type === 'consumable') {
+                  addSingleConsumableMesh(updatedEntity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                } else {
+                  addSingleItemMesh(updatedEntity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                }
+              }
+            }
+          }
+        }
+        break;
+      case 'message':
+        hud.showMessage(action.text);
+        break;
+    }
+  }
+
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
+
+    // Inventory overlay gets input priority (except KeyI which closes it)
+    const inventoryOverlay = hud.getInventoryOverlay();
+    if (inventoryOverlay.isOpen()) {
+      if (e.code === 'KeyI') {
+        inventoryOverlay.toggle();
+        return;
+      }
+      const ps = ls.player.getState();
+      const action = inventoryOverlay.handleKey(e.code, gameState, ps.col, ps.row);
+      if (action) {
+        processInventoryAction(action);
+      }
+      return;
+    }
+
+    // Attribute panel routing — Tab closes, other keys are consumed by the panel
+    const attributePanel = hud.getAttributePanel();
+    if (attributePanel.isOpen()) {
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        attributePanel.toggle();
+        return;
+      }
+      attributePanel.handleKey(e.code, gameState);
+      return;
+    }
 
     // Stats panel blocks all input except T (to close)
     if (hud.getStatsPanel().isOpen() && e.code !== 'KeyT') return;
@@ -512,7 +592,14 @@ async function init(): Promise<void> {
                   damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
                 }
               }
+              if (result.type === 'hit' && result.targetCol !== undefined && result.targetRow !== undefined) {
+                const hitEnemy = gameState.getEnemy(result.targetCol, result.targetRow);
+                if (hitEnemy) {
+                  ls.healthBarManager.update(doorKey(result.targetCol, result.targetRow), hitEnemy.hp, hitEnemy.maxHp);
+                }
+              }
               if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
+                ls.healthBarManager.remove(doorKey(result.targetCol, result.targetRow));
                 hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
                 ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
                 // Award XP for the kill
@@ -546,32 +633,10 @@ async function init(): Promise<void> {
                       drop.modifiers,
                     );
 
-                    // Legacy dual-write + dynamic mesh creation
                     const itemDef = itemDatabase.getItem(drop.itemId);
                     if (itemDef && itemDef.type === 'consumable') {
-                      // Write to legacy groundConsumables + create mesh
-                      const key = doorKey(result.targetCol!, result.targetRow!);
-                      gameState.groundConsumables.set(key, {
-                        id: drop.itemId,
-                        name: itemDef.name,
-                        consumableType: itemDef.subtype as 'health_potion' | 'torch_oil',
-                        value: itemDef.effect?.torchFuel ?? itemDef.stats.hp ?? 0,
-                      });
                       addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
                     } else if (itemDef) {
-                      // Write to legacy groundItems + create mesh
-                      const key = doorKey(result.targetCol!, result.targetRow!);
-                      // Map item type to legacy slot
-                      let slot: string = 'weapon';
-                      if (itemDef.type === 'armor') slot = itemDef.subtype;
-                      else if (itemDef.type === 'accessory') slot = itemDef.subtype === 'ring' ? 'ring1' : itemDef.subtype;
-                      gameState.groundItems.set(key, {
-                        id: drop.itemId,
-                        name: itemDef.name,
-                        slot: slot as any,
-                        atkBonus: itemDef.stats.atk ?? 0,
-                        defBonus: itemDef.stats.def ?? 0,
-                      });
                       addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
                     }
                   }
@@ -591,8 +656,20 @@ async function init(): Promise<void> {
           }
         }
         break;
+      case 'Tab':
+        e.preventDefault(); // prevent browser tab focus
+        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
+        hud.getAttributePanel().toggle();
+        break;
       case 'KeyT':
         hud.getStatsPanel().toggle();
+        break;
+      case 'KeyI':
+        // Close stats panel and attribute panel if open, then open inventory overlay
+        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        if (hud.getAttributePanel().isOpen()) hud.getAttributePanel().toggle();
+        hud.getInventoryOverlay().toggle();
         break;
       case 'KeyL':
         debugFullbright = !debugFullbright;
@@ -636,6 +713,10 @@ async function init(): Promise<void> {
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
 
+    // Sync health bar positions (enemies animate with hit shake and lunge)
+    ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
+    ls.healthBarManager.updateBillboards(camera);
+
     // Sconce torch flicker
     updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
 
@@ -645,8 +726,10 @@ async function init(): Promise<void> {
     sconceEmbers.update(delta);
     waterDrips.update(delta, camPos2.x, camPos2.z);
 
-    // Attack cooldown tick
-    if (gameState.attackCooldown > 0) {
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen();
+
+    // Attack cooldown tick — paused when overlays are open
+    if (gameState.attackCooldown > 0 && !anyOverlayOpen) {
       gameState.attackCooldown = Math.max(0, gameState.attackCooldown - delta);
     }
 
@@ -655,8 +738,8 @@ async function init(): Promise<void> {
       playerDamageFlashTimer = Math.max(0, playerDamageFlashTimer - delta);
     }
 
-    // Real-time enemy AI tick
-    if (!transition.isActive) {
+    // Real-time enemy AI tick — paused when overlays are open
+    if (!transition.isActive && !anyOverlayOpen) {
       const ps = ls.player.getState();
       const actions = updateEnemies(
         gameState, ps.col, ps.row, ls.level.grid, ls.walkable,
