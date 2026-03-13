@@ -4,6 +4,35 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-13 — M1 Phase F: Content (enemy types, AI, dungeon)
+
+6 new enemy types, 3 new AI behaviors, and the 3-level M1 test dungeon.
+
+**F1 — New enemy types** (`src/enemies/enemyTypes.ts`, `src/rendering/enemyRenderer.ts`):
+- Added goblin, giant_bat, spider, kobold, zombie, troll to `ENEMY_DEFS`
+- Stats from `planning/m1/ENEMIES.md`; existing enemy stats rebalanced for M1 (higher HP/faster moves to match player progression)
+- `EnemyAIState` extended with `'flee'`; `EnemyInstance` extended with `regenTimer`/`regenPauseTimer` for troll
+- Sprite paths and sizes registered in renderer (placeholder until art assets created)
+
+**F2 — AI behaviors** (`src/enemies/enemyAI.ts`, `src/core/gameState.ts`):
+- **Bat erratic movement**: 30% chance per move tick to pick a random adjacent cell instead of pathfinding toward player
+- **Kobold flee**: switches to `'flee'` state below 30% HP — pathfinds away from player (max manhattan distance), moves at double speed. Falls back to attack if cornered
+- **Troll HP regen**: +2 HP every 2 seconds, paused for 3 seconds after taking damage. `damageEnemy()` sets `regenPauseTimer = 3` on hit
+
+**F4 — M1 test dungeon** (`public/levels/dungeon_m1.json`):
+- Level 1 "The Upper Crypts" — tutorial: rats, bats, goblins (~112 XP)
+- Level 2 "The Dark Warrens" — mid: spiders, skeletons, kobolds, locked door + lever puzzle (~304 XP)
+- Level 3 "The Troll's Domain" — hard: orcs, zombies, troll boss with guaranteed sword_steel drop (~600 XP)
+- Total ~1016 XP across full clear → reaches level 4. CharDef-themed areas, all weapon types placed on ground
+- Wired as default dungeon in `main.ts`
+
+**Decisions:**
+- Existing enemy stats updated to ENEMIES.md M1 values (not just new enemies) — old pre-M1 stats were too weak for the progression system
+- Stair targets must land on adjacent walkable cells, not on the stair cell itself (prevents immediate re-traversal)
+- Enemy sprites deferred to F3 — renderer falls back to skeleton sprite for unknown types
+
+---
+
 ## 2026-03-12 — M1 Phase D: Loot & Drops
 
 Enemy death loot rolls, ground item spawning, and gold counter.
