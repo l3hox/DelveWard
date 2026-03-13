@@ -239,11 +239,11 @@ async function init(): Promise<void> {
   document.body.appendChild(renderer.domElement);
 
   // --- Lighting ---
-  const ambient = new THREE.AmbientLight(0x111111);
+  const ambient = new THREE.AmbientLight(0x1a1a22);
   scene.add(ambient);
 
-  const torchLight = new THREE.PointLight(0xff994d, 4, 10);
-  const torchFillLight = new THREE.PointLight(0xff994d, 2, 8);
+  const torchLight = new THREE.PointLight(0xff994d, 6, 21);
+  const torchFillLight = new THREE.PointLight(0xff994d, 3, 16.5);
   let flickerTarget = 3.5;
   let flickerTimer = 0;
   scene.add(torchLight);
@@ -512,10 +512,10 @@ async function init(): Promise<void> {
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
-    // Inventory overlay gets input priority (except KeyI which closes it)
+    // Inventory overlay gets input priority (except KeyI/Escape which closes it)
     const inventoryOverlay = hud.getInventoryOverlay();
     if (inventoryOverlay.isOpen()) {
-      if (e.code === 'KeyI') {
+      if (e.code === 'KeyI' || e.code === 'Escape') {
         inventoryOverlay.toggle();
         return;
       }
@@ -527,10 +527,10 @@ async function init(): Promise<void> {
       return;
     }
 
-    // Attribute panel routing — L closes (with tryClose guard), other keys consumed by panel
+    // Attribute panel routing — L/Escape closes (with tryClose guard), other keys consumed by panel
     const attributePanel = hud.getAttributePanel();
     if (attributePanel.isOpen()) {
-      if (e.code === 'KeyL') {
+      if (e.code === 'KeyL' || e.code === 'Escape') {
         attributePanel.tryClose(gameState);
         return;
       }
@@ -538,8 +538,13 @@ async function init(): Promise<void> {
       return;
     }
 
-    // Stats panel blocks all input except T (to close)
-    if (hud.getStatsPanel().isOpen() && e.code !== 'KeyT') return;
+    // Stats panel blocks all input except T/Escape (to close)
+    if (hud.getStatsPanel().isOpen()) {
+      if (e.code === 'KeyT' || e.code === 'Escape') {
+        hud.getStatsPanel().toggle();
+      }
+      return;
+    }
 
     switch (e.code) {
       case 'ArrowUp':
@@ -778,13 +783,15 @@ async function init(): Promise<void> {
     torchFillLight.position.set(fillX, camPos.y + TORCH_OFFSET_Y, fillZ);
 
     const fuelRatio = gameState.torchFuel / gameState.maxTorchFuel;
-    torchLight.distance = 3 + fuelRatio * 5;
-    torchFillLight.distance = 2 + fuelRatio * 4;
+    // Light stays full above 35%, then fades linearly to dim below that
+    const lightScale = fuelRatio >= 0.35 ? 1 : fuelRatio / 0.35;
+    torchLight.distance = 4.5 + lightScale * 7.5;
+    torchFillLight.distance = 3 + lightScale * 6;
 
     flickerTimer -= delta;
     if (flickerTimer <= 0) {
-      const baseIntensity = 0.8 + fuelRatio * 2.8;
-      flickerTarget = baseIntensity + Math.random() * FLICKER_RANGE * fuelRatio;
+      const baseIntensity = 1.2 + lightScale * 4.2;
+      flickerTarget = baseIntensity + Math.random() * FLICKER_RANGE * lightScale;
       flickerTimer = FLICKER_MIN_INTERVAL + Math.random() * FLICKER_INTERVAL_RANGE;
     }
     torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;

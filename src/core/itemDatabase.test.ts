@@ -139,7 +139,7 @@ describe('ItemDatabase', () => {
       expect(item).toBeDefined();
       expect(item!.stackable).toBe(true);
       expect(item!.stackMax).toBe(5);
-      expect(item!.effect?.torchFuel).toBe(50);
+      expect(item!.effect?.torchFuel).toBe(100);
     });
 
     it('antidote has curePoison effect', async () => {

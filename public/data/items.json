@@ -656,7 +656,7 @@
       "modifiers": [],
       "requirements": {},
       "stackable": true, "stackMax": 5,
-      "effect": { "torchFuel": 50 }
+      "effect": { "torchFuel": 100 }
     },
     {
       "id": "antidote",

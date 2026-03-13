@@ -4,6 +4,23 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-13 — Lighting, torch, and UX improvements
+
+**Torch & lighting overhaul** (`src/main.ts`):
+- Torch light 50% brighter (intensity 4→6, fill 2→3) and 50% longer range (distance 10→21, fill 8→16.5)
+- Light no longer dims above 35% fuel — full brightness until low, then linear fade
+- Ambient light bumped from `0x111111` to `0x1a1a22` for slight visibility in distant darkness
+
+**Torch capacity** (`src/core/gameState.ts`, `public/data/items.json`):
+- Max torch fuel doubled: 100 → 200
+- Oil flask fuel restore doubled: 50 → 100
+
+**Escape key closes overlay panels** (`src/main.ts`):
+- Inventory, stats, and attribute panels can all be closed with Escape
+- Attribute panel respects tryClose guard (can't dismiss during level-up with unspent points)
+
+---
+
 ## 2026-03-13 — Bugfixes & enemy sprites
 
 **Equipment pickup fix** (`src/core/gameState.ts`):

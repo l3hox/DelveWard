@@ -148,8 +148,8 @@ export class GameState {
     this.atk = 3;
     this.def = 1;
     this.attackCooldown = 0;
-    this.torchFuel = 100;
-    this.maxTorchFuel = 100;
+    this.torchFuel = 200;
+    this.maxTorchFuel = 200;
     this.exploredCells = new Set();
 
     // maxHp derived from VIT: 40 + VIT * 5

@@ -495,10 +495,10 @@ describe('GameState', () => {
       expect(gs.maxHp).toBe(65);
     });
 
-    it('torchFuel defaults to 100/100', () => {
+    it('torchFuel defaults to 200/200', () => {
       const gs = new GameState([]);
-      expect(gs.torchFuel).toBe(100);
-      expect(gs.maxTorchFuel).toBe(100);
+      expect(gs.torchFuel).toBe(200);
+      expect(gs.maxTorchFuel).toBe(200);
     });
 
     it('exploredCells starts empty', () => {
@@ -725,7 +725,7 @@ describe('GameState', () => {
     it('drains the correct amount', () => {
       const gs = new GameState([]);
       gs.drainTorchFuel(10);
-      expect(gs.torchFuel).toBe(90);
+      expect(gs.torchFuel).toBe(190);
     });
 
     it('clamps at 0 when draining more than available', () => {
@@ -737,7 +737,7 @@ describe('GameState', () => {
     it('draining 0 does nothing', () => {
       const gs = new GameState([]);
       gs.drainTorchFuel(0);
-      expect(gs.torchFuel).toBe(100);
+      expect(gs.torchFuel).toBe(200);
     });
   });
 
@@ -863,10 +863,10 @@ describe('GameState', () => {
 
     it('useConsumable torch_oil clamps at maxTorchFuel', () => {
       const gs = new GameState([]);
-      gs.torchFuel = 90;
+      gs.torchFuel = 190;
       gs.entityRegistry.createItem('oil1', 'common', { kind: 'backpack', slot: 0 });
       gs.useConsumable(0);
-      expect(gs.torchFuel).toBe(100);
+      expect(gs.torchFuel).toBe(200);
     });
 
     it('useConsumable returns false for invalid index', () => {

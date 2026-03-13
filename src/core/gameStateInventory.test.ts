@@ -246,10 +246,10 @@ describe('GameState.useConsumableFromRegistry', () => {
   });
 
   it('torch_oil clamps torchFuel at maxTorchFuel', () => {
-    gs.torchFuel = 90;
+    gs.torchFuel = 190;
     const entity = gs.entityRegistry.createItem('torch_oil', 'common', { kind: 'backpack', slot: 0 });
     gs.useConsumableFromRegistry(entity.instanceId);
-    expect(gs.torchFuel).toBe(100);
+    expect(gs.torchFuel).toBe(200);
   });
 
   it('removes the item from the registry after use', () => {
