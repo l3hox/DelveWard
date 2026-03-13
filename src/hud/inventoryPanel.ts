@@ -116,24 +116,10 @@ export function drawInventoryPanel(
       if (slotIndex < backpackItems.length) {
         const entity = backpackItems[slotIndex];
         let color = '#888';
-        if (itemDatabase.isLoaded()) {
-          const def = itemDatabase.getItem(entity.itemId);
-          if (def?.type === 'consumable') {
-            color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
-          }
-        } else {
-          // Legacy fallback: look up legacy backpack by index position.
-          const legacyItem = gameState.backpack[slotIndex];
-          if (legacyItem) {
-            color = CONSUMABLE_COLORS[legacyItem.consumableType] ?? '#888';
-          }
+        const def = itemDatabase.getItem(entity.itemId);
+        if (def?.type === 'consumable') {
+          color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
         }
-        ctx.fillStyle = color;
-        ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-      } else if (slotIndex < gameState.backpack.length) {
-        // Legacy-only items not yet in registry (edge case during transition).
-        const legacyItem = gameState.backpack[slotIndex];
-        const color = CONSUMABLE_COLORS[legacyItem.consumableType] ?? '#888';
         ctx.fillStyle = color;
         ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
       }

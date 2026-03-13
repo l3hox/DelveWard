@@ -52,23 +52,6 @@ export interface SconceInstance {
   lit: boolean;
 }
 
-// Legacy item interfaces — kept for backwards compat with tests and levelLoader.
-// Renderers and HUD are migrated to EntityRegistry; these remain for now.
-export interface EquipmentItem {
-  id: string;
-  name: string;
-  slot: EquipSlot;
-  atkBonus: number;
-  defBonus: number;
-}
-
-export interface ConsumableItem {
-  id: string;
-  name: string;
-  consumableType: 'health_potion' | 'torch_oil';
-  value: number;
-}
-
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -98,21 +81,9 @@ export interface LevelSnapshot {
   sconces: Map<string, SconceInstance>;
   enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
-  // Legacy fields — kept for snapshot backwards compat with tests.
-  groundItems: Map<string, EquipmentItem>;
-  groundConsumables: Map<string, ConsumableItem>;
-  // New registry snapshot — stores entity instances across all locations.
   registrySnapshot: ItemEntity[];
 }
 
-// Maps legacy 3-slot names (pre-M1) to current 10-slot EquipSlot values.
-function normalizeLegacySlot(slot: string): EquipSlot {
-  const map: Record<string, EquipSlot> = {
-    armor: 'chest',
-    ring:  'ring1',
-  };
-  return (map[slot] ?? slot) as EquipSlot;
-}
 
 export class GameState {
   doors: Map<string, DoorInstance>;
@@ -123,13 +94,7 @@ export class GameState {
   enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
 
-  // Legacy item collections — kept in sync with entityRegistry for backwards compat.
-  equipment: Map<EquipSlot, EquipmentItem>;
-  backpack: ConsumableItem[];
-  groundItems: Map<string, EquipmentItem>;
-  groundConsumables: Map<string, ConsumableItem>;
-
-  // New entity registry — single source of truth for all item instances.
+  // Entity registry — single source of truth for all item instances.
   entityRegistry: EntityRegistry;
   currentLevelId: string;
 
@@ -164,10 +129,6 @@ export class GameState {
     this.sconces = new Map();
     this.enemies = new Map();
     this.inventory = new Set();
-    this.equipment = new Map();
-    this.backpack = [];
-    this.groundItems = new Map();
-    this.groundConsumables = new Map();
 
     this.entityRegistry = new EntityRegistry();
     this.currentLevelId = levelId;
@@ -253,17 +214,6 @@ export class GameState {
           this.enemies.set(doorKey(e.col, e.row), instance);
         }
       } else if (e.type === 'equipment') {
-        // Legacy map — still populated for backwards compat.
-        const legacyItem: EquipmentItem = {
-          id: e.itemId as string,
-          name: e.name as string,
-          slot: normalizeLegacySlot(e.slot as string),
-          atkBonus: e.atkBonus as number,
-          defBonus: e.defBonus as number,
-        };
-        this.groundItems.set(doorKey(e.col, e.row), legacyItem);
-
-        // EntityRegistry — create a world-located item entity.
         const location: ItemLocation = {
           kind: 'world',
           levelId: this.currentLevelId,
@@ -272,16 +222,6 @@ export class GameState {
         };
         this.entityRegistry.createItem(e.itemId as string, 'common', location);
       } else if (e.type === 'consumable') {
-        // Legacy map — still populated for backwards compat.
-        const legacyItem: ConsumableItem = {
-          id: e.itemId as string,
-          name: e.name as string,
-          consumableType: e.consumableType as 'health_potion' | 'torch_oil',
-          value: e.value as number,
-        };
-        this.groundConsumables.set(doorKey(e.col, e.row), legacyItem);
-
-        // EntityRegistry — create a world-located item entity.
         const location: ItemLocation = {
           kind: 'world',
           levelId: this.currentLevelId,
@@ -348,19 +288,10 @@ export class GameState {
       enemies.set(k, { ...v });
     }
     const exploredCells = new Set<string>(this.exploredCells);
-    // Legacy maps for snapshot backwards compat.
-    const groundItems = new Map<string, EquipmentItem>();
-    for (const [k, v] of this.groundItems) {
-      groundItems.set(k, { ...v });
-    }
-    const groundConsumables = new Map<string, ConsumableItem>();
-    for (const [k, v] of this.groundConsumables) {
-      groundConsumables.set(k, { ...v });
-    }
     const registrySnapshot = this.entityRegistry.snapshot();
     return {
       doors, keys, levers, plates, sconces, enemies,
-      exploredCells, groundItems, groundConsumables, registrySnapshot,
+      exploredCells, registrySnapshot,
     };
   }
 
@@ -390,16 +321,6 @@ export class GameState {
       this.enemies.set(k, { ...v });
     }
     this.exploredCells = new Set<string>(snapshot.exploredCells);
-    // Restore legacy maps.
-    this.groundItems = new Map<string, EquipmentItem>();
-    for (const [k, v] of snapshot.groundItems) {
-      this.groundItems.set(k, { ...v });
-    }
-    this.groundConsumables = new Map<string, ConsumableItem>();
-    for (const [k, v] of snapshot.groundConsumables) {
-      this.groundConsumables.set(k, { ...v });
-    }
-    // Restore entity registry from snapshot.
     if (snapshot.registrySnapshot) {
       this.entityRegistry.restore(snapshot.registrySnapshot);
     }
@@ -415,8 +336,6 @@ export class GameState {
     this.sconces = new Map();
     this.enemies = new Map();
     this.exploredCells = new Set();
-    this.groundItems = new Map();
-    this.groundConsumables = new Map();
     // Clear only ground items for the old level; equipped/backpack items survive transitions.
     this.entityRegistry.clearLevel(oldLevelId);
     this._parseEntities(entities, grid);
@@ -575,8 +494,6 @@ export class GameState {
    *   maxHp      = 40 + VIT * 5 + sum(equipped items hp bonus)
    *   critChance = 5 + floor(DEX / 3) + weapon critChance bonus    [percentage]
    *   dodgeChance= floor((DEX - 5) / 4)  [min 0, cap 25]           [percentage]
-   *
-   * Falls back to legacy equipment map when itemDatabase is not loaded.
    */
   getEffectiveStats(): {
     atk: number;
@@ -589,17 +506,16 @@ export class GameState {
     effectiveVit: number;
     effectiveWis: number;
   } {
-    if (itemDatabase.isLoaded()) {
-      // C3: Compute effective attributes = base + item attribute bonuses
-      let bonusStr = 0;
-      let bonusDex = 0;
-      let bonusVit = 0;
-      let bonusWis = 0;
-      let weaponAtk = 0;
-      let armorDef = 0;
-      let hpBonus = 0;
-      let weaponCrit = 0;
+    let bonusStr = 0;
+    let bonusDex = 0;
+    let bonusVit = 0;
+    let bonusWis = 0;
+    let weaponAtk = 0;
+    let armorDef = 0;
+    let hpBonus = 0;
+    let weaponCrit = 0;
 
+    if (itemDatabase.isLoaded()) {
       for (const [, entity] of this.entityRegistry.getAllEquipped()) {
         const itemDef = itemDatabase.getItem(entity.itemId);
         if (!itemDef) continue;
@@ -612,53 +528,28 @@ export class GameState {
         if (itemDef.stats.hp) hpBonus += itemDef.stats.hp;
         if (itemDef.stats.critChance) weaponCrit += itemDef.stats.critChance;
       }
-
-      const effStr = this.str + bonusStr;
-      const effDex = this.dex + bonusDex;
-      const effVit = this.vit + bonusVit;
-      const effWis = this.wis + bonusWis;
-
-      const strBonus = Math.floor(effStr / 2);
-      const vitDefBonus = Math.floor(effVit / 4);
-      const baseCrit = 5 + Math.floor(effDex / 3);
-      const dodge = Math.max(0, Math.min(25, Math.floor((effDex - 5) / 4)));
-
-      return {
-        atk: weaponAtk + strBonus,
-        def: armorDef + vitDefBonus,
-        maxHp: 40 + effVit * 5 + hpBonus,
-        critChance: baseCrit + weaponCrit,
-        dodgeChance: dodge,
-        effectiveStr: effStr,
-        effectiveDex: effDex,
-        effectiveVit: effVit,
-        effectiveWis: effWis,
-      };
     }
 
-    // Fallback: use legacy equipment map + base atk/def fields
-    const strBonus = Math.floor(this.str / 2);
-    const vitDefBonus = Math.floor(this.vit / 4);
-    const baseCrit = 5 + Math.floor(this.dex / 3);
-    const dodge = Math.max(0, Math.min(25, Math.floor((this.dex - 5) / 4)));
+    const effStr = this.str + bonusStr;
+    const effDex = this.dex + bonusDex;
+    const effVit = this.vit + bonusVit;
+    const effWis = this.wis + bonusWis;
 
-    let legacyAtk = this.atk + strBonus;
-    let legacyDef = this.def + vitDefBonus;
-    for (const item of this.equipment.values()) {
-      legacyAtk += item.atkBonus;
-      legacyDef += item.defBonus;
-    }
+    const strBonus = Math.floor(effStr / 2);
+    const vitDefBonus = Math.floor(effVit / 4);
+    const baseCrit = 5 + Math.floor(effDex / 3);
+    const dodge = Math.max(0, Math.min(25, Math.floor((effDex - 5) / 4)));
 
     return {
-      atk: legacyAtk,
-      def: legacyDef,
-      maxHp: 40 + this.vit * 5,
-      critChance: baseCrit,
+      atk: weaponAtk + strBonus,
+      def: armorDef + vitDefBonus,
+      maxHp: 40 + effVit * 5 + hpBonus,
+      critChance: baseCrit + weaponCrit,
       dodgeChance: dodge,
-      effectiveStr: this.str,
-      effectiveDex: this.dex,
-      effectiveVit: this.vit,
-      effectiveWis: this.wis,
+      effectiveStr: effStr,
+      effectiveDex: effDex,
+      effectiveVit: effVit,
+      effectiveWis: effWis,
     };
   }
 
@@ -872,92 +763,77 @@ export class GameState {
     return true;
   }
 
-  equipItem(item: EquipmentItem): EquipmentItem | null {
-    const displaced = this.equipment.get(item.slot) ?? null;
-    this.equipment.set(item.slot, item);
-    return displaced;
-  }
+  pickupEquipmentAt(col: number, row: number): { item?: { name: string }; denied?: string } {
+    const worldEntities = this.entityRegistry.getGroundItems(this.currentLevelId, col, row);
+    const equipEntity = worldEntities.find((e) => {
+      if (!itemDatabase.isLoaded()) return true;
+      const def = itemDatabase.getItem(e.itemId);
+      return def && def.type !== 'consumable';
+    });
+    if (!equipEntity) return {};
 
-  pickupEquipmentAt(col: number, row: number): { item?: EquipmentItem; denied?: string } {
-    const key = doorKey(col, row);
-    const item = this.groundItems.get(key);
-    if (!item) return {};
-
-    // C2: Check item requirements before equipping
     if (itemDatabase.isLoaded()) {
-      // Try to find a matching entity in the registry and look up its ItemDef
-      const worldEntities = this.entityRegistry.getGroundItems(this.currentLevelId, col, row);
-      if (worldEntities.length > 0) {
-        const itemDef = itemDatabase.getItem(worldEntities[0].itemId);
-        if (itemDef) {
-          const check = this.canEquipItem(itemDef);
-          if (!check.allowed) {
-            return { denied: check.reason };
-          }
+      const itemDef = itemDatabase.getItem(equipEntity.itemId);
+      if (itemDef) {
+        const check = this.canEquipItem(itemDef);
+        if (!check.allowed) {
+          return { denied: check.reason };
         }
       }
     }
 
-    this.groundItems.delete(key);
+    const slot = itemDatabase.isLoaded()
+      ? _subtypeToEquipSlot(itemDatabase.getItem(equipEntity.itemId)!.subtype as string, this)
+      : 'weapon';
 
-    // Also remove the corresponding world entity from the registry.
-    const worldEntities = this.entityRegistry.getGroundItems(this.currentLevelId, col, row);
-    if (worldEntities.length > 0) {
-      // Move first matching entity to equipped slot (best-effort; no DB in tests).
-      const entity = worldEntities[0];
-      const slot = item.slot;
-      // Displace any existing registry entity in this slot so getEquipped() always
-      // returns the current item, not a stale entry from a prior pickup.
-      const existing = this.entityRegistry.getEquipped(slot);
-      if (existing) this.entityRegistry.removeItem(existing.instanceId);
-      this.entityRegistry.moveItem(entity.instanceId, { kind: 'equipped', slot });
-    }
+    const existing = this.entityRegistry.getEquipped(slot);
+    if (existing) this.entityRegistry.removeItem(existing.instanceId);
+    this.entityRegistry.moveItem(equipEntity.instanceId, { kind: 'equipped', slot });
 
-    this.equipItem(item);
-    return { item };
+    const name = itemDatabase.isLoaded()
+      ? (itemDatabase.getItem(equipEntity.itemId)?.name ?? equipEntity.itemId)
+      : equipEntity.itemId;
+
+    return { item: { name } };
   }
 
-  pickupConsumableAt(col: number, row: number): ConsumableItem | undefined {
-    if (this.backpack.length >= 8) return undefined;
-    const key = doorKey(col, row);
-    const item = this.groundConsumables.get(key);
-    if (!item) return undefined;
-    this.groundConsumables.delete(key);
+  pickupConsumableAt(col: number, row: number): { name: string } | undefined {
+    const slot = this.entityRegistry.nextBackpackSlot();
+    if (slot === null) return undefined;
 
-    // Also move the corresponding world entity into the backpack in the registry.
     const worldEntities = this.entityRegistry.getGroundItems(this.currentLevelId, col, row);
-    if (worldEntities.length > 0) {
-      const entity = worldEntities[0];
-      const slot = this.entityRegistry.nextBackpackSlot();
-      if (slot !== null) {
-        this.entityRegistry.moveItem(entity.instanceId, { kind: 'backpack', slot });
-      }
-    }
+    const consumableEntity = worldEntities.find((e) => {
+      if (!itemDatabase.isLoaded()) return true;
+      const def = itemDatabase.getItem(e.itemId);
+      return def && def.type === 'consumable';
+    });
+    if (!consumableEntity) return undefined;
 
-    this.backpack.push(item);
-    return item;
+    this.entityRegistry.moveItem(consumableEntity.instanceId, { kind: 'backpack', slot });
+
+    const name = itemDatabase.isLoaded()
+      ? (itemDatabase.getItem(consumableEntity.itemId)?.name ?? consumableEntity.itemId)
+      : consumableEntity.itemId;
+
+    return { name };
   }
 
   useConsumable(index: number): boolean {
-    if (index < 0 || index >= this.backpack.length) return false;
-    const item = this.backpack[index];
+    const backpackItems = this.entityRegistry.getBackpackItems();
+    if (index < 0 || index >= backpackItems.length) return false;
+    const entity = backpackItems[index];
 
-    // Apply effect via legacy consumableType (DB integration deferred to future phase).
-    if (item.consumableType === 'health_potion') {
-      this.hp = Math.min(this.maxHp, this.hp + item.value);
-    } else if (item.consumableType === 'torch_oil') {
-      this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + item.value);
-    }
-    this.backpack.splice(index, 1);
-
-    // Remove the corresponding backpack entity from the registry.
-    // The backpack slot is index-based; after sync drifts across pickups it may not
-    // match, so we walk by position order rather than assuming slot == index.
-    const registryBackpack = this.entityRegistry.getBackpackItems();
-    if (registryBackpack.length > index) {
-      this.entityRegistry.removeItem(registryBackpack[index].instanceId);
+    if (itemDatabase.isLoaded()) {
+      const itemDef = itemDatabase.getItem(entity.itemId);
+      if (!itemDef || itemDef.type !== 'consumable') return false;
+      if (itemDef.subtype === 'health_potion') {
+        this.hp = Math.min(this.maxHp, this.hp + (itemDef.stats.hp ?? 0));
+      } else if (itemDef.subtype === 'torch_oil') {
+        this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
+      }
     }
 
+    this.entityRegistry.removeItem(entity.instanceId);
     return true;
   }
 

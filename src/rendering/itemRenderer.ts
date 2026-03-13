@@ -116,26 +116,16 @@ export function buildItemMeshes(
   const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId);
 
   for (const entity of groundEntities) {
-    // Determine visual category — use DB if loaded, else fall back to legacy slot field.
     let category: ItemVisualCategory = 'ring';
-    if (itemDatabase.isLoaded()) {
-      const def = itemDatabase.getItem(entity.itemId);
-      if (def && def.type !== 'consumable') {
-        category = subtypeToVisualCategory(def.subtype as string);
-      } else if (def?.type === 'consumable') {
-        // Consumables are handled by consumableRenderer — skip here.
-        continue;
-      } else {
-        // itemId not found in DB — fall back to legacy groundItems slot field.
-        const loc = entity.location;
-        if (loc.kind !== 'world') continue;
-        const legacyItem = gameState.groundItems.get(doorKey(loc.col, loc.row));
-        if (!legacyItem) continue; // not in legacy map either — skip (likely a consumable)
-        const slotStr = legacyItem.slot as string;
-        if (slotStr === 'weapon') category = 'weapon';
-        else if (['chest', 'head', 'legs', 'hands', 'feet', 'shield', 'armor'].includes(slotStr)) category = 'armor';
-        else category = 'ring';
-      }
+    const def = itemDatabase.getItem(entity.itemId);
+    if (def && def.type === 'consumable') {
+      // Consumables are handled by consumableRenderer — skip here.
+      continue;
+    } else if (def) {
+      category = subtypeToVisualCategory(def.subtype as string);
+    } else {
+      // itemId not found in DB — skip.
+      continue;
     }
 
     if (!textureCache.has(category)) {
@@ -162,45 +152,6 @@ export function buildItemMeshes(
 
     group.add(mesh);
     meshMap.set(mapKey, mesh);
-  }
-
-  // Fallback: if DB is not loaded, render items from legacy groundItems map so the
-  // scene is not empty when running without the item database (e.g., local dev).
-  if (!itemDatabase.isLoaded()) {
-    for (const [mapKey, item] of gameState.groundItems) {
-      // Map legacy slot string to visual category.
-      // Cast to string to handle both new EquipSlot values and legacy 'armor'/'ring'
-      // values that may still appear in older dungeon JSON.
-      let category: ItemVisualCategory = 'ring';
-      const slotStr = item.slot as string;
-      if (slotStr === 'weapon') category = 'weapon';
-      else if (slotStr === 'armor' || slotStr === 'chest' || slotStr === 'head' ||
-               slotStr === 'legs' || slotStr === 'hands' || slotStr === 'feet' ||
-               slotStr === 'shield') category = 'armor';
-
-      if (!textureCache.has(category)) {
-        textureCache.set(category, generateItemTexture(category));
-      }
-
-      const mat = new THREE.MeshLambertMaterial({
-        map: textureCache.get(category)!,
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-
-      const [colStr, rowStr] = mapKey.split(',');
-      const col = Number(colStr);
-      const row = Number(rowStr);
-      const cx = col * CELL_SIZE + CELL_SIZE / 2;
-      const cz = row * CELL_SIZE + CELL_SIZE / 2;
-
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(cx, ITEM_HEIGHT, cz);
-
-      group.add(mesh);
-      meshMap.set(mapKey, mesh);
-    }
   }
 
   return { group, meshMap };

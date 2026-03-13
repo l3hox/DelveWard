@@ -95,76 +95,38 @@ export function buildConsumableMeshes(
   const meshMap = new Map<string, THREE.Mesh>();
   const geo = new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE);
 
-  if (itemDatabase.isLoaded()) {
-    const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId);
+  const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId);
 
-    for (const entity of groundEntities) {
-      const def = itemDatabase.getItem(entity.itemId);
-      let consumableType: string;
-      if (def && def.type === 'consumable') {
-        consumableType = def.subtype as string;
-      } else if (!def) {
-        // itemId not in DB — fall back to legacy groundConsumables entry.
-        const loc = entity.location;
-        if (loc.kind !== 'world') continue;
-        const legacyItem = gameState.groundConsumables.get(doorKey(loc.col, loc.row));
-        if (!legacyItem) continue; // not a consumable — skip
-        consumableType = legacyItem.consumableType;
-      } else {
-        continue; // equipment item — handled by itemRenderer
-      }
+  for (const entity of groundEntities) {
+    const def = itemDatabase.getItem(entity.itemId);
+    if (!def || def.type !== 'consumable') continue;
 
-      if (!textureCache.has(consumableType)) {
-        textureCache.set(consumableType, generateConsumableTexture(consumableType));
-      }
+    const consumableType = def.subtype as string;
 
-      const mat = new THREE.MeshLambertMaterial({
-        map: textureCache.get(consumableType)!,
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-
-      const loc = entity.location;
-      if (loc.kind !== 'world') continue;
-      const col = loc.col;
-      const row = loc.row;
-      const mapKey = doorKey(col, row);
-      const cx = col * CELL_SIZE + CELL_SIZE / 2;
-      const cz = row * CELL_SIZE + CELL_SIZE / 2;
-
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(cx, ITEM_HEIGHT, cz);
-
-      group.add(mesh);
-      meshMap.set(mapKey, mesh);
+    if (!textureCache.has(consumableType)) {
+      textureCache.set(consumableType, generateConsumableTexture(consumableType));
     }
-  } else {
-    // Fallback: render from legacy groundConsumables map when DB is not loaded.
-    for (const [mapKey, item] of gameState.groundConsumables) {
-      if (!textureCache.has(item.consumableType)) {
-        textureCache.set(item.consumableType, generateConsumableTexture(item.consumableType));
-      }
 
-      const mat = new THREE.MeshLambertMaterial({
-        map: textureCache.get(item.consumableType)!,
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
+    const mat = new THREE.MeshLambertMaterial({
+      map: textureCache.get(consumableType)!,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
 
-      const [colStr, rowStr] = mapKey.split(',');
-      const col = Number(colStr);
-      const row = Number(rowStr);
-      const cx = col * CELL_SIZE + CELL_SIZE / 2;
-      const cz = row * CELL_SIZE + CELL_SIZE / 2;
+    const loc = entity.location;
+    if (loc.kind !== 'world') continue;
+    const col = loc.col;
+    const row = loc.row;
+    const mapKey = doorKey(col, row);
+    const cx = col * CELL_SIZE + CELL_SIZE / 2;
+    const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(cx, ITEM_HEIGHT, cz);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(cx, ITEM_HEIGHT, cz);
 
-      group.add(mesh);
-      meshMap.set(mapKey, mesh);
-    }
+    group.add(mesh);
+    meshMap.set(mapKey, mesh);
   }
 
   return { group, meshMap };

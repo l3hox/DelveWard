@@ -633,32 +633,10 @@ async function init(): Promise<void> {
                       drop.modifiers,
                     );
 
-                    // Legacy dual-write + dynamic mesh creation
                     const itemDef = itemDatabase.getItem(drop.itemId);
                     if (itemDef && itemDef.type === 'consumable') {
-                      // Write to legacy groundConsumables + create mesh
-                      const key = doorKey(result.targetCol!, result.targetRow!);
-                      gameState.groundConsumables.set(key, {
-                        id: drop.itemId,
-                        name: itemDef.name,
-                        consumableType: itemDef.subtype as 'health_potion' | 'torch_oil',
-                        value: itemDef.effect?.torchFuel ?? itemDef.stats.hp ?? 0,
-                      });
                       addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
                     } else if (itemDef) {
-                      // Write to legacy groundItems + create mesh
-                      const key = doorKey(result.targetCol!, result.targetRow!);
-                      // Map item type to legacy slot
-                      let slot: string = 'weapon';
-                      if (itemDef.type === 'armor') slot = itemDef.subtype;
-                      else if (itemDef.type === 'accessory') slot = itemDef.subtype === 'ring' ? 'ring1' : itemDef.subtype;
-                      gameState.groundItems.set(key, {
-                        id: drop.itemId,
-                        name: itemDef.name,
-                        slot: slot as any,
-                        atkBonus: itemDef.stats.atk ?? 0,
-                        defBonus: itemDef.stats.def ?? 0,
-                      });
                       addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
                     }
                   }

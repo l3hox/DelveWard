@@ -9,6 +9,38 @@ import { PlayerState } from './grid';
 import type { Facing } from './grid';
 import type { WeaponSubtype } from './itemDatabase';
 
+vi.mock('./itemDatabase', () => ({
+  itemDatabase: {
+    isLoaded: () => true,
+    getItem: (id: string) => {
+      const items: Record<string, object> = {
+        sword_iron: {
+          id: 'sword_iron', name: 'Iron Sword', type: 'weapon', subtype: 'sword',
+          stats: { atk: 4 }, requirements: {}, modifiers: [],
+        },
+        heavy_axe: {
+          id: 'heavy_axe', name: 'Heavy Axe', type: 'weapon', subtype: 'axe',
+          stats: { atk: 8 }, requirements: {}, modifiers: [],
+        },
+        dagger: {
+          id: 'dagger', name: 'Dagger', type: 'weapon', subtype: 'dagger',
+          stats: { atk: 2 }, requirements: {}, modifiers: [],
+        },
+        mace: {
+          id: 'mace', name: 'Mace', type: 'weapon', subtype: 'mace',
+          stats: { atk: 5 }, requirements: {}, modifiers: [],
+        },
+        spear: {
+          id: 'spear', name: 'Spear', type: 'weapon', subtype: 'spear',
+          stats: { atk: 3 }, requirements: {}, modifiers: [],
+        },
+      };
+      return (items as Record<string, unknown>)[id];
+    },
+    getItemsByType: () => [],
+  },
+}));
+
 function makePlayer(col: number, row: number, facing: Facing): PlayerState {
   return new PlayerState(col, row, facing);
 }
@@ -84,7 +116,7 @@ describe('playerAttack', () => {
   it('can kill an enemy', () => {
     const gs = makeGameStateWithEnemy();
     const player = makePlayer(2, 1, 'E');
-    gs.atk = 100; // overkill
+    gs.str = 1000; // overkill via STR (atk = floor(1000/2) = 500)
     const results = playerAttack(player, gs);
     expect(results[0].type).toBe('kill');
     expect(gs.getEnemy(3, 1)).toBeUndefined();
@@ -111,7 +143,7 @@ describe('enemyAttackPlayer', () => {
 // --- C1: Weapon subtype cooldown ---
 
 describe('getWeaponCooldown', () => {
-  it('returns PLAYER_ATTACK_COOLDOWN when no weapon equipped (no DB)', () => {
+  it('returns PLAYER_ATTACK_COOLDOWN when no weapon equipped', () => {
     const gs = new GameState([]);
     expect(getWeaponCooldown(gs)).toBe(PLAYER_ATTACK_COOLDOWN);
   });
