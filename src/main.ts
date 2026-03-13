@@ -34,6 +34,7 @@ import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
+import type { InventoryAction } from './hud/inventoryOverlay';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -462,10 +463,66 @@ async function init(): Promise<void> {
   // --- Input ---
   const pressedKeys = new Set<string>();
 
+  function processInventoryAction(action: InventoryAction): void {
+    switch (action.type) {
+      case 'equip':
+        gameState.equipFromBackpack(action.backpackSlot);
+        break;
+      case 'unequip':
+        gameState.unequipToBackpack(action.equipSlot);
+        break;
+      case 'use':
+        {
+          const backpackItems = gameState.entityRegistry.getBackpackItems();
+          if (action.backpackSlot < backpackItems.length) {
+            gameState.useConsumableFromRegistry(backpackItems[action.backpackSlot].instanceId);
+          }
+        }
+        break;
+      case 'drop':
+        {
+          const entity = gameState.entityRegistry.getItem(action.instanceId);
+          if (entity) {
+            gameState.dropItem(action.instanceId, action.col, action.row);
+            const def = itemDatabase.getItem(entity.itemId);
+            if (def) {
+              const updatedEntity = gameState.entityRegistry.getItem(action.instanceId);
+              if (updatedEntity) {
+                if (def.type === 'consumable') {
+                  addSingleConsumableMesh(updatedEntity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                } else {
+                  addSingleItemMesh(updatedEntity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                }
+              }
+            }
+          }
+        }
+        break;
+      case 'message':
+        hud.showMessage(action.text);
+        break;
+    }
+  }
+
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
+
+    // Inventory overlay gets input priority (except KeyI which closes it)
+    const inventoryOverlay = hud.getInventoryOverlay();
+    if (inventoryOverlay.isOpen()) {
+      if (e.code === 'KeyI') {
+        inventoryOverlay.toggle();
+        return;
+      }
+      const ps = ls.player.getState();
+      const action = inventoryOverlay.handleKey(e.code, gameState, ps.col, ps.row);
+      if (action) {
+        processInventoryAction(action);
+      }
+      return;
+    }
 
     // Stats panel blocks all input except T (to close)
     if (hud.getStatsPanel().isOpen() && e.code !== 'KeyT') return;
@@ -612,6 +669,11 @@ async function init(): Promise<void> {
       case 'KeyT':
         hud.getStatsPanel().toggle();
         break;
+      case 'KeyI':
+        // Close stats panel if open, then open inventory overlay
+        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        hud.getInventoryOverlay().toggle();
+        break;
       case 'KeyL':
         debugFullbright = !debugFullbright;
         if (debugFullbright) {
@@ -667,8 +729,10 @@ async function init(): Promise<void> {
     sconceEmbers.update(delta);
     waterDrips.update(delta, camPos2.x, camPos2.z);
 
-    // Attack cooldown tick
-    if (gameState.attackCooldown > 0) {
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen();
+
+    // Attack cooldown tick — paused when overlays are open
+    if (gameState.attackCooldown > 0 && !anyOverlayOpen) {
       gameState.attackCooldown = Math.max(0, gameState.attackCooldown - delta);
     }
 
@@ -677,8 +741,8 @@ async function init(): Promise<void> {
       playerDamageFlashTimer = Math.max(0, playerDamageFlashTimer - delta);
     }
 
-    // Real-time enemy AI tick
-    if (!transition.isActive) {
+    // Real-time enemy AI tick — paused when overlays are open
+    if (!transition.isActive && !anyOverlayOpen) {
       const ps = ls.player.getState();
       const actions = updateEnemies(
         gameState, ps.col, ps.row, ls.level.grid, ls.walkable,

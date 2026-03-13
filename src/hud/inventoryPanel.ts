@@ -140,6 +140,14 @@ export function drawInventoryPanel(
     }
   }
 
+  // Gold display — below the backpack grid
+  const goldY = backpackY + 3 * (SLOT_SIZE + SLOT_GAP) + 4;
+  ctx.fillStyle = '#DAA520';
+  ctx.beginPath();
+  ctx.arc(x + 12, goldY + 5, 4, 0, Math.PI * 2);
+  ctx.fill();
+  drawPixelText(ctx, String(gameState.gold) + 'G', x + 22, goldY + 1, '#DAA520', 2);
+
   // Border
   ctx.strokeStyle = HUD_COLORS.panelBorder;
   ctx.lineWidth = 1;

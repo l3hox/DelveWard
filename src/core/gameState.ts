@@ -783,6 +783,95 @@ export class GameState {
     this.hp = this.maxHp;
   }
 
+  /**
+   * Equip an item from backpack to the appropriate equipment slot.
+   * If the target slot is occupied, swap items.
+   * backpackIndex is a positional index into the sorted backpack list (getBackpackItems()).
+   */
+  equipFromBackpack(backpackIndex: number): { success: boolean; reason?: string; swappedToSlot?: number } {
+    const backpackItems = this.entityRegistry.getBackpackItems();
+    if (backpackIndex < 0 || backpackIndex >= backpackItems.length) return { success: false };
+
+    const entity = backpackItems[backpackIndex];
+    if (!itemDatabase.isLoaded()) return { success: false };
+    const itemDef = itemDatabase.getItem(entity.itemId);
+    if (!itemDef) return { success: false };
+
+    const targetSlot: EquipSlot = _subtypeToEquipSlot(itemDef.subtype as string, this);
+
+    const check = this.canEquipItem(itemDef);
+    if (!check.allowed) return { success: false, reason: check.reason };
+
+    // Actual backpack slot number from entity location
+    const backpackSlot = (entity.location as { kind: 'backpack'; slot: number }).slot;
+
+    // If target slot is occupied, swap existing item to the backpack slot
+    const existing = this.entityRegistry.getEquipped(targetSlot);
+    if (existing) {
+      this.entityRegistry.moveItem(existing.instanceId, { kind: 'backpack', slot: backpackSlot });
+    }
+
+    this.entityRegistry.moveItem(entity.instanceId, { kind: 'equipped', slot: targetSlot });
+    this.maxHp = this.getEffectiveStats().maxHp;
+
+    return { success: true, swappedToSlot: existing ? backpackSlot : undefined };
+  }
+
+  /**
+   * Unequip an item from equipment slot to first free backpack slot.
+   */
+  unequipToBackpack(equipSlot: EquipSlot): { success: boolean; reason?: string } {
+    const entity = this.entityRegistry.getEquipped(equipSlot);
+    if (!entity) return { success: false };
+
+    const slot = this.entityRegistry.nextBackpackSlot();
+    if (slot === null) return { success: false, reason: 'Backpack is full' };
+
+    this.entityRegistry.moveItem(entity.instanceId, { kind: 'backpack', slot });
+    this.maxHp = this.getEffectiveStats().maxHp;
+
+    return { success: true };
+  }
+
+  /**
+   * Drop an item from inventory to the ground at the given position.
+   */
+  dropItem(instanceId: string, col: number, row: number): boolean {
+    const entity = this.entityRegistry.getItem(instanceId);
+    if (!entity) return false;
+
+    this.entityRegistry.moveItem(instanceId, {
+      kind: 'world',
+      levelId: this.currentLevelId,
+      col,
+      row,
+    });
+
+    this.maxHp = this.getEffectiveStats().maxHp;
+    return true;
+  }
+
+  /**
+   * Use a consumable from backpack using the registry + item database.
+   */
+  useConsumableFromRegistry(instanceId: string): boolean {
+    const entity = this.entityRegistry.getItem(instanceId);
+    if (!entity) return false;
+
+    if (!itemDatabase.isLoaded()) return false;
+    const itemDef = itemDatabase.getItem(entity.itemId);
+    if (!itemDef || itemDef.type !== 'consumable') return false;
+
+    if (itemDef.subtype === 'health_potion') {
+      this.hp = Math.min(this.maxHp, this.hp + (itemDef.stats.hp ?? 0));
+    } else if (itemDef.subtype === 'torch_oil') {
+      this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
+    }
+
+    this.entityRegistry.removeItem(instanceId);
+    return true;
+  }
+
   equipItem(item: EquipmentItem): EquipmentItem | null {
     const displaced = this.equipment.get(item.slot) ?? null;
     this.equipment.set(item.slot, item);
@@ -901,4 +990,23 @@ export class GameState {
       r += dr;
     }
   }
+}
+
+// Module-level helper used by equipFromBackpack.
+// Kept here to avoid a circular dependency with inventoryOverlay.ts.
+function _subtypeToEquipSlot(subtype: string, gameState: GameState): EquipSlot {
+  const weaponSubtypes = new Set(['sword', 'axe', 'dagger', 'mace', 'spear', 'staff']);
+  if (weaponSubtypes.has(subtype)) return 'weapon';
+
+  const armorSlots: Record<string, EquipSlot> = {
+    head: 'head', chest: 'chest', legs: 'legs', hands: 'hands', feet: 'feet', shield: 'shield',
+  };
+  if (armorSlots[subtype]) return armorSlots[subtype];
+
+  if (subtype === 'ring') {
+    return gameState.entityRegistry.getEquipped('ring1') ? 'ring2' : 'ring1';
+  }
+  if (subtype === 'amulet') return 'amulet';
+
+  return 'weapon'; // fallback
 }
