@@ -27,6 +27,7 @@ import { TransitionOverlay } from './rendering/transitionOverlay';
 import { CharacterCreationScreen } from './hud/characterCreation';
 import { LevelUpNotification } from './hud/levelUpNotification';
 import { DamageNumberManager } from './rendering/damageNumbers';
+import { EnemyHealthBarManager } from './rendering/enemyHealthBar';
 import { SwordSwingAnimator } from './rendering/swordSwing';
 import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
@@ -72,6 +73,7 @@ interface LevelScene {
   stairMeshes: { group: THREE.Group };
   enemyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   enemyAnimator: EnemyAnimator;
+  healthBarManager: EnemyHealthBarManager;
   itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   player: Player;
@@ -136,6 +138,13 @@ function buildLevelScene(
     if (enemy) enemyAnimator.register(key, mesh, enemy.col, enemy.row);
   }
 
+  const healthBarManager = new EnemyHealthBarManager();
+  for (const [key, enemy] of gameState.enemies) {
+    const mesh = enemyMeshes.meshMap.get(key);
+    if (mesh) healthBarManager.create(key, mesh, enemy.maxHp);
+  }
+  scene.add(healthBarManager.getGroup());
+
   const player = new Player(
     camera,
     level.grid,
@@ -161,6 +170,7 @@ function buildLevelScene(
     stairMeshes,
     enemyMeshes,
     enemyAnimator,
+    healthBarManager,
     itemMeshes,
     consumableMeshes,
     player,
@@ -177,6 +187,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
     ls.enemyMeshes.group,
+    ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
     ls.consumableMeshes.group,
   ];
@@ -512,7 +523,14 @@ async function init(): Promise<void> {
                   damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
                 }
               }
+              if (result.type === 'hit' && result.targetCol !== undefined && result.targetRow !== undefined) {
+                const hitEnemy = gameState.getEnemy(result.targetCol, result.targetRow);
+                if (hitEnemy) {
+                  ls.healthBarManager.update(doorKey(result.targetCol, result.targetRow), hitEnemy.hp, hitEnemy.maxHp);
+                }
+              }
               if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
+                ls.healthBarManager.remove(doorKey(result.targetCol, result.targetRow));
                 hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
                 ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
                 // Award XP for the kill
@@ -635,6 +653,10 @@ async function init(): Promise<void> {
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
+
+    // Sync health bar positions (enemies animate with hit shake and lunge)
+    ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
+    ls.healthBarManager.updateBillboards(camera);
 
     // Sconce torch flicker
     updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
