@@ -5,6 +5,7 @@ import { itemDatabase } from '../core/itemDatabase';
 import type { GameState } from '../core/gameState';
 import type { EquipSlot } from '../core/entities';
 import { drawItemTooltip } from './itemTooltip';
+import { getItemImage } from '../rendering/itemSprites';
 
 type InventorySection = 'equipment' | 'backpack';
 
@@ -301,11 +302,7 @@ export class InventoryOverlay {
       const slot = EQUIP_SLOTS[i];
       const entity = gameState.entityRegistry.getEquipped(slot);
       if (entity) {
-        const color = EQUIP_COLORS[slot] ?? '#888';
-        ctx.fillStyle = color;
-        ctx.fillRect(sx + 4, sy + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-        const label = _getItemShortLabel(entity.itemId);
-        drawPixelText(ctx, label, sx + 9, sy + 9, '#000', 2);
+        _drawItemIcon(ctx, entity.itemId, sx, sy, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
       }
     }
 
@@ -341,23 +338,20 @@ export class InventoryOverlay {
 
       const entity = _getBackpackEntityAt(i, gameState);
       if (entity) {
-        let color = '#888';
+        let fallbackColor = '#888';
         if (itemDatabase.isLoaded()) {
           const def = itemDatabase.getItem(entity.itemId);
           if (def?.type === 'consumable') {
-            color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
+            fallbackColor = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
           } else if (def?.type === 'weapon') {
-            color = EQUIP_COLORS['weapon'] ?? '#888';
+            fallbackColor = EQUIP_COLORS['weapon'] ?? '#888';
           } else if (def?.type === 'armor') {
-            color = EQUIP_COLORS[def.subtype as EquipSlot] ?? '#888';
+            fallbackColor = EQUIP_COLORS[def.subtype as EquipSlot] ?? '#888';
           } else if (def?.type === 'accessory') {
-            color = EQUIP_COLORS[def.subtype as EquipSlot] ?? '#DAA520';
+            fallbackColor = EQUIP_COLORS[def.subtype as EquipSlot] ?? '#DAA520';
           }
         }
-        ctx.fillStyle = color;
-        ctx.fillRect(sx + 4, sy + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-        const label = _getItemShortLabel(entity.itemId);
-        drawPixelText(ctx, label, sx + 9, sy + 9, '#000', 2);
+        _drawItemIcon(ctx, entity.itemId, sx, sy, SLOT_SIZE, fallbackColor);
       }
     }
 
@@ -438,10 +432,27 @@ function _drawSlot(
   }
 }
 
-function _getItemShortLabel(itemId: string): string {
-  if (itemDatabase.isLoaded()) {
-    const def = itemDatabase.getItem(itemId);
-    if (def?.name) return def.name.charAt(0).toUpperCase();
+function _drawItemIcon(
+  ctx: CanvasRenderingContext2D,
+  itemId: string,
+  sx: number,
+  sy: number,
+  slotSize: number,
+  fallbackColor: string,
+): void {
+  const padding = 2;
+  const iconSize = slotSize - padding * 2;
+  const def = itemDatabase.isLoaded() ? itemDatabase.getItem(itemId) : null;
+  const icon = def?.icon;
+  const img = icon ? getItemImage(icon) : null;
+
+  if (img) {
+    ctx.drawImage(img, sx + padding, sy + padding, iconSize, iconSize);
+  } else {
+    // Fallback: colored square with initial letter
+    ctx.fillStyle = fallbackColor;
+    ctx.fillRect(sx + 4, sy + 4, slotSize - 8, slotSize - 8);
+    const label = def?.name?.charAt(0).toUpperCase() ?? itemId.charAt(0).toUpperCase();
+    drawPixelText(ctx, label, sx + 9, sy + 9, '#000', 2);
   }
-  return itemId.charAt(0).toUpperCase();
 }

@@ -4,6 +4,35 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-13 — Item sprite system
+
+Replaced procedural canvas textures with PNG sprite loading for all items.
+
+**New module** (`src/rendering/itemSprites.ts`):
+- Shared sprite loader providing both THREE.Texture (3D ground items) and HTMLImageElement (2D HUD canvas)
+- `getItemTexture(icon)` / `getItemImage(icon)` with caching
+- `preloadItemSprites()` called at startup after item DB loads
+- Falls back gracefully if a PNG is missing
+
+**Updated renderers:**
+- `itemRenderer.ts` — replaced procedural weapon/armor/ring textures with per-item PNG sprites via `icon` field
+- `consumableRenderer.ts` — replaced procedural potion textures with per-item PNG sprites
+- `inventoryPanel.ts` (HUD quickbar) — draws sprite icons in equipment and backpack slots
+- `inventoryOverlay.ts` (full inventory screen) — draws sprite icons in all slots
+- All four fall back to colored rectangles if sprite not loaded
+
+**Item data** (`public/data/items.json`):
+- `icon` field updated to match actual sprite filenames (hyphenated, e.g. `red-potion`, `leather-cap`)
+- Items sharing visual category reuse the same sprite (e.g. all swords → `sword.png`)
+
+**Sprite assets** (`public/sprites/items/`):
+- 26 pixelart item sprites (32x32 PNG): weapons, armor, shields, rings, amulets, potions, bone
+
+**Other:**
+- `ItemDatabase.getAllItems()` added for preloader icon collection
+
+---
+
 ## 2026-03-13 — Lighting, torch, and UX improvements
 
 **Torch & lighting overhaul** (`src/main.ts`):

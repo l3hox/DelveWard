@@ -5,6 +5,7 @@ import { PLAYER_ATTACK_COOLDOWN } from '../core/combat';
 import { itemDatabase } from '../core/itemDatabase';
 import type { GameState } from '../core/gameState';
 import type { EquipSlot } from '../core/gameState';
+import { getItemImage } from '../rendering/itemSprites';
 
 const SLOT_SIZE = 24;
 const SLOT_GAP = 4;
@@ -69,15 +70,7 @@ export function drawInventoryPanel(
 
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
-      const color = EQUIP_COLORS[slot] ?? '#888';
-      ctx.fillStyle = color;
-      ctx.fillRect(sx + 4, equipY1 + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-      // Show item name abbreviation — prefer DB name, fall back to itemId.
-      const displayLabel = _getItemLabel(entity.itemId);
-      drawPixelText(ctx, displayLabel, sx + 8, equipY1 + 7, '#000', 2);
-    } else if (i === 0 && !entity) {
-      // Empty weapon slot — still show label
-      // (already drawn by drawSlot above)
+      _drawItemIcon(ctx, entity.itemId, sx, equipY1, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
     }
   }
 
@@ -100,11 +93,7 @@ export function drawInventoryPanel(
 
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
-      const color = EQUIP_COLORS[slot] ?? '#888';
-      ctx.fillStyle = color;
-      ctx.fillRect(sx + 4, equipY2 + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
-      const displayLabel = _getItemLabel(entity.itemId);
-      drawPixelText(ctx, displayLabel, sx + 8, equipY2 + 7, '#000', 2);
+      _drawItemIcon(ctx, entity.itemId, sx, equipY2, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
     }
   }
 
@@ -122,13 +111,12 @@ export function drawInventoryPanel(
       // Find item in this backpack slot position (by sorted order).
       if (slotIndex < backpackItems.length) {
         const entity = backpackItems[slotIndex];
-        let color = '#888';
+        let fallbackColor = '#888';
         const def = itemDatabase.getItem(entity.itemId);
         if (def?.type === 'consumable') {
-          color = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
+          fallbackColor = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
         }
-        ctx.fillStyle = color;
-        ctx.fillRect(sx + 4, slotY + 4, SLOT_SIZE - 8, SLOT_SIZE - 8);
+        _drawItemIcon(ctx, entity.itemId, sx, slotY, SLOT_SIZE, fallbackColor);
       }
     }
   }
@@ -139,13 +127,28 @@ export function drawInventoryPanel(
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
-// Returns a short display label for an item — first char of DB name, or first char of itemId.
-function _getItemLabel(itemId: string): string {
-  if (itemDatabase.isLoaded()) {
-    const def = itemDatabase.getItem(itemId);
-    if (def?.name) return def.name.charAt(0).toUpperCase();
+function _drawItemIcon(
+  ctx: CanvasRenderingContext2D,
+  itemId: string,
+  sx: number,
+  sy: number,
+  slotSize: number,
+  fallbackColor: string,
+): void {
+  const padding = 2;
+  const iconSize = slotSize - padding * 2;
+  const def = itemDatabase.isLoaded() ? itemDatabase.getItem(itemId) : null;
+  const icon = def?.icon;
+  const img = icon ? getItemImage(icon) : null;
+
+  if (img) {
+    ctx.drawImage(img, sx + padding, sy + padding, iconSize, iconSize);
+  } else {
+    ctx.fillStyle = fallbackColor;
+    ctx.fillRect(sx + 4, sy + 4, slotSize - 8, slotSize - 8);
+    const label = def?.name?.charAt(0).toUpperCase() ?? itemId.charAt(0).toUpperCase();
+    drawPixelText(ctx, label, sx + 8, sy + 7, '#000', 2);
   }
-  return itemId.charAt(0).toUpperCase();
 }
 
 function drawSlot(

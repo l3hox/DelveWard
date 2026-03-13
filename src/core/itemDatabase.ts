@@ -103,6 +103,10 @@ export class ItemDatabase {
     return result;
   }
 
+  getAllItems(): ItemDef[] {
+    return [...this.items.values()];
+  }
+
   isLoaded(): boolean {
     return this.loaded;
   }

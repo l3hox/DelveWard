@@ -3,55 +3,18 @@ import { CELL_SIZE } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
 import { itemDatabase } from '../core/itemDatabase';
 import type { ItemEntity } from '../core/entities';
+import { getItemTexture } from './itemSprites';
 
 const ITEM_SIZE = 0.3;
 const ITEM_HEIGHT = 0.15;
 
-function generateConsumableTexture(consumableType: string): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 16;
-  canvas.height = 16;
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, 16, 16);
-
-  if (consumableType === 'health_potion') {
-    // Red flask
-    ctx.fillStyle = '#CC3333';
-    ctx.fillRect(6, 5, 4, 8);
-    ctx.fillRect(5, 7, 6, 4);
-    // Neck
-    ctx.fillStyle = '#AA2222';
-    ctx.fillRect(7, 3, 2, 3);
-    // Cork
-    ctx.fillStyle = '#8B6914';
-    ctx.fillRect(7, 2, 2, 2);
-    // Highlight
-    ctx.fillStyle = '#FF6666';
-    ctx.fillRect(6, 7, 1, 2);
-  } else {
-    // Yellow flask (torch oil / default consumable)
-    ctx.fillStyle = '#CC9900';
-    ctx.fillRect(6, 5, 4, 8);
-    ctx.fillRect(5, 7, 6, 4);
-    // Neck
-    ctx.fillStyle = '#AA8800';
-    ctx.fillRect(7, 3, 2, 3);
-    // Cork
-    ctx.fillStyle = '#8B6914';
-    ctx.fillRect(7, 2, 2, 2);
-    // Highlight
-    ctx.fillStyle = '#FFCC44';
-    ctx.fillRect(6, 7, 1, 2);
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  return tex;
+function createConsumableMaterial(icon: string): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({
+    map: getItemTexture(icon),
+    transparent: true,
+    side: THREE.DoubleSide,
+  });
 }
-
-// Module-level texture cache — shared between buildConsumableMeshes and addSingleConsumableMesh.
-const textureCache = new Map<string, THREE.CanvasTexture>();
 
 export function addSingleConsumableMesh(
   entity: ItemEntity,
@@ -61,17 +24,7 @@ export function addSingleConsumableMesh(
   const def = itemDatabase.getItem(entity.itemId);
   if (!def || def.type !== 'consumable') return;
 
-  const consumableType = def.subtype as string;
-
-  if (!textureCache.has(consumableType)) {
-    textureCache.set(consumableType, generateConsumableTexture(consumableType));
-  }
-
-  const mat = new THREE.MeshLambertMaterial({
-    map: textureCache.get(consumableType)!,
-    transparent: true,
-    side: THREE.DoubleSide,
-  });
+  const mat = createConsumableMaterial(def.icon);
 
   const loc = entity.location;
   // Caller guarantees this is a world item.
@@ -101,17 +54,7 @@ export function buildConsumableMeshes(
     const def = itemDatabase.getItem(entity.itemId);
     if (!def || def.type !== 'consumable') continue;
 
-    const consumableType = def.subtype as string;
-
-    if (!textureCache.has(consumableType)) {
-      textureCache.set(consumableType, generateConsumableTexture(consumableType));
-    }
-
-    const mat = new THREE.MeshLambertMaterial({
-      map: textureCache.get(consumableType)!,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
+    const mat = createConsumableMaterial(def.icon);
 
     const loc = entity.location;
     if (loc.kind !== 'world') continue;

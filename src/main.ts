@@ -14,6 +14,7 @@ import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, SPRITE_SIZES, DEFAULT_SPRITE_SIZE } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
+import { preloadItemSprites } from './rendering/itemSprites';
 import { loadLootTables, rollLoot } from './core/lootTable';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
@@ -255,6 +256,9 @@ async function init(): Promise<void> {
 
   // --- Item database + enemy textures (preload before scene build so sprites appear immediately) ---
   await Promise.all([itemDatabase.load(), preloadEnemyTextures(), loadLootTables()]);
+  // Preload item sprites (needs item DB loaded first for icon names)
+  const allIcons = itemDatabase.getAllItems().map((item) => item.icon);
+  await preloadItemSprites(allIcons);
 
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
