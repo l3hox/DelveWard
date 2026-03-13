@@ -4,6 +4,25 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-13 — Bugfixes & enemy sprites
+
+**Equipment pickup fix** (`src/core/gameState.ts`):
+- `pickupEquipmentAt()` now moves displaced equipped item to backpack instead of destroying it
+- If backpack is full, pickup is denied with a message instead of silently losing the item
+
+**Bat vertical offset** (`src/rendering/enemyRenderer.ts`):
+- Added `SPRITE_Y_OFFSETS` lookup — giant_bat sprites now hover 1.0 unit above floor (upper half of cell)
+- Other enemy types unaffected
+
+**Enemy sprite art** (`public/sprites/`):
+- Added pixelart sprites for all 6 new enemy types: goblin, giant_bat, spider, kobold, zombie, troll
+- Enemies no longer fall back to skeleton placeholder
+
+**Dungeon fixes** (`public/levels/dungeon_m1.json`):
+- Minor layout adjustments to level 2 and level 3
+
+---
+
 ## 2026-03-13 — M1 Phase F: Content (enemy types, AI, dungeon)
 
 6 new enemy types, 3 new AI behaviors, and the 3-level M1 test dungeon.

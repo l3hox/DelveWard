@@ -791,7 +791,11 @@ export class GameState {
       : 'weapon';
 
     const existing = this.entityRegistry.getEquipped(slot);
-    if (existing) this.entityRegistry.removeItem(existing.instanceId);
+    if (existing) {
+      const backpackSlot = this.entityRegistry.nextBackpackSlot();
+      if (backpackSlot === null) return { denied: 'Backpack is full' };
+      this.entityRegistry.moveItem(existing.instanceId, { kind: 'backpack', slot: backpackSlot });
+    }
     this.entityRegistry.moveItem(equipEntity.instanceId, { kind: 'equipped', slot });
 
     const name = itemDatabase.isLoaded()

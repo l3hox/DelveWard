@@ -29,7 +29,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Phase F: Content (new enemy types, AI behaviors, M1 test dungeon)
 
 ### Remaining for M1 ship
-- [ ] F3: Enemy sprite art (6 new enemies using skeleton placeholder)
+- [x] F3: Enemy sprite art (6 new enemies)
 - [ ] F5: Playtesting & balance pass
 - [ ] Tag v0.1
 
@@ -52,7 +52,6 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Known Issues
 
-- 6 new enemy types (goblin, giant_bat, spider, kobold, zombie, troll) use skeleton sprite as placeholder — need pixelart sprites in `public/sprites/`
 - Existing enemy stats rebalanced for M1 (rat HP 4→8, skeleton HP 8→20, orc HP 15→40) — may need tuning during F5
 
 ---

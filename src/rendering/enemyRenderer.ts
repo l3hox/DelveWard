@@ -15,6 +15,11 @@ export const SPRITE_SIZES: Record<string, number> = {
 };
 export const DEFAULT_SPRITE_SIZE = 1.2;
 
+/** Extra vertical offset — lifts sprite above the default floor-anchored position. */
+const SPRITE_Y_OFFSETS: Record<string, number> = {
+  giant_bat: 1.0,
+};
+
 const SPRITE_PATHS: Record<string, string> = {
   rat: '/sprites/rat.png',
   skeleton: '/sprites/skeleton.png',
@@ -145,7 +150,8 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
     const cx = enemy.col * CELL_SIZE + CELL_SIZE / 2;
     const cz = enemy.row * CELL_SIZE + CELL_SIZE / 2;
     // Place sprite so bottom edge sits at floor level (PlaneGeometry is center-anchored)
-    mesh.position.set(cx, size * 0.5, cz);
+    const yOffset = SPRITE_Y_OFFSETS[enemy.type] ?? 0;
+    mesh.position.set(cx, size * 0.5 + yOffset, cz);
 
     group.add(mesh);
     meshMap.set(mapKey, mesh);
