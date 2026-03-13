@@ -257,7 +257,7 @@ async function init(): Promise<void> {
   await Promise.all([itemDatabase.load(), preloadEnemyTextures(), loadLootTables()]);
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon3.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
   const firstLevel = dungeon.levels[0];
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
