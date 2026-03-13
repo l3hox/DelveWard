@@ -524,6 +524,18 @@ async function init(): Promise<void> {
       return;
     }
 
+    // Attribute panel routing — Tab closes, other keys are consumed by the panel
+    const attributePanel = hud.getAttributePanel();
+    if (attributePanel.isOpen()) {
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        attributePanel.toggle();
+        return;
+      }
+      attributePanel.handleKey(e.code, gameState);
+      return;
+    }
+
     // Stats panel blocks all input except T (to close)
     if (hud.getStatsPanel().isOpen() && e.code !== 'KeyT') return;
 
@@ -666,12 +678,19 @@ async function init(): Promise<void> {
           }
         }
         break;
+      case 'Tab':
+        e.preventDefault(); // prevent browser tab focus
+        if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
+        hud.getAttributePanel().toggle();
+        break;
       case 'KeyT':
         hud.getStatsPanel().toggle();
         break;
       case 'KeyI':
-        // Close stats panel if open, then open inventory overlay
+        // Close stats panel and attribute panel if open, then open inventory overlay
         if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
+        if (hud.getAttributePanel().isOpen()) hud.getAttributePanel().toggle();
         hud.getInventoryOverlay().toggle();
         break;
       case 'KeyL':
@@ -729,7 +748,7 @@ async function init(): Promise<void> {
     sconceEmbers.update(delta);
     waterDrips.update(delta, camPos2.x, camPos2.z);
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen();
 
     // Attack cooldown tick — paused when overlays are open
     if (gameState.attackCooldown > 0 && !anyOverlayOpen) {
