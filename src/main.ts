@@ -36,6 +36,7 @@ import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
+import { checkAssets } from './core/assetCheck';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -259,6 +260,9 @@ async function init(): Promise<void> {
   // Preload item sprites (needs item DB loaded first for icon names)
   const allIcons = itemDatabase.getAllItems().map((item) => item.icon);
   await preloadItemSprites(allIcons);
+
+  // Verify all referenced PNG assets exist (non-blocking, logs errors)
+  checkAssets();
 
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
