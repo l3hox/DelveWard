@@ -4,6 +4,38 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Level environment system
+
+Added per-level `environment` parameter to control visual atmosphere (fog, background, ambient light).
+
+**New type** (`src/core/types.ts`):
+- `Environment` type: `'dungeon' | 'mist'`
+- Optional `environment` field on `DungeonLevel` (defaults to `'dungeon'`)
+
+**New module** (`src/rendering/environment.ts`):
+- Environment presets with fog color/range and ambient light color
+- `applyEnvironment()` sets scene fog, background, and ambient per level
+- `getEnvironmentConfig()` for debug fullbright fog restore
+- Dungeon: black fog (6–26), dark ambient — original behavior
+- Mist: grey fog (2–14), bright ambient — outdoor/misty feel
+
+**Gameplay** (`src/main.ts`):
+- Environment applied at initial load, level transitions, and restarts
+- Torch fuel does not drain in mist environment (ambient light, no torch needed)
+- Debug fullbright toggle restores correct environment fog
+
+**Stair rendering** (`src/rendering/stairRenderer.ts`):
+- Fixed back wall facing (removed incorrect π rotation)
+- Doubled back wall height to cover two floors — prevents background bleed in non-black environments
+
+**Validation** (`src/level/levelLoader.ts`):
+- Validates `environment` field against known values
+
+**Docs** (`DUNGEON-DESIGNER.md`):
+- Documented environment field with available presets
+
+---
+
 ## 2026-03-13 — Item sprite system
 
 Replaced procedural canvas textures with PNG sprite loading for all items.

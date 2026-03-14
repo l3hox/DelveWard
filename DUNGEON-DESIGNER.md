@@ -430,6 +430,27 @@ For wall faces specifically: if the solid neighbor is a solid charDef with `wall
 
 ---
 
+## Environment (optional)
+
+Controls the visual atmosphere of the level — fog color, background, and ambient light.
+
+```json
+{
+  "name": "Misty Ruins",
+  "environment": "mist",
+  "grid": [ ... ]
+}
+```
+
+| Value | Fog | Background | Ambient | Default |
+|-------|-----|------------|---------|---------|
+| `dungeon` | Black, fades to darkness | Black | Very dark blue-grey | Yes |
+| `mist` | Grey, fades to grey mist | Grey | Brighter cool grey | No |
+
+If omitted, defaults to `"dungeon"`. The environment is applied per-level, so different floors of a dungeon can have different atmospheres.
+
+---
+
 ## Particle effects (optional booleans)
 
 | Field | Default | Effect |

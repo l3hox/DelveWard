@@ -37,6 +37,7 @@ import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
+import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -213,8 +214,6 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
 async function init(): Promise<void> {
   // --- Scene ---
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
-  scene.fog = new THREE.Fog(0x000000, 6, 26);
 
   // --- Camera ---
   const camera = new THREE.PerspectiveCamera(
@@ -241,7 +240,7 @@ async function init(): Promise<void> {
   document.body.appendChild(renderer.domElement);
 
   // --- Lighting ---
-  const ambient = new THREE.AmbientLight(0x1a1a22);
+  const ambient = new THREE.AmbientLight(0x000000); // color set by applyEnvironment
   scene.add(ambient);
 
   const torchLight = new THREE.PointLight(0xff994d, 6, 21);
@@ -269,6 +268,7 @@ async function init(): Promise<void> {
   const firstLevel = dungeon.levels[0];
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
+  applyEnvironment(firstLevel.environment, scene, ambient);
 
   const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
 
@@ -335,6 +335,7 @@ async function init(): Promise<void> {
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
       gameState.gold = 0;
+      applyEnvironment(currentLevel.environment, scene, ambient);
 
       ls = buildLevelScene(
         currentLevel, gameState, camera, scene,
@@ -406,8 +407,10 @@ async function init(): Promise<void> {
         pressPlate(ls.plateMeshes.meshMap, col, row);
       }
 
-      // Torch fuel drain
-      gameState.drainTorchFuel(1);
+      // Torch fuel drain (mist environments have ambient light — no torch needed)
+      if ((ls.level.environment ?? 'dungeon') !== 'mist') {
+        gameState.drainTorchFuel(1);
+      }
 
       // Stair detection
       const cell = ls.level.grid[row]?.[col];
@@ -449,6 +452,7 @@ async function init(): Promise<void> {
       }
 
       currentLevelId = targetId;
+      applyEnvironment(targetLevel.environment, scene, ambient);
       ls = buildLevelScene(targetLevel, gameState, camera, scene, targetCol, targetRow, targetFacing);
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
@@ -691,7 +695,8 @@ async function init(): Promise<void> {
           scene.fog = null;
         } else {
           scene.remove(debugLight);
-          scene.fog = new THREE.Fog(0x000000, 6, 26);
+          const cfg = getEnvironmentConfig();
+          scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
         }
         console.log(`Debug fullbright: ${debugFullbright ? 'ON' : 'OFF'}`);
         break;

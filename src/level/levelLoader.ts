@@ -251,6 +251,14 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
   }
 
+  // environment (optional)
+  if (obj.environment !== undefined) {
+    const validEnvs = ['dungeon', 'mist'];
+    if (!validEnvs.includes(obj.environment as string)) {
+      throw new Error(`Level ${source}: "environment" must be one of ${validEnvs.join(', ')}`);
+    }
+  }
+
   // defaults (optional)
   if (obj.defaults !== undefined) {
     if (typeof obj.defaults !== 'object' || obj.defaults === null || Array.isArray(obj.defaults)) {

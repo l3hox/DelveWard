@@ -258,11 +258,12 @@ function buildStairGroup(
   );
   group.add(rightWall);
 
-  // Back wall — pure black at the far end of the stairwell
-  const backWallGeo = new THREE.PlaneGeometry(STEP_WIDTH, WALL_HEIGHT);
+  // Back wall — pure black at the far end of the stairwell, covers two floors
+  const backWallH = WALL_HEIGHT * 2;
+  const backWallGeo = new THREE.PlaneGeometry(STEP_WIDTH, backWallH);
   const backWall = new THREE.Mesh(backWallGeo, backWallMat);
-  backWall.position.set(0, WALL_HEIGHT / 2, -CELL_SIZE / 2);
-  backWall.rotation.y = Math.PI; // face toward approach
+  backWall.position.set(0, backWallH / 2 - WALL_HEIGHT / 2, -CELL_SIZE / 2);
+  // PlaneGeometry default normal is +Z, which already faces toward the approach
   group.add(backWall);
 
   // Rotate to match facing direction

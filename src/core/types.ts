@@ -18,12 +18,15 @@ export interface TextureArea extends TextureSet {
   toRow: number;
 }
 
+export type Environment = 'dungeon' | 'mist';
+
 export interface DungeonLevel {
   id?: string;               // optional stable identifier for save/load keying
   name: string;
   grid: string[];            // each string = one row of chars
   playerStart: { col: number; row: number; facing: Facing };
   entities: Entity[];
+  environment?: Environment;     // visual environment preset (default: 'dungeon')
   dustMotes?: boolean;           // enable floating dust particles (default: true)
   waterDrips?: boolean;          // enable ceiling water drip effect (default: false)
   defaults?: TextureSet;
