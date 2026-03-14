@@ -4,6 +4,44 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Dungeon Editor Phase 3: Entity Placement + Inspector
+
+**Entity CRUD** (`src/editor/EditorApp.ts`):
+- Expanded `EditorTool` to include `'entity'` mode
+- Added `selectedEntity`, `selectedEntityType` state with cycling selection for multi-entity cells
+- Entity defaults registry — new entities get sensible defaults per type
+- Placement constraints: doors only on 'D' cells, stairs only on 'S'/'U' cells, others on walkable cells
+- Methods: `getEntitiesAt`, `selectEntityAt`, `deselectEntity`, `addEntity`, `deleteSelectedEntity`, `canPlaceEntityType`
+
+**Inspector panel** (`src/editor/Inspector.ts` — new):
+- Right sidebar with type-specific property forms (dropdowns, text inputs, number inputs)
+- Door state dropdown dynamically shows/hides `keyId` field when locked
+- Enemy type dropdown populated from `ENEMY_DEFS`
+- Delete Entity button, entity changed / delete callbacks
+
+**Grid interaction** (`src/editor/GridCanvas.ts`):
+- Select tool: click to select/cycle entities, click empty to deselect
+- Entity tool: click to place new entity of selected type
+- Cyan selection highlight on selected entity's cell
+- Green hover color for entity tool, crosshair cursor
+
+**Toolbar** (`src/editor/Toolbar.ts`):
+- Entity tool button added to tool group
+- Entity type `<select>` dropdown (9 types) — selecting auto-switches to entity tool
+- Dropdown dims when not in entity mode
+
+**Layout** (`editor.html`):
+- `#main-area` flex wrapper around canvas + inspector
+- Full inspector CSS (dark theme, field styling, delete button)
+- Entity type select styling
+
+**Wiring** (`src/editor/main.ts`):
+- Inspector refresh on selection change, entity change → canvas redraw
+- Delete key listener with input focus guard (doesn't trigger while editing fields)
+- Inspector refresh on level load
+
+---
+
 ## 2026-03-14 — Door blocking & troll regen improvements
 
 **Door enemy blocking** (`src/core/gameState.ts`, `src/level/interaction.ts`, `src/rendering/doorAnimator.ts`, `src/main.ts`):

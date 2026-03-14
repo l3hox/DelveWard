@@ -14,7 +14,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Current Milestone
 
-**Milestone 1: The Loot Game**
+**Dungeon Editor** (pulled forward from later milestones)
 
 ---
 
@@ -30,8 +30,16 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ### Remaining for M1 ship
 - [x] F3: Enemy sprite art (6 new enemies)
-- [ ] F5: Playtesting & balance pass
-- [ ] Tag v0.1
+- [x] F5: Playtesting & balance pass
+- [x] Tag v0.1 (**shipped**)
+
+### Dungeon Editor
+- [x] Phase 1: Scaffold + grid canvas (2D textured view, pan/zoom, import JSON)
+- [x] Phase 2: Grid painting (char palette, paint/erase tools, export)
+- [x] Phase 3: Entity placement + inspector (select, CRUD, property editing)
+- [ ] Phase 4: Level properties tree (environment, defaults, charDefs, areas)
+- [ ] Phase 5: Target picking + wiring visualization (interactive references)
+- [ ] Phase 6: Polish + validation (error display, resize, shortcuts)
 
 ---
 
@@ -52,11 +60,11 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Recent Changes
 
-- Procedural starry night skybox (`skybox: 'starry-night'`) for ceiling-less levels
-- Stair back wall Y positioning fixed per direction (no longer pokes above walls on open levels)
-- Horizontal door slide nudged +0.05 to avoid z-fighting
-- Doors blocked by enemies: bounce animation (20% close then spring back)
-- Troll regen buffed to +7 HP/1s (was +2/2s), health bar updates in real time during regen
+- Dungeon Editor Phase 3: entity placement + inspector panel (select/cycle entities, entity tool with type dropdown, right-side inspector with type-specific property forms, delete key support, placement constraints)
+- Dungeon Editor Phase 2: char palette, paint/erase tools, click/drag grid painting, JSON export
+- Dungeon Editor Phase 1: separate `editor.html` entry point, 2D textured grid canvas with pan/zoom/hover, JSON import, entity icons, player start arrow
+- Extracted `resolveTextures()` to `src/core/textureResolver.ts` (shared by game + editor)
+- Vite multi-page build config (`vite.config.ts`)
 
 ## Known Issues
 

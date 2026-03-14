@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { WALKABLE_CELLS, buildWalkableSet } from '../core/grid';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from './textures';
+import { resolveTextures } from '../core/textureResolver';
 import type { TextureSet, TextureArea, CharDef } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 
@@ -49,54 +50,6 @@ function isSolid(grid: string[], col: number, row: number, walkable: Set<string>
   if (row < 0 || row >= grid.length) return true;
   if (col < 0 || col >= grid[0].length) return true;
   return !walkable.has(grid[row][col]);
-}
-
-function resolveTextures(
-  col: number,
-  row: number,
-  char: string,
-  defaults?: TextureSet,
-  charDefMap?: Map<string, CharDef>,
-  areas?: TextureArea[],
-): { wall: WallTextureName; floor: FloorTextureName; ceiling: CeilingTextureName } {
-  // Layer 1: hard-coded defaults
-  let wall: string = 'stone';
-  let floor: string = 'stone_tile';
-  let ceiling: string = 'dark_rock';
-
-  // Layer 2: level defaults
-  if (defaults) {
-    if (defaults.wallTexture) wall = defaults.wallTexture;
-    if (defaults.floorTexture) floor = defaults.floorTexture;
-    if (defaults.ceilingTexture) ceiling = defaults.ceilingTexture;
-  }
-
-  // Layer 3: charDefs — character-specific textures
-  if (charDefMap) {
-    const def = charDefMap.get(char);
-    if (def) {
-      if (def.wallTexture) wall = def.wallTexture;
-      if (def.floorTexture) floor = def.floorTexture;
-      if (def.ceilingTexture) ceiling = def.ceilingTexture;
-    }
-  }
-
-  // Layer 4: areas (later entries win)
-  if (areas) {
-    for (const area of areas) {
-      if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
-        if (area.wallTexture) wall = area.wallTexture;
-        if (area.floorTexture) floor = area.floorTexture;
-        if (area.ceilingTexture) ceiling = area.ceilingTexture;
-      }
-    }
-  }
-
-  return {
-    wall: wall as WallTextureName,
-    floor: floor as FloorTextureName,
-    ceiling: ceiling as CeilingTextureName,
-  };
 }
 
 // Resolve wall material for a face against a solid neighbor.

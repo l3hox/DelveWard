@@ -31,6 +31,10 @@ npm run dev
 
 Then open `http://localhost:5173` in your browser.
 
+### Dungeon Editor
+
+The project includes a visual dungeon editor at `http://localhost:5173/editor.html`. Open a level JSON file, paint the grid, place and configure entities, then export the modified level.
+
 ---
 
 ## Controls

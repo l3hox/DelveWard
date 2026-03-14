@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DelveWard — Dungeon Editor</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: #0d0d0d;
+        color: #ccc;
+        font-family: monospace;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #toolbar {
+        background: #1a1a1a;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 12px;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+      }
+
+      #btn-open {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 4px 10px;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      #btn-open:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      #level-name {
+        color: #aaa;
+        font-size: 13px;
+      }
+
+      #coord-display {
+        margin-left: auto;
+        color: #888;
+        font-size: 13px;
+      }
+
+      #canvas-container {
+        background: #111;
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+
+      #editor-canvas {
+        image-rendering: pixelated;
+      }
+
+      .tool-group {
+        display: flex;
+        gap: 4px;
+      }
+
+      .tool-btn {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 4px 10px;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .tool-btn:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      .tool-btn.active {
+        background: #3a3a3a;
+        border-color: #fff;
+        color: #fff;
+      }
+
+      .char-btn {
+        width: 28px;
+        height: 28px;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .char-btn:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      .char-btn.selected {
+        border-color: #4488ff;
+      }
+
+      #char-palette {
+        background: #1a1a1a;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 12px;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+      }
+
+      #char-palette.dimmed {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+
+      #btn-export {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 4px 10px;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      #btn-export:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      #btn-export:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .toolbar-sep {
+        width: 1px;
+        height: 20px;
+        background: #444;
+        margin: 0 4px;
+      }
+
+      #main-area {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      #inspector {
+        width: 260px;
+        min-width: 260px;
+        background: #1a1a1a;
+        border-left: 1px solid #333;
+        overflow-y: auto;
+        padding: 12px;
+      }
+
+      .inspector-placeholder {
+        color: #666;
+        font-size: 12px;
+        text-align: center;
+        margin-top: 40px;
+      }
+
+      .inspector-header {
+        color: #fff;
+        font-size: 14px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #333;
+      }
+
+      .inspector-field {
+        margin-bottom: 10px;
+      }
+
+      .inspector-field label {
+        display: block;
+        color: #888;
+        font-size: 11px;
+        margin-bottom: 3px;
+      }
+
+      .inspector-field input,
+      .inspector-field select {
+        width: 100%;
+        background: #222;
+        color: #ccc;
+        border: 1px solid #444;
+        padding: 4px 6px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .inspector-field input:focus,
+      .inspector-field select:focus {
+        outline: none;
+        border-color: #4488ff;
+      }
+
+      .btn-delete {
+        width: 100%;
+        margin-top: 16px;
+        padding: 6px 0;
+        background: #442222;
+        color: #ff6666;
+        border: 1px solid #663333;
+        font-family: monospace;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .btn-delete:hover {
+        background: #553333;
+        border-color: #884444;
+      }
+
+      .entity-type-select {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 4px 6px;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .entity-type-select:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      .entity-type-select.dimmed {
+        opacity: 0.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <button id="btn-open">Open File</button>
+      <span id="level-name">Level: (none)</span>
+      <span id="coord-display">Pos: —</span>
+    </div>
+    <div id="char-palette" class="dimmed"></div>
+    <div id="main-area">
+      <div id="canvas-container">
+        <canvas id="editor-canvas"></canvas>
+      </div>
+      <div id="inspector"></div>
+    </div>
+    <script type="module" src="/src/editor/main.ts"></script>
+  </body>
+</html>

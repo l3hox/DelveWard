@@ -1,0 +1,218 @@
+import type { Entity } from '../core/types';
+import type { EditorApp } from './EditorApp';
+import { ENEMY_DEFS } from '../enemies/enemyTypes';
+
+export class Inspector {
+  private container: HTMLElement;
+  private app: EditorApp;
+  private onEntityChanged: (() => void) | null = null;
+  private onDelete: (() => void) | null = null;
+
+  constructor(container: HTMLElement, app: EditorApp) {
+    this.container = container;
+    this.app = app;
+  }
+
+  setEntityChangedCallback(cb: () => void): void {
+    this.onEntityChanged = cb;
+  }
+
+  setDeleteCallback(cb: () => void): void {
+    this.onDelete = cb;
+  }
+
+  refresh(): void {
+    this.container.innerHTML = '';
+
+    const entity = this.app.selectedEntity;
+    if (!entity) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'inspector-placeholder';
+      placeholder.textContent = 'No entity selected';
+      this.container.appendChild(placeholder);
+      return;
+    }
+
+    const header = document.createElement('div');
+    header.className = 'inspector-header';
+    header.textContent = `${entity.type} @ (${entity.col}, ${entity.row})`;
+    this.container.appendChild(header);
+
+    this.buildFields(entity);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-delete';
+    deleteBtn.textContent = 'Delete Entity';
+    deleteBtn.addEventListener('click', () => this.onDelete?.());
+    this.container.appendChild(deleteBtn);
+  }
+
+  private buildFields(entity: Entity): void {
+    switch (entity.type) {
+      case 'door': {
+        const state = (entity.state as string) ?? 'closed';
+        this.addDropdownField('state', state, ['open', 'closed', 'locked'], (val) => {
+          entity.state = val;
+          this.onEntityChanged?.();
+          this.refresh();
+        });
+        if (state === 'locked') {
+          this.addTextField('keyId', (entity.keyId as string) ?? '', (val) => {
+            entity.keyId = val;
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+      }
+
+      case 'key':
+        this.addTextField('keyId', (entity.keyId as string) ?? '', (val) => {
+          entity.keyId = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'lever':
+        this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+          entity.wall = val;
+          this.onEntityChanged?.();
+        });
+        this.addTextField('targetDoor', (entity.targetDoor as string) ?? '', (val) => {
+          entity.targetDoor = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'pressure_plate':
+        this.addTextField('targetDoor', (entity.targetDoor as string) ?? '', (val) => {
+          entity.targetDoor = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'torch_sconce':
+        this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+          entity.wall = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'enemy':
+        this.addDropdownField(
+          'enemyType',
+          (entity.enemyType as string) ?? Object.keys(ENEMY_DEFS)[0] ?? '',
+          Object.keys(ENEMY_DEFS),
+          (val) => {
+            entity.enemyType = val;
+            this.onEntityChanged?.();
+          }
+        );
+        break;
+
+      case 'equipment':
+        this.addTextField('itemId', (entity.itemId as string) ?? '', (val) => {
+          entity.itemId = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'consumable':
+        this.addTextField('itemId', (entity.itemId as string) ?? '', (val) => {
+          entity.itemId = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'stairs':
+        this.addDropdownField('direction', (entity.direction as string) ?? 'down', ['up', 'down'], (val) => {
+          entity.direction = val;
+          this.onEntityChanged?.();
+        });
+        this.addTextField('targetLevel', (entity.targetLevel as string) ?? '', (val) => {
+          entity.targetLevel = val;
+          this.onEntityChanged?.();
+        });
+        this.addNumberField('targetCol', (entity.targetCol as number) ?? 0, (val) => {
+          entity.targetCol = val;
+          this.onEntityChanged?.();
+        });
+        this.addNumberField('targetRow', (entity.targetRow as number) ?? 0, (val) => {
+          entity.targetRow = val;
+          this.onEntityChanged?.();
+        });
+        break;
+    }
+  }
+
+  private addDropdownField(
+    label: string,
+    value: string,
+    options: string[],
+    onChange: (val: string) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const select = document.createElement('select');
+    for (const opt of options) {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === value) option.selected = true;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => onChange(select.value));
+    wrapper.appendChild(select);
+
+    this.container.appendChild(wrapper);
+  }
+
+  private addTextField(
+    label: string,
+    value: string,
+    onChange: (val: string) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.addEventListener('input', () => onChange(input.value));
+    wrapper.appendChild(input);
+
+    this.container.appendChild(wrapper);
+  }
+
+  private addNumberField(
+    label: string,
+    value: number,
+    onChange: (val: number) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.value = String(value);
+    input.addEventListener('input', () => {
+      const parsed = parseInt(input.value, 10);
+      if (!isNaN(parsed)) onChange(parsed);
+    });
+    wrapper.appendChild(input);
+
+    this.container.appendChild(wrapper);
+  }
+}
