@@ -4,6 +4,35 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Dungeon Editor Phase 4: Level Properties Panel
+
+**Level properties panel** (`src/editor/LevelProperties.ts` — new):
+- Left sidebar (260px) with collapsible sections: Level, Environment, Defaults, CharDefs, Areas
+- Level section: name and id text fields
+- Environment section: environment dropdown, ceiling checkbox (toggles skybox dropdown visibility), dustMotes/waterDrips checkboxes
+- Defaults section: optional wall/floor/ceiling texture dropdowns with "none" option
+- CharDefs section: array editor with summary rows, expand/collapse per item, char/solid/texture fields, add/remove buttons. Duplicate char detection (rejects edits that would create duplicates, marks existing duplicates in red)
+- Areas section: array editor with coordinate fields + optional texture overrides, add/remove buttons
+- Expansion state (sections, charDef indices, area indices) persists across refresh cycles
+
+**New level creation** (`src/editor/EditorApp.ts`, `src/editor/Toolbar.ts`, `src/editor/main.ts`):
+- `createNewLevel(cols, rows)` builds wall-border grid with floor interior, minimal DungeonLevel
+- "New" toolbar button prompts for WxH dimensions (3–100), creates blank level
+- Refreshes all panels (properties, palette, inspector, canvas)
+
+**Centralized validation** (`src/editor/EditorApp.ts`):
+- `validate()` returns error strings array (currently: duplicate charDef chars)
+- Called automatically from `rebuildDerivedState()`, stored on `errors` field
+- Export gated: shows alert with error list instead of exporting when errors present
+
+**Refactored** `loadLevel()` to use extracted `rebuildDerivedState()` (charDefMap + walkableSet rebuild)
+
+**Layout** (`editor.html`):
+- `#level-properties` div added as first child of `#main-area`
+- CSS for collapsible sections, array entry summaries, add/remove buttons, checkbox width fix, "New" button
+
+---
+
 ## 2026-03-14 — Dungeon Editor Phase 3: Entity Placement + Inspector
 
 **Entity CRUD** (`src/editor/EditorApp.ts`):

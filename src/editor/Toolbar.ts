@@ -23,6 +23,7 @@ export class Toolbar {
   onCharSelect: ((char: string) => void) | null = null;
   onExport: (() => void) | null = null;
   onEntityTypeSelect: ((type: string) => void) | null = null;
+  onNewLevel: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.palette = document.getElementById('char-palette')!;
@@ -44,6 +45,10 @@ export class Toolbar {
 
   setEntityTypeSelectCallback(cb: (type: string) => void): void {
     this.onEntityTypeSelect = cb;
+  }
+
+  setNewLevelCallback(cb: () => void): void {
+    this.onNewLevel = cb;
   }
 
   enableExport(): void {
@@ -96,6 +101,13 @@ export class Toolbar {
     // Find the existing btn-open to insert after it
     const btnOpen = container.querySelector('#btn-open') as HTMLButtonElement;
     const coordDisplay = container.querySelector('#coord-display') as HTMLElement;
+
+    // New button — insert before Open File
+    const btnNew = document.createElement('button');
+    btnNew.id = 'btn-new';
+    btnNew.textContent = 'New';
+    btnNew.addEventListener('click', () => this.onNewLevel?.());
+    btnOpen.insertAdjacentElement('beforebegin', btnNew);
 
     // Separator after Open File
     const sep1 = this.makeSep();

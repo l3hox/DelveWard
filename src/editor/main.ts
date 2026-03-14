@@ -2,6 +2,7 @@ import { EditorApp } from './EditorApp';
 import { GridCanvas } from './GridCanvas';
 import { Toolbar } from './Toolbar';
 import { Inspector } from './Inspector';
+import { LevelProperties } from './LevelProperties';
 import { openLevelFile, exportLevelFile } from './io';
 
 const app = new EditorApp();
@@ -15,6 +16,7 @@ const coordEl = document.getElementById('coord-display') as HTMLSpanElement;
 const gridCanvas = new GridCanvas(canvas, container, app);
 const toolbar = new Toolbar(document.getElementById('toolbar')!);
 const inspector = new Inspector(document.getElementById('inspector')!, app);
+const levelProps = new LevelProperties(document.getElementById('level-properties')!, app);
 
 // Toolbar callbacks
 toolbar.setToolChangeCallback((tool) => {
@@ -30,7 +32,12 @@ toolbar.setCharSelectCallback((char) => {
 });
 
 toolbar.setExportCallback(() => {
-  if (app.level) exportLevelFile(app.level);
+  if (!app.level) return;
+  if (app.errors.length > 0) {
+    alert('Cannot export — fix errors first:\n\n' + app.errors.join('\n'));
+    return;
+  }
+  exportLevelFile(app.level);
 });
 
 toolbar.setEntityTypeSelectCallback((type) => {
@@ -38,6 +45,36 @@ toolbar.setEntityTypeSelectCallback((type) => {
   app.activeTool = 'entity';
   toolbar.setActiveTool('entity');
   gridCanvas.updateCursor();
+});
+
+// Level properties changed callback
+levelProps.setChangedCallback(() => {
+  app.rebuildDerivedState();
+  toolbar.updatePalette(app.level!.charDefs);
+  levelNameEl.textContent = app.level!.name;
+  gridCanvas.markDirty();
+});
+
+// New level callback
+toolbar.setNewLevelCallback(() => {
+  const input = prompt('New level dimensions (WxH):', '16x16');
+  if (!input) return;
+  const match = input.match(/^(\d+)\s*[xX×]\s*(\d+)$/);
+  if (!match) return;
+  const cols = parseInt(match[1], 10);
+  const rows = parseInt(match[2], 10);
+  if (cols < 3 || cols > 100 || rows < 3 || rows > 100) {
+    alert('Dimensions must be between 3 and 100.');
+    return;
+  }
+  app.createNewLevel(cols, rows);
+  levelNameEl.textContent = app.level!.name;
+  toolbar.updatePalette(app.level!.charDefs);
+  toolbar.enableExport();
+  inspector.refresh();
+  levelProps.refresh();
+  gridCanvas.updateCursor();
+  gridCanvas.markDirty();
 });
 
 // Selection callback — update inspector
@@ -86,6 +123,7 @@ btnOpen.addEventListener('click', async () => {
     toolbar.updatePalette(level.charDefs);
     toolbar.enableExport();
     inspector.refresh();
+    levelProps.refresh();
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
   }

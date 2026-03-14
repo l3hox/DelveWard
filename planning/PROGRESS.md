@@ -37,7 +37,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Phase 1: Scaffold + grid canvas (2D textured view, pan/zoom, import JSON)
 - [x] Phase 2: Grid painting (char palette, paint/erase tools, export)
 - [x] Phase 3: Entity placement + inspector (select, CRUD, property editing)
-- [ ] Phase 4: Level properties tree (environment, defaults, charDefs, areas)
+- [x] Phase 4: Level properties panel + new level + validation
 - [ ] Phase 5: Target picking + wiring visualization (interactive references)
 - [ ] Phase 6: Polish + validation (error display, resize, shortcuts)
 
@@ -60,6 +60,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Recent Changes
 
+- Dungeon Editor Phase 4: left-side level properties panel (name/id, environment, texture defaults, charDefs array editor, areas array editor), "New" button for creating levels from scratch, centralized validation with export gating
 - Dungeon Editor Phase 3: entity placement + inspector panel (select/cycle entities, entity tool with type dropdown, right-side inspector with type-specific property forms, delete key support, placement constraints)
 - Dungeon Editor Phase 2: char palette, paint/erase tools, click/drag grid painting, JSON export
 - Dungeon Editor Phase 1: separate `editor.html` entry point, 2D textured grid canvas with pan/zoom/hover, JSON import, entity icons, player start arrow

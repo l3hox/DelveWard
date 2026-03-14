@@ -33,6 +33,7 @@ export class EditorApp {
   hover: HoverInfo | null = null;
   charDefMap: Map<string, CharDef> = new Map();
   walkableSet: Set<string> = new Set();
+  errors: string[] = [];
   activeTool: EditorTool = 'select';
   selectedChar = '.';
   selectedEntity: Entity | null = null;
@@ -43,17 +44,7 @@ export class EditorApp {
 
   loadLevel(level: DungeonLevel): void {
     this.level = level;
-
-    // Build charDef lookup map
-    this.charDefMap = new Map();
-    if (level.charDefs) {
-      for (const def of level.charDefs) {
-        this.charDefMap.set(def.char, def);
-      }
-    }
-
-    // Build walkable set
-    this.walkableSet = buildWalkableSet(level.charDefs);
+    this.rebuildDerivedState();
 
     // Reset viewport and tool state
     this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -63,6 +54,56 @@ export class EditorApp {
     this.selectedEntity = null;
     this.selectionIndex = 0;
     this.lastClickCell = '';
+  }
+
+  rebuildDerivedState(): void {
+    if (!this.level) return;
+    this.charDefMap = new Map();
+    if (this.level.charDefs) {
+      for (const def of this.level.charDefs) {
+        this.charDefMap.set(def.char, def);
+      }
+    }
+    this.walkableSet = buildWalkableSet(this.level.charDefs);
+    this.errors = this.validate();
+  }
+
+  validate(): string[] {
+    if (!this.level) return [];
+    const errors: string[] = [];
+
+    // Duplicate charDef chars
+    if (this.level.charDefs) {
+      const seen = new Map<string, number>();
+      for (let i = 0; i < this.level.charDefs.length; i++) {
+        const ch = this.level.charDefs[i].char;
+        if (seen.has(ch)) {
+          errors.push(`Duplicate charDef '${ch}' at indices ${seen.get(ch)} and ${i}`);
+        } else {
+          seen.set(ch, i);
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  createNewLevel(cols: number, rows: number): void {
+    const grid: string[] = [];
+    for (let r = 0; r < rows; r++) {
+      if (r === 0 || r === rows - 1) {
+        grid.push('#'.repeat(cols));
+      } else {
+        grid.push('#' + '.'.repeat(cols - 2) + '#');
+      }
+    }
+    const level: DungeonLevel = {
+      name: 'Untitled',
+      grid,
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [],
+    };
+    this.loadLevel(level);
   }
 
   paintCell(col: number, row: number, char: string): boolean {

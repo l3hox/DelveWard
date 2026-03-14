@@ -139,6 +139,16 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
   - 281 tests (23 new)
 
+- [x] **Dungeon Editor Phase 4** — Level Properties Panel:
+  - Left sidebar `LevelProperties` with 5 collapsible sections (Level, Environment, Defaults, CharDefs, Areas)
+  - Environment: environment dropdown, ceiling toggle (shows/hides skybox), dustMotes/waterDrips checkboxes
+  - Defaults: optional wall/floor/ceiling texture dropdowns with "none" option
+  - CharDefs: array editor with expand/collapse, char/solid/textures, add/remove, duplicate detection (visual + edit rejection)
+  - Areas: array editor with coordinate fields, optional texture overrides, add/remove
+  - "New" button creates blank levels (wall border + floor interior, prompted WxH dimensions 3–100)
+  - Centralized `validate()` on EditorApp — duplicate charDef detection, export gated on zero errors
+  - Refactored `loadLevel()` to use extracted `rebuildDerivedState()`
+
 - [x] **Particle Effects** — Atmosphere & visual polish:
   - Dust motes: warm-tinted particles floating near ceiling, spawn around player, per-level toggle (`dustMotes`, default true)
   - Sconce embers: orange sparks rising from lit sconce flame meshes, additive blending
