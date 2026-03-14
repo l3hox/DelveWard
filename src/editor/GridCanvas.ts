@@ -27,6 +27,7 @@ export class GridCanvas {
   private lastPanY = 0;
   private onHoverChange: (() => void) | null = null;
   private onSelectionChange: (() => void) | null = null;
+  private onPickComplete: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
     this.canvas = canvas;
@@ -44,6 +45,10 @@ export class GridCanvas {
 
   setSelectionCallback(cb: () => void): void {
     this.onSelectionChange = cb;
+  }
+
+  setPickCompleteCallback(cb: () => void): void {
+    this.onPickComplete = cb;
   }
 
   markDirty(): void {
@@ -101,6 +106,17 @@ export class GridCanvas {
       }
 
       if (e.button === 0) {
+        if (this.app.pickMode) {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const { col, row } = this.screenToGrid(screenX, screenY);
+          const success = this.app.completePickMode(col, row);
+          if (success) this.onPickComplete?.();
+          this.dirty = true;
+          return;
+        }
+
         const tool = this.app.activeTool;
         if (tool === 'paint' || tool === 'erase') {
           const rect = canvas.getBoundingClientRect();
@@ -170,6 +186,11 @@ export class GridCanvas {
 
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (this.app.pickMode) {
+        this.app.cancelPickMode();
+        this.onPickComplete?.();
+        this.dirty = true;
+      }
     });
   }
 
@@ -261,6 +282,9 @@ export class GridCanvas {
 
     // Draw selection highlight
     this.drawSelectionHighlight(offsetX, offsetY, tileSize);
+
+    // Draw wiring lines for lever/pressure_plate -> door connections
+    this.drawWiringLines(offsetX, offsetY, tileSize);
   }
 
   private drawCell(
@@ -556,23 +580,29 @@ export class GridCanvas {
     let strokeColor: string;
     let fillColor: string;
 
-    switch (this.app.activeTool) {
-      case 'paint':
-        strokeColor = 'rgba(68, 136, 255, 0.7)';
-        fillColor = 'rgba(68, 136, 255, 0.1)';
-        break;
-      case 'erase':
-        strokeColor = 'rgba(255, 68, 68, 0.7)';
-        fillColor = 'rgba(255, 68, 68, 0.1)';
-        break;
-      case 'entity':
-        strokeColor = 'rgba(68, 255, 68, 0.7)';
-        fillColor = 'rgba(68, 255, 68, 0.1)';
-        break;
-      default:
-        strokeColor = 'rgba(255, 255, 255, 0.6)';
-        fillColor = 'rgba(255, 255, 255, 0.05)';
-        break;
+    if (this.app.pickMode) {
+      const isValid = hover.char === this.app.pickMode.validChar;
+      strokeColor = isValid ? 'rgba(68, 255, 68, 0.8)' : 'rgba(255, 68, 68, 0.5)';
+      fillColor = isValid ? 'rgba(68, 255, 68, 0.15)' : 'rgba(255, 68, 68, 0.05)';
+    } else {
+      switch (this.app.activeTool) {
+        case 'paint':
+          strokeColor = 'rgba(68, 136, 255, 0.7)';
+          fillColor = 'rgba(68, 136, 255, 0.1)';
+          break;
+        case 'erase':
+          strokeColor = 'rgba(255, 68, 68, 0.7)';
+          fillColor = 'rgba(255, 68, 68, 0.1)';
+          break;
+        case 'entity':
+          strokeColor = 'rgba(68, 255, 68, 0.7)';
+          fillColor = 'rgba(68, 255, 68, 0.1)';
+          break;
+        default:
+          strokeColor = 'rgba(255, 255, 255, 0.6)';
+          fillColor = 'rgba(255, 255, 255, 0.05)';
+          break;
+      }
     }
 
     ctx.save();
@@ -602,7 +632,80 @@ export class GridCanvas {
   }
 
   updateCursor(): void {
+    if (this.app.pickMode) { this.canvas.style.cursor = 'crosshair'; return; }
     const tool = this.app.activeTool;
     this.canvas.style.cursor = tool === 'paint' || tool === 'erase' || tool === 'entity' ? 'crosshair' : 'default';
+  }
+
+  private parseCoordString(str: string): { col: number; row: number } | null {
+    const match = str.match(/^(\d+),(\d+)$/);
+    if (!match) return null;
+    return { col: parseInt(match[1], 10), row: parseInt(match[2], 10) };
+  }
+
+  private drawArrowhead(x1: number, y1: number, x2: number, y2: number, size: number): void {
+    const { ctx } = this;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - size * Math.cos(angle - Math.PI / 6), y2 - size * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(x2 - size * Math.cos(angle + Math.PI / 6), y2 - size * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private drawWiringLines(offsetX: number, offsetY: number, tileSize: number): void {
+    const level = this.app.level;
+    if (!level) return;
+
+    const { ctx } = this;
+    const selected = this.app.selectedEntity;
+
+    // Collect all wiring arrows from every lever/pressure_plate
+    type Arrow = { fromCol: number; fromRow: number; toCol: number; toRow: number; active: boolean };
+    const arrows: Arrow[] = [];
+
+    for (const e of level.entities) {
+      if ((e.type === 'lever' || e.type === 'pressure_plate') && e.targetDoor) {
+        const target = this.parseCoordString(e.targetDoor as string);
+        if (!target) continue;
+        const isActive = selected !== null && (
+          e === selected ||
+          (selected.type === 'door' && selected.col === target.col && selected.row === target.row)
+        );
+        arrows.push({ fromCol: e.col, fromRow: e.row, toCol: target.col, toRow: target.row, active: isActive });
+      }
+    }
+
+    if (arrows.length === 0) return;
+
+    // Draw inactive first, then active on top
+    for (const active of [false, true]) {
+      for (const a of arrows) {
+        if (a.active !== active) continue;
+
+        const color = active ? '#ffaa00' : 'rgba(150, 150, 150, 0.3)';
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = active ? 2 : 1;
+        ctx.setLineDash(active ? [6, 3] : [4, 3]);
+
+        const x1 = offsetX + (a.fromCol + 0.5) * tileSize;
+        const y1 = offsetY + (a.fromRow + 0.5) * tileSize;
+        const x2 = offsetX + (a.toCol + 0.5) * tileSize;
+        const y2 = offsetY + (a.toRow + 0.5) * tileSize;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        this.drawArrowhead(x1, y1, x2, y2, active ? 8 : 5);
+
+        ctx.restore();
+      }
+    }
   }
 }

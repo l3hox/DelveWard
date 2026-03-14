@@ -27,6 +27,12 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   stairs:         { direction: 'down', targetLevel: '', targetCol: 0, targetRow: 0 },
 };
 
+export interface PickModeState {
+  entity: Entity;
+  field: string;
+  validChar: string;
+}
+
 export class EditorApp {
   level: DungeonLevel | null = null;
   viewport: Viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -38,6 +44,7 @@ export class EditorApp {
   selectedChar = '.';
   selectedEntity: Entity | null = null;
   selectedEntityType = 'enemy';
+  pickMode: PickModeState | null = null;
 
   private selectionIndex = 0;
   private lastClickCell = '';
@@ -54,6 +61,7 @@ export class EditorApp {
     this.selectedEntity = null;
     this.selectionIndex = 0;
     this.lastClickCell = '';
+    this.pickMode = null;
   }
 
   rebuildDerivedState(): void {
@@ -180,5 +188,33 @@ export class EditorApp {
     if (type === 'stairs') return char === 'S' || char === 'U';
     // All others require a walkable cell
     return this.walkableSet.has(char);
+  }
+
+  enterPickMode(entity: Entity, field: string, validChar: string): void {
+    this.pickMode = { entity, field, validChar };
+  }
+
+  cancelPickMode(): void {
+    this.pickMode = null;
+  }
+
+  completePickMode(col: number, row: number): boolean {
+    if (!this.pickMode || !this.level) return false;
+    const grid = this.level.grid;
+    if (row < 0 || row >= grid.length) return false;
+    if (col < 0 || col >= grid[row].length) return false;
+
+    const char = grid[row][col];
+    if (char !== this.pickMode.validChar) return false;
+
+    (this.pickMode.entity as Record<string, unknown>)[this.pickMode.field] = `${col},${row}`;
+    this.pickMode = null;
+    return true;
+  }
+
+  getReferencingEntities(col: number, row: number): Entity[] {
+    if (!this.level) return [];
+    const key = `${col},${row}`;
+    return this.level.entities.filter(e => (e as Record<string, unknown>).targetDoor === key);
   }
 }

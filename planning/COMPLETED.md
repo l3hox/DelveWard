@@ -139,6 +139,17 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
   - 281 tests (23 new)
 
+- [x] **Dungeon Editor Phase 5** — Target Picking + Wiring Visualization:
+  - Pick mode: "Pick" button on lever/pressure_plate targetDoor fields, crosshair cursor, green/red hover validation
+  - Pick completes on valid cell click, cancels on right-click/Escape/tool-switch/delete
+  - `PickModeState` on EditorApp with `enterPickMode`/`cancelPickMode`/`completePickMode`
+  - Wiring arrows: all connections always visible — active in orange dashed 2px, inactive in faint grey 1px
+  - Solid arrowheads at target end (8px active, 5px inactive), inactive drawn first for z-order
+  - "Referenced by" section on door inspector — lists referencing levers/plates, clickable to select
+  - `getReferencingEntities()` reverse lookup on EditorApp
+  - `addPickableField()` inspector helper (text input + inline Pick button with active state)
+  - CSS: `.btn-pick`, `.inspector-ref-header`, `.inspector-ref-item`
+
 - [x] **Dungeon Editor Phase 4** — Level Properties Panel:
   - Left sidebar `LevelProperties` with 5 collapsible sections (Level, Environment, Defaults, CharDefs, Areas)
   - Environment: environment dropdown, ceiling toggle (shows/hides skybox), dustMotes/waterDrips checkboxes

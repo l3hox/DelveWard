@@ -7,6 +7,8 @@ export class Inspector {
   private app: EditorApp;
   private onEntityChanged: (() => void) | null = null;
   private onDelete: (() => void) | null = null;
+  private onPickRequested: ((entity: Entity, field: string, validChar: string) => void) | null = null;
+  private onRefClicked: ((entity: Entity) => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -19,6 +21,14 @@ export class Inspector {
 
   setDeleteCallback(cb: () => void): void {
     this.onDelete = cb;
+  }
+
+  setPickRequestedCallback(cb: (entity: Entity, field: string, validChar: string) => void): void {
+    this.onPickRequested = cb;
+  }
+
+  setRefClickedCallback(cb: (entity: Entity) => void): void {
+    this.onRefClicked = cb;
   }
 
   refresh(): void {
@@ -62,6 +72,20 @@ export class Inspector {
             this.onEntityChanged?.();
           });
         }
+        const refs = this.app.getReferencingEntities(entity.col, entity.row);
+        if (refs.length > 0) {
+          const refHeader = document.createElement('div');
+          refHeader.className = 'inspector-ref-header';
+          refHeader.textContent = `Referenced by (${refs.length})`;
+          this.container.appendChild(refHeader);
+          for (const ref of refs) {
+            const refItem = document.createElement('div');
+            refItem.className = 'inspector-ref-item';
+            refItem.textContent = `${ref.type} @ (${ref.col}, ${ref.row})`;
+            refItem.addEventListener('click', () => this.onRefClicked?.(ref));
+            this.container.appendChild(refItem);
+          }
+        }
         break;
       }
 
@@ -77,14 +101,14 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTextField('targetDoor', (entity.targetDoor as string) ?? '', (val) => {
+        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', 'D', entity, 'targetDoor', (val) => {
           entity.targetDoor = val;
           this.onEntityChanged?.();
         });
         break;
 
       case 'pressure_plate':
-        this.addTextField('targetDoor', (entity.targetDoor as string) ?? '', (val) => {
+        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', 'D', entity, 'targetDoor', (val) => {
           entity.targetDoor = val;
           this.onEntityChanged?.();
         });
@@ -213,6 +237,46 @@ export class Inspector {
     });
     wrapper.appendChild(input);
 
+    this.container.appendChild(wrapper);
+  }
+
+  private addPickableField(
+    label: string,
+    value: string,
+    validChar: string,
+    entity: Entity,
+    field: string,
+    onChange: (val: string) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '4px';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.style.flex = '1';
+    input.value = value;
+    input.addEventListener('input', () => onChange(input.value));
+    row.appendChild(input);
+
+    const pickBtn = document.createElement('button');
+    const isPickingThis =
+      this.app.pickMode !== null &&
+      this.app.pickMode.entity === entity &&
+      this.app.pickMode.field === field;
+    pickBtn.className = isPickingThis ? 'btn-pick active' : 'btn-pick';
+    pickBtn.textContent = isPickingThis ? 'Picking...' : 'Pick';
+    pickBtn.addEventListener('click', () => this.onPickRequested?.(entity, field, validChar));
+    row.appendChild(pickBtn);
+
+    wrapper.appendChild(row);
     this.container.appendChild(wrapper);
   }
 }

@@ -4,6 +4,29 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Dungeon Editor Phase 5: Target Picking + Wiring Visualization
+
+**Pick mode** for lever/pressure_plate `targetDoor` fields:
+- "Pick" button next to text input in inspector — enters pick mode (shows "Picking..." with active style)
+- Crosshair cursor, green hover on valid `D` cells, red hover on invalid cells
+- Left-click valid cell completes pick (sets `"col,row"` string), right-click or Escape cancels
+- Tool switch or entity delete also cancels pick mode
+- `PickModeState` on EditorApp stores entity, field name, and valid char filter
+
+**Wiring visualization** on grid canvas:
+- All lever/pressure_plate → door connections always visible as dashed arrows
+- Active connections (selected entity involved) rendered in orange (#ffaa00), 2px, 8px arrowhead
+- Inactive connections rendered in faint grey (rgba(150,150,150,0.3)), 1px, 5px arrowhead
+- Inactive drawn first so active renders on top
+
+**"Referenced by" section** in inspector for doors:
+- Shows list of levers/plates targeting the selected door
+- Clickable items — clicking selects the referencing entity
+
+**Design decision**: wiring arrows always visible (not just for selected entity) — makes connection topology discoverable at a glance. Active/inactive distinction via color intensity avoids visual clutter.
+
+---
+
 ## 2026-03-14 — Dungeon Editor Phase 4: Level Properties Panel
 
 **Level properties panel** (`src/editor/LevelProperties.ts` — new):

@@ -18,8 +18,9 @@ const toolbar = new Toolbar(document.getElementById('toolbar')!);
 const inspector = new Inspector(document.getElementById('inspector')!, app);
 const levelProps = new LevelProperties(document.getElementById('level-properties')!, app);
 
-// Toolbar callbacks
+// Toolbar callbacks — cancel pick mode on tool switch
 toolbar.setToolChangeCallback((tool) => {
+  if (app.pickMode) { app.cancelPickMode(); inspector.refresh(); }
   app.activeTool = tool;
   gridCanvas.updateCursor();
 });
@@ -89,7 +90,30 @@ inspector.setEntityChangedCallback(() => {
 });
 
 inspector.setDeleteCallback(() => {
+  if (app.pickMode) app.cancelPickMode();
   app.deleteSelectedEntity();
+  inspector.refresh();
+  gridCanvas.updateCursor();
+  gridCanvas.markDirty();
+});
+
+// Pick mode entry
+inspector.setPickRequestedCallback((entity, field, validChar) => {
+  app.enterPickMode(entity, field, validChar);
+  gridCanvas.updateCursor();
+  gridCanvas.markDirty();
+});
+
+// Pick mode completion (success or cancel via right-click)
+gridCanvas.setPickCompleteCallback(() => {
+  inspector.refresh();
+  gridCanvas.updateCursor();
+  gridCanvas.markDirty();
+});
+
+// Reference click → select that entity
+inspector.setRefClickedCallback((entity) => {
+  app.selectedEntity = entity;
   inspector.refresh();
   gridCanvas.markDirty();
 });
@@ -103,13 +127,22 @@ gridCanvas.setHoverCallback(() => {
   }
 });
 
-// Delete key listener
+// Keyboard listeners
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.pickMode) {
+    app.cancelPickMode();
+    inspector.refresh();
+    gridCanvas.updateCursor();
+    gridCanvas.markDirty();
+    return;
+  }
   if (e.key === 'Delete' && app.selectedEntity) {
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (app.pickMode) app.cancelPickMode();
     app.deleteSelectedEntity();
     inspector.refresh();
+    gridCanvas.updateCursor();
     gridCanvas.markDirty();
   }
 });
