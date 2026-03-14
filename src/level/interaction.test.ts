@@ -7,18 +7,18 @@ import type { Entity } from '../core/types';
 // Grid layout (col, row):
 //   01234
 // 0 #####
-// 1 #.D.#
+// 1 #...#
 // 2 #...#
 // 3 #####
 const GRID = [
   '#####',
-  '#.D.#',
+  '#...#',
   '#...#',
   '#####',
 ];
 
 // Player at (1,2) facing N -> facing cell is (1,1) = '.'
-// Player at (2,2) facing N -> facing cell is (2,1) = 'D'
+// Player at (2,2) facing N -> facing cell is (2,1) = '.' (door entity may be here)
 
 function closedDoorEntities(): Entity[] {
   return [
@@ -28,7 +28,7 @@ function closedDoorEntities(): Entity[] {
 
 function lockedDoorEntities(keyId: string = 'gold_key'): Entity[] {
   return [
-    { col: 2, row: 1, type: 'door', state: 'locked', keyId },
+    { col: 2, row: 1, type: 'door', state: 'closed', keyId },
   ];
 }
 
@@ -106,35 +106,35 @@ describe('interact', () => {
     expect(gs.getDoor(2, 1)!.state).toBe('closed');
   });
 
-  it('returns door_locked for a locked door without key', () => {
+  it('returns door_locked for a closed keyed door without key', () => {
     const gs = new GameState(lockedDoorEntities());
     const player = new PlayerState(2, 2, 'N');
     const result = interact(player, GRID, gs);
 
     expect(result.type).toBe('door_locked');
     expect(result.message).toBe('This door is locked.');
-    expect(gs.getDoor(2, 1)!.state).toBe('locked');
+    expect(gs.getDoor(2, 1)!.state).toBe('closed');
   });
 
-  it('unlocks and opens a locked door with the correct key', () => {
+  it('opens a closed keyed door with the correct key', () => {
     const gs = new GameState(lockedDoorEntities('gold_key'));
     gs.addKey('gold_key');
     const player = new PlayerState(2, 2, 'N');
     const result = interact(player, GRID, gs);
 
-    expect(result.type).toBe('door_unlocked');
-    expect(result.message).toBe('Door unlocked and opened.');
+    expect(result.type).toBe('door_opened');
+    expect(result.message).toBe('Door opened.');
     expect(gs.getDoor(2, 1)!.state).toBe('open');
   });
 
-  it('does not unlock a locked door with the wrong key', () => {
+  it('does not open a closed keyed door with the wrong key', () => {
     const gs = new GameState(lockedDoorEntities('gold_key'));
     gs.addKey('silver_key');
     const player = new PlayerState(2, 2, 'N');
     const result = interact(player, GRID, gs);
 
     expect(result.type).toBe('door_locked');
-    expect(gs.getDoor(2, 1)!.state).toBe('locked');
+    expect(gs.getDoor(2, 1)!.state).toBe('closed');
   });
 
   // --- Non-door interactions ---
@@ -157,23 +157,12 @@ describe('interact', () => {
     expect(result.type).toBe('nothing');
   });
 
-  it('returns nothing for a D cell with no door entity (no grid)', () => {
-    // No entities registered, no grid — the D cell at (2,1) has no GameState door
+  it('returns nothing when facing a floor cell with no door entity', () => {
     const gs = new GameState([]);
     const player = new PlayerState(2, 2, 'N');
     const result = interact(player, GRID, gs);
 
     expect(result.type).toBe('nothing');
-  });
-
-  it('opens auto-created door from grid D cell', () => {
-    // GameState with grid auto-creates door for D cell
-    const gs = new GameState([], GRID);
-    const player = new PlayerState(2, 2, 'N');
-    const result = interact(player, GRID, gs);
-
-    expect(result.type).toBe('door_opened');
-    expect(gs.getDoor(2, 1)!.state).toBe('open');
   });
 
   it('returns nothing when facing a floor cell', () => {
@@ -203,14 +192,14 @@ describe('interact', () => {
 // Grid layout (col, row):
 //   01234
 // 0 #####
-// 1 #.O.#    <- lever at (2,1), north wall is (2,0)='#'
-// 2 #.D.#
+// 1 #...#    <- lever entity at (2,1), north wall is (2,0)='#'
+// 2 #...#    <- door entity may be placed here
 // 3 #...#
 // 4 #####
 const LEVER_GRID = [
   '#####',
-  '#.O.#',
-  '#.D.#',
+  '#...#',
+  '#...#',
   '#...#',
   '#####',
 ];
@@ -260,7 +249,7 @@ describe('lever interaction', () => {
     expect(result.type).toBe('lever_activated');
   });
 
-  it('standing on O cell with no lever returns nothing', () => {
+  it('standing on cell with no lever returns nothing', () => {
     const gs = new GameState([], LEVER_GRID);
     const player = new PlayerState(2, 1, 'N');
     const result = interact(player, LEVER_GRID, gs);

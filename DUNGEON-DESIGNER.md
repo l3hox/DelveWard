@@ -19,19 +19,18 @@ row 0:  "#########"
 row 1:  "#.......#"
 row 2:  "#.#.#.#.#"
 row 3:  "#.......#"
-row 4:  "####S####"
-         0123456789
-              ^col
+row 4:  "#########"
+         012345678
 ```
 
-The `S` cell is at **col 4, row 4** (count: `#`=0, `#`=1, `#`=2, `#`=3, `S`=4).
+A floor cell `.` at row 1, col 1 would be at **col 1, row 1**.
 
 **Common mistake**: When a row has a pattern like `#.#.#.#.#`, the `.` cells are at cols 1, 3, 5, 7 and the `#` cells are at cols 0, 2, 4, 6, 8. Do not place entities or playerStart on a `#` col when you want a walkable cell.
 
 **Verification checklist** for every coordinate you write:
 1. Count the row index from the top (0-based) — that's `row`
 2. Count the character position from the left (0-based) — that's `col`
-3. Check that `grid[row][col]` is the expected character (walkable for playerStart/keys/plates, `D` for doors, `S`/`U` for stairs)
+3. Check that `grid[row][col]` is the expected character (walkable for playerStart/keys/plates/doors/stairs/levers)
 
 ---
 
@@ -105,11 +104,9 @@ The coordinate system: **col** = character position within a row (X axis, left-t
 |------|---------|----------|
 | `#`  | Wall    | No       |
 | `.`  | Floor   | Yes      |
-| `D`  | Door    | Yes      |
-| `S`  | Stairs down | Yes  |
-| `U`  | Stairs up   | Yes  |
-| `O`  | Object (details in entities) | Yes |
 | ` `  | Void (empty space, no geometry) | No |
+
+All interactive features (doors, stairs, levers, etc.) are entity-only — placed on walkable cells.
 
 Walls (`#`) are never rendered as geometry themselves. Instead, walkable cells detect solid neighbors and render wall faces toward them.
 
@@ -143,15 +140,15 @@ Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 
 #### Entity types
 
-**Door** (`type: "door"`) — placed on `D` cells. Note: `D` cells without a door entity automatically get a closed, non-mechanical door.
+**Door** (`type: "door"`) — placed on any walkable cell. Every door must have an explicit entity.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `state` | string | No | `"closed"` (default), `"open"`, or `"locked"` |
-| `keyId` | string | No | Required if `state` is `"locked"`. Must match a key entity's `keyId`. |
+| `state` | string | No | `"closed"` (default) or `"open"` |
+| `keyId` | string | No | If set, the door requires the matching key to open. Must match a key entity's `keyId`. |
 
 ```json
-{ "col": 5, "row": 2, "type": "door", "state": "locked", "keyId": "gold_key" }
+{ "col": 5, "row": 2, "type": "door", "state": "closed", "keyId": "gold_key" }
 ```
 
 **Key** (`type: "key"`) — placed on walkable cells. Auto-picked up when player steps on it.
@@ -164,7 +161,7 @@ Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 { "col": 3, "row": 4, "type": "key", "keyId": "gold_key" }
 ```
 
-**Lever** (`type: "lever"`) — placed on `O` cells. Player activates by standing on the cell and facing the wall the lever is mounted on.
+**Lever** (`type: "lever"`) — placed on walkable cells. Player activates by standing on the cell and facing the wall the lever is mounted on.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -189,16 +186,16 @@ The targeted door is marked **mechanical** — same as lever-targeted doors.
 { "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
 ```
 
-**Stairs** (`type: "stairs"`) — placed on `S` (stairs down) or `U` (stairs up) cells. Triggers automatically when player steps on the cell (not via Space).
+**Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `direction` | string | Yes | `"down"` (must be on `S` cell) or `"up"` (must be on `U` cell) |
+| `direction` | string | Yes | `"down"` or `"up"` |
 | `targetLevel` | string | Yes | `id` of the destination level |
 | `targetCol` | number | Yes | Column on the destination level where player arrives |
 | `targetRow` | number | Yes | Row on the destination level where player arrives |
 
-The target position must be a walkable cell on the target level. Typically, stairs down target a `U` cell on the lower level and vice versa.
+The target position must be a walkable cell on the target level. Typically, stairs down target stairs up on the lower level and vice versa.
 
 ```json
 { "col": 4, "row": 8, "type": "stairs", "direction": "down", "targetLevel": "lower_vault", "targetCol": 4, "targetRow": 0 }
@@ -268,8 +265,8 @@ Item properties (name, stats, slot, requirements) are defined in the item databa
 
 | Door type | Open with Space | Close with Space | Visual cue |
 |-----------|----------------|-----------------|------------|
-| Normal (no entity or plain door entity) | Yes | Yes | Brass button on frame |
-| Locked | Yes (with matching key) | Yes (after unlocking) | Iron-banded texture |
+| Normal (no keyId) | Yes | Yes | Brass button on frame |
+| Keyed (has keyId) | Yes (with matching key) | Yes (after opening) | Iron-banded texture |
 | Mechanical (lever/plate target) | No | No | No button on frame |
 
 All doors have a 3D stone frame (pillars + lintel) that stays visible when open. Door panels slide up on open and down on close.
@@ -320,7 +317,7 @@ Define custom ASCII characters that carry texture information. Each charDef maps
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `char` | string | Yes | Single ASCII character. Must not be a built-in char (`# . D S U O` or space). No duplicates. |
+| `char` | string | Yes | Single ASCII character. Must not be a built-in char (`# .` or space). No duplicates. |
 | `solid` | boolean | Yes | `false` = walkable (player can walk on it, floor/ceiling are rendered). `true` = solid (blocks movement, acts like a wall). |
 | `wallTexture` | string | No | Wall texture name |
 | `floorTexture` | string | No | Floor texture name |
@@ -638,7 +635,7 @@ All cells use default textures (stone walls, stone tile floor, dark rock ceiling
     "#########",
     "#.......#",
     "#.......#",
-    "#...D...#",
+    "#.......#",
     "#.......#",
     "#.......#",
     "#########"

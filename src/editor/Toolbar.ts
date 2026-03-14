@@ -4,10 +4,6 @@ import type { CharDef } from '../core/types';
 const BUILTIN_CHARS: Array<{ char: string; label: string }> = [
   { char: '.', label: '.' },
   { char: '#', label: '#' },
-  { char: 'D', label: 'D' },
-  { char: 'S', label: 'S' },
-  { char: 'U', label: 'U' },
-  { char: 'O', label: 'O' },
   { char: ' ', label: '_' },
 ];
 

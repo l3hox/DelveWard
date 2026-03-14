@@ -11,7 +11,7 @@ import type { ItemDef } from './itemDatabase';
 export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
 
-export type DoorState = 'open' | 'closed' | 'locked';
+export type DoorState = 'open' | 'closed';
 
 export interface DoorInstance {
   col: number;
@@ -43,6 +43,12 @@ export interface PlateInstance {
   row: number;
   targetDoor: string; // "col,row" of the door to open
   activated: boolean;
+}
+
+export interface StairInstance {
+  col: number;
+  row: number;
+  direction: 'up' | 'down';
 }
 
 export interface SconceInstance {
@@ -79,6 +85,7 @@ export interface LevelSnapshot {
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
   sconces: Map<string, SconceInstance>;
+  stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -91,6 +98,7 @@ export class GameState {
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
   sconces: Map<string, SconceInstance>;
+  stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
 
@@ -127,6 +135,7 @@ export class GameState {
     this.levers = new Map();
     this.plates = new Map();
     this.sconces = new Map();
+    this.stairs = new Map();
     this.enemies = new Map();
     this.inventory = new Set();
 
@@ -204,6 +213,12 @@ export class GameState {
           wall,
           lit: true,
         });
+      } else if (e.type === 'stairs') {
+        this.stairs.set(doorKey(e.col, e.row), {
+          col: e.col,
+          row: e.row,
+          direction: e.direction as 'up' | 'down',
+        });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (ENEMY_DEFS[enemyType]) {
@@ -242,24 +257,6 @@ export class GameState {
       if (door) door.mechanical = true;
     }
 
-    // Auto-create doors for D cells with no entity
-    if (grid) {
-      for (let row = 0; row < grid.length; row++) {
-        for (let col = 0; col < grid[row].length; col++) {
-          if (grid[row][col] === 'D') {
-            const key = doorKey(col, row);
-            if (!this.doors.has(key)) {
-              this.doors.set(key, {
-                col,
-                row,
-                state: 'closed',
-                mechanical: false,
-              });
-            }
-          }
-        }
-      }
-    }
   }
 
   saveLevelState(): LevelSnapshot {
@@ -283,6 +280,10 @@ export class GameState {
     for (const [k, v] of this.sconces) {
       sconces.set(k, { ...v });
     }
+    const stairs = new Map<string, StairInstance>();
+    for (const [k, v] of this.stairs) {
+      stairs.set(k, { ...v });
+    }
     const enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of this.enemies) {
       enemies.set(k, { ...v });
@@ -290,7 +291,7 @@ export class GameState {
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
     return {
-      doors, keys, levers, plates, sconces, enemies,
+      doors, keys, levers, plates, sconces, stairs, enemies,
       exploredCells, registrySnapshot,
     };
   }
@@ -316,6 +317,10 @@ export class GameState {
     for (const [k, v] of snapshot.sconces) {
       this.sconces.set(k, { ...v });
     }
+    this.stairs = new Map<string, StairInstance>();
+    for (const [k, v] of snapshot.stairs) {
+      this.stairs.set(k, { ...v });
+    }
     this.enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of snapshot.enemies) {
       this.enemies.set(k, { ...v });
@@ -334,6 +339,7 @@ export class GameState {
     this.levers = new Map();
     this.plates = new Map();
     this.sconces = new Map();
+    this.stairs = new Map();
     this.enemies = new Map();
     this.exploredCells = new Set();
     // Clear only ground items for the old level; equipped/backpack items survive transitions.
@@ -349,6 +355,10 @@ export class GameState {
     return this.doors.get(doorKey(col, row));
   }
 
+  getStair(col: number, row: number): StairInstance | undefined {
+    return this.stairs.get(doorKey(col, row));
+  }
+
   isDoorOpen(col: number, row: number): boolean {
     const door = this.getDoor(col, row);
     if (!door) return true;
@@ -360,16 +370,8 @@ export class GameState {
     if (!door) return false;
     if (door.state !== 'closed') return false;
     if (door.mechanical) return false;
+    if (door.keyId && !this.hasKey(door.keyId)) return false;
     door.state = 'open';
-    return true;
-  }
-
-  unlockDoor(col: number, row: number): boolean {
-    const door = this.getDoor(col, row);
-    if (!door) return false;
-    if (door.state !== 'locked') return false;
-    if (!door.keyId || !this.hasKey(door.keyId)) return false;
-    door.state = 'closed';
     return true;
   }
 

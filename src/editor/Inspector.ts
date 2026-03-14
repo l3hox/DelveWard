@@ -7,7 +7,7 @@ export class Inspector {
   private app: EditorApp;
   private onEntityChanged: (() => void) | null = null;
   private onDelete: (() => void) | null = null;
-  private onPickRequested: ((entity: Entity, field: string, validChar: string) => void) | null = null;
+  private onPickRequested: ((entity: Entity, field: string, validChar?: string, validEntityType?: string, coordinateMode?: boolean) => void) | null = null;
   private onRefClicked: ((entity: Entity) => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
@@ -23,7 +23,7 @@ export class Inspector {
     this.onDelete = cb;
   }
 
-  setPickRequestedCallback(cb: (entity: Entity, field: string, validChar: string) => void): void {
+  setPickRequestedCallback(cb: (entity: Entity, field: string, validChar?: string, validEntityType?: string, coordinateMode?: boolean) => void): void {
     this.onPickRequested = cb;
   }
 
@@ -61,18 +61,19 @@ export class Inspector {
     switch (entity.type) {
       case 'door': {
         const state = (entity.state as string) ?? 'closed';
-        this.addDropdownField('state', state, ['open', 'closed', 'locked'], (val) => {
+        this.addDropdownField('state', state, ['open', 'closed'], (val) => {
           entity.state = val;
           this.onEntityChanged?.();
           this.refresh();
         });
-        if (state === 'locked') {
-          this.addTextField('keyId', (entity.keyId as string) ?? '', (val) => {
-            entity.keyId = val;
-            this.onEntityChanged?.();
-          });
-        }
-        const refs = this.app.getReferencingEntities(entity.col, entity.row);
+        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
+          entity.keyId = val;
+          this.onEntityChanged?.();
+        }, undefined, 'key');
+        const refs = [
+          ...this.app.getReferencingEntities(entity.col, entity.row),
+          ...this.app.getKeyIdPeers(entity).filter(e => e.type === 'key'),
+        ];
         if (refs.length > 0) {
           const refHeader = document.createElement('div');
           refHeader.className = 'inspector-ref-header';
@@ -89,29 +90,44 @@ export class Inspector {
         break;
       }
 
-      case 'key':
-        this.addTextField('keyId', (entity.keyId as string) ?? '', (val) => {
+      case 'key': {
+        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
           entity.keyId = val;
           this.onEntityChanged?.();
-        });
+        }, undefined, 'door');
+        const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'door');
+        if (keyPeers.length > 0) {
+          const unlockHeader = document.createElement('div');
+          unlockHeader.className = 'inspector-ref-header';
+          unlockHeader.textContent = `Unlocks (${keyPeers.length})`;
+          this.container.appendChild(unlockHeader);
+          for (const peer of keyPeers) {
+            const peerItem = document.createElement('div');
+            peerItem.className = 'inspector-ref-item';
+            peerItem.textContent = `${peer.type} @ (${peer.col}, ${peer.row})`;
+            peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
+            this.container.appendChild(peerItem);
+          }
+        }
         break;
+      }
 
       case 'lever':
         this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', 'D', entity, 'targetDoor', (val) => {
+        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', entity, 'targetDoor', (val) => {
           entity.targetDoor = val;
           this.onEntityChanged?.();
-        });
+        }, undefined, 'door', true);
         break;
 
       case 'pressure_plate':
-        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', 'D', entity, 'targetDoor', (val) => {
+        this.addPickableField('targetDoor', (entity.targetDoor as string) ?? '', entity, 'targetDoor', (val) => {
           entity.targetDoor = val;
           this.onEntityChanged?.();
-        });
+        }, undefined, 'door', true);
         break;
 
       case 'torch_sconce':
@@ -243,10 +259,12 @@ export class Inspector {
   private addPickableField(
     label: string,
     value: string,
-    validChar: string,
     entity: Entity,
     field: string,
-    onChange: (val: string) => void
+    onChange: (val: string) => void,
+    validChar?: string,
+    validEntityType?: string,
+    coordinateMode?: boolean,
   ): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field';
@@ -273,7 +291,7 @@ export class Inspector {
       this.app.pickMode.field === field;
     pickBtn.className = isPickingThis ? 'btn-pick active' : 'btn-pick';
     pickBtn.textContent = isPickingThis ? 'Picking...' : 'Pick';
-    pickBtn.addEventListener('click', () => this.onPickRequested?.(entity, field, validChar));
+    pickBtn.addEventListener('click', () => this.onPickRequested?.(entity, field, validChar, validEntityType, coordinateMode));
     row.appendChild(pickBtn);
 
     wrapper.appendChild(row);

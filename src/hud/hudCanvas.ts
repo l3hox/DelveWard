@@ -97,7 +97,7 @@ export class HudOverlay {
     drawCompass(this.ctx, playerState.facing);
     drawHealthBar(this.ctx, gameState.hp, gameState.maxHp, this.time);
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
-    drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies);
+    drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies, gameState.doors, gameState.stairs);
     drawInventoryPanel(this.ctx, gameState);
 
     const lvl = gameState.level;

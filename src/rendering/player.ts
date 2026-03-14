@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
 import { PlayerState, Facing, FACING_ANGLE } from '../core/grid';
+import { doorKey, type StairInstance } from '../core/gameState';
 
 const TWEEN_SPEED = 20;
 const ANIM_THRESHOLD = 0.05;
@@ -28,6 +29,8 @@ export class Player {
   private onTurnCallback?: () => void;
   private commandQueue: Array<() => void> = [];
 
+  private stairs?: Map<string, StairInstance>;
+
   constructor(
     camera: THREE.PerspectiveCamera,
     grid: string[],
@@ -37,9 +40,11 @@ export class Player {
     walkable?: Set<string>,
     isDoorOpen?: (col: number, row: number) => boolean,
     isBlocked?: (col: number, row: number) => boolean,
+    stairs?: Map<string, StairInstance>,
   ) {
     this.camera = camera;
     this.grid = grid;
+    this.stairs = stairs;
     this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen, isBlocked);
 
     const worldPos = this.gridToWorld(startCol, startRow);
@@ -60,9 +65,9 @@ export class Player {
 
   private gridToWorld(col: number, row: number): THREE.Vector3 {
     let y = EYE_HEIGHT;
-    const cell = this.grid[row]?.[col];
-    if (cell === 'S') y -= STAIR_Y_OFFSET;
-    if (cell === 'U') y += STAIR_Y_OFFSET;
+    const stair = this.stairs?.get(doorKey(col, row));
+    if (stair?.direction === 'down') y -= STAIR_Y_OFFSET;
+    if (stair?.direction === 'up') y += STAIR_Y_OFFSET;
     return new THREE.Vector3(
       col * CELL_SIZE + CELL_SIZE / 2,
       y,
@@ -71,9 +76,9 @@ export class Player {
   }
 
   private pitchForCell(col: number, row: number): number {
-    const cell = this.grid[row]?.[col];
-    if (cell === 'S') return -STAIR_PITCH;  // look down
-    if (cell === 'U') return STAIR_PITCH;   // look up
+    const stair = this.stairs?.get(doorKey(col, row));
+    if (stair?.direction === 'down') return -STAIR_PITCH;
+    if (stair?.direction === 'up') return STAIR_PITCH;
     return 0;
   }
 

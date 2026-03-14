@@ -30,7 +30,9 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
 export interface PickModeState {
   entity: Entity;
   field: string;
-  validChar: string;
+  validChar?: string;
+  validEntityType?: string;
+  coordinateMode?: boolean;
 }
 
 export class EditorApp {
@@ -184,30 +186,59 @@ export class EditorApp {
 
     const char = grid[row][col];
 
-    if (type === 'door') return char === 'D';
-    if (type === 'stairs') return char === 'S' || char === 'U';
+    if (type === 'door') {
+      if (!this.walkableSet.has(char)) return false;
+      return !this.getEntitiesAt(col, row).some(e => e.type === 'door');
+    }
+    if (type === 'stairs') {
+      if (!this.walkableSet.has(char)) return false;
+      return !this.getEntitiesAt(col, row).some(e => e.type === 'stairs');
+    }
     // All others require a walkable cell
     return this.walkableSet.has(char);
   }
 
-  enterPickMode(entity: Entity, field: string, validChar: string): void {
-    this.pickMode = { entity, field, validChar };
+  enterPickMode(entity: Entity, field: string, validChar?: string, validEntityType?: string, coordinateMode?: boolean): void {
+    this.pickMode = { entity, field, validChar, validEntityType, coordinateMode };
   }
 
   cancelPickMode(): void {
     this.pickMode = null;
   }
 
-  completePickMode(col: number, row: number): boolean {
+  isValidPickTarget(col: number, row: number): boolean {
     if (!this.pickMode || !this.level) return false;
     const grid = this.level.grid;
     if (row < 0 || row >= grid.length) return false;
     if (col < 0 || col >= grid[row].length) return false;
 
-    const char = grid[row][col];
-    if (char !== this.pickMode.validChar) return false;
+    const pm = this.pickMode;
+    if (pm.validChar && grid[row][col] !== pm.validChar) return false;
+    if (pm.validEntityType && !this.getEntitiesAt(col, row).some(e => e.type === pm.validEntityType)) return false;
+    return pm.validChar !== undefined || pm.validEntityType !== undefined;
+  }
 
-    (this.pickMode.entity as Record<string, unknown>)[this.pickMode.field] = `${col},${row}`;
+  completePickMode(col: number, row: number): boolean {
+    if (!this.pickMode || !this.level) return false;
+    if (!this.isValidPickTarget(col, row)) return false;
+
+    const pm = this.pickMode;
+
+    if (pm.validEntityType && !pm.coordinateMode) {
+      // Entity-based pick: sync field value between source and target
+      const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      if (targets.length === 0) { this.pickMode = null; return false; }
+      const target = targets[0];
+      const sourceVal = (pm.entity as Record<string, unknown>)[pm.field] as string || '';
+      const targetVal = (target as Record<string, unknown>)[pm.field] as string || '';
+      const syncedVal = targetVal || sourceVal || this.generateKeyId();
+      (pm.entity as Record<string, unknown>)[pm.field] = syncedVal;
+      (target as Record<string, unknown>)[pm.field] = syncedVal;
+    } else {
+      // Coordinate-based pick: set "col,row" string
+      (pm.entity as Record<string, unknown>)[pm.field] = `${col},${row}`;
+    }
+
     this.pickMode = null;
     return true;
   }
@@ -216,5 +247,24 @@ export class EditorApp {
     if (!this.level) return [];
     const key = `${col},${row}`;
     return this.level.entities.filter(e => (e as Record<string, unknown>).targetDoor === key);
+  }
+
+  getKeyIdPeers(entity: Entity): Entity[] {
+    if (!this.level) return [];
+    const keyId = (entity as Record<string, unknown>).keyId as string;
+    if (!keyId) return [];
+    return this.level.entities.filter(e => e !== entity && (e as Record<string, unknown>).keyId === keyId);
+  }
+
+  private generateKeyId(): string {
+    if (!this.level) return 'key_1';
+    const existing = new Set<string>();
+    for (const e of this.level.entities) {
+      const kid = (e as Record<string, unknown>).keyId;
+      if (typeof kid === 'string' && kid) existing.add(kid);
+    }
+    let n = 1;
+    while (existing.has(`key_${n}`)) n++;
+    return `key_${n}`;
   }
 }

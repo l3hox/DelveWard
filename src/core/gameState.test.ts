@@ -35,7 +35,7 @@ describe('GameState', () => {
   it('extracts door entities into doors map', () => {
     const gs = new GameState([
       doorEntity(1, 2, 'closed'),
-      doorEntity(3, 4, 'locked', 'gold_key'),
+      doorEntity(3, 4, 'closed', 'gold_key'),
     ]);
     expect(gs.doors.size).toBe(2);
     expect(gs.getDoor(1, 2)).toBeDefined();
@@ -66,12 +66,12 @@ describe('GameState', () => {
   // --- getDoor ---
 
   it('getDoor returns correct instance', () => {
-    const gs = new GameState([doorEntity(5, 6, 'locked', 'key1')]);
+    const gs = new GameState([doorEntity(5, 6, 'closed', 'key1')]);
     const door = gs.getDoor(5, 6);
     expect(door).toBeDefined();
     expect(door!.col).toBe(5);
     expect(door!.row).toBe(6);
-    expect(door!.state).toBe('locked');
+    expect(door!.state).toBe('closed');
     expect(door!.keyId).toBe('key1');
   });
 
@@ -89,11 +89,6 @@ describe('GameState', () => {
 
   it('isDoorOpen returns false for closed doors', () => {
     const gs = new GameState([doorEntity(1, 1, 'closed')]);
-    expect(gs.isDoorOpen(1, 1)).toBe(false);
-  });
-
-  it('isDoorOpen returns false for locked doors', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
     expect(gs.isDoorOpen(1, 1)).toBe(false);
   });
 
@@ -115,10 +110,30 @@ describe('GameState', () => {
     expect(gs.openDoor(1, 1)).toBe(false);
   });
 
-  it('openDoor: locked returns false', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
+  it('openDoor: closed with keyId but no key returns false', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed', 'gold_key')]);
     expect(gs.openDoor(1, 1)).toBe(false);
-    expect(gs.getDoor(1, 1)!.state).toBe('locked');
+    expect(gs.getDoor(1, 1)!.state).toBe('closed');
+  });
+
+  it('openDoor: closed with keyId and correct key succeeds', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed', 'gold_key')]);
+    gs.addKey('gold_key');
+    expect(gs.openDoor(1, 1)).toBe(true);
+    expect(gs.getDoor(1, 1)!.state).toBe('open');
+  });
+
+  it('openDoor: closed with keyId and wrong key returns false', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed', 'gold_key')]);
+    gs.addKey('silver_key');
+    expect(gs.openDoor(1, 1)).toBe(false);
+    expect(gs.getDoor(1, 1)!.state).toBe('closed');
+  });
+
+  it('openDoor: closed without keyId succeeds (no key needed)', () => {
+    const gs = new GameState([doorEntity(1, 1, 'closed')]);
+    expect(gs.openDoor(1, 1)).toBe(true);
+    expect(gs.getDoor(1, 1)!.state).toBe('open');
   });
 
   it('openDoor: mechanical door returns false', () => {
@@ -128,27 +143,6 @@ describe('GameState', () => {
     ]);
     expect(gs.openDoor(3, 2)).toBe(false);
     expect(gs.getDoor(3, 2)!.state).toBe('closed');
-  });
-
-  // --- unlockDoor ---
-
-  it('unlockDoor: locked -> closed with correct key returns true', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'gold_key')]);
-    gs.addKey('gold_key');
-    expect(gs.unlockDoor(1, 1)).toBe(true);
-    expect(gs.getDoor(1, 1)!.state).toBe('closed');
-  });
-
-  it('unlockDoor: locked but wrong key returns false', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'gold_key')]);
-    gs.addKey('silver_key');
-    expect(gs.unlockDoor(1, 1)).toBe(false);
-    expect(gs.getDoor(1, 1)!.state).toBe('locked');
-  });
-
-  it('unlockDoor: not locked returns false', () => {
-    const gs = new GameState([doorEntity(1, 1, 'closed')]);
-    expect(gs.unlockDoor(1, 1)).toBe(false);
   });
 
   // --- toggleDoor ---
@@ -165,12 +159,6 @@ describe('GameState', () => {
     expect(gs.getDoor(1, 1)!.state).toBe('open');
   });
 
-  it('toggleDoor: locked stays locked', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
-    gs.toggleDoor(1, 1);
-    expect(gs.getDoor(1, 1)!.state).toBe('locked');
-  });
-
   // --- closeDoor ---
 
   it('closeDoor: open -> closed returns true', () => {
@@ -181,11 +169,6 @@ describe('GameState', () => {
 
   it('closeDoor: closed returns false', () => {
     const gs = new GameState([doorEntity(1, 1, 'closed')]);
-    expect(gs.closeDoor(1, 1)).toBe(false);
-  });
-
-  it('closeDoor: locked returns false', () => {
-    const gs = new GameState([doorEntity(1, 1, 'locked', 'key1')]);
     expect(gs.closeDoor(1, 1)).toBe(false);
   });
 
@@ -226,43 +209,6 @@ describe('GameState', () => {
   it('door without lever/plate is not mechanical', () => {
     const gs = new GameState([doorEntity(1, 1, 'closed')]);
     expect(gs.getDoor(1, 1)!.mechanical).toBe(false);
-  });
-
-  // --- auto-created doors from grid ---
-
-  describe('auto-door creation from grid', () => {
-    const grid = [
-      '#####',
-      '#.D.#',
-      '#...#',
-      '#####',
-    ];
-
-    it('D cell without entity gets auto-created door', () => {
-      const gs = new GameState([], grid);
-      const door = gs.getDoor(2, 1);
-      expect(door).toBeDefined();
-      expect(door!.state).toBe('closed');
-      expect(door!.mechanical).toBe(false);
-    });
-
-    it('D cell with entity is not overwritten', () => {
-      const gs = new GameState([doorEntity(2, 1, 'locked', 'key1')], grid);
-      const door = gs.getDoor(2, 1);
-      expect(door!.state).toBe('locked');
-      expect(door!.keyId).toBe('key1');
-    });
-
-    it('auto-created door is openable', () => {
-      const gs = new GameState([], grid);
-      expect(gs.openDoor(2, 1)).toBe(true);
-      expect(gs.getDoor(2, 1)!.state).toBe('open');
-    });
-
-    it('no grid parameter keeps backward compat', () => {
-      const gs = new GameState([]);
-      expect(gs.doors.size).toBe(0);
-    });
   });
 
   // --- addKey / hasKey ---
@@ -716,6 +662,50 @@ describe('GameState', () => {
       expect(gs.hp).toBe(15);
       expect(gs.torchFuel).toBe(50);
       expect(gs.hasKey('iron_key')).toBe(true);
+    });
+  });
+
+  // --- stairs ---
+
+  describe('stairs', () => {
+    it('parses stairs entities into stairs map', () => {
+      const gs = new GameState([
+        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+      ]);
+      expect(gs.stairs.size).toBe(1);
+      expect(gs.getStair(2, 1)).toBeDefined();
+      expect(gs.getStair(2, 1)!.direction).toBe('down');
+    });
+
+    it('getStair returns undefined for non-existent position', () => {
+      const gs = new GameState([]);
+      expect(gs.getStair(9, 9)).toBeUndefined();
+    });
+
+    it('stairs are included in level snapshots', () => {
+      const gs = new GameState([
+        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+      ]);
+      const snap = gs.saveLevelState();
+      expect(snap.stairs.size).toBe(1);
+    });
+
+    it('stairs are restored from level snapshots', () => {
+      const gs = new GameState([
+        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+      ]);
+      const snap = gs.saveLevelState();
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+      expect(gs2.getStair(2, 1)).toBeDefined();
+    });
+
+    it('stairs are reset in loadNewLevel', () => {
+      const gs = new GameState([
+        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+      ]);
+      gs.loadNewLevel([]);
+      expect(gs.stairs.size).toBe(0);
     });
   });
 

@@ -9,16 +9,16 @@
         "#.......#",
         "#.#.#.#.#",
         "#.......#",
-        "##.#D#.##",
+        "##.#.#.##",
         "#.......#",
         "#.#...#.#",
         "#.......#",
-        "####S####"
+        "####.####"
       ],
       "playerStart": { "col": 4, "row": 1, "facing": "S" },
       "entities": [
         { "col": 1, "row": 5, "type": "key", "keyId": "vault_key" },
-        { "col": 4, "row": 4, "type": "door", "state": "locked", "keyId": "vault_key" },
+        { "col": 4, "row": 4, "type": "door", "state": "closed", "keyId": "vault_key" },
         { "col": 4, "row": 8, "type": "stairs", "direction": "down", "targetLevel": "lower_vault", "targetCol": 4, "targetRow": 1 },
         { "col": 7, "row": 3, "type": "enemy", "enemyType": "rat" },
         { "col": 1, "row": 7, "type": "enemy", "enemyType": "rat" },
@@ -38,7 +38,7 @@
       "id": "lower_vault",
       "name": "Lower Vault",
       "grid": [
-        "####U####",
+        "####.####",
         "#.......#",
         "#.#.#.#.#",
         "#.......#",

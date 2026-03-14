@@ -21,7 +21,7 @@ export const FACING_DELTA: Record<Facing, [number, number]> = {
 export const TURN_LEFT: Record<Facing, Facing> = { N: 'W', W: 'S', S: 'E', E: 'N' };
 export const TURN_RIGHT: Record<Facing, Facing> = { N: 'E', E: 'S', S: 'W', W: 'N' };
 
-export const WALKABLE_CELLS = new Set(['.', 'D', 'S', 'U', 'O']);
+export const WALKABLE_CELLS = new Set(['.']);
 
 export function buildWalkableSet(
   charDefs?: Array<{ char: string; solid: boolean }>,
@@ -45,11 +45,8 @@ export function isWalkable(
   if (row < 0 || row >= grid.length) return false;
   if (col < 0 || col >= grid[0].length) return false;
   const cell = grid[row][col];
-  if (cell === 'D' && isDoorOpen) {
-    if (!isDoorOpen(col, row)) return false;
-  } else if (!walkable.has(cell)) {
-    return false;
-  }
+  if (!walkable.has(cell)) return false;
+  if (isDoorOpen && !isDoorOpen(col, row)) return false;
   if (isBlocked && isBlocked(col, row)) return false;
   return true;
 }

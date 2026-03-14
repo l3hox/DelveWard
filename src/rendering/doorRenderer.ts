@@ -176,7 +176,7 @@ export function buildDoorMeshes(
     group.add(frame);
 
     // Panel (toggles visibility)
-    const mat = door.state === 'locked' ? lockedDoorMat : doorMat;
+    const mat = door.keyId ? lockedDoorMat : doorMat;
     const panel = new THREE.Mesh(panelGeo, mat);
     panel.position.set(cx, panelHeight / 2, cz);
 

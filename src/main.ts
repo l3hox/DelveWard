@@ -96,7 +96,8 @@ function buildLevelScene(
 ): LevelScene {
   const walkable = buildWalkableSet(level.charDefs);
 
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false);
+  const stairPositions = new Set(gameState.stairs.keys());
+  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions);
   scene.add(dungeonGroup);
 
   const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
@@ -132,7 +133,7 @@ function buildLevelScene(
   const sconceMeshes = buildSconceMeshes(gameState);
   scene.add(sconceMeshes.group);
 
-  const stairMeshes = buildStairMeshes(level, walkable);
+  const stairMeshes = buildStairMeshes(gameState.stairs, level.grid, walkable, level.defaults, level.areas);
   scene.add(stairMeshes.group);
 
   const enemyMeshes = buildEnemyMeshes(gameState);
@@ -169,6 +170,7 @@ function buildLevelScene(
     walkable,
     gameState.isDoorOpen.bind(gameState),
     gameState.isBlockedByEnemy.bind(gameState),
+    gameState.stairs,
   );
 
   let skyboxMesh: THREE.Mesh | undefined;
@@ -285,6 +287,7 @@ async function init(): Promise<void> {
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
   const firstLevel = dungeon.levels[0];
+
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
   applyEnvironment(firstLevel.environment, scene, ambient);
@@ -431,9 +434,8 @@ async function init(): Promise<void> {
         gameState.drainTorchFuel(1);
       }
 
-      // Stair detection
-      const cell = ls.level.grid[row]?.[col];
-      if (cell === 'S' || cell === 'U') {
+      // Stair detection — entity-based lookup
+      if (gameState.getStair(col, row)) {
         const stair = ls.level.entities.find(
           (e) => e.type === 'stairs' && e.col === col && e.row === row,
         );
@@ -594,7 +596,7 @@ async function init(): Promise<void> {
           if (result.message) {
             console.log(result.message);
           }
-          if (result.type === 'door_opened' || result.type === 'door_unlocked') {
+          if (result.type === 'door_opened') {
             const facing = getFacingCell(ls.player.getState());
             updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, true, ls.doorAnimator);
           }

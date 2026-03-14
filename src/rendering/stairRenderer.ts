@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 import { getFloorTexture, getWallTexture, getCeilingTexture } from './textures';
-import type { DungeonLevel, TextureSet, TextureArea } from '../core/types';
+import type { TextureSet, TextureArea } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 import type { Facing } from '../core/grid';
+import { doorKey, type StairInstance } from '../core/gameState';
 
 const STEP_COUNT = 4;
 const STEP_HEIGHT = 0.25;
@@ -126,6 +127,7 @@ export function detectStairFacing(
   col: number,
   row: number,
   walkable: Set<string>,
+  stairPositions: Set<string>,
 ): Facing {
   const neighbors: { facing: Facing; dc: number; dr: number }[] = [
     { facing: 'N', dc: 0, dr: -1 },
@@ -141,7 +143,7 @@ export function detectStairFacing(
     if (nc < 0 || nc >= grid[nr].length) continue;
     const cell = grid[nr][nc];
     // Walkable neighbor that isn't itself a stair cell
-    if (walkable.has(cell) && cell !== 'S' && cell !== 'U') {
+    if (walkable.has(cell) && !stairPositions.has(doorKey(nc, nr))) {
       return facing;
     }
   }
@@ -158,14 +160,14 @@ export function detectStairFacing(
  * UP (U):   step 0 at Y=0.25, each next step 0.25 higher (ascending away)
  */
 function buildStairGroup(
-  cellChar: string,
+  direction: 'up' | 'down',
   facing: Facing,
   stepMaterial: THREE.MeshLambertMaterial,
   sideMaterial: THREE.MeshLambertMaterial,
   ceilingMaterial: THREE.MeshLambertMaterial,
 ): THREE.Group {
   const group = new THREE.Group();
-  const isDown = cellChar === 'S';
+  const isDown = direction === 'down';
 
   // Floor steps — each step is a thin slab at the correct Y for its tread
   for (let i = 0; i < STEP_COUNT; i++) {
@@ -280,31 +282,27 @@ export interface StairMeshes {
 }
 
 export function buildStairMeshes(
-  level: DungeonLevel,
+  stairs: Map<string, StairInstance>,
+  grid: string[],
   walkable: Set<string>,
+  defaults?: TextureSet,
+  areas?: TextureArea[],
 ): StairMeshes {
   const group = new THREE.Group();
 
-  for (let row = 0; row < level.grid.length; row++) {
-    const line = level.grid[row];
-    for (let col = 0; col < line.length; col++) {
-      const ch = line[col];
-      if (ch !== 'S' && ch !== 'U') continue;
-
-      const facing = detectStairFacing(level.grid, col, row, walkable);
-      const tex = resolveStairTextures(col, row, level.defaults, level.areas);
-      const stepMat = getStairStepMaterial(tex.floor);
-      const sideMat = getStairSideMaterial(tex.wall);
-      const ceilMat = getStairCeilingMaterial(tex.ceiling);
-      const stairGroup = buildStairGroup(ch, facing, stepMat, sideMat, ceilMat);
-
-      // Position at cell center
-      const cx = col * CELL_SIZE + CELL_SIZE / 2;
-      const cz = row * CELL_SIZE + CELL_SIZE / 2;
-      stairGroup.position.set(cx, 0, cz);
-
-      group.add(stairGroup);
-    }
+  const stairPositions = new Set(stairs.keys());
+  for (const [, stair] of stairs) {
+    const { col, row, direction } = stair;
+    const facing = detectStairFacing(grid, col, row, walkable, stairPositions);
+    const tex = resolveStairTextures(col, row, defaults, areas);
+    const stepMat = getStairStepMaterial(tex.floor);
+    const sideMat = getStairSideMaterial(tex.wall);
+    const ceilMat = getStairCeilingMaterial(tex.ceiling);
+    const stairGroup = buildStairGroup(direction, facing, stepMat, sideMat, ceilMat);
+    const cx = col * CELL_SIZE + CELL_SIZE / 2;
+    const cz = row * CELL_SIZE + CELL_SIZE / 2;
+    stairGroup.position.set(cx, 0, cz);
+    group.add(stairGroup);
   }
 
   return { group };

@@ -3,7 +3,7 @@ import { getFacingCell } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
   message?: string;
   targetDoor?: string; // "col,row" of affected door (for mesh updates)
 }
@@ -20,13 +20,9 @@ export function interact(
     return { type: 'nothing' };
   }
 
-  const cell = grid[row][col];
-
-  // Door interaction
-  if (cell === 'D') {
-    const door = gameState.getDoor(col, row);
-    if (!door) return { type: 'nothing' }; // no door entity = always open, nothing to interact with
-
+  // Door interaction — entity-based lookup (no special grid char)
+  const door = gameState.getDoor(col, row);
+  if (door) {
     if (door.state === 'open') {
       if (gameState.isBlockedByEnemy(col, row)) {
         return { type: 'door_blocked', message: 'Something is blocking the door.' };
@@ -37,19 +33,12 @@ export function interact(
       return { type: 'nothing' }; // mechanical door, can't close manually
     }
 
-    if (door.state === 'locked') {
-      // Try to unlock
-      if (gameState.unlockDoor(col, row)) {
-        // After unlocking, also open it immediately
-        gameState.openDoor(col, row);
-        return { type: 'door_unlocked', message: 'Door unlocked and opened.' };
-      }
-      return { type: 'door_locked', message: 'This door is locked.' };
-    }
-
     if (door.state === 'closed') {
       if (door.mechanical) {
         return { type: 'nothing', message: 'This door is operated by a mechanism.' };
+      }
+      if (door.keyId && !gameState.hasKey(door.keyId)) {
+        return { type: 'door_locked', message: 'This door is locked.' };
       }
       if (gameState.openDoor(col, row)) {
         return { type: 'door_opened', message: 'Door opened.' };
@@ -58,14 +47,11 @@ export function interact(
   }
 
   // Lever interaction — player stands on lever cell, faces the wall
-  const playerCell = grid[playerState.row]?.[playerState.col];
-  if (playerCell === 'O') {
-    const lever = gameState.getLever(playerState.col, playerState.row);
-    if (lever && lever.wall === playerState.facing) {
-      const targetDoor = gameState.activateLever(playerState.col, playerState.row);
-      if (targetDoor) {
-        return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
-      }
+  const lever = gameState.getLever(playerState.col, playerState.row);
+  if (lever && lever.wall === playerState.facing) {
+    const targetDoor = gameState.activateLever(playerState.col, playerState.row);
+    if (targetDoor) {
+      return { type: 'lever_activated', message: 'Lever pulled.', targetDoor };
     }
   }
 

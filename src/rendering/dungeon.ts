@@ -4,6 +4,7 @@ import { getWallTexture, getFloorTexture, getCeilingTexture } from './textures';
 import { resolveTextures } from '../core/textureResolver';
 import type { TextureSet, TextureArea, CharDef } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
+import { doorKey } from '../core/gameState';
 
 export const CELL_SIZE = 2;
 export const WALL_HEIGHT = 2.5;
@@ -72,7 +73,7 @@ function resolveWallMat(
   return fallbackMat;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true): THREE.Group {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -98,7 +99,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const cellCeilMat = getCeilingMaterial(tex.ceiling);
 
       // Floor (skip for stair cells — stairRenderer provides the geometry)
-      if (char !== 'S' && char !== 'U') {
+      const isStair = stairPositions?.has(doorKey(col, row)) ?? false;
+
+      if (!isStair) {
         const floor = new THREE.Mesh(tileGeo, cellFloorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.position.set(cx, 0, cz);
@@ -106,7 +109,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // Ceiling (skip for stair cells — stairRenderer provides the geometry)
-      if (ceiling && char !== 'S' && char !== 'U') {
+      if (ceiling && !isStair) {
         const ceil = new THREE.Mesh(tileGeo, cellCeilMat);
         ceil.rotation.x = Math.PI / 2;
         ceil.position.set(cx, WALL_HEIGHT, cz);
@@ -114,7 +117,6 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // Walls (skip for stair cells — stairRenderer owns the entire cell)
-      const isStair = char === 'S' || char === 'U';
 
       // North wall
       if (!isStair && isSolid(grid, col, row - 1, walkable)) {

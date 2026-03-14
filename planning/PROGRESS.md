@@ -60,6 +60,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Recent Changes
 
+- **Data model unification**: Removed all special grid chars (D, S, U, O). Doors, stairs, and levers are now purely entity-based on walkable cells. `WALKABLE_CELLS` simplified to `new Set(['.'])`. Grid owns only geometry (`#`, `.`, ` `, charDefs), entities own all behavior. GameState tracks stairs in a new `stairs` Map. All renderers use entity lookup instead of grid char checks. 515 tests passing.
 - Dungeon Editor Phase 5: interactive target picking (Pick button on lever/plate targetDoor fields, crosshair cursor, green/red hover for valid/invalid targets, Escape/right-click cancel), wiring visualization (dashed orange arrows for active connections, faint grey for all others — always visible), "Referenced by" section on doors with clickable source list
 - Dungeon Editor Phase 4: left-side level properties panel (name/id, environment, texture defaults, charDefs array editor, areas array editor), "New" button for creating levels from scratch, centralized validation with export gating
 - Dungeon Editor Phase 3: entity placement + inspector panel (select/cycle entities, entity tool with type dropdown, right-side inspector with type-specific property forms, delete key support, placement constraints)

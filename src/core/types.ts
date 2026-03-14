@@ -43,8 +43,8 @@ export interface Dungeon {
 }
 
 // Grid char legend:
-// '#' = wall, '.' = floor, 'D' = door, 'S' = stairs down,
-// 'U' = stairs up, 'O' = object (details in entities), ' ' = void
+// '#' = wall, '.' = floor, ' ' = void
+// All interactive features (doors, stairs, levers, etc.) are entity-only on walkable cells.
 
 export interface Entity {
   col: number;

@@ -6,7 +6,7 @@ import { parseDoorKey } from '../core/gameState';
 import { ENEMY_DEFS } from '../enemies/enemyTypes';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
-const BUILTIN_CHARS = new Set(['.', '#', 'D', 'S', 'U', 'O', ' ']);
+const BUILTIN_CHARS = new Set(['.', '#', ' ']);
 
 function validateTextures(
   entry: Record<string, unknown>,
@@ -129,7 +129,13 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "entities" must be an array`);
   }
 
-  const VALID_DOOR_STATES = new Set(['open', 'closed', 'locked']);
+  const VALID_DOOR_STATES = new Set(['open', 'closed']);
+
+  // Two-pass: collect door entity positions for lever/plate validation
+  const doorPositions = new Set<string>();
+  for (const ent of obj.entities as Array<Record<string, unknown>>) {
+    if (ent.type === 'door') doorPositions.add(`${ent.col},${ent.row}`);
+  }
 
   for (let i = 0; i < obj.entities.length; i++) {
     const e = obj.entities[i] as Record<string, unknown>;
@@ -149,14 +155,14 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     const cellAtEntity = grid[e.row as number][e.col as number];
 
     if (e.type === 'door') {
-      if (cellAtEntity !== 'D') {
-        throw new Error(`Level ${source}: entities[${i}] door must be on a 'D' cell, found '${cellAtEntity}'`);
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] door must be on a walkable cell, found '${cellAtEntity}'`);
       }
       if (e.state !== undefined && !VALID_DOOR_STATES.has(e.state as string)) {
-        throw new Error(`Level ${source}: entities[${i}] door state must be open, closed, or locked`);
+        throw new Error(`Level ${source}: entities[${i}] door state must be open or closed`);
       }
-      if (e.state === 'locked' && typeof e.keyId !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] locked door must have a string keyId`);
+      if (e.keyId !== undefined && typeof e.keyId !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] door keyId must be a string`);
       }
     }
 
@@ -173,9 +179,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever must have targetDoor in "col,row" format`);
       }
-      const [tc, tr] = parseDoorKey(e.targetDoor as string);
-      if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
-        throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a 'D' cell`);
+      if (!doorPositions.has(e.targetDoor as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a door entity`);
       }
       if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
@@ -186,9 +191,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must have targetDoor in "col,row" format`);
       }
-      const [tc, tr] = parseDoorKey(e.targetDoor as string);
-      if (tr < 0 || tr >= grid.length || tc < 0 || tc >= rowLen || grid[tr][tc] !== 'D') {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate targetDoor must reference a 'D' cell`);
+      if (!doorPositions.has(e.targetDoor as string)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate targetDoor must reference a door entity`);
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
@@ -238,9 +242,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.direction !== 'up' && e.direction !== 'down') {
         throw new Error(`Level ${source}: entities[${i}] stairs must have direction "up" or "down"`);
       }
-      const expectedCell = (e.direction as string) === 'down' ? 'S' : 'U';
-      if (cellAtEntity !== expectedCell) {
-        throw new Error(`Level ${source}: entities[${i}] stairs direction="${e.direction}" must be on '${expectedCell}' cell, found '${cellAtEntity}'`);
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] stairs must be on a walkable cell, found '${cellAtEntity}'`);
       }
       if (typeof e.targetLevel !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] stairs must have a string targetLevel`);

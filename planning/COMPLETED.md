@@ -139,6 +139,18 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Items placed in dungeon1.json (sword, shield, ring, potions, oil)
   - 281 tests (23 new)
 
+- [x] **Data Model Unification** — Entity-only doors, stairs, and levers:
+  - Removed all special grid chars (`D`, `S`, `U`, `O`) — grid owns only geometry, entities own all behavior
+  - `WALKABLE_CELLS` simplified to `new Set(['.'])`
+  - Doors: removed `'locked'` state, `keyId` on closed door means "needs key". Removed `unlockDoor()` and auto-creation
+  - Stairs: added `StairInstance` + `stairs` Map to GameState. All renderers use entity lookup (player camera, dungeon walls, stair meshes, minimap)
+  - Levers: removed `O` cell guard from interaction.ts — entity lookup only
+  - Level loader: two-pass validation for door/lever cross-refs, walkable cell requirement for all entity types
+  - Editor: `coordinateMode` for lever→door picking, door/stair one-per-cell guards, reduced palette (`.`, `#`, `_`)
+  - Updated all level JSON files (D→`.`, S→`.`, U→`.`, O→`.`), added missing door entity in dungeon3
+  - 515 tests passing, DUNGEON-DESIGNER.md updated
+  - Architecture: established principle that grid = geometry, entities = behavior
+
 - [x] **Dungeon Editor Phase 5** — Target Picking + Wiring Visualization:
   - Pick mode: "Pick" button on lever/pressure_plate targetDoor fields, crosshair cursor, green/red hover validation
   - Pick completes on valid cell click, cancels on right-click/Escape/tool-switch/delete

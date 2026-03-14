@@ -9,9 +9,6 @@ const TILE_SIZE = 32;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4.0;
 
-// Special walkable chars that get a floor + indicator overlay
-const SPECIAL_CHARS = new Set(['D', 'S', 'U', 'O']);
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -323,46 +320,9 @@ export class GridCanvas {
       const { floor } = resolveTextures(col, row, char, level.defaults, app.charDefMap, level.areas);
       const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
       ctx.drawImage(texImage, px, py, tw, th);
-
-      // Special char indicator
-      if (SPECIAL_CHARS.has(char)) {
-        this.drawSpecialIndicator(char, px, py, tw, th);
-      }
     }
   }
 
-  private drawSpecialIndicator(char: string, px: number, py: number, tw: number, th: number): void {
-    const { ctx } = this;
-    const cx = px + tw / 2;
-    const cy = py + th / 2;
-    const s = Math.max(4, Math.min(tw, th) * 0.25);
-
-    ctx.save();
-    ctx.font = `bold ${Math.max(8, s * 1.2)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    switch (char) {
-      case 'D':
-        ctx.fillStyle = '#c8a060';
-        ctx.fillText('D', cx, cy);
-        break;
-      case 'S':
-        ctx.fillStyle = '#80c0ff';
-        ctx.fillText('↓', cx, cy);
-        break;
-      case 'U':
-        ctx.fillStyle = '#80c0ff';
-        ctx.fillText('↑', cx, cy);
-        break;
-      case 'O':
-        ctx.fillStyle = '#b080ff';
-        ctx.fillText('O', cx, cy);
-        break;
-    }
-
-    ctx.restore();
-  }
 
   private drawGridLines(
     firstCol: number,
@@ -501,18 +461,35 @@ export class GridCanvas {
       }
 
       case 'door': {
-        // Lock icon overlay for locked doors
-        if (entity.state === 'locked') {
-          // Small padlock icon
-          const s = iconRadius * 0.8;
+        // Door letter indicator for all door entities
+        ctx.fillStyle = '#c8a060';
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('D', cx, cy);
+        // Padlock overlay for keyed doors
+        if (entity.keyId) {
+          const s = iconRadius * 0.5;
+          const lockX = cx + iconRadius * 0.6;
+          const lockY = cy - iconRadius * 0.4;
           ctx.fillStyle = '#ffcc44';
-          ctx.fillRect(cx - s, cy - s * 0.2, s * 2, s * 1.4);
+          ctx.fillRect(lockX - s, lockY, s * 2, s * 1.2);
           ctx.strokeStyle = '#ffcc44';
           ctx.lineWidth = Math.max(1, s * 0.3);
           ctx.beginPath();
-          ctx.arc(cx, cy - s * 0.4, s * 0.6, Math.PI, 0);
+          ctx.arc(lockX, lockY - s * 0.1, s * 0.5, Math.PI, 0);
           ctx.stroke();
         }
+        break;
+      }
+
+      case 'stairs': {
+        const isDown = entity.direction === 'down';
+        ctx.fillStyle = '#80c0ff';
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isDown ? '↓' : '↑', cx, cy);
         break;
       }
 
@@ -581,7 +558,7 @@ export class GridCanvas {
     let fillColor: string;
 
     if (this.app.pickMode) {
-      const isValid = hover.char === this.app.pickMode.validChar;
+      const isValid = this.app.isValidPickTarget(hover.col, hover.row);
       strokeColor = isValid ? 'rgba(68, 255, 68, 0.8)' : 'rgba(255, 68, 68, 0.5)';
       fillColor = isValid ? 'rgba(68, 255, 68, 0.15)' : 'rgba(255, 68, 68, 0.05)';
     } else {
@@ -675,6 +652,15 @@ export class GridCanvas {
         );
         arrows.push({ fromCol: e.col, fromRow: e.row, toCol: target.col, toRow: target.row, active: isActive });
       }
+      if (e.type === 'key' && (e as Record<string, unknown>).keyId) {
+        const keyId = (e as Record<string, unknown>).keyId as string;
+        for (const other of level.entities) {
+          if (other.type === 'door' && (other as Record<string, unknown>).keyId === keyId) {
+            const isActive = selected !== null && (e === selected || other === selected);
+            arrows.push({ fromCol: e.col, fromRow: e.row, toCol: other.col, toRow: other.row, active: isActive });
+          }
+        }
+      }
     }
 
     if (arrows.length === 0) return;
@@ -684,7 +670,7 @@ export class GridCanvas {
       for (const a of arrows) {
         if (a.active !== active) continue;
 
-        const color = active ? '#ffaa00' : 'rgba(150, 150, 150, 0.3)';
+        const color = active ? '#ffaa00' : 'rgba(150, 150, 150, 0.6)';
         ctx.save();
         ctx.strokeStyle = color;
         ctx.fillStyle = color;

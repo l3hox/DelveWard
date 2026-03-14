@@ -330,7 +330,7 @@ describe('validateLevel', () => {
 
   function doorLevel(entities: unknown[]) {
     return validLevel({
-      grid: ['#####', '#.D.#', '#...#', '#####'],
+      grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'E' },
       entities,
     });
@@ -343,9 +343,9 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('accepts valid locked door entity', () => {
+  it('accepts valid door entity with keyId', () => {
     const level = validateLevel(doorLevel([
-      { col: 2, row: 1, type: 'door', state: 'locked', keyId: 'gold_key' },
+      { col: 2, row: 1, type: 'door', state: 'closed', keyId: 'gold_key' },
     ]), 'test');
     expect(level.entities).toHaveLength(1);
   });
@@ -353,19 +353,15 @@ describe('validateLevel', () => {
   it('rejects door entity with invalid state', () => {
     expect(() => validateLevel(doorLevel([
       { col: 2, row: 1, type: 'door', state: 'broken' },
-    ]), 'test')).toThrow('door state must be open, closed, or locked');
+    ]), 'test')).toThrow('door state must be open or closed');
   });
 
-  it('rejects locked door without keyId', () => {
-    expect(() => validateLevel(doorLevel([
-      { col: 2, row: 1, type: 'door', state: 'locked' },
-    ]), 'test')).toThrow('locked door must have a string keyId');
-  });
-
-  it('rejects door entity on non-D cell', () => {
-    expect(() => validateLevel(doorLevel([
-      { col: 1, row: 1, type: 'door', state: 'closed' },
-    ]), 'test')).toThrow("door must be on a 'D' cell");
+  it('rejects door entity on non-walkable cell', () => {
+    expect(() => validateLevel(validLevel({
+      grid: ['#####', '#.#.#', '#...#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'E' },
+      entities: [{ col: 2, row: 1, type: 'door', state: 'closed' }],
+    }), 'test')).toThrow("door must be on a walkable cell");
   });
 
   it('accepts valid key entity', () => {
@@ -383,34 +379,38 @@ describe('validateLevel', () => {
 
   it('accepts valid lever entity', () => {
     const level = validateLevel(validLevel({
-      grid: ['#####', '#.D.#', '#.O.#', '#####'],
+      grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
-      entities: [{ col: 2, row: 2, type: 'lever', targetDoor: '2,1' }],
+      entities: [
+        { col: 2, row: 1, type: 'door', state: 'closed' },
+        { col: 2, row: 2, type: 'lever', targetDoor: '2,1' },
+      ],
     }), 'test');
-    expect(level.entities).toHaveLength(1);
+    expect(level.entities).toHaveLength(2);
   });
 
   it('rejects lever with invalid targetDoor format', () => {
     expect(() => validateLevel(validLevel({
-      grid: ['#####', '#.D.#', '#.O.#', '#####'],
+      grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever', targetDoor: 'bad' }],
     }), 'test')).toThrow('lever must have targetDoor in "col,row" format');
   });
 
-  it('rejects lever targeting non-D cell', () => {
+  it('rejects lever targeting position without door entity', () => {
     expect(() => validateLevel(validLevel({
-      grid: ['#####', '#...#', '#.O.#', '#####'],
+      grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever', targetDoor: '2,1' }],
-    }), 'test')).toThrow("lever targetDoor must reference a 'D' cell");
+    }), 'test')).toThrow("lever targetDoor must reference a door entity");
   });
 
   it('accepts valid pressure_plate entity', () => {
     const level = validateLevel(doorLevel([
+      { col: 2, row: 1, type: 'door', state: 'closed' },
       { col: 1, row: 2, type: 'pressure_plate', targetDoor: '2,1' },
     ]), 'test');
-    expect(level.entities).toHaveLength(1);
+    expect(level.entities).toHaveLength(2);
   });
 
   it('rejects pressure_plate with missing targetDoor', () => {
@@ -442,7 +442,7 @@ describe('validateLevel', () => {
 describe('stair entity validation', () => {
   function stairLevel(entities: unknown[]) {
     return validLevel({
-      grid: ['#####', '#.S.#', '#...#', '#.U.#', '#####'],
+      grid: ['#####', '#...#', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities,
     });
@@ -462,6 +462,14 @@ describe('stair entity validation', () => {
     expect(level.entities).toHaveLength(1);
   });
 
+  it('rejects stairs entity on non-walkable cell', () => {
+    expect(() => validateLevel(validLevel({
+      grid: ['#####', '#.#.#', '#...#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'E' },
+      entities: [{ col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 }],
+    }), 'test')).toThrow('stairs must be on a walkable cell');
+  });
+
   it('rejects stairs without direction', () => {
     expect(() => validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
@@ -472,18 +480,6 @@ describe('stair entity validation', () => {
     expect(() => validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', direction: 'left', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
     ]), 'test')).toThrow('stairs must have direction "up" or "down"');
-  });
-
-  it('rejects stairs-down on U cell (wrong cell type)', () => {
-    expect(() => validateLevel(stairLevel([
-      { col: 2, row: 3, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
-    ]), 'test')).toThrow("stairs direction=\"down\" must be on 'S' cell");
-  });
-
-  it('rejects stairs-up on S cell (wrong cell type)', () => {
-    expect(() => validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 1, targetRow: 1 },
-    ]), 'test')).toThrow("stairs direction=\"up\" must be on 'U' cell");
   });
 
   it('rejects stairs without targetLevel', () => {
@@ -505,7 +501,7 @@ function validDungeonLevel(id: string, overrides: Record<string, unknown> = {}) 
   return {
     id,
     name: `Level ${id}`,
-    grid: ['#####', '#.S.#', '#...#', '#.U.#', '#####'],
+    grid: ['#####', '#...#', '#...#', '#...#', '#####'],
     playerStart: { col: 1, row: 1, facing: 'S' },
     entities: [],
     ...overrides,

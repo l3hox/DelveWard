@@ -11,6 +11,8 @@ export function drawMinimap(
   playerRow: number,
   facing: Facing,
   enemies?: Map<string, EnemyInstance>,
+  doors?: Map<string, unknown>,
+  stairs?: Map<string, unknown>,
 ): void {
   const { x, y, w, h, cellSize } = MINIMAP;
 
@@ -40,9 +42,9 @@ export function drawMinimap(
 
       if (cell === '#') {
         ctx.fillStyle = HUD_COLORS.minimapWall;
-      } else if (cell === 'D') {
+      } else if (doors && doors.has(`${gc},${gr}`)) {
         ctx.fillStyle = HUD_COLORS.minimapDoor;
-      } else if (cell === 'S' || cell === 'U') {
+      } else if (stairs && stairs.has(`${gc},${gr}`)) {
         ctx.fillStyle = HUD_COLORS.minimapStairs;
       } else {
         ctx.fillStyle = HUD_COLORS.minimapFloor;

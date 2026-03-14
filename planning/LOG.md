@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Data Model Unification: Entity-Only Doors, Stairs, Levers
+
+**Problem**: The grid used special characters (`D`, `S`, `U`, `O`) that duplicated entity information. This created dual-tracked state (grid char + entity must agree), silent breakage when they diverged, and extra validation complexity. Designed for manual JSON editing, now unnecessary with the visual editor.
+
+**Solution — two-pass refactor**:
+
+1. **Door unification**: Removed `'D'` grid char. Doors placed on `'.'` cells. Removed `'locked'` state — `keyId` on a closed door means "needs key." Removed `unlockDoor()`, auto-creation from D cells. Level loader uses two-pass validation (collect door positions, then validate lever/plate references). Editor updated: doors on walkable cells, `coordinateMode` added to pick system for lever→door targeting.
+
+2. **Stairs + lever unification**: Removed `'S'`, `'U'`, `'O'` grid chars. `WALKABLE_CELLS` → `new Set(['.'])`. Added `StairInstance` and `stairs` Map to GameState (same pattern as doors/keys/levers). All renderers (`player.ts`, `dungeon.ts`, `stairRenderer.ts`, `minimapRenderer.ts`) use entity lookup. Interaction.ts dropped `O` cell guard — levers work on any walkable cell. Editor palette reduced to `.`, `#`, `_`.
+
+**Architectural principle established**: Grid owns geometry only (`#` wall, `.` floor, ` ` void, charDefs for texture zones). Entities own all behavior. This eliminates the class of bugs where grid and entity state diverge.
+
+**Future**: `id?: string` on Entity recommended for stable references (enabling editor drag-to-reposition without breaking lever→door wiring). Deferred until needed.
+
+---
+
 ## 2026-03-14 — Dungeon Editor Phase 5: Target Picking + Wiring Visualization
 
 **Pick mode** for lever/pressure_plate `targetDoor` fields:

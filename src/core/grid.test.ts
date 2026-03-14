@@ -48,12 +48,10 @@ describe('isWalkable', () => {
     expect(isWalkable(GRID, 2, 5)).toBe(false);
   });
 
-  it('recognizes all walkable cell types', () => {
-    const specialGrid = ['#D#', '#S#', '#U#', '#O#'];
-    expect(isWalkable(specialGrid, 1, 0)).toBe(true); // Door
-    expect(isWalkable(specialGrid, 1, 1)).toBe(true); // Stairs down
-    expect(isWalkable(specialGrid, 1, 2)).toBe(true); // Stairs up
-    expect(isWalkable(specialGrid, 1, 3)).toBe(true); // Object
+  it('recognizes floor as the walkable cell type', () => {
+    const grid = ['#.#'];
+    expect(isWalkable(grid, 1, 0)).toBe(true); // Floor
+    expect(isWalkable(grid, 0, 0)).toBe(false); // Wall
   });
 
   it('returns false for void cells', () => {
@@ -67,7 +65,7 @@ describe('isWalkable', () => {
 
 describe('WALKABLE_CELLS', () => {
   it('contains exactly the expected cell types', () => {
-    expect(WALKABLE_CELLS).toEqual(new Set(['.', 'D', 'S', 'U', 'O']));
+    expect(WALKABLE_CELLS).toEqual(new Set(['.']));
   });
 
   it('does not include walls or void', () => {
@@ -272,41 +270,40 @@ describe('isWalkable with custom walkable set', () => {
 
 const DOOR_GRID = [
   '#####',
-  '#.D.#',
+  '#...#',
   '#...#',
   '#####',
 ];
 
 describe('isWalkable with isDoorOpen callback', () => {
-  it('D cell with isDoorOpen returning true is walkable', () => {
+  it('walkable cell with isDoorOpen returning true is walkable', () => {
     expect(isWalkable(DOOR_GRID, 2, 1, WALKABLE_CELLS, () => true)).toBe(true);
   });
 
-  it('D cell with isDoorOpen returning false is not walkable', () => {
+  it('walkable cell with isDoorOpen returning false is not walkable', () => {
     expect(isWalkable(DOOR_GRID, 2, 1, WALKABLE_CELLS, () => false)).toBe(false);
   });
 
-  it('D cell with no callback is walkable (default behavior)', () => {
+  it('walkable cell with no callback is walkable', () => {
     expect(isWalkable(DOOR_GRID, 2, 1)).toBe(true);
   });
 
-  it('callback is not called for non-D cells', () => {
+  it('callback is called for walkable cells', () => {
     let called = false;
-    const cb = () => { called = true; return false; };
-    // floor cell — should be walkable regardless, callback should not be called
+    const cb = (_col: number, _row: number) => { called = true; return true; };
     expect(isWalkable(DOOR_GRID, 1, 1, WALKABLE_CELLS, cb)).toBe(true);
-    expect(called).toBe(false);
+    expect(called).toBe(true);
   });
 });
 
 describe('PlayerState with isDoorOpen', () => {
-  it('can walk through open door', () => {
+  it('can walk when isDoorOpen returns true', () => {
     const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => true);
     expect(p.moveForward(DOOR_GRID)).toBe(true);
     expect(p.col).toBe(2);
   });
 
-  it('cannot walk through closed door', () => {
+  it('cannot walk when isDoorOpen returns false', () => {
     const p = new PlayerState(1, 1, 'E', WALKABLE_CELLS, () => false);
     expect(p.moveForward(DOOR_GRID)).toBe(false);
     expect(p.col).toBe(1);
