@@ -36,6 +36,9 @@ export async function checkAssets(): Promise<void> {
     [...paths].map(async (path) => {
       const res = await fetch(path, { method: 'HEAD' });
       if (!res.ok) return path;
+      // Vite SPA fallback returns 200 with text/html for missing files
+      const ct = res.headers.get('Content-Type') ?? '';
+      if (!ct.startsWith('image/')) return path;
       return null;
     }),
   );
