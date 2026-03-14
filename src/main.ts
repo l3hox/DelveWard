@@ -94,16 +94,22 @@ function buildLevelScene(
 ): LevelScene {
   const walkable = buildWalkableSet(level.charDefs);
 
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs);
+  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false);
   scene.add(dungeonGroup);
 
   const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
   scene.add(doorMeshes.group);
 
   const doorAnimator = new DoorAnimator();
+  const hasCeiling = level.ceiling !== false;
   for (const [key, panel] of doorMeshes.panelMap) {
     const door = gameState.doors.get(key);
-    doorAnimator.register(key, panel, door ? door.state === 'open' : false);
+    let slideAxis: 'y' | 'x' | 'z' = 'y';
+    if (!hasCeiling) {
+      const orient = doorMeshes.orientationMap.get(key);
+      slideAxis = orient === 'NS' ? 'z' : 'x';
+    }
+    doorAnimator.register(key, panel, door ? door.state === 'open' : false, slideAxis);
   }
 
   const keyMeshes = buildKeyMeshes(gameState);

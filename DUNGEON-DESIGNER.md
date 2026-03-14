@@ -451,6 +451,22 @@ If omitted, defaults to `"dungeon"`. The environment is applied per-level, so di
 
 ---
 
+## Ceiling (optional boolean)
+
+Controls whether ceiling geometry is rendered for the level. Defaults to `true`.
+
+```json
+{
+  "name": "Open Ruins",
+  "ceiling": false,
+  "grid": [ ... ]
+}
+```
+
+When `false`, no ceiling tiles are generated — the level is open to the sky (or fog). Stair ceilings are unaffected.
+
+---
+
 ## Particle effects (optional booleans)
 
 | Field | Default | Effect |

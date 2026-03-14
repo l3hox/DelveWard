@@ -71,6 +71,7 @@ export function detectDoorOrientation(
 export interface DoorMeshes {
   group: THREE.Group;
   panelMap: Map<string, THREE.Mesh>;
+  orientationMap: Map<string, DoorOrientation>;
 }
 
 const BUTTON_SIZE = 0.06;
@@ -139,6 +140,7 @@ export function buildDoorMeshes(
 ): DoorMeshes {
   const group = new THREE.Group();
   const panelMap = new Map<string, THREE.Mesh>();
+  const orientationMap = new Map<string, DoorOrientation>();
 
   const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
   const panelHeight = WALL_HEIGHT - FRAME_WIDTH;
@@ -186,9 +188,10 @@ export function buildDoorMeshes(
 
     group.add(panel);
     panelMap.set(key, panel);
+    orientationMap.set(key, orientation);
   }
 
-  return { group, panelMap };
+  return { group, panelMap, orientationMap };
 }
 
 export function updateDoorMesh(

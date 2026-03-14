@@ -119,7 +119,7 @@ function resolveWallMat(
   return fallbackMat;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[]): THREE.Group {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -153,7 +153,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // Ceiling (skip for stair cells — stairRenderer provides the geometry)
-      if (char !== 'S' && char !== 'U') {
+      if (ceiling && char !== 'S' && char !== 'U') {
         const ceil = new THREE.Mesh(tileGeo, cellCeilMat);
         ceil.rotation.x = Math.PI / 2;
         ceil.position.set(cx, WALL_HEIGHT, cz);
