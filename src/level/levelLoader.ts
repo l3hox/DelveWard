@@ -259,6 +259,17 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
   }
 
+  // skybox (optional)
+  if (obj.skybox !== undefined) {
+    const validSkyboxes = ['starry-night'];
+    if (!validSkyboxes.includes(obj.skybox as string)) {
+      throw new Error(`Level ${source}: "skybox" must be one of ${validSkyboxes.join(', ')}`);
+    }
+    if (obj.ceiling !== false) {
+      console.warn(`Level ${source}: "skybox" is set but "ceiling" is not false — skybox won't be visible`);
+    }
+  }
+
   // defaults (optional)
   if (obj.defaults !== undefined) {
     if (typeof obj.defaults !== 'object' || obj.defaults === null || Array.isArray(obj.defaults)) {

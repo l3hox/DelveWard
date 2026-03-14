@@ -467,6 +467,27 @@ When `false`, no ceiling tiles are generated — the level is open to the sky (o
 
 ---
 
+## Skybox (optional string)
+
+When a level has `ceiling: false`, an optional `skybox` field adds a procedural sky visible through the ceiling openings.
+
+```json
+{
+  "name": "Open Ruins",
+  "ceiling": false,
+  "skybox": "starry-night",
+  "grid": [ ... ]
+}
+```
+
+| Value | Look |
+|-------|------|
+| `starry-night` | Dark blue gradient with scattered white stars |
+
+The skybox is immune to scene fog and lighting — stars always look the same regardless of the level's `environment` setting. If `skybox` is set but `ceiling` is not `false`, a console warning is emitted (the skybox won't be visible through a solid ceiling).
+
+---
+
 ## Particle effects (optional booleans)
 
 | Field | Default | Effect |

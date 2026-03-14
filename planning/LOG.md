@@ -4,6 +4,41 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Procedural starry night skybox
+
+Added optional `skybox` field for levels with `ceiling: false`. Renders a procedural star field visible through ceiling openings, immune to fog and lighting.
+
+**New type** (`src/core/types.ts`):
+- `Skybox` type: `'starry-night'`
+- Optional `skybox` field on `DungeonLevel`
+
+**New module** (`src/rendering/skybox.ts`):
+- `generateStarryNightTexture()` — 1024×1024 canvas: near-black blue gradient + 1200 small star dots
+- `createSkyboxMesh()` — `SphereGeometry(90, BackSide)` with `MeshBasicMaterial(fog: false, depthWrite: false)`, `renderOrder: -1`
+- Radius 90 to stay within camera far plane (100)
+
+**Scene integration** (`src/main.ts`):
+- Skybox created/destroyed per level in `buildLevelScene()`/`teardownLevelScene()`
+- Position tracks camera each frame (always "infinitely far")
+- `skyboxMesh?: THREE.Mesh` added to `LevelScene` interface
+
+**Stair back wall fix** (`src/rendering/stairRenderer.ts`):
+- Back wall Y now depends on stair direction: down centers at 0, up centers at WALL_HEIGHT
+- Prevents back wall from poking above wall height on ceiling-less levels
+
+**Door slide fix** (`src/rendering/doorAnimator.ts`):
+- Horizontal door slide adds 0.05 extra offset to tuck panel fully inside adjacent wall
+- Fixes z-fighting artifact on ceiling-less levels
+
+**Validation** (`src/level/levelLoader.ts`):
+- Validates `skybox` field against known values
+- Warns if `skybox` set but `ceiling` is not `false`
+
+**Docs** (`DUNGEON-DESIGNER.md`):
+- Documented `skybox` field with example and behavior
+
+---
+
 ## 2026-03-14 — Level environment system
 
 Added per-level `environment` parameter to control visual atmosphere (fog, background, ambient light).

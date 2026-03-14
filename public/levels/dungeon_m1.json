@@ -6,8 +6,9 @@
       "name": "The Upper Crypts",
       "dustMotes": true,
       "waterDrips": false,
-      "environment": "mist",
+      "environment": "dungeon",
       "ceiling": false,
+      "skybox": "starry-night",
       "defaults": {
         "wallTexture": "stone",
         "floorTexture": "stone_tile",

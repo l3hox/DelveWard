@@ -19,6 +19,7 @@ export interface TextureArea extends TextureSet {
 }
 
 export type Environment = 'dungeon' | 'mist';
+export type Skybox = 'starry-night';
 
 export interface DungeonLevel {
   id?: string;               // optional stable identifier for save/load keying
@@ -28,6 +29,7 @@ export interface DungeonLevel {
   entities: Entity[];
   environment?: Environment;     // visual environment preset (default: 'dungeon')
   ceiling?: boolean;             // render ceiling geometry (default: true)
+  skybox?: Skybox;               // procedural skybox visible through ceiling openings
   dustMotes?: boolean;           // enable floating dust particles (default: true)
   waterDrips?: boolean;          // enable ceiling water drip effect (default: false)
   defaults?: TextureSet;

@@ -50,6 +50,12 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ---
 
+## Recent Changes
+
+- Procedural starry night skybox (`skybox: 'starry-night'`) for ceiling-less levels
+- Stair back wall Y positioning fixed per direction (no longer pokes above walls on open levels)
+- Horizontal door slide nudged +0.05 to avoid z-fighting
+
 ## Known Issues
 
 - Existing enemy stats rebalanced for M1 (rat HP 4→8, skeleton HP 8→20, orc HP 15→40) — may need tuning during F5

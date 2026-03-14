@@ -38,6 +38,7 @@ import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
 import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
+import { createSkyboxMesh } from './rendering/skybox';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -80,6 +81,7 @@ interface LevelScene {
   healthBarManager: EnemyHealthBarManager;
   itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  skyboxMesh?: THREE.Mesh;
   player: Player;
 }
 
@@ -169,6 +171,12 @@ function buildLevelScene(
     gameState.isBlockedByEnemy.bind(gameState),
   );
 
+  let skyboxMesh: THREE.Mesh | undefined;
+  if (level.skybox) {
+    skyboxMesh = createSkyboxMesh();
+    scene.add(skyboxMesh);
+  }
+
   return {
     level,
     walkable,
@@ -186,6 +194,7 @@ function buildLevelScene(
     healthBarManager,
     itemMeshes,
     consumableMeshes,
+    skyboxMesh,
     player,
   };
 }
@@ -212,6 +221,10 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
         // Don't dispose materials — they're shared/cached
       }
     });
+  }
+  if (ls.skyboxMesh) {
+    scene.remove(ls.skyboxMesh);
+    ls.skyboxMesh.geometry.dispose();
   }
 }
 
@@ -727,6 +740,9 @@ async function init(): Promise<void> {
     lastTime = time;
 
     ls.player.update(delta);
+    if (ls.skyboxMesh) {
+      ls.skyboxMesh.position.copy(camera.position);
+    }
     ls.doorAnimator.update(delta);
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);

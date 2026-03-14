@@ -33,14 +33,14 @@ export class DoorAnimator {
       openVal = WALL_HEIGHT + panelHeight / 2;
       panel.position.y = isOpen ? openVal : closedVal;
     } else if (slideAxis === 'x') {
-      // EW door: slide east (+X)
+      // EW door: slide east (+X), extra nudge to avoid z-fighting with adjacent wall
       closedVal = panel.position.x;
-      openVal = closedVal + panelWidth;
+      openVal = closedVal + panelWidth + 0.05;
       if (isOpen) panel.position.x = openVal;
     } else {
-      // NS door: slide north (-Z)
+      // NS door: slide north (-Z), extra nudge to avoid z-fighting with adjacent wall
       closedVal = panel.position.z;
-      openVal = closedVal - panelWidth;
+      openVal = closedVal - panelWidth - 0.05;
       if (isOpen) panel.position.z = openVal;
     }
 
