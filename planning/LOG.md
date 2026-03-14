@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Door blocking & troll regen improvements
+
+**Door enemy blocking** (`src/core/gameState.ts`, `src/level/interaction.ts`, `src/rendering/doorAnimator.ts`, `src/main.ts`):
+- `closeDoor()` now rejects if an enemy occupies the door cell
+- New `door_blocked` interaction result with "Something is blocking the door." message
+- `DoorAnimator.bounce()` — door slides 20% toward closed then springs back open (slower speed for visual weight)
+
+**Troll regen buff** (`src/enemies/enemyAI.ts`):
+- Regen rate increased to +7 HP every 1s (was +2 every 2s)
+- Regen now emits `'regen'` action type so health bar updates in real time (was only updating on next hit)
+
+**Docs** (`DUNGEON-DESIGNER.md`):
+- Updated troll regen stats in enemy table
+
+---
+
 ## 2026-03-14 — Procedural starry night skybox
 
 Added optional `skybox` field for levels with `ceiling: false`. Renders a procedural star field visible through ceiling openings, immune to fog and lighting.

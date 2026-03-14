@@ -5,7 +5,7 @@ import { doorKey } from '../core/gameState';
 import { findPath, manhattanDistance } from './pathfinding';
 import { isWalkable } from '../core/grid';
 
-export type EnemyActionType = 'idle' | 'move' | 'attack';
+export type EnemyActionType = 'idle' | 'move' | 'attack' | 'regen';
 
 export interface EnemyAction {
   enemyKey: string;
@@ -56,9 +56,10 @@ export function updateEnemies(
         enemy.regenPauseTimer = Math.max(0, enemy.regenPauseTimer - delta);
       } else if (enemy.hp < enemy.maxHp) {
         enemy.regenTimer += delta;
-        if (enemy.regenTimer >= 2) {
-          enemy.regenTimer -= 2;
-          enemy.hp = Math.min(enemy.hp + 2, enemy.maxHp);
+        if (enemy.regenTimer >= 1) {
+          enemy.regenTimer -= 1;
+          enemy.hp = Math.min(enemy.hp + 7, enemy.maxHp);
+          actions.push({ enemyKey: key, type: 'regen', fromCol: enemy.col, fromRow: enemy.row });
         }
       }
     }

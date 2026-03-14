@@ -228,7 +228,7 @@ Available enemy types:
 | `skeleton` | 20 | 3 | 1 | 4 | 1.0s | 25 | — |
 | `zombie` | 50 | 3 | 1 | 3 | 1.6s | 30 | — |
 | `orc` | 40 | 5 | 2 | 5 | 1.4s | 50 | — |
-| `troll` | 80 | 5 | 2 | 5 | 1.2s | 120 | HP regen (+2/2s) |
+| `troll` | 80 | 5 | 2 | 5 | 1.2s | 120 | HP regen (+7/1s) |
 
 Enemies drop loot on death (XP, gold, and items from loot tables in `public/data/loot-tables.json`).
 

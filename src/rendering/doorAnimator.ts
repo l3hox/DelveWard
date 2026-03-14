@@ -3,6 +3,8 @@ import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 
 const FRAME_WIDTH = 0.15;
 const SPEED = 5.0; // units per second
+const BOUNCE_FRACTION = 0.2; // how far toward closed before bouncing back
+const BOUNCE_SPEED = 3.0;
 
 type SlideAxis = 'y' | 'x' | 'z';
 
@@ -12,6 +14,7 @@ interface PanelEntry {
   closedVal: number;
   openVal: number;
   targetVal: number;
+  bounce?: { phase: 'closing' | 'reopening'; bounceVal: number };
 }
 
 export class DoorAnimator {
@@ -61,9 +64,47 @@ export class DoorAnimator {
     entry.targetVal = isOpen ? entry.openVal : entry.closedVal;
   }
 
+  /** Animate door closing 20% then bouncing back to open. */
+  bounce(key: string): void {
+    const entry = this.panels.get(key);
+    if (!entry) return;
+    const range = entry.openVal - entry.closedVal;
+    // bounceVal is 20% of the way from open toward closed
+    const bounceVal = entry.openVal - range * BOUNCE_FRACTION;
+    entry.bounce = { phase: 'closing', bounceVal };
+    entry.targetVal = entry.openVal; // will be restored after bounce
+  }
+
   update(delta: number): void {
     const step = SPEED * delta;
+    const bounceStep = BOUNCE_SPEED * delta;
     for (const entry of this.panels.values()) {
+      if (entry.bounce) {
+        const current = entry.panel.position[entry.axis];
+        if (entry.bounce.phase === 'closing') {
+          // Move toward the bounce point
+          const dir = entry.bounce.bounceVal < current ? -1 : 1;
+          const next = current + dir * bounceStep;
+          if ((dir < 0 && next <= entry.bounce.bounceVal) || (dir > 0 && next >= entry.bounce.bounceVal)) {
+            entry.panel.position[entry.axis] = entry.bounce.bounceVal;
+            entry.bounce.phase = 'reopening';
+          } else {
+            entry.panel.position[entry.axis] = next;
+          }
+        } else {
+          // Move back to open
+          const dir = entry.openVal < current ? -1 : 1;
+          const next = current + dir * bounceStep;
+          if ((dir < 0 && next <= entry.openVal) || (dir > 0 && next >= entry.openVal)) {
+            entry.panel.position[entry.axis] = entry.openVal;
+            entry.bounce = undefined;
+          } else {
+            entry.panel.position[entry.axis] = next;
+          }
+        }
+        continue;
+      }
+
       const current = entry.panel.position[entry.axis];
       if (Math.abs(current - entry.targetVal) < 0.001) continue;
 

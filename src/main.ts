@@ -602,6 +602,11 @@ async function init(): Promise<void> {
             const facing = getFacingCell(ls.player.getState());
             updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, false, ls.doorAnimator);
           }
+          if (result.type === 'door_blocked') {
+            const facing = getFacingCell(ls.player.getState());
+            const bk = doorKey(facing.col, facing.row);
+            ls.doorAnimator.bounce(bk);
+          }
           if (result.type === 'lever_activated' && result.targetDoor) {
             const [dc, dr] = parseDoorKey(result.targetDoor);
             updateDoorMesh(ls.doorMeshes.panelMap, dc, dr, gameState.isDoorOpen(dc, dr), ls.doorAnimator);
@@ -797,6 +802,11 @@ async function init(): Promise<void> {
             enemyAttackPlayer(gameState, enemy.atk);
             playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
             ls.enemyAnimator.triggerLunge(action.enemyKey, ps.col, ps.row);
+          }
+        } else if (action.type === 'regen') {
+          const enemy = gameState.enemies.get(action.enemyKey);
+          if (enemy) {
+            ls.healthBarManager.update(action.enemyKey, enemy.hp, enemy.maxHp);
           }
         }
       }

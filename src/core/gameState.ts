@@ -378,6 +378,7 @@ export class GameState {
     if (!door) return false;
     if (door.state !== 'open') return false;
     if (door.mechanical) return false;
+    if (this.isBlockedByEnemy(col, row)) return false;
     door.state = 'closed';
     return true;
   }

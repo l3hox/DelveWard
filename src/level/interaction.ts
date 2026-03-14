@@ -3,7 +3,7 @@ import { getFacingCell } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_unlocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
   message?: string;
   targetDoor?: string; // "col,row" of affected door (for mesh updates)
 }
@@ -28,6 +28,9 @@ export function interact(
     if (!door) return { type: 'nothing' }; // no door entity = always open, nothing to interact with
 
     if (door.state === 'open') {
+      if (gameState.isBlockedByEnemy(col, row)) {
+        return { type: 'door_blocked', message: 'Something is blocking the door.' };
+      }
       if (gameState.closeDoor(col, row)) {
         return { type: 'door_closed', message: 'Door closed.' };
       }

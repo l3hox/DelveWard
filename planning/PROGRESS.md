@@ -55,6 +55,8 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - Procedural starry night skybox (`skybox: 'starry-night'`) for ceiling-less levels
 - Stair back wall Y positioning fixed per direction (no longer pokes above walls on open levels)
 - Horizontal door slide nudged +0.05 to avoid z-fighting
+- Doors blocked by enemies: bounce animation (20% close then spring back)
+- Troll regen buffed to +7 HP/1s (was +2/2s), health bar updates in real time during regen
 
 ## Known Issues
 
