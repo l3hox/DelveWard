@@ -40,16 +40,19 @@
       },
       "entities": [
         {
+          "id": "door_1",
           "col": 6,
           "row": 4,
           "type": "door"
         },
         {
+          "id": "door_2",
           "col": 5,
           "row": 7,
           "type": "door"
         },
         {
+          "id": "door_3",
           "col": 5,
           "row": 13,
           "type": "door"
@@ -254,6 +257,7 @@
           "targetRow": 3
         },
         {
+          "id": "door_1",
           "col": 4,
           "row": 10,
           "type": "door",
@@ -261,31 +265,36 @@
           "keyId": "warrens_key"
         },
         {
+          "id": "door_2",
           "col": 9,
           "row": 11,
           "type": "door"
         },
         {
+          "id": "door_3",
           "col": 9,
           "row": 9,
           "type": "door"
         },
         {
+          "id": "door_4",
           "col": 13,
           "row": 12,
           "type": "door"
         },
         {
+          "id": "key_1",
           "col": 5,
           "row": 7,
           "type": "key",
           "keyId": "warrens_key"
         },
         {
+          "id": "lever_1",
           "col": 13,
           "row": 11,
           "type": "lever",
-          "targetDoor": "13,12",
+          "target": "door_4",
           "wall": "E"
         },
         {
@@ -508,16 +517,19 @@
           "targetRow": 16
         },
         {
+          "id": "door_1",
           "col": 3,
           "row": 8,
           "type": "door"
         },
         {
+          "id": "door_2",
           "col": 14,
           "row": 11,
           "type": "door"
         },
         {
+          "id": "door_3",
           "col": 11,
           "row": 14,
           "type": "door",
@@ -525,6 +537,7 @@
           "keyId": "troll_key"
         },
         {
+          "id": "key_1",
           "col": 7,
           "row": 16,
           "type": "key",

@@ -614,12 +614,6 @@ export class GridCanvas {
     this.canvas.style.cursor = tool === 'paint' || tool === 'erase' || tool === 'entity' ? 'crosshair' : 'default';
   }
 
-  private parseCoordString(str: string): { col: number; row: number } | null {
-    const match = str.match(/^(\d+),(\d+)$/);
-    if (!match) return null;
-    return { col: parseInt(match[1], 10), row: parseInt(match[2], 10) };
-  }
-
   private drawArrowhead(x1: number, y1: number, x2: number, y2: number, size: number): void {
     const { ctx } = this;
     const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -643,14 +637,15 @@ export class GridCanvas {
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
-      if ((e.type === 'lever' || e.type === 'pressure_plate') && e.targetDoor) {
-        const target = this.parseCoordString(e.targetDoor as string);
-        if (!target) continue;
+      if ((e.type === 'lever' || e.type === 'pressure_plate') && e.target) {
+        const targetId = e.target as string;
+        const targetEntity = level.entities.find(t => t.id === targetId);
+        if (!targetEntity) continue;
         const isActive = selected !== null && (
           e === selected ||
-          (selected.type === 'door' && selected.col === target.col && selected.row === target.row)
+          (selected.id !== undefined && selected.id === targetId)
         );
-        arrows.push({ fromCol: e.col, fromRow: e.row, toCol: target.col, toRow: target.row, active: isActive });
+        arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
       }
       if (e.type === 'key' && (e as Record<string, unknown>).keyId) {
         const keyId = (e as Record<string, unknown>).keyId as string;

@@ -138,6 +138,18 @@ Array of entity objects placed on the grid. Can be empty (`[]`).
 
 Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 
+#### Entity IDs
+
+Entities can have an optional `id` field — a stable identifier used for cross-entity references. Format: `{type}_{N}` (e.g., `door_1`, `lever_2`). IDs must be unique within a level.
+
+- **Required** on entities that are referenced by other entities (e.g., doors targeted by levers/plates)
+- **Required** on entities that reference other entities (e.g., levers, pressure plates)
+- **Optional** on all other entities (the editor auto-assigns IDs)
+
+```json
+{ "col": 5, "row": 2, "type": "door", "id": "door_1" }
+```
+
 #### Entity types
 
 **Door** (`type: "door"`) — placed on any walkable cell. Every door must have an explicit entity.
@@ -148,7 +160,7 @@ Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 | `keyId` | string | No | If set, the door requires the matching key to open. Must match a key entity's `keyId`. |
 
 ```json
-{ "col": 5, "row": 2, "type": "door", "state": "closed", "keyId": "gold_key" }
+{ "col": 5, "row": 2, "type": "door", "id": "door_1", "state": "closed", "keyId": "gold_key" }
 ```
 
 **Key** (`type: "key"`) — placed on walkable cells. Auto-picked up when player steps on it.
@@ -165,25 +177,27 @@ Each entity has `col`, `row`, `type`, and any type-specific extra properties.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `targetDoor` | string | Yes | `"col,row"` of the door to toggle |
+| `target` | string | Yes | Entity ID of the door to toggle (e.g., `"door_1"`) |
 | `wall` | string | No | Which wall the lever is on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
 
 The targeted door is marked **mechanical** — it cannot be opened or closed by player interaction (Space key). It can only be operated by the lever.
 
 ```json
-{ "col": 7, "row": 8, "type": "lever", "targetDoor": "8,5", "wall": "E" }
+{ "col": 8, "row": 5, "type": "door", "id": "door_3" },
+{ "col": 7, "row": 8, "type": "lever", "id": "lever_1", "target": "door_3", "wall": "E" }
 ```
 
 **Pressure plate** (`type: "pressure_plate"`) — placed on walkable cells. Triggers automatically when player steps on it. One-way (stays open).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `targetDoor` | string | Yes | `"col,row"` of the door to open |
+| `target` | string | Yes | Entity ID of the door to open (e.g., `"door_4"`) |
 
 The targeted door is marked **mechanical** — same as lever-targeted doors.
 
 ```json
-{ "col": 4, "row": 9, "type": "pressure_plate", "targetDoor": "4,7" }
+{ "col": 4, "row": 7, "type": "door", "id": "door_4" },
+{ "col": 4, "row": 9, "type": "pressure_plate", "id": "plate_1", "target": "door_4" }
 ```
 
 **Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space).

@@ -1,8 +1,7 @@
-import type { DungeonLevel, Dungeon } from '../core/types';
+import type { DungeonLevel, Dungeon, Entity } from '../core/types';
 import type { Facing } from '../core/grid';
 import { WALKABLE_CELLS } from '../core/grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from '../core/textureNames';
-import { parseDoorKey } from '../core/gameState';
 import { ENEMY_DEFS } from '../enemies/enemyTypes';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
@@ -21,6 +20,55 @@ function validateTextures(
   }
   if (entry.ceilingTexture !== undefined && !CEILING_TEXTURE_SET.has(entry.ceilingTexture as string)) {
     throw new Error(`Level ${source}: ${label} has unknown ceilingTexture "${entry.ceilingTexture}"`);
+  }
+}
+
+/**
+ * Backward-compat preprocessor: converts legacy `targetDoor: "col,row"` to
+ * `target: entityId` and auto-assigns IDs to doors that lack them.
+ * Mutates the entities array in-place.
+ */
+export function migrateEntities(entities: Entity[]): void {
+  // Collect existing IDs
+  const usedIds = new Set<string>();
+  for (const e of entities) {
+    if (e.id) usedIds.add(e.id as string);
+  }
+
+  // Auto-assign IDs to doors without one
+  const counters: Record<string, number> = {};
+  function nextId(type: string): string {
+    if (!counters[type]) counters[type] = 1;
+    while (usedIds.has(`${type}_${counters[type]}`)) counters[type]++;
+    const id = `${type}_${counters[type]}`;
+    usedIds.add(id);
+    counters[type]++;
+    return id;
+  }
+
+  for (const e of entities) {
+    if (e.type === 'door' && !e.id) {
+      e.id = nextId('door');
+    }
+  }
+
+  // Build door position → ID map for legacy targetDoor conversion
+  const doorPosToId = new Map<string, string>();
+  for (const e of entities) {
+    if (e.type === 'door' && e.id) {
+      doorPosToId.set(`${e.col},${e.row}`, e.id as string);
+    }
+  }
+
+  // Convert targetDoor → target on levers and plates
+  for (const e of entities) {
+    if ((e.type === 'lever' || e.type === 'pressure_plate') && e.targetDoor && !e.target) {
+      const doorId = doorPosToId.get(e.targetDoor as string);
+      if (doorId) {
+        e.target = doorId;
+        delete e.targetDoor;
+      }
+    }
   }
 }
 
@@ -129,12 +177,20 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "entities" must be an array`);
   }
 
+  // Run backward-compat migration before validation
+  migrateEntities(obj.entities as Entity[]);
+
   const VALID_DOOR_STATES = new Set(['open', 'closed']);
 
-  // Two-pass: collect door entity positions for lever/plate validation
-  const doorPositions = new Set<string>();
+  // Two-pass: collect entity IDs for target validation, check for duplicates
+  const entityIds = new Set<string>();
   for (const ent of obj.entities as Array<Record<string, unknown>>) {
-    if (ent.type === 'door') doorPositions.add(`${ent.col},${ent.row}`);
+    if (ent.id) {
+      if (entityIds.has(ent.id as string)) {
+        throw new Error(`Level ${source}: duplicate entity id "${ent.id}"`);
+      }
+      entityIds.add(ent.id as string);
+    }
   }
 
   for (let i = 0; i < obj.entities.length; i++) {
@@ -176,11 +232,11 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'lever') {
-      if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
-        throw new Error(`Level ${source}: entities[${i}] lever must have targetDoor in "col,row" format`);
+      if (typeof e.target !== 'string' || e.target === '') {
+        throw new Error(`Level ${source}: entities[${i}] lever must have a non-empty string target`);
       }
-      if (!doorPositions.has(e.targetDoor as string)) {
-        throw new Error(`Level ${source}: entities[${i}] lever targetDoor must reference a door entity`);
+      if (!entityIds.has(e.target as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever target must reference an existing entity id`);
       }
       if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
@@ -188,11 +244,11 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'pressure_plate') {
-      if (typeof e.targetDoor !== 'string' || !/^\d+,\d+$/.test(e.targetDoor as string)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have targetDoor in "col,row" format`);
+      if (typeof e.target !== 'string' || e.target === '') {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a non-empty string target`);
       }
-      if (!doorPositions.has(e.targetDoor as string)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate targetDoor must reference a door entity`);
+      if (!entityIds.has(e.target as string)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate target must reference an existing entity id`);
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);

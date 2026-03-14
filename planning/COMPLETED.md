@@ -151,8 +151,23 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - 515 tests passing, DUNGEON-DESIGNER.md updated
   - Architecture: established principle that grid = geometry, entities = behavior
 
+- [x] **Stable Entity IDs + ID-Based References**:
+  - Every entity gets optional `id` field (format: `type_N`). Editor auto-generates IDs via `generateEntityId()`
+  - Cross-references use `target: entityId` instead of `targetDoor: "col,row"`
+  - `GameState.entityById` Map + `resolveEntityPosition()` for ID→position lookup
+  - `_rebuildEntityIndex()` rebuilds derived index after parse/load
+  - `migrateEntities()` backward-compat preprocessor: auto-assigns door IDs, converts `targetDoor`→`target`
+  - `InteractionResult.target` (was `targetDoor`) — carries entity ID
+  - Editor: `completePickMode` writes target entity ID, `getReferencingEntities` matches by ID
+  - `GridCanvas.drawWiringLines` resolves entity IDs to positions (removed `parseCoordString`)
+  - Removed `coordinateMode` from pick system (no longer needed)
+  - All 3 level JSON files migrated (level7, dungeon3, dungeon_m1)
+  - `DUNGEON-DESIGNER.md` updated with entity ID docs, `target` field examples
+  - Duplicate entity ID validation, non-existent target rejection
+  - 529 tests (14 new)
+
 - [x] **Dungeon Editor Phase 5** — Target Picking + Wiring Visualization:
-  - Pick mode: "Pick" button on lever/pressure_plate targetDoor fields, crosshair cursor, green/red hover validation
+  - Pick mode: "Pick" button on lever/pressure_plate target fields, crosshair cursor, green/red hover validation
   - Pick completes on valid cell click, cancels on right-click/Escape/tool-switch/delete
   - `PickModeState` on EditorApp with `enterPickMode`/`cancelPickMode`/`completePickMode`
   - Wiring arrows: all connections always visible — active in orange dashed 2px, inactive in faint grey 1px

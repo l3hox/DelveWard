@@ -47,6 +47,7 @@ export interface Dungeon {
 // All interactive features (doors, stairs, levers, etc.) are entity-only on walkable cells.
 
 export interface Entity {
+  id?: string;               // stable identifier for cross-entity references
   col: number;
   row: number;
   type: string;              // "door", "object", "key", "enemy", etc.

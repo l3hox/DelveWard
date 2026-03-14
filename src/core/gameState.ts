@@ -14,6 +14,7 @@ import type { EquipSlot } from './entities';
 export type DoorState = 'open' | 'closed';
 
 export interface DoorInstance {
+  id?: string;
   col: number;
   row: number;
   state: DoorState;
@@ -22,6 +23,7 @@ export interface DoorInstance {
 }
 
 export interface KeyInstance {
+  id?: string;
   col: number;
   row: number;
   keyId: string;
@@ -31,27 +33,31 @@ export interface KeyInstance {
 export type LeverState = 'up' | 'down';
 
 export interface LeverInstance {
+  id?: string;
   col: number;
   row: number;
-  targetDoor: string; // "col,row" of the door to toggle
+  target: string; // entity ID of the door to toggle
   wall: Facing;       // which wall the lever is mounted on
   state: LeverState;
 }
 
 export interface PlateInstance {
+  id?: string;
   col: number;
   row: number;
-  targetDoor: string; // "col,row" of the door to open
+  target: string; // entity ID of the door to open
   activated: boolean;
 }
 
 export interface StairInstance {
+  id?: string;
   col: number;
   row: number;
   direction: 'up' | 'down';
 }
 
 export interface SconceInstance {
+  id?: string;
   col: number;
   row: number;
   wall: Facing;
@@ -102,6 +108,9 @@ export class GameState {
   enemies: Map<string, EnemyInstance>;
   inventory: Set<string>;
 
+  // Index: entity ID → position + type (derived state, rebuilt after parse/load)
+  entityById: Map<string, { col: number; row: number; type: string }>;
+
   // Entity registry — single source of truth for all item instances.
   entityRegistry: EntityRegistry;
   currentLevelId: string;
@@ -138,6 +147,7 @@ export class GameState {
     this.stairs = new Map();
     this.enemies = new Map();
     this.inventory = new Set();
+    this.entityById = new Map();
 
     this.entityRegistry = new EntityRegistry();
     this.currentLevelId = levelId;
@@ -174,6 +184,7 @@ export class GameState {
         const state = (e.state as DoorState) ?? 'closed';
         const keyId = e.keyId as string | undefined;
         this.doors.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
           state,
@@ -182,6 +193,7 @@ export class GameState {
         });
       } else if (e.type === 'key') {
         this.keys.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
           keyId: e.keyId as string,
@@ -190,24 +202,30 @@ export class GameState {
       } else if (e.type === 'lever') {
         const wall = (e.wall as Facing | undefined) ??
           autoDetectLeverWall(e.col, e.row, grid);
+        // Support both `target` (new) and `targetDoor` (legacy) fields
+        const target = (e.target as string | undefined) ?? (e.targetDoor as string);
         this.levers.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
-          targetDoor: e.targetDoor as string,
+          target,
           wall,
           state: 'up',
         });
       } else if (e.type === 'pressure_plate') {
+        const target = (e.target as string | undefined) ?? (e.targetDoor as string);
         this.plates.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
-          targetDoor: e.targetDoor as string,
+          target,
           activated: false,
         });
       } else if (e.type === 'torch_sconce') {
         const wall = (e.wall as Facing | undefined) ??
           autoDetectLeverWall(e.col, e.row, grid);
         this.sconces.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
           wall,
@@ -215,6 +233,7 @@ export class GameState {
         });
       } else if (e.type === 'stairs') {
         this.stairs.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
           col: e.col,
           row: e.row,
           direction: e.direction as 'up' | 'down',
@@ -247,16 +266,39 @@ export class GameState {
       }
     }
 
-    // Mark doors targeted by levers/plates as mechanical
+    // Mark doors targeted by levers/plates as mechanical (resolve via entityById)
+    this._rebuildEntityIndex();
     for (const lever of this.levers.values()) {
-      const door = this.doors.get(lever.targetDoor);
-      if (door) door.mechanical = true;
+      const pos = this.resolveEntityPosition(lever.target);
+      if (pos) {
+        const door = this.getDoor(pos.col, pos.row);
+        if (door) door.mechanical = true;
+      }
     }
     for (const plate of this.plates.values()) {
-      const door = this.doors.get(plate.targetDoor);
-      if (door) door.mechanical = true;
+      const pos = this.resolveEntityPosition(plate.target);
+      if (pos) {
+        const door = this.getDoor(pos.col, pos.row);
+        if (door) door.mechanical = true;
+      }
     }
+  }
 
+  private _rebuildEntityIndex(): void {
+    this.entityById.clear();
+    const register = (inst: { id?: string; col: number; row: number }, type: string) => {
+      if (inst.id) this.entityById.set(inst.id, { col: inst.col, row: inst.row, type });
+    };
+    for (const d of this.doors.values()) register(d, 'door');
+    for (const k of this.keys.values()) register(k, 'key');
+    for (const l of this.levers.values()) register(l, 'lever');
+    for (const p of this.plates.values()) register(p, 'pressure_plate');
+    for (const s of this.sconces.values()) register(s, 'torch_sconce');
+    for (const s of this.stairs.values()) register(s, 'stairs');
+  }
+
+  resolveEntityPosition(id: string): { col: number; row: number } | undefined {
+    return this.entityById.get(id);
   }
 
   saveLevelState(): LevelSnapshot {
@@ -329,6 +371,7 @@ export class GameState {
     if (snapshot.registrySnapshot) {
       this.entityRegistry.restore(snapshot.registrySnapshot);
     }
+    this._rebuildEntityIndex();
   }
 
   loadNewLevel(entities: Entity[], grid?: string[], levelId?: string): void {
@@ -341,6 +384,7 @@ export class GameState {
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
+    this.entityById = new Map();
     this.exploredCells = new Set();
     // Clear only ground items for the old level; equipped/backpack items survive transitions.
     this.entityRegistry.clearLevel(oldLevelId);
@@ -419,22 +463,24 @@ export class GameState {
     const lever = this.levers.get(doorKey(col, row));
     if (!lever) return undefined;
     lever.state = lever.state === 'up' ? 'down' : 'up';
-    const [dc, dr] = parseDoorKey(lever.targetDoor);
-    this.toggleDoor(dc, dr);
-    return lever.targetDoor;
+    const pos = this.resolveEntityPosition(lever.target);
+    if (pos) this.toggleDoor(pos.col, pos.row);
+    return lever.target;
   }
 
   activatePressurePlate(col: number, row: number): string | undefined {
     const plate = this.plates.get(doorKey(col, row));
     if (!plate || plate.activated) return undefined;
     plate.activated = true;
-    const [dc, dr] = parseDoorKey(plate.targetDoor);
-    // Bypass openDoor check — mechanisms can always operate their doors
-    const door = this.getDoor(dc, dr);
-    if (door && door.state === 'closed') {
-      door.state = 'open';
+    const pos = this.resolveEntityPosition(plate.target);
+    if (pos) {
+      // Bypass openDoor check — mechanisms can always operate their doors
+      const door = this.getDoor(pos.col, pos.row);
+      if (door && door.state === 'closed') {
+        door.state = 'open';
+      }
     }
-    return plate.targetDoor;
+    return plate.target;
   }
 
   getSconce(col: number, row: number): SconceInstance | undefined {

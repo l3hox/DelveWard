@@ -3,7 +3,7 @@ import { buildDungeon } from './rendering/dungeon';
 import { Player } from './rendering/player';
 import { loadDungeon } from './level/levelLoader';
 import { buildWalkableSet, getFacingCell } from './core/grid';
-import { GameState, doorKey, parseDoorKey } from './core/gameState';
+import { GameState, doorKey } from './core/gameState';
 import { interact } from './level/interaction';
 import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
@@ -424,8 +424,10 @@ async function init(): Promise<void> {
       const plateTarget = gameState.activatePressurePlate(col, row);
       if (plateTarget) {
         console.log('Pressure plate activated.');
-        const [dc, dr] = parseDoorKey(plateTarget);
-        updateDoorMesh(ls.doorMeshes.panelMap, dc, dr, true, ls.doorAnimator);
+        const targetPos = gameState.resolveEntityPosition(plateTarget);
+        if (targetPos) {
+          updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
+        }
         pressPlate(ls.plateMeshes.meshMap, col, row);
       }
 
@@ -609,9 +611,11 @@ async function init(): Promise<void> {
             const bk = doorKey(facing.col, facing.row);
             ls.doorAnimator.bounce(bk);
           }
-          if (result.type === 'lever_activated' && result.targetDoor) {
-            const [dc, dr] = parseDoorKey(result.targetDoor);
-            updateDoorMesh(ls.doorMeshes.panelMap, dc, dr, gameState.isDoorOpen(dc, dr), ls.doorAnimator);
+          if (result.type === 'lever_activated' && result.target) {
+            const targetPos = gameState.resolveEntityPosition(result.target);
+            if (targetPos) {
+              updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+            }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);
             if (lever) ls.leverAnimator.setState(leverKey, lever.state);

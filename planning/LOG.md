@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-14 — Stable Entity IDs + ID-Based References
+
+**Problem**: Levers/plates referenced doors via `targetDoor: "col,row"` position strings. This broke when entities moved in the editor, couldn't generalize to future entity types (spawners, trap doors, logical gates), and was the last position-based coupling in the data model.
+
+**Solution**:
+- Every entity gets an optional `id` field (format: `type_N`, e.g., `door_1`, `lever_2`). Editor auto-generates IDs on entity creation.
+- Cross-references use `target: entityId` instead of `targetDoor: "col,row"`. Generic field name supports future non-door targets.
+- `GameState` maintains derived `entityById` Map, rebuilt after `_parseEntities()` and `loadLevelState()`. `resolveEntityPosition(id)` provides lookup.
+- `migrateEntities()` preprocessor in levelLoader handles backward compat: auto-assigns IDs to doors, converts `targetDoor` → `target` with entity ID.
+- `keyId` system stays as-is — it's a group identifier (key↔door), not a direct reference.
+
+**Design decisions**:
+- `id` is optional on Entity type. Editor auto-generates for all. Validator requires on referenced/referencing entities.
+- Single `target: string` now; documented path to `string | string[]` when logical gates arrive.
+- `entityById` is derived state, not saved in snapshots — rebuilt from instance Maps.
+
+---
+
 ## 2026-03-14 — Data Model Unification: Entity-Only Doors, Stairs, Levers
 
 **Problem**: The grid used special characters (`D`, `S`, `U`, `O`) that duplicated entity information. This created dual-tracked state (grid char + entity must agree), silent breakage when they diverged, and extra validation complexity. Designed for manual JSON editing, now unnecessary with the visual editor.

@@ -98,8 +98,8 @@ inspector.setDeleteCallback(() => {
 });
 
 // Pick mode entry
-inspector.setPickRequestedCallback((entity, field, validChar, validEntityType, coordinateMode) => {
-  app.enterPickMode(entity, field, validChar, validEntityType, coordinateMode);
+inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) => {
+  app.enterPickMode(entity, field, validChar, validEntityType);
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
 });

@@ -18,8 +18,8 @@ export type EditorTool = 'select' | 'paint' | 'erase' | 'entity';
 const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   door:           { state: 'closed' },
   key:            { keyId: '' },
-  lever:          { targetDoor: '', wall: 'N' },
-  pressure_plate: { targetDoor: '' },
+  lever:          { target: '', wall: 'N' },
+  pressure_plate: { target: '' },
   torch_sconce:   { wall: 'N' },
   enemy:          { enemyType: 'rat' },
   equipment:      { itemId: '' },
@@ -32,7 +32,6 @@ export interface PickModeState {
   field: string;
   validChar?: string;
   validEntityType?: string;
-  coordinateMode?: boolean;
 }
 
 export class EditorApp {
@@ -163,7 +162,7 @@ export class EditorApp {
     if (!this.canPlaceEntityType(col, row, type)) return null;
 
     const defaults = ENTITY_DEFAULTS[type] ?? {};
-    const entity: Entity = { col, row, type, ...defaults };
+    const entity: Entity = { col, row, type, id: this.generateEntityId(type), ...defaults };
     this.level.entities.push(entity);
     this.selectedEntity = entity;
     return entity;
@@ -198,8 +197,8 @@ export class EditorApp {
     return this.walkableSet.has(char);
   }
 
-  enterPickMode(entity: Entity, field: string, validChar?: string, validEntityType?: string, coordinateMode?: boolean): void {
-    this.pickMode = { entity, field, validChar, validEntityType, coordinateMode };
+  enterPickMode(entity: Entity, field: string, validChar?: string, validEntityType?: string): void {
+    this.pickMode = { entity, field, validChar, validEntityType };
   }
 
   cancelPickMode(): void {
@@ -224,8 +223,17 @@ export class EditorApp {
 
     const pm = this.pickMode;
 
-    if (pm.validEntityType && !pm.coordinateMode) {
-      // Entity-based pick: sync field value between source and target
+    if (pm.field === 'target' && pm.validEntityType) {
+      // ID-based pick: find target entity, ensure it has an ID, write ID into source's target field
+      const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      if (targets.length === 0) { this.pickMode = null; return false; }
+      const target = targets[0];
+      if (!target.id) {
+        target.id = this.generateEntityId(target.type);
+      }
+      (pm.entity as Record<string, unknown>)[pm.field] = target.id;
+    } else {
+      // keyId sync: sync field value between source and target entities
       const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
       if (targets.length === 0) { this.pickMode = null; return false; }
       const target = targets[0];
@@ -234,19 +242,15 @@ export class EditorApp {
       const syncedVal = targetVal || sourceVal || this.generateKeyId();
       (pm.entity as Record<string, unknown>)[pm.field] = syncedVal;
       (target as Record<string, unknown>)[pm.field] = syncedVal;
-    } else {
-      // Coordinate-based pick: set "col,row" string
-      (pm.entity as Record<string, unknown>)[pm.field] = `${col},${row}`;
     }
 
     this.pickMode = null;
     return true;
   }
 
-  getReferencingEntities(col: number, row: number): Entity[] {
-    if (!this.level) return [];
-    const key = `${col},${row}`;
-    return this.level.entities.filter(e => (e as Record<string, unknown>).targetDoor === key);
+  getReferencingEntities(entity: Entity): Entity[] {
+    if (!this.level || !entity.id) return [];
+    return this.level.entities.filter(e => (e as Record<string, unknown>).target === entity.id);
   }
 
   getKeyIdPeers(entity: Entity): Entity[] {
@@ -254,6 +258,17 @@ export class EditorApp {
     const keyId = (entity as Record<string, unknown>).keyId as string;
     if (!keyId) return [];
     return this.level.entities.filter(e => e !== entity && (e as Record<string, unknown>).keyId === keyId);
+  }
+
+  private generateEntityId(type: string): string {
+    if (!this.level) return `${type}_1`;
+    const existing = new Set<string>();
+    for (const e of this.level.entities) {
+      if (typeof e.id === 'string' && e.id) existing.add(e.id);
+    }
+    let n = 1;
+    while (existing.has(`${type}_${n}`)) n++;
+    return `${type}_${n}`;
   }
 
   private generateKeyId(): string {

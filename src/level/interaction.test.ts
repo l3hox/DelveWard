@@ -63,8 +63,8 @@ describe('interact', () => {
 
   it('cannot close a mechanical door', () => {
     const gs = new GameState([
-      { col: 2, row: 1, type: 'door', state: 'closed' },
-      { col: 1, row: 1, type: 'lever', targetDoor: '2,1' },
+      { col: 2, row: 1, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 1, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
     ]);
     // Open via lever (makes it mechanical)
     gs.activateLever(1, 1);
@@ -95,8 +95,8 @@ describe('interact', () => {
 
   it('cannot open a closed mechanical door', () => {
     const gs = new GameState([
-      { col: 2, row: 1, type: 'door', state: 'closed' },
-      { col: 1, row: 1, type: 'lever', targetDoor: '2,1' },
+      { col: 2, row: 1, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 1, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
     ]);
     const player = new PlayerState(2, 2, 'N');
     const result = interact(player, GRID, gs);
@@ -210,8 +210,8 @@ describe('lever interaction', () => {
 
   it('standing on lever cell facing the wall activates it', () => {
     const entities: Entity[] = [
-      { col: 2, row: 2, type: 'door', state: 'closed' },
-      { col: 2, row: 1, type: 'lever', targetDoor: '2,2' },
+      { col: 2, row: 2, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
     ];
     const gs = new GameState(entities, LEVER_GRID);
     // Player at (2,1) facing N -> lever wall is N
@@ -220,14 +220,14 @@ describe('lever interaction', () => {
 
     expect(result.type).toBe('lever_activated');
     expect(result.message).toBe('Lever pulled.');
-    expect(result.targetDoor).toBe('2,2');
+    expect(result.target).toBe('door_1');
     expect(gs.getDoor(2, 2)!.state).toBe('open');
   });
 
   it('standing on lever cell but facing wrong direction returns nothing', () => {
     const entities: Entity[] = [
-      { col: 2, row: 2, type: 'door', state: 'closed' },
-      { col: 2, row: 1, type: 'lever', targetDoor: '2,2' },
+      { col: 2, row: 2, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
     ];
     const gs = new GameState(entities, LEVER_GRID);
     // Player at (2,1) facing S -> wrong direction
@@ -239,8 +239,8 @@ describe('lever interaction', () => {
 
   it('lever with explicit wall field activates when facing that wall', () => {
     const entities: Entity[] = [
-      { col: 2, row: 2, type: 'door', state: 'closed' },
-      { col: 2, row: 1, type: 'lever', targetDoor: '2,2', wall: 'N' },
+      { col: 2, row: 2, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1', wall: 'N' },
     ];
     const gs = new GameState(entities, LEVER_GRID);
     const player = new PlayerState(2, 1, 'N');
@@ -259,8 +259,8 @@ describe('lever interaction', () => {
 
   it('lever can be toggled repeatedly', () => {
     const entities: Entity[] = [
-      { col: 2, row: 2, type: 'door', state: 'closed' },
-      { col: 2, row: 1, type: 'lever', targetDoor: '2,2' },
+      { col: 2, row: 2, type: 'door', state: 'closed', id: 'door_1' },
+      { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
     ];
     const gs = new GameState(entities, LEVER_GRID);
     const player = new PlayerState(2, 1, 'N');
