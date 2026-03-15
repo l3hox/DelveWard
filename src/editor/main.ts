@@ -86,7 +86,7 @@ toolbar.setCharSelectCallback((char) => {
 toolbar.setExportCallback(() => {
   if (!app.level) return;
   if (app.errors.length > 0) {
-    alert('Cannot export \u2014 fix errors first:\n\n' + app.errors.join('\n'));
+    alert('Cannot export \u2014 fix errors first:\n\n' + app.errors.map(e => e.message).join('\n'));
     return;
   }
   if (app.isDungeonMode()) {
@@ -98,7 +98,7 @@ toolbar.setExportCallback(() => {
       app.level = lvl;
       app.rebuildDerivedState();
       if (app.errors.length > 0) {
-        allErrors.push(...app.errors.map(e => `[${lvl.name}] ${e}`));
+        allErrors.push(...app.errors.map(e => `[${lvl.name}] ${e.message}`));
       }
     }
     // Restore active level
@@ -381,15 +381,45 @@ gridCanvas.setHoverCallback(() => {
   }
 });
 
+function selectEntity(entity: import('../core/types').Entity): void {
+  app.selectedEntity = entity;
+  inspector.refresh();
+  gridCanvas.markDirty();
+}
+
+function renderErrorSpan(err: import('./EditorApp').ValidationError): HTMLSpanElement {
+  const span = document.createElement('span');
+  span.textContent = err.message;
+  if (err.entity) {
+    const link = document.createElement('a');
+    link.className = 'error-goto';
+    link.textContent = '\u2192select';
+    link.title = `Select ${err.entity.type} at (${err.entity.col}, ${err.entity.row})`;
+    link.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectEntity(err.entity!);
+    });
+    span.appendChild(link);
+  }
+  return span;
+}
+
 function updateErrorBanner(): void {
+  errorBannerEl.innerHTML = '';
   if (app.errors.length === 0) {
     errorBannerEl.classList.remove('visible');
-    errorBannerEl.textContent = '';
-  } else {
-    errorBannerEl.classList.add('visible');
-    errorBannerEl.textContent = app.errors.length === 1
-      ? `\u26a0 ${app.errors[0]}`
-      : `\u26a0 ${app.errors.length} errors: ${app.errors.join(' | ')}`;
+    return;
+  }
+  errorBannerEl.classList.add('visible');
+  const prefix = document.createTextNode(
+    app.errors.length === 1 ? '\u26a0 ' : `\u26a0 ${app.errors.length} errors: `
+  );
+  errorBannerEl.appendChild(prefix);
+  for (let i = 0; i < app.errors.length; i++) {
+    if (i > 0) {
+      errorBannerEl.appendChild(document.createTextNode(' | '));
+    }
+    errorBannerEl.appendChild(renderErrorSpan(app.errors[i]));
   }
 }
 

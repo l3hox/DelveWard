@@ -28,6 +28,11 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   stairs:         { direction: 'down', targetLevel: '', targetCol: 0, targetRow: 0 },
 };
 
+export interface ValidationError {
+  message: string;
+  entity?: Entity;
+}
+
 export interface PickModeState {
   entity: Entity;
   field: string;
@@ -41,7 +46,7 @@ export class EditorApp {
   hover: HoverInfo | null = null;
   charDefMap: Map<string, CharDef> = new Map();
   walkableSet: Set<string> = new Set();
-  errors: string[] = [];
+  errors: ValidationError[] = [];
   dirty = false;
   cleanSnapshot = '';
   dungeon: Dungeon | null = null;
@@ -253,9 +258,9 @@ export class EditorApp {
     this.errors = this.validate();
   }
 
-  validate(): string[] {
+  validate(): ValidationError[] {
     if (!this.level) return [];
-    const errors: string[] = [];
+    const errors: ValidationError[] = [];
     const level = this.level;
 
     // Duplicate charDef chars
@@ -264,7 +269,7 @@ export class EditorApp {
       for (let i = 0; i < level.charDefs.length; i++) {
         const ch = level.charDefs[i].char;
         if (seen.has(ch)) {
-          errors.push(`Duplicate charDef '${ch}' at indices ${seen.get(ch)} and ${i}`);
+          errors.push({ message: `Duplicate charDef '${ch}' at indices ${seen.get(ch)} and ${i}` });
         } else {
           seen.set(ch, i);
         }
@@ -283,7 +288,7 @@ export class EditorApp {
       }
     }
     for (const ch of unknownChars) {
-      errors.push(`Grid char '${ch}' is used but has no charDef`);
+      errors.push({ message: `Grid char '${ch}' is used but has no charDef` });
     }
 
     // Entity references to non-existent targets
@@ -294,7 +299,7 @@ export class EditorApp {
     for (const e of level.entities) {
       const target = (e as Record<string, unknown>).target;
       if (typeof target === 'string' && target && !entityIds.has(target)) {
-        errors.push(`${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`);
+        errors.push({ message: `${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`, entity: e });
       }
     }
 
@@ -302,11 +307,11 @@ export class EditorApp {
     const ps = level.playerStart;
     if (ps.row < 0 || ps.row >= level.grid.length ||
         ps.col < 0 || ps.col >= (level.grid[ps.row]?.length ?? 0)) {
-      errors.push(`Player start (${ps.col},${ps.row}) is out of bounds`);
+      errors.push({ message: `Player start (${ps.col},${ps.row}) is out of bounds` });
     } else {
       const psChar = level.grid[ps.row][ps.col];
       if (!this.walkableSet.has(psChar)) {
-        errors.push(`Player start (${ps.col},${ps.row}) is on non-walkable cell '${psChar}'`);
+        errors.push({ message: `Player start (${ps.col},${ps.row}) is on non-walkable cell '${psChar}'` });
       }
     }
 
@@ -314,12 +319,12 @@ export class EditorApp {
     for (const e of level.entities) {
       if (e.row < 0 || e.row >= level.grid.length ||
           e.col < 0 || e.col >= (level.grid[e.row]?.length ?? 0)) {
-        errors.push(`${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`);
+        errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`, entity: e });
         continue;
       }
       const ch = level.grid[e.row][e.col];
       if (!this.walkableSet.has(ch)) {
-        errors.push(`${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`);
+        errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
       }
     }
 
@@ -331,7 +336,7 @@ export class EditorApp {
         const targetId = e.targetLevel as string;
         if (!targetId) continue;
         if (!levelIds.has(targetId)) {
-          errors.push(`Stairs '${e.id ?? '?'}' targets non-existent level '${targetId}'`);
+          errors.push({ message: `Stairs '${e.id ?? '?'}' targets non-existent level '${targetId}'`, entity: e });
           continue;
         }
         const targetLevel = this.dungeon.levels.find(l => l.id === targetId);
@@ -339,12 +344,12 @@ export class EditorApp {
           const tc = e.targetCol as number ?? 0;
           const tr = e.targetRow as number ?? 0;
           if (tr < 0 || tr >= targetLevel.grid.length || tc < 0 || tc >= (targetLevel.grid[tr]?.length ?? 0)) {
-            errors.push(`Stairs '${e.id ?? '?'}' target (${tc},${tr}) is out of bounds on level '${targetId}'`);
+            errors.push({ message: `Stairs '${e.id ?? '?'}' target (${tc},${tr}) is out of bounds on level '${targetId}'`, entity: e });
           } else {
             const targetWalkable = buildWalkableSet(targetLevel.charDefs);
             const targetChar = targetLevel.grid[tr][tc];
             if (!targetWalkable.has(targetChar)) {
-              errors.push(`Stairs '${e.id ?? '?'}' target (${tc},${tr}) is on non-walkable cell '${targetChar}' on level '${targetId}'`);
+              errors.push({ message: `Stairs '${e.id ?? '?'}' target (${tc},${tr}) is on non-walkable cell '${targetChar}' on level '${targetId}'`, entity: e });
             }
           }
         }
