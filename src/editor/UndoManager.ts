@@ -1,31 +1,41 @@
 import type { DungeonLevel } from '../core/types';
 
+interface UndoEntry {
+  levelIndex: number;
+  snapshot: string;
+}
+
+export interface UndoResult {
+  level: DungeonLevel;
+  levelIndex: number;
+}
+
 export class UndoManager {
-  private undoStack: string[] = [];
-  private redoStack: string[] = [];
-  private pending: string | null = null;
+  private undoStack: UndoEntry[] = [];
+  private redoStack: UndoEntry[] = [];
+  private pending: UndoEntry | null = null;
   private maxSize = 100;
 
-  init(_level: DungeonLevel): void {
+  init(): void {
     this.undoStack = [];
     this.redoStack = [];
     this.pending = null;
   }
 
-  snapshot(level: DungeonLevel): void {
-    this.pushUndo(JSON.stringify(level));
+  snapshot(level: DungeonLevel, levelIndex = 0): void {
+    this.pushUndo({ levelIndex, snapshot: JSON.stringify(level) });
     this.redoStack = [];
   }
 
-  beginBatch(level: DungeonLevel): void {
+  beginBatch(level: DungeonLevel, levelIndex = 0): void {
     if (this.pending !== null) return;
-    this.pending = JSON.stringify(level);
+    this.pending = { levelIndex, snapshot: JSON.stringify(level) };
   }
 
   commitBatch(level: DungeonLevel): void {
     if (this.pending === null) return;
     const current = JSON.stringify(level);
-    if (current !== this.pending) {
+    if (current !== this.pending.snapshot) {
       this.pushUndo(this.pending);
       this.redoStack = [];
     }
@@ -36,18 +46,28 @@ export class UndoManager {
     this.pending = null;
   }
 
-  undo(currentLevel: DungeonLevel): DungeonLevel | null {
+  undo(currentLevel: DungeonLevel): UndoResult | null {
     if (this.undoStack.length === 0) return null;
-    this.redoStack.push(JSON.stringify(currentLevel));
-    const snapshot = this.undoStack.pop()!;
-    return JSON.parse(snapshot) as DungeonLevel;
+    const entry = this.undoStack.pop()!;
+    this.redoStack.push({ levelIndex: entry.levelIndex, snapshot: JSON.stringify(currentLevel) });
+    return { level: JSON.parse(entry.snapshot) as DungeonLevel, levelIndex: entry.levelIndex };
   }
 
-  redo(currentLevel: DungeonLevel): DungeonLevel | null {
+  redo(currentLevel: DungeonLevel): UndoResult | null {
     if (this.redoStack.length === 0) return null;
-    this.undoStack.push(JSON.stringify(currentLevel));
-    const snapshot = this.redoStack.pop()!;
-    return JSON.parse(snapshot) as DungeonLevel;
+    const entry = this.redoStack.pop()!;
+    this.undoStack.push({ levelIndex: entry.levelIndex, snapshot: JSON.stringify(currentLevel) });
+    return { level: JSON.parse(entry.snapshot) as DungeonLevel, levelIndex: entry.levelIndex };
+  }
+
+  get undoLevelIndex(): number | null {
+    if (this.undoStack.length === 0) return null;
+    return this.undoStack[this.undoStack.length - 1].levelIndex;
+  }
+
+  get redoLevelIndex(): number | null {
+    if (this.redoStack.length === 0) return null;
+    return this.redoStack[this.redoStack.length - 1].levelIndex;
   }
 
   get canUndo(): boolean {
@@ -62,8 +82,8 @@ export class UndoManager {
     return this.pending !== null;
   }
 
-  private pushUndo(snapshot: string): void {
-    this.undoStack.push(snapshot);
+  private pushUndo(entry: UndoEntry): void {
+    this.undoStack.push(entry);
     if (this.undoStack.length > this.maxSize) {
       this.undoStack.shift();
     }

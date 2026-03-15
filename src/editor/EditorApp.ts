@@ -67,7 +67,7 @@ export class EditorApp {
   loadLevel(level: DungeonLevel): void {
     this.level = level;
     this.rebuildDerivedState();
-    this.undo.init(level);
+    this.undo.init();
 
     // Reset viewport and tool state
     this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -99,6 +99,7 @@ export class EditorApp {
     // Populate clean snapshots
     this.levelCleanSnapshots = dungeon.levels.map(level => JSON.stringify(level));
     this.dirtyLevelIndices = new Set();
+    this.undo.init();
     this.switchToLevel(0);
   }
 
@@ -118,7 +119,6 @@ export class EditorApp {
     this.level = this.dungeon.levels[index];
 
     this.rebuildDerivedState();
-    this.undo.init(this.level);
     this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
     this.hover = null;
     this.activeTool = 'select';
@@ -384,6 +384,30 @@ export class EditorApp {
       this.selectedEntity = id ? level.entities.find(e => e.id === id) ?? null : null;
     }
     this.onLevelRestored?.();
+  }
+
+  /** Restore a level that may be on a different level index (cross-level undo/redo). */
+  restoreLevelAtIndex(level: DungeonLevel, levelIndex: number): void {
+    if (this.dungeon && levelIndex !== this.activeLevelIndex) {
+      // Commit dirty state for outgoing level
+      if (this.level !== null) {
+        if (JSON.stringify(this.level) !== this.levelCleanSnapshots[this.activeLevelIndex]) {
+          this.dirtyLevelIndices.add(this.activeLevelIndex);
+        } else {
+          this.dirtyLevelIndices.delete(this.activeLevelIndex);
+        }
+      }
+      this.activeLevelIndex = levelIndex;
+      this.cleanSnapshot = this.levelCleanSnapshots[levelIndex];
+      // Reset viewport/selection for the new level
+      this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
+      this.hover = null;
+      this.selectedEntity = null;
+      this.selectionIndex = 0;
+      this.lastClickCell = '';
+      this.pickMode = null;
+    }
+    this.restoreLevel(level);
   }
 
   paintCell(col: number, row: number, char: string): boolean {

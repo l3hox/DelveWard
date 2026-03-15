@@ -265,7 +265,7 @@ levelList.onDungeonNameChanged = () => {
 };
 
 levelList.onBeginTextEdit = () => {
-  if (app.level) app.undo.beginBatch(app.level);
+  if (app.level) app.undo.beginBatch(app.level, app.activeLevelIndex);
 };
 
 levelList.onCommitTextEdit = () => {
@@ -290,7 +290,7 @@ inspector.setEntityChangedCallback(() => {
 inspector.setDeleteCallback(() => {
   if (!app.level) return;
   if (app.pickMode) app.cancelPickMode();
-  app.undo.snapshot(app.level);
+  app.undo.snapshot(app.level, app.activeLevelIndex);
   app.deleteSelectedEntity();
   markDirty();
   inspector.refresh();
@@ -302,11 +302,11 @@ inspector.setDeleteCallback(() => {
 
 // Inspector undo callbacks
 inspector.setBeforeDiscreteChangeCallback(() => {
-  if (app.level) app.undo.snapshot(app.level);
+  if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
 });
 
 inspector.setBeginTextEditCallback(() => {
-  if (app.level) app.undo.beginBatch(app.level);
+  if (app.level) app.undo.beginBatch(app.level, app.activeLevelIndex);
 });
 
 inspector.setCommitTextEditCallback(() => {
@@ -315,11 +315,11 @@ inspector.setCommitTextEditCallback(() => {
 
 // LevelProperties undo callbacks
 levelProps.setBeforeDiscreteChangeCallback(() => {
-  if (app.level) app.undo.snapshot(app.level);
+  if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
 });
 
 levelProps.setBeginTextEditCallback(() => {
-  if (app.level) app.undo.beginBatch(app.level);
+  if (app.level) app.undo.beginBatch(app.level, app.activeLevelIndex);
 });
 
 levelProps.setCommitTextEditCallback(() => {
@@ -343,7 +343,7 @@ gridCanvas.setPickCompleteCallback(() => {
 
 // GridCanvas undo callbacks — paint drag coalescing
 gridCanvas.setBeforePaintCallback(() => {
-  if (app.level) app.undo.beginBatch(app.level);
+  if (app.level) app.undo.beginBatch(app.level, app.activeLevelIndex);
 });
 
 gridCanvas.setAfterPaintCallback(() => {
@@ -355,13 +355,13 @@ gridCanvas.setAfterPaintCallback(() => {
 
 // Entity add snapshot
 gridCanvas.setBeforeEntityAddCallback(() => {
-  if (app.level) app.undo.snapshot(app.level);
+  if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
   markDirty();
 });
 
 // Pick complete snapshot
 gridCanvas.setBeforePickCompleteCallback(() => {
-  if (app.level) app.undo.snapshot(app.level);
+  if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
   markDirty();
 });
 
@@ -413,7 +413,7 @@ document.addEventListener('keydown', (e) => {
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (app.pickMode) app.cancelPickMode();
-    if (app.level) app.undo.snapshot(app.level);
+    if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
     app.deleteSelectedEntity();
     markDirty();
     inspector.refresh();
@@ -430,13 +430,16 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       if (!app.level) return;
-      // Cancel pick modes before undo
       if (app.coordPickCallback) { app.coordPickCallback = null; }
       if (app.pickMode) { app.cancelPickMode(); }
-      // Flush any pending batch
       if (app.undo.hasPending) app.undo.commitBatch(app.level);
-      const restored = app.undo.undo(app.level);
-      if (restored) app.restoreLevel(restored);
+      const targetIdx = app.undo.undoLevelIndex;
+      if (targetIdx === null) return;
+      const levelToSave = (app.isDungeonMode() && targetIdx !== app.activeLevelIndex)
+        ? app.dungeon!.levels[targetIdx]
+        : app.level;
+      const result = app.undo.undo(levelToSave);
+      if (result) app.restoreLevelAtIndex(result.level, result.levelIndex);
       return;
     }
 
@@ -446,8 +449,13 @@ document.addEventListener('keydown', (e) => {
       if (app.coordPickCallback) { app.coordPickCallback = null; }
       if (app.pickMode) { app.cancelPickMode(); }
       if (app.undo.hasPending) app.undo.commitBatch(app.level);
-      const restored = app.undo.redo(app.level);
-      if (restored) app.restoreLevel(restored);
+      const targetIdx = app.undo.redoLevelIndex;
+      if (targetIdx === null) return;
+      const levelToSave = (app.isDungeonMode() && targetIdx !== app.activeLevelIndex)
+        ? app.dungeon!.levels[targetIdx]
+        : app.level;
+      const result = app.undo.redo(levelToSave);
+      if (result) app.restoreLevelAtIndex(result.level, result.levelIndex);
       return;
     }
   }
