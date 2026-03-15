@@ -1,6 +1,8 @@
 import type { CharDef, TextureArea } from '../core/types';
 import type { EditorApp } from './EditorApp';
 import { WALL_TEXTURES, FLOOR_TEXTURES, CEILING_TEXTURES } from '../core/textureNames';
+import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
+import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
 
 export class LevelProperties {
   private container: HTMLElement;
@@ -107,7 +109,7 @@ export class LevelProperties {
           level.defaults.wallTexture = val;
         }
         this.onChanged?.();
-      });
+      }, 'wall');
 
       this.addOptionalDropdownField(body, 'floorTexture', defaults?.floorTexture, FLOOR_TEXTURES, (val) => {
         if (!level.defaults) level.defaults = {};
@@ -117,7 +119,7 @@ export class LevelProperties {
           level.defaults.floorTexture = val;
         }
         this.onChanged?.();
-      });
+      }, 'floor');
 
       this.addOptionalDropdownField(body, 'ceilingTexture', defaults?.ceilingTexture, CEILING_TEXTURES, (val) => {
         if (!level.defaults) level.defaults = {};
@@ -127,7 +129,7 @@ export class LevelProperties {
           level.defaults.ceilingTexture = val;
         }
         this.onChanged?.();
-      });
+      }, 'ceiling');
     });
 
     this.addCollapsibleSection('CharDefs', 'charDefs', (body) => {
@@ -247,7 +249,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'wall');
 
       this.addOptionalDropdownField(detail, 'floorTexture', def.floorTexture, FLOOR_TEXTURES, (val) => {
         if (val === undefined) {
@@ -257,7 +259,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'floor');
 
       this.addOptionalDropdownField(detail, 'ceilingTexture', def.ceilingTexture, CEILING_TEXTURES, (val) => {
         if (val === undefined) {
@@ -267,7 +269,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'ceiling');
 
       entry.appendChild(detail);
     }
@@ -320,26 +322,18 @@ export class LevelProperties {
       const detail = document.createElement('div');
       detail.className = 'props-array-detail';
 
-      this.addNumberField(detail, 'fromCol', area.fromCol, (val) => {
-        area.fromCol = val;
+      // From corner: fromCol, fromRow + pick button
+      this.addCoordPairField(detail, 'from', area.fromCol, area.fromRow, (col, row) => {
+        area.fromCol = col;
+        area.fromRow = row;
         this.onChanged?.();
         this.refresh();
       });
 
-      this.addNumberField(detail, 'toCol', area.toCol, (val) => {
-        area.toCol = val;
-        this.onChanged?.();
-        this.refresh();
-      });
-
-      this.addNumberField(detail, 'fromRow', area.fromRow, (val) => {
-        area.fromRow = val;
-        this.onChanged?.();
-        this.refresh();
-      });
-
-      this.addNumberField(detail, 'toRow', area.toRow, (val) => {
-        area.toRow = val;
+      // To corner: toCol, toRow + pick button
+      this.addCoordPairField(detail, 'to', area.toCol, area.toRow, (col, row) => {
+        area.toCol = col;
+        area.toRow = row;
         this.onChanged?.();
         this.refresh();
       });
@@ -352,7 +346,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'wall');
 
       this.addOptionalDropdownField(detail, 'floorTexture', area.floorTexture, FLOOR_TEXTURES, (val) => {
         if (val === undefined) {
@@ -362,7 +356,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'floor');
 
       this.addOptionalDropdownField(detail, 'ceilingTexture', area.ceilingTexture, CEILING_TEXTURES, (val) => {
         if (val === undefined) {
@@ -372,7 +366,7 @@ export class LevelProperties {
         }
         this.onChanged?.();
         this.refresh();
-      });
+      }, 'ceiling');
 
       entry.appendChild(detail);
     }
@@ -497,11 +491,7 @@ export class LevelProperties {
     onChange: (val: boolean) => void
   ): void {
     const wrapper = document.createElement('div');
-    wrapper.className = 'inspector-field';
-
-    const lbl = document.createElement('label');
-    lbl.textContent = label;
-    wrapper.appendChild(lbl);
+    wrapper.className = 'inspector-field checkbox-field';
 
     const input = document.createElement('input');
     input.type = 'checkbox';
@@ -509,6 +499,10 @@ export class LevelProperties {
     input.style.width = 'auto';
     input.addEventListener('change', () => onChange(input.checked));
     wrapper.appendChild(input);
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
 
     parent.appendChild(wrapper);
   }
@@ -518,7 +512,8 @@ export class LevelProperties {
     label: string,
     value: string | undefined,
     options: readonly string[],
-    onChange: (val: string | undefined) => void
+    onChange: (val: string | undefined) => void,
+    textureCategory?: 'wall' | 'floor' | 'ceiling'
   ): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field';
@@ -527,27 +522,203 @@ export class LevelProperties {
     lbl.textContent = label;
     wrapper.appendChild(lbl);
 
-    const select = document.createElement('select');
+    if (textureCategory) {
+      this.buildTextureDropdown(wrapper, value, options, onChange, textureCategory);
+    } else {
+      const select = document.createElement('select');
 
-    const noneOption = document.createElement('option');
-    noneOption.value = 'none';
-    noneOption.textContent = 'none';
-    if (value === undefined) noneOption.selected = true;
-    select.appendChild(noneOption);
+      const noneOption = document.createElement('option');
+      noneOption.value = 'none';
+      noneOption.textContent = 'none';
+      if (value === undefined) noneOption.selected = true;
+      select.appendChild(noneOption);
 
-    for (const opt of options) {
-      const option = document.createElement('option');
-      option.value = opt;
-      option.textContent = opt;
-      if (opt === value) option.selected = true;
-      select.appendChild(option);
+      for (const opt of options) {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt === value) option.selected = true;
+        select.appendChild(option);
+      }
+
+      select.addEventListener('change', () => {
+        onChange(select.value === 'none' ? undefined : select.value);
+      });
+      wrapper.appendChild(select);
     }
 
-    select.addEventListener('change', () => {
-      onChange(select.value === 'none' ? undefined : select.value);
-    });
-    wrapper.appendChild(select);
+    parent.appendChild(wrapper);
+  }
 
+  private buildTextureDropdown(
+    wrapper: HTMLElement,
+    value: string | undefined,
+    options: readonly string[],
+    onChange: (val: string | undefined) => void,
+    category: 'wall' | 'floor' | 'ceiling'
+  ): void {
+    const allValues: (string | undefined)[] = [undefined, ...options];
+    const container = document.createElement('div');
+    container.className = 'tex-dropdown';
+
+    // Selected display (trigger button)
+    const trigger = document.createElement('div');
+    trigger.className = 'tex-dropdown-trigger';
+    const triggerSwatch = this.createSwatch(category, value);
+    const triggerText = document.createElement('span');
+    triggerText.textContent = value ?? 'none';
+    trigger.appendChild(triggerSwatch);
+    trigger.appendChild(triggerText);
+    container.appendChild(trigger);
+
+    // Dropdown panel
+    const panel = document.createElement('div');
+    panel.className = 'tex-dropdown-panel';
+
+    for (const opt of allValues) {
+      const row = document.createElement('div');
+      row.className = 'tex-dropdown-option';
+      if (opt === value) row.classList.add('selected');
+
+      const swatch = this.createSwatch(category, opt);
+      const name = document.createElement('span');
+      name.textContent = opt ?? 'none';
+      row.appendChild(swatch);
+      row.appendChild(name);
+
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Update trigger display
+        triggerSwatch.replaceWith(this.createSwatch(category, opt));
+        triggerText.textContent = opt ?? 'none';
+        panel.classList.remove('open');
+        onChange(opt);
+      });
+
+      panel.appendChild(row);
+    }
+    container.appendChild(panel);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close any other open tex-dropdown panels first
+      document.querySelectorAll('.tex-dropdown-panel.open').forEach((p) => {
+        if (p !== panel) p.classList.remove('open');
+      });
+      panel.classList.toggle('open');
+    });
+
+    // Close on outside click
+    const closeHandler = (e: MouseEvent) => {
+      if (!container.contains(e.target as Node)) {
+        panel.classList.remove('open');
+      }
+    };
+    document.addEventListener('click', closeHandler);
+    // Clean up when the panel is removed from DOM (on refresh)
+    const observer = new MutationObserver(() => {
+      if (!container.isConnected) {
+        document.removeEventListener('click', closeHandler);
+        observer.disconnect();
+      }
+    });
+    observer.observe(this.container, { childList: true, subtree: true });
+
+    wrapper.appendChild(container);
+  }
+
+  private createSwatch(
+    category: 'wall' | 'floor' | 'ceiling',
+    textureName: string | undefined
+  ): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'tex-swatch';
+    canvas.width = 20;
+    canvas.height = 20;
+    this.drawSwatch(canvas, category, textureName);
+    return canvas;
+  }
+
+  private drawSwatch(
+    canvas: HTMLCanvasElement,
+    category: 'wall' | 'floor' | 'ceiling',
+    textureName: string | undefined
+  ): void {
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 20, 20);
+
+    if (!textureName) {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, 20, 20);
+      return;
+    }
+
+    let source: HTMLCanvasElement;
+    if (category === 'wall') {
+      source = getWallTexture(textureName as WallTextureName).image as HTMLCanvasElement;
+    } else if (category === 'floor') {
+      source = getFloorTexture(textureName as FloorTextureName).image as HTMLCanvasElement;
+    } else {
+      source = getCeilingTexture(textureName as CeilingTextureName).image as HTMLCanvasElement;
+    }
+
+    ctx.drawImage(source, 0, 0, 20, 20);
+  }
+
+  private addCoordPairField(
+    parent: HTMLElement,
+    label: string,
+    col: number,
+    row: number,
+    onChange: (col: number, row: number) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field coord-pair-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const row_ = document.createElement('div');
+    row_.className = 'coord-pair-row';
+
+    const colInput = document.createElement('input');
+    colInput.type = 'number';
+    colInput.value = String(col);
+    colInput.title = 'col';
+    colInput.addEventListener('input', () => {
+      const v = parseInt(colInput.value, 10);
+      if (!isNaN(v)) onChange(v, parseInt(rowInput.value, 10) || 0);
+    });
+    row_.appendChild(colInput);
+
+    const sep = document.createElement('span');
+    sep.textContent = ',';
+    sep.className = 'coord-sep';
+    row_.appendChild(sep);
+
+    const rowInput = document.createElement('input');
+    rowInput.type = 'number';
+    rowInput.value = String(row);
+    rowInput.title = 'row';
+    rowInput.addEventListener('input', () => {
+      const v = parseInt(rowInput.value, 10);
+      if (!isNaN(v)) onChange(parseInt(colInput.value, 10) || 0, v);
+    });
+    row_.appendChild(rowInput);
+
+    const isPicking = this.app.coordPickCallback !== null;
+    const pickBtn = document.createElement('button');
+    pickBtn.className = isPicking ? 'btn-pick active' : 'btn-pick';
+    pickBtn.textContent = isPicking ? '...' : 'Pick';
+    pickBtn.addEventListener('click', () => {
+      this.app.coordPickCallback = (c, r) => {
+        onChange(c, r);
+      };
+    });
+    row_.appendChild(pickBtn);
+
+    wrapper.appendChild(row_);
     parent.appendChild(wrapper);
   }
 }

@@ -4,6 +4,23 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-15 — Editor Phase 6: Visual Toolbars + Inspector Polish
+
+**Goal**: Make the editor visually informative — replace text-only dropdowns and simple shape icons with texture previews, sprite-based entity icons, and item database integration.
+
+**Key decisions**:
+- Native `<select>` can't render images → built a custom dropdown component (`.tex-dropdown`) reused for texture fields and item selection
+- Char palette split into two groups (Floors + Walls) with texture swatches, sized to show actual pixelart. Entity palette is a separate row with canvas-drawn icons matching the grid view.
+- View toggles (floor/ceiling, item preview) placed on entity palette row, right-aligned. Item preview on by default.
+- Wall-mounted entities (lever, sconce) now draw at the wall edge according to their `wall` property, not centered. Lever = perpendicular bar, sconce = circle + radial aura.
+- Door orientation auto-detected from adjacent solid cells (same logic as 3D renderer). Drawn as bar with hinge squares.
+- Item database loaded eagerly at editor startup. Equipment/consumable inspector shows full item details as readonly fields. Right-click context menu on toolbar entity buttons for quick item type selection.
+- Area coordinates reorganized as (col, row) pairs with Pick buttons. New `coordPickCallback` mechanism on EditorApp — simpler than entity pick mode, just captures one grid click.
+
+**Files touched**: `editor.html` (CSS), `Toolbar.ts` (rewrite), `GridCanvas.ts` (ceiling view, sprite preview, wall-mounted icons, door bars, coord pick), `Inspector.ts` (item dropdown, item/enemy details), `LevelProperties.ts` (texture swatches, checkbox layout, coord pair fields), `EditorApp.ts` (view flags, item IDs, coord pick), `main.ts` (wiring).
+
+---
+
 ## 2026-03-14 — Stable Entity IDs + ID-Based References
 
 **Problem**: Levers/plates referenced doors via `targetDoor: "col,row"` position strings. This broke when entities moved in the editor, couldn't generalize to future entity types (spawners, trap doors, logical gates), and was the last position-based coupling in the data model.

@@ -1,9 +1,10 @@
 import { EditorApp } from './EditorApp';
 import { resolveTextures } from '../core/textureResolver';
-import { getWallTexture, getFloorTexture } from '../rendering/textures';
-import type { WallTextureName, FloorTextureName } from '../core/textureNames';
+import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
+import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 import type { Entity } from '../core/types';
 import type { Facing } from '../core/grid';
+import { itemDatabase } from '../core/itemDatabase';
 
 const TILE_SIZE = 32;
 const MIN_ZOOM = 0.25;
@@ -11,6 +12,17 @@ const MAX_ZOOM = 4.0;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+// Simple image cache for entity sprite previews
+const spriteCache = new Map<string, HTMLImageElement>();
+function getSpriteImage(path: string): HTMLImageElement | null {
+  const cached = spriteCache.get(path);
+  if (cached) return cached.complete ? cached : null;
+  const img = new Image();
+  img.src = path;
+  spriteCache.set(path, img);
+  return null;
 }
 
 export class GridCanvas {
@@ -103,6 +115,19 @@ export class GridCanvas {
       }
 
       if (e.button === 0) {
+        if (this.app.coordPickCallback) {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const { col, row } = this.screenToGrid(screenX, screenY);
+          const cb = this.app.coordPickCallback;
+          this.app.coordPickCallback = null;
+          cb(col, row);
+          this.onPickComplete?.();
+          this.dirty = true;
+          return;
+        }
+
         if (this.app.pickMode) {
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
@@ -183,6 +208,12 @@ export class GridCanvas {
 
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (this.app.coordPickCallback) {
+        this.app.coordPickCallback = null;
+        this.onPickComplete?.();
+        this.dirty = true;
+        return;
+      }
       if (this.app.pickMode) {
         this.app.cancelPickMode();
         this.onPickComplete?.();
@@ -315,8 +346,13 @@ export class GridCanvas {
       // Dark overlay to distinguish walls from floor
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fillRect(px, py, tw, th);
+    } else if (app.showCeiling) {
+      // Ceiling view mode
+      const { ceiling } = resolveTextures(col, row, char, level.defaults, app.charDefMap, level.areas);
+      const texImage = getCeilingTexture(ceiling as CeilingTextureName).image as HTMLCanvasElement;
+      ctx.drawImage(texImage, px, py, tw, th);
     } else {
-      // Walkable (floor, D, S, U, O, custom walkable)
+      // Floor view mode (default)
       const { floor } = resolveTextures(col, row, char, level.defaults, app.charDefMap, level.areas);
       const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
       ctx.drawImage(texImage, px, py, tw, th);
@@ -383,6 +419,12 @@ export class GridCanvas {
 
   private drawEntityIcon(entity: Entity, px: number, py: number, tw: number, th: number): void {
     const { ctx } = this;
+
+    // Try sprite preview mode first
+    if (this.app.showItemPreview && this.drawEntitySprite(entity, px, py, tw, th)) {
+      return;
+    }
+
     const cx = px + tw / 2;
     const cy = py + th / 2;
     const iconRadius = Math.max(3, Math.min(tw, th) * 0.2);
@@ -409,11 +451,25 @@ export class GridCanvas {
       }
 
       case 'lever': {
-        ctx.fillStyle = '#aaaaaa';
-        ctx.font = `bold ${fontSize}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('L', cx, cy);
+        const lWall = (entity.wall as string) || 'N';
+        const lLen = Math.max(4, Math.min(tw, th) * 0.3);
+        const lThick = Math.max(2, Math.min(tw, th) * 0.08);
+        // Bar sticks out perpendicular from the wall
+        let lx: number, ly: number, lw: number, lh: number;
+        if (lWall === 'N') {
+          lx = cx - lThick / 2; ly = py; lw = lThick; lh = lLen;
+        } else if (lWall === 'S') {
+          lx = cx - lThick / 2; ly = py + th - lLen; lw = lThick; lh = lLen;
+        } else if (lWall === 'W') {
+          lx = px; ly = cy - lThick / 2; lw = lLen; lh = lThick;
+        } else {
+          lx = px + tw - lLen; ly = cy - lThick / 2; lw = lLen; lh = lThick;
+        }
+        ctx.fillStyle = '#8B5A2B';
+        ctx.fillRect(lx, ly, lw, lh);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = Math.max(1, lThick * 0.3);
+        ctx.strokeRect(lx, ly, lw, lh);
         break;
       }
 
@@ -447,26 +503,74 @@ export class GridCanvas {
       }
 
       case 'torch_sconce': {
-        // Small orange triangle (flame)
-        ctx.fillStyle = '#ff8800';
-        const fh = iconRadius * 1.5;
-        const fw = iconRadius;
+        const sWall = (entity.wall as string) || 'N';
+        const sInset = Math.max(1, Math.min(tw, th) * 0.05);
+        const sRadius = Math.max(2, Math.min(tw, th) * 0.1);
+        // Position the flame center against the wall edge
+        let sx: number, sy: number;
+        if (sWall === 'N') {
+          sx = cx; sy = py + sInset + sRadius;
+        } else if (sWall === 'S') {
+          sx = cx; sy = py + th - sInset - sRadius;
+        } else if (sWall === 'W') {
+          sx = px + sInset + sRadius; sy = cy;
+        } else {
+          sx = px + tw - sInset - sRadius; sy = cy;
+        }
+        // Warm aura glow
+        const auraRadius = sRadius * 3.5;
+        const grad = ctx.createRadialGradient(sx, sy, sRadius * 0.5, sx, sy, auraRadius);
+        grad.addColorStop(0, 'rgba(255, 200, 60, 0.35)');
+        grad.addColorStop(1, 'rgba(255, 200, 60, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(sx - auraRadius, sy - auraRadius, auraRadius * 2, auraRadius * 2);
+        // Flame circle
+        ctx.fillStyle = '#ffcc33';
         ctx.beginPath();
-        ctx.moveTo(cx, cy - fh);
-        ctx.lineTo(cx + fw, cy + fh * 0.3);
-        ctx.lineTo(cx - fw, cy + fh * 0.3);
-        ctx.closePath();
+        ctx.arc(sx, sy, sRadius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#cc8800';
+        ctx.lineWidth = Math.max(1, sRadius * 0.3);
+        ctx.beginPath();
+        ctx.arc(sx, sy, sRadius, 0, Math.PI * 2);
+        ctx.stroke();
         break;
       }
 
       case 'door': {
-        // Door letter indicator for all door entities
+        const ew = this.isDoorEW(entity.col, entity.row);
+        const barThick = Math.max(2, Math.min(tw, th) * 0.1);
+        const hingeSize = Math.max(2, Math.min(tw, th) * 0.08);
+        const pad = Math.min(tw, th) * 0.05;
+
         ctx.fillStyle = '#c8a060';
-        ctx.font = `bold ${fontSize}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('D', cx, cy);
+        ctx.strokeStyle = '#6b4226';
+        ctx.lineWidth = Math.max(1, barThick * 0.3);
+
+        if (ew) {
+          // Bar runs E-W (horizontal)
+          const bx = px + pad;
+          const by = cy - barThick / 2;
+          const bw = tw - pad * 2;
+          ctx.fillRect(bx, by, bw, barThick);
+          ctx.strokeRect(bx, by, bw, barThick);
+          // Hinges at left and right ends
+          ctx.fillStyle = '#555';
+          ctx.fillRect(bx, cy - hingeSize, hingeSize, hingeSize * 2);
+          ctx.fillRect(bx + bw - hingeSize, cy - hingeSize, hingeSize, hingeSize * 2);
+        } else {
+          // Bar runs N-S (vertical)
+          const bx = cx - barThick / 2;
+          const by = py + pad;
+          const bh = th - pad * 2;
+          ctx.fillRect(bx, by, barThick, bh);
+          ctx.strokeRect(bx, by, barThick, bh);
+          // Hinges at top and bottom ends
+          ctx.fillStyle = '#555';
+          ctx.fillRect(cx - hingeSize, by, hingeSize * 2, hingeSize);
+          ctx.fillRect(cx - hingeSize, by + bh - hingeSize, hingeSize * 2, hingeSize);
+        }
+
         // Padlock overlay for keyed doors
         if (entity.keyId) {
           const s = iconRadius * 0.5;
@@ -486,10 +590,10 @@ export class GridCanvas {
       case 'stairs': {
         const isDown = entity.direction === 'down';
         ctx.fillStyle = '#80c0ff';
-        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.font = `bold ${fontSize * 2}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(isDown ? '↓' : '↑', cx, cy);
+        ctx.fillText(isDown ? '\u2193' : '\u2191', cx, cy);
         break;
       }
 
@@ -498,6 +602,70 @@ export class GridCanvas {
     }
 
     ctx.restore();
+  }
+
+  /**
+   * Try to draw a sprite image for this entity. Returns true if drawn,
+   * false if no sprite is available (caller should fall back to simple icon).
+   */
+  private drawEntitySprite(entity: Entity, px: number, py: number, tw: number, th: number): boolean {
+    let spritePath: string | null = null;
+
+    switch (entity.type) {
+      case 'enemy': {
+        const enemyType = (entity.enemyType as string) || 'rat';
+        spritePath = `/sprites/${enemyType}.png`;
+        break;
+      }
+      case 'key':
+        spritePath = '/sprites/items/key.png';
+        break;
+      case 'equipment':
+      case 'consumable': {
+        const itemId = entity.itemId as string;
+        if (itemId) {
+          const def = itemDatabase.getItem(itemId);
+          if (def) {
+            spritePath = `/sprites/items/${def.icon}.png`;
+          }
+        }
+        break;
+      }
+      default:
+        // No sprite available for this entity type
+        return false;
+    }
+
+    if (!spritePath) return false;
+
+    const img = getSpriteImage(spritePath);
+    if (!img) {
+      this.dirty = true; // re-render once the image loads
+      return false;
+    }
+
+    const { ctx } = this;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    // Draw sprite scaled to fit tile with some padding
+    const pad = Math.max(2, tw * 0.1);
+    ctx.drawImage(img, px + pad, py + pad, tw - pad * 2, th - pad * 2);
+    ctx.restore();
+    return true;
+  }
+
+  /** Detect door orientation: EW means bar runs east-west (horizontal). */
+  private isDoorEW(col: number, row: number): boolean {
+    const level = this.app.level!;
+    const grid = level.grid;
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const walkable = this.app.walkableSet;
+
+    const eastSolid = col + 1 >= cols || !walkable.has(grid[row][col + 1]);
+    const westSolid = col - 1 < 0 || !walkable.has(grid[row][col - 1]);
+    if (eastSolid && westSolid) return true;
+    return false;
   }
 
   private drawPlayerStart(offsetX: number, offsetY: number, tileSize: number): void {

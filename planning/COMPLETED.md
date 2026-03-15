@@ -166,6 +166,23 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Duplicate entity ID validation, non-existent target rejection
   - 529 tests (14 new)
 
+- [x] **Dungeon Editor Phase 6** — Visual Toolbars + Inspector Polish:
+  - Texture swatch dropdowns: custom dropdown component with 20×20 canvas swatches for all 9 texture fields (defaults, charDefs, areas) in LevelProperties
+  - Char palette rewrite: two-group toolbar — Floors (walkable charDefs, 28×57 ceiling+floor swatches) and Walls (solid charDefs, 28×28 wall swatches), void button
+  - Entity palette: second toolbar row with 24×24 canvas-drawn icons matching grid view icons, replaces old `<select>` dropdown
+  - View toggles (right side of entity palette): Floor/Ceiling switch (toggles walkable cell texture between floor and ceiling), Item Preview (renders actual `/sprites/` images on grid for enemies, keys, equipment, consumable)
+  - Wall-mounted entity icons: levers draw as brown bar perpendicular to wall (N/S/E/W), sconces as yellow circle with radial aura glow against wall edge
+  - Door icon: bar spanning cell with hinge squares at ends, auto-detects EW/NS orientation from adjacent solid cells; padlock overlay preserved for keyed doors
+  - Stairs icon: 2× font size arrows
+  - Item database integration in inspector: equipment/consumable `itemId` field replaced with icon+name custom dropdown populated from `itemDatabase`, grouped by subtype; readonly details section below showing name, type/subtype, quality, description, stats, requirements, modifiers, weight/value, consumable effects
+  - Enemy inspector: readonly stat details (hp, atk/def, aggro range, move interval, xp) below enemyType dropdown
+  - Equipment/consumable toolbar buttons: sprite icons (sword default, red-potion default), right-click context menu for item selection, remembered `selectedEquipmentId`/`selectedConsumableId` on EditorApp injected into placed entities
+  - Key toolbar icon: uses `/sprites/items/key.png` sprite
+  - Area UX: coordinate fields reorganized as `from (col, row) [Pick]` / `to (col, row) [Pick]` pairs with map pick buttons via `coordPickCallback` on EditorApp
+  - Checkbox fields: inline layout (checkbox + label in one row)
+  - Item database loaded eagerly at editor startup for item preview (default on)
+  - CSS: `.tex-dropdown`, `.tex-swatch`, `.char-swatch-btn`, `.entity-swatch-btn`, `.palette-label`, `.palette-group`, `.view-toggle`, `.item-context-menu`, `.item-details`, `.readonly-field`, `.coord-pair-row`
+
 - [x] **Dungeon Editor Phase 5** — Target Picking + Wiring Visualization:
   - Pick mode: "Pick" button on lever/pressure_plate target fields, crosshair cursor, green/red hover validation
   - Pick completes on valid cell click, cancels on right-click/Escape/tool-switch/delete

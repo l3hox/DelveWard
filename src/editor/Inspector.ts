@@ -1,6 +1,8 @@
 import type { Entity } from '../core/types';
 import type { EditorApp } from './EditorApp';
 import { ENEMY_DEFS } from '../enemies/enemyTypes';
+import { itemDatabase, type ItemDef } from '../core/itemDatabase';
+import { getItemImage } from '../rendering/itemSprites';
 
 export class Inspector {
   private container: HTMLElement;
@@ -144,30 +146,31 @@ export class Inspector {
         });
         break;
 
-      case 'enemy':
+      case 'enemy': {
+        const enemyType = (entity.enemyType as string) ?? Object.keys(ENEMY_DEFS)[0] ?? '';
         this.addDropdownField(
           'enemyType',
-          (entity.enemyType as string) ?? Object.keys(ENEMY_DEFS)[0] ?? '',
+          enemyType,
           Object.keys(ENEMY_DEFS),
           (val) => {
             entity.enemyType = val;
             this.onEntityChanged?.();
+            this.refresh();
           }
         );
+        const def = ENEMY_DEFS[enemyType];
+        if (def) {
+          this.addEnemyDetails(def);
+        }
         break;
+      }
 
       case 'equipment':
-        this.addTextField('itemId', (entity.itemId as string) ?? '', (val) => {
-          entity.itemId = val;
-          this.onEntityChanged?.();
-        });
+        this.addItemDropdown(entity, 'equipment');
         break;
 
       case 'consumable':
-        this.addTextField('itemId', (entity.itemId as string) ?? '', (val) => {
-          entity.itemId = val;
-          this.onEntityChanged?.();
-        });
+        this.addItemDropdown(entity, 'consumable');
         break;
 
       case 'stairs':
@@ -302,5 +305,239 @@ export class Inspector {
 
     wrapper.appendChild(row);
     this.container.appendChild(wrapper);
+  }
+
+  private addEnemyDetails(def: import('../enemies/enemyTypes').EnemyDef): void {
+    const section = document.createElement('div');
+    section.className = 'item-details';
+
+    this.addReadonlyField(section, 'hp', String(def.maxHp));
+    this.addReadonlyField(section, 'atk / def', `${def.atk} / ${def.def}`);
+    this.addReadonlyField(section, 'aggro range', String(def.aggroRange));
+    this.addReadonlyField(section, 'move interval', `${def.moveInterval}s`);
+    this.addReadonlyField(section, 'xp', String(def.xp));
+
+    this.container.appendChild(section);
+  }
+
+  private addItemDropdown(entity: Entity, entityType: 'equipment' | 'consumable'): void {
+    const currentId = (entity.itemId as string) ?? '';
+
+    if (!itemDatabase.isLoaded()) {
+      // Fallback to plain text field if database not loaded
+      this.addTextField('itemId', currentId, (val) => {
+        entity.itemId = val;
+        this.onEntityChanged?.();
+      });
+      return;
+    }
+
+    const items = itemDatabase.getAllItems().filter((item) => {
+      if (entityType === 'consumable') return item.type === 'consumable';
+      return item.type !== 'consumable';
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'itemId';
+    wrapper.appendChild(lbl);
+
+    // Custom dropdown with icons
+    const container = document.createElement('div');
+    container.className = 'tex-dropdown';
+
+    const currentItem = currentId ? itemDatabase.getItem(currentId) : undefined;
+
+    // Trigger
+    const trigger = document.createElement('div');
+    trigger.className = 'tex-dropdown-trigger';
+    const triggerSwatch = this.createItemSwatch(currentItem?.icon);
+    const triggerText = document.createElement('span');
+    triggerText.textContent = currentId || '(none)';
+    trigger.appendChild(triggerSwatch);
+    trigger.appendChild(triggerText);
+    container.appendChild(trigger);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'tex-dropdown-panel';
+
+    // "none" option
+    const noneRow = document.createElement('div');
+    noneRow.className = 'tex-dropdown-option';
+    if (!currentId) noneRow.classList.add('selected');
+    const noneSwatch = this.createItemSwatch(undefined);
+    const noneLabel = document.createElement('span');
+    noneLabel.textContent = '(none)';
+    noneRow.appendChild(noneSwatch);
+    noneRow.appendChild(noneLabel);
+    noneRow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      entity.itemId = '';
+      triggerSwatch.replaceWith(this.createItemSwatch(undefined));
+      triggerText.textContent = '(none)';
+      panel.classList.remove('open');
+      this.onEntityChanged?.();
+      this.refresh();
+    });
+    panel.appendChild(noneRow);
+
+    // Group items by subtype
+    const groups = new Map<string, ItemDef[]>();
+    for (const item of items) {
+      if (!groups.has(item.subtype)) groups.set(item.subtype, []);
+      groups.get(item.subtype)!.push(item);
+    }
+
+    for (const [subtype, groupItems] of groups) {
+      const header = document.createElement('div');
+      header.className = 'item-ctx-header';
+      header.textContent = subtype.replace(/_/g, ' ');
+      panel.appendChild(header);
+
+      for (const item of groupItems) {
+        const row = document.createElement('div');
+        row.className = 'tex-dropdown-option';
+        if (item.id === currentId) row.classList.add('selected');
+
+        const swatch = this.createItemSwatch(item.icon);
+        const name = document.createElement('span');
+        name.textContent = `${item.name} (${item.id})`;
+        row.appendChild(swatch);
+        row.appendChild(name);
+
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          entity.itemId = item.id;
+          triggerSwatch.replaceWith(this.createItemSwatch(item.icon));
+          triggerText.textContent = item.id;
+          panel.classList.remove('open');
+          this.onEntityChanged?.();
+          this.refresh();
+        });
+
+        panel.appendChild(row);
+      }
+    }
+
+    container.appendChild(panel);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.tex-dropdown-panel.open').forEach((p) => {
+        if (p !== panel) p.classList.remove('open');
+      });
+      panel.classList.toggle('open');
+    });
+
+    const closeHandler = (e: MouseEvent) => {
+      if (!container.contains(e.target as Node)) {
+        panel.classList.remove('open');
+      }
+    };
+    document.addEventListener('click', closeHandler);
+    const observer = new MutationObserver(() => {
+      if (!container.isConnected) {
+        document.removeEventListener('click', closeHandler);
+        observer.disconnect();
+      }
+    });
+    observer.observe(this.container, { childList: true, subtree: true });
+
+    wrapper.appendChild(container);
+    this.container.appendChild(wrapper);
+
+    // Show item details below
+    if (currentItem) {
+      this.addItemDetails(currentItem);
+    }
+  }
+
+  private createItemSwatch(icon: string | undefined): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'tex-swatch';
+    canvas.width = 20;
+    canvas.height = 20;
+    const ctx = canvas.getContext('2d')!;
+    if (!icon) {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, 20, 20);
+      return canvas;
+    }
+    const img = getItemImage(icon);
+    if (img) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, 20, 20);
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, 20, 20);
+    }
+    return canvas;
+  }
+
+  private addItemDetails(item: ItemDef): void {
+    const section = document.createElement('div');
+    section.className = 'item-details';
+
+    this.addReadonlyField(section, 'name', item.name);
+    this.addReadonlyField(section, 'type', `${item.type} / ${item.subtype}`);
+    this.addReadonlyField(section, 'quality', item.quality);
+
+    if (item.description) {
+      this.addReadonlyField(section, 'description', item.description);
+    }
+
+    // Stats
+    const statEntries = Object.entries(item.stats).filter(([, v]) => v !== undefined && v !== 0);
+    if (statEntries.length > 0) {
+      this.addReadonlyField(section, 'stats', statEntries.map(([k, v]) => `${k}: ${v}`).join(', '));
+    }
+
+    // Requirements
+    const reqEntries = Object.entries(item.requirements).filter(([, v]) => v !== undefined && v !== 0);
+    if (reqEntries.length > 0) {
+      this.addReadonlyField(section, 'requires', reqEntries.map(([k, v]) => `${k}: ${v}`).join(', '));
+    }
+
+    // Modifiers
+    if (item.modifiers.length > 0) {
+      this.addReadonlyField(section, 'modifiers', item.modifiers.map((m) => `${m.name}: ${m.effect}`).join('; '));
+    }
+
+    // Weight & value
+    this.addReadonlyField(section, 'weight / value', `${item.weight} / ${item.value}g`);
+
+    // Consumable-specific
+    if (item.stackable) {
+      this.addReadonlyField(section, 'stackable', `max ${item.stackMax ?? '?'}`);
+    }
+    if (item.effect) {
+      const effects: string[] = [];
+      if (item.effect.torchFuel) effects.push(`torch fuel: ${item.effect.torchFuel}`);
+      if (item.effect.curePoison) effects.push('cures poison');
+      if (effects.length > 0) {
+        this.addReadonlyField(section, 'effect', effects.join(', '));
+      }
+    }
+
+    this.container.appendChild(section);
+  }
+
+  private addReadonlyField(parent: HTMLElement, label: string, value: string): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field readonly-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const val = document.createElement('div');
+    val.className = 'readonly-value';
+    val.textContent = value;
+    wrapper.appendChild(val);
+
+    parent.appendChild(wrapper);
   }
 }

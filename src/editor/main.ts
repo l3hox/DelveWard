@@ -4,8 +4,12 @@ import { Toolbar } from './Toolbar';
 import { Inspector } from './Inspector';
 import { LevelProperties } from './LevelProperties';
 import { openLevelFile, exportLevelFile } from './io';
+import { itemDatabase } from '../core/itemDatabase';
 
 const app = new EditorApp();
+
+// Load item database eagerly for item preview (default on)
+itemDatabase.load().catch(() => { /* non-fatal */ });
 
 const canvas = document.getElementById('editor-canvas') as HTMLCanvasElement;
 const container = document.getElementById('canvas-container') as HTMLElement;
@@ -48,10 +52,29 @@ toolbar.setEntityTypeSelectCallback((type) => {
   gridCanvas.updateCursor();
 });
 
+toolbar.setItemIdChangeCallback((type, itemId) => {
+  if (type === 'equipment') {
+    app.selectedEquipmentId = itemId;
+  } else {
+    app.selectedConsumableId = itemId;
+  }
+});
+
+toolbar.setViewToggleCallback(async (flag, value) => {
+  app[flag] = value;
+  if (flag === 'showItemPreview' && value) {
+    const { itemDatabase } = await import('../core/itemDatabase');
+    if (!itemDatabase.isLoaded()) {
+      await itemDatabase.load();
+    }
+  }
+  gridCanvas.markDirty();
+});
+
 // Level properties changed callback
 levelProps.setChangedCallback(() => {
   app.rebuildDerivedState();
-  toolbar.updatePalette(app.level!.charDefs);
+  toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
   levelNameEl.textContent = app.level!.name;
   gridCanvas.markDirty();
 });
@@ -70,7 +93,7 @@ toolbar.setNewLevelCallback(() => {
   }
   app.createNewLevel(cols, rows);
   levelNameEl.textContent = app.level!.name;
-  toolbar.updatePalette(app.level!.charDefs);
+  toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
   toolbar.enableExport();
   inspector.refresh();
   levelProps.refresh();
@@ -107,6 +130,7 @@ inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) =
 // Pick mode completion (success or cancel via right-click)
 gridCanvas.setPickCompleteCallback(() => {
   inspector.refresh();
+  levelProps.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
 });
@@ -129,6 +153,13 @@ gridCanvas.setHoverCallback(() => {
 
 // Keyboard listeners
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.coordPickCallback) {
+    app.coordPickCallback = null;
+    levelProps.refresh();
+    gridCanvas.updateCursor();
+    gridCanvas.markDirty();
+    return;
+  }
   if (e.key === 'Escape' && app.pickMode) {
     app.cancelPickMode();
     inspector.refresh();
@@ -153,7 +184,7 @@ btnOpen.addEventListener('click', async () => {
   if (level) {
     app.loadLevel(level);
     levelNameEl.textContent = level.name;
-    toolbar.updatePalette(level.charDefs);
+    toolbar.updatePalette(level.charDefs, level.defaults);
     toolbar.enableExport();
     inspector.refresh();
     levelProps.refresh();

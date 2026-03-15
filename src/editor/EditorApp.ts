@@ -46,6 +46,11 @@ export class EditorApp {
   selectedEntity: Entity | null = null;
   selectedEntityType = 'enemy';
   pickMode: PickModeState | null = null;
+  coordPickCallback: ((col: number, row: number) => void) | null = null;
+  showCeiling = false;
+  showItemPreview = true;
+  selectedEquipmentId = 'sword_iron';
+  selectedConsumableId = 'health_potion_small';
 
   private selectionIndex = 0;
   private lastClickCell = '';
@@ -163,6 +168,12 @@ export class EditorApp {
 
     const defaults = ENTITY_DEFAULTS[type] ?? {};
     const entity: Entity = { col, row, type, id: this.generateEntityId(type), ...defaults };
+    // Inject remembered itemId for equipment/consumable
+    if (type === 'equipment' && this.selectedEquipmentId) {
+      entity.itemId = this.selectedEquipmentId;
+    } else if (type === 'consumable' && this.selectedConsumableId) {
+      entity.itemId = this.selectedConsumableId;
+    }
     this.level.entities.push(entity);
     this.selectedEntity = entity;
     return entity;

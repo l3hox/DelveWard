@@ -39,7 +39,8 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Phase 3: Entity placement + inspector (select, CRUD, property editing)
 - [x] Phase 4: Level properties panel + new level + validation
 - [x] Phase 5: Target picking + wiring visualization (interactive references)
-- [ ] Phase 6: Polish + validation (error display, resize, shortcuts)
+- [x] Phase 6: Visual toolbars + inspector polish (texture swatches, entity icons, item database integration)
+- [ ] Phase 7: Final polish + validation (error display, resize, shortcuts)
 
 ---
 
@@ -60,6 +61,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Recent Changes
 
+- **Editor Phase 6 — Visual toolbars + inspector polish**: Texture swatch dropdowns (icon+name custom dropdowns for all 9 texture fields in LevelProperties). Two-row toolbar: floor/wall texture palette with ceiling/floor swatches, entity palette with canvas-drawn icons matching grid view. View toggles: floor/ceiling switch, item preview mode (renders actual sprites on grid). Wall-mounted entity icons for levers (perpendicular bar) and sconces (yellow circle + aura glow). Door bar with hinges (auto-detects orientation from adjacent walls). Item database integration: equipment/consumable inspector shows icon dropdown with all items grouped by subtype + readonly stat details. Enemy inspector shows stat details. Area coordinate pairs with map pick buttons. Toolbar entity buttons: right-click context menu for equipment/consumable item selection, remembered itemId injected on placement.
 - **Stable entity IDs + ID-based references**: Every entity gets an `id` field (`type_N` format). Levers/plates reference doors via `target: entityId` instead of `targetDoor: "col,row"`. `GameState` has `entityById` Map + `resolveEntityPosition()`. `migrateEntities()` preprocessor auto-converts legacy `targetDoor` format. Editor auto-assigns IDs on entity creation, pick mode writes target entity IDs. All level JSONs migrated. 529 tests passing.
 - **Data model unification**: Removed all special grid chars (D, S, U, O). Doors, stairs, and levers are now purely entity-based on walkable cells. `WALKABLE_CELLS` simplified to `new Set(['.'])`. Grid owns only geometry (`#`, `.`, ` `, charDefs), entities own all behavior. GameState tracks stairs in a new `stairs` Map. All renderers use entity lookup instead of grid char checks.
 - Dungeon Editor Phase 5: interactive target picking (Pick button on lever/plate target fields, crosshair cursor, green/red hover for valid/invalid targets, Escape/right-click cancel), wiring visualization (dashed orange arrows for active connections, faint grey for all others — always visible), "Referenced by" section on doors with clickable source list
