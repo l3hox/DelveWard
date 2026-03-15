@@ -103,6 +103,7 @@
         padding: 4px 12px;
         border-bottom: 1px solid #333;
         flex-shrink: 0;
+        overflow-x: auto;
       }
 
       #char-palette.dimmed {
@@ -120,6 +121,7 @@
         display: flex;
         align-items: center;
         gap: 3px;
+        min-width: 0;
       }
 
       .palette-sep {
@@ -168,6 +170,7 @@
         padding: 4px 12px;
         border-bottom: 1px solid #333;
         flex-shrink: 0;
+        overflow-x: auto;
       }
 
       #entity-palette.dimmed {
@@ -278,6 +281,14 @@
         color: #aaa;
         font-size: 11px;
         word-wrap: break-word;
+      }
+
+      .sprite-preview {
+        display: block;
+        image-rendering: pixelated;
+        margin-bottom: 8px;
+        max-width: 100%;
+        height: auto;
       }
 
       .coord-pair-row {
@@ -582,6 +593,34 @@
         width:20px; height:20px; border:1px solid #555;
         image-rendering:pixelated; flex-shrink:0;
       }
+      #error-banner {
+        display: none;
+        background: #2a1515;
+        border-bottom: 1px solid #663333;
+        color: #ff8888;
+        font-size: 12px;
+        padding: 4px 12px;
+        flex-shrink: 0;
+      }
+      #error-banner.visible {
+        display: block;
+      }
+
+      #char-palette::-webkit-scrollbar,
+      #entity-palette::-webkit-scrollbar {
+        height: 4px;
+      }
+
+      #char-palette::-webkit-scrollbar-thumb,
+      #entity-palette::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 2px;
+      }
+
+      #char-palette::-webkit-scrollbar-track,
+      #entity-palette::-webkit-scrollbar-track {
+        background: transparent;
+      }
     </style>
   </head>
   <body>
@@ -592,6 +631,7 @@
     </div>
     <div id="char-palette" class="dimmed"></div>
     <div id="entity-palette" class="dimmed"></div>
+    <div id="error-banner"></div>
     <div id="main-area">
       <div id="level-properties"></div>
       <div id="canvas-container">

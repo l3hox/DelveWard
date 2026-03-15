@@ -23,3 +23,5 @@ Unplanned feature ideas and wishlist items. Not scoped or scheduled — just cap
 - Status effects — poison (tick damage), slow (longer tween), blind (reduced torch range)
 - Pushable blocks — grid-aligned blocks for dungeon puzzles
 - Thin walls — walls between two walkable cells (edge walls, not cell walls), including thin wall doors; enables villages and walk-in houses
+- Editor: monster database editor — edit enemy stats (hp, atk, def, aggro, speed, xp), add/remove enemy types, preview sprites, live-save to enemyTypes
+- Editor: item database editor — edit items.json directly from the editor, add/remove items, edit stats/modifiers/requirements, icon picker from available sprites

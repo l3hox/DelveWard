@@ -42,6 +42,8 @@ export class EditorApp {
   charDefMap: Map<string, CharDef> = new Map();
   walkableSet: Set<string> = new Set();
   errors: string[] = [];
+  dirty = false;
+  cleanSnapshot = '';
   activeTool: EditorTool = 'select';
   selectedChar = '.';
   selectedEntity: Entity | null = null;
@@ -72,6 +74,8 @@ export class EditorApp {
     this.selectionIndex = 0;
     this.lastClickCell = '';
     this.pickMode = null;
+    this.dirty = false;
+    this.cleanSnapshot = JSON.stringify(level);
   }
 
   rebuildDerivedState(): void {
@@ -89,17 +93,70 @@ export class EditorApp {
   validate(): string[] {
     if (!this.level) return [];
     const errors: string[] = [];
+    const level = this.level;
 
     // Duplicate charDef chars
-    if (this.level.charDefs) {
+    if (level.charDefs) {
       const seen = new Map<string, number>();
-      for (let i = 0; i < this.level.charDefs.length; i++) {
-        const ch = this.level.charDefs[i].char;
+      for (let i = 0; i < level.charDefs.length; i++) {
+        const ch = level.charDefs[i].char;
         if (seen.has(ch)) {
           errors.push(`Duplicate charDef '${ch}' at indices ${seen.get(ch)} and ${i}`);
         } else {
           seen.set(ch, i);
         }
+      }
+    }
+
+    // Grid chars used but not defined
+    const knownChars = new Set(['#', '.', ' ']);
+    if (level.charDefs) {
+      for (const def of level.charDefs) knownChars.add(def.char);
+    }
+    const unknownChars = new Set<string>();
+    for (const row of level.grid) {
+      for (const ch of row) {
+        if (!knownChars.has(ch)) unknownChars.add(ch);
+      }
+    }
+    for (const ch of unknownChars) {
+      errors.push(`Grid char '${ch}' is used but has no charDef`);
+    }
+
+    // Entity references to non-existent targets
+    const entityIds = new Set<string>();
+    for (const e of level.entities) {
+      if (e.id) entityIds.add(e.id);
+    }
+    for (const e of level.entities) {
+      const target = (e as Record<string, unknown>).target;
+      if (typeof target === 'string' && target && !entityIds.has(target)) {
+        errors.push(`${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`);
+      }
+    }
+
+    // Player start out of bounds
+    const ps = level.playerStart;
+    if (ps.row < 0 || ps.row >= level.grid.length ||
+        ps.col < 0 || ps.col >= (level.grid[ps.row]?.length ?? 0)) {
+      errors.push(`Player start (${ps.col},${ps.row}) is out of bounds`);
+    } else {
+      const psChar = level.grid[ps.row][ps.col];
+      if (!this.walkableSet.has(psChar)) {
+        errors.push(`Player start (${ps.col},${ps.row}) is on non-walkable cell '${psChar}'`);
+      }
+    }
+
+    // Entity on non-walkable cell
+    for (const e of level.entities) {
+      if (e.row < 0 || e.row >= level.grid.length ||
+          e.col < 0 || e.col >= (level.grid[e.row]?.length ?? 0)) {
+        errors.push(`${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`);
+        continue;
+      }
+      const ch = level.grid[e.row][e.col];
+      if (!this.walkableSet.has(ch)) {
+        errors.push(`${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`);
       }
     }
 

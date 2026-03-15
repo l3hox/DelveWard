@@ -166,6 +166,14 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Duplicate entity ID validation, non-existent target rejection
   - 529 tests (14 new)
 
+- [x] **Dungeon Editor Phase 7** — Final Polish:
+  - Inline error banner: `#error-banner` div with red-tinted background below entity palette, hidden when no errors, `updateErrorBanner()` after every mutation path
+  - Expanded validation in `EditorApp.validate()`: undefined grid chars, broken entity `target` references, player start OOB/non-walkable, entity OOB/non-walkable
+  - Keyboard tool shortcuts: `1`–`4` for Select/Paint/Erase/Entity, guarded against input focus, cancels pick mode
+  - Dirty state: `app.dirty` flag + `cleanSnapshot` JSON comparison, `*` prefix on level name + document title, `beforeunload` guard, clears on export/load/new, clears when undo restores to clean state
+  - Scrollable palette rows: `overflow-x: auto` on char/entity palettes, `min-width: 0` on palette groups, thin webkit scrollbar styling
+  - CSS: `#error-banner`, `#error-banner.visible`, scrollbar pseudo-elements
+
 - [x] **Dungeon Editor — Undo/Redo System**:
   - `UndoManager` class: two stacks (undo/redo, max 100), full JSON snapshot approach, pending slot for batch ops
   - Paint drag coalescing: `beginBatch` on mousedown, `commitBatch` on mouseup/mouseleave — entire drag = one undo step

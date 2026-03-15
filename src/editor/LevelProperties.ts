@@ -683,6 +683,12 @@ export class LevelProperties {
     if (!textureName) {
       ctx.fillStyle = '#333';
       ctx.fillRect(0, 0, 20, 20);
+      ctx.strokeStyle = '#882222';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(4, 4); ctx.lineTo(16, 16);
+      ctx.moveTo(16, 4); ctx.lineTo(4, 16);
+      ctx.stroke();
       return;
     }
 

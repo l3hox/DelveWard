@@ -4,6 +4,21 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-15 — Editor Phase 7: Final Polish
+
+**Goal**: Close usability gaps that make the editor feel unfinished — errors only shown on export, no keyboard shortcuts, no dirty-state feedback, palette overflow.
+
+**Key decisions**:
+- **Inline error banner** — red-tinted `#error-banner` div below entity palette, hidden when no errors. Shows single error or count + joined list. `updateErrorBanner()` called after every mutation path (paint, entity add/delete, property changes, undo/redo, level load/new). Export `alert()` kept as safety net.
+- **Expanded validation** — 4 new checks in `EditorApp.validate()`: undefined grid chars (char in grid not in `#`, `.`, ` `, or charDefs), broken entity `target` references, player start out-of-bounds or non-walkable, entity on non-walkable or out-of-bounds. Unknown chars deduplicated via `Set` to avoid error floods.
+- **Keyboard tool shortcuts** — `1`–`4` for Select/Paint/Erase/Entity. Plain number keys, no modifiers. Same `activeElement` guard as Delete/Undo. Cancels pick mode on switch (matching toolbar button behavior).
+- **Dirty state** — `app.dirty` flag + `cleanSnapshot` (JSON string of level at load/export time). Set dirty on every mutation. Clear on export, load, new level. `*` prefix on level name span + document title. `beforeunload` event fires only when dirty. Undo/redo compares `JSON.stringify(level)` against `cleanSnapshot` — undoing all the way back clears dirty.
+- **Scrollable palettes** — `overflow-x: auto` on `#char-palette` and `#entity-palette`. `min-width: 0` on `.palette-group` to allow shrinking. 4px webkit scrollbar styling.
+
+**Files**: `editor.html` (CSS + error banner div), `EditorApp.ts` (dirty, cleanSnapshot, expanded validate), `main.ts` (updateErrorBanner, markDirty, updateDirtyDisplay, keyboard shortcuts, beforeunload).
+
+---
+
 ## 2026-03-15 — Editor Undo/Redo System
 
 **Goal**: Make editor mutations reversible — one misclick shouldn't require manual repair or reimport.

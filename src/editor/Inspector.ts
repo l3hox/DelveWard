@@ -4,6 +4,16 @@ import { ENEMY_DEFS } from '../enemies/enemyTypes';
 import { itemDatabase, type ItemDef } from '../core/itemDatabase';
 import { getItemImage } from '../rendering/itemSprites';
 
+const enemySpriteCache = new Map<string, HTMLImageElement>();
+function getEnemySpriteImage(type: string): HTMLImageElement | null {
+  const cached = enemySpriteCache.get(type);
+  if (cached) return cached.complete ? cached : null;
+  const img = new Image();
+  img.src = `/sprites/${type}.png`;
+  enemySpriteCache.set(type, img);
+  return null;
+}
+
 export class Inspector {
   private container: HTMLElement;
   private app: EditorApp;
@@ -163,16 +173,7 @@ export class Inspector {
 
       case 'enemy': {
         const enemyType = (entity.enemyType as string) ?? Object.keys(ENEMY_DEFS)[0] ?? '';
-        this.addDropdownField(
-          'enemyType',
-          enemyType,
-          Object.keys(ENEMY_DEFS),
-          (val) => {
-            entity.enemyType = val;
-            this.onEntityChanged?.();
-            this.refresh();
-          }
-        );
+        this.addEnemyTypeDropdown(entity, enemyType);
         const def = ENEMY_DEFS[enemyType];
         if (def) {
           this.addEnemyDetails(def);
@@ -333,6 +334,101 @@ export class Inspector {
 
     wrapper.appendChild(row);
     this.container.appendChild(wrapper);
+  }
+
+  private addEnemyTypeDropdown(entity: Entity, currentType: string): void {
+    const types = Object.keys(ENEMY_DEFS);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'enemyType';
+    wrapper.appendChild(lbl);
+
+    const container = document.createElement('div');
+    container.className = 'tex-dropdown';
+
+    // Trigger
+    const trigger = document.createElement('div');
+    trigger.className = 'tex-dropdown-trigger';
+    const triggerSwatch = this.createEnemySwatch(currentType);
+    const triggerText = document.createElement('span');
+    triggerText.textContent = currentType;
+    trigger.appendChild(triggerSwatch);
+    trigger.appendChild(triggerText);
+    container.appendChild(trigger);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'tex-dropdown-panel';
+
+    for (const type of types) {
+      const row = document.createElement('div');
+      row.className = 'tex-dropdown-option';
+      if (type === currentType) row.classList.add('selected');
+
+      const swatch = this.createEnemySwatch(type);
+      const name = document.createElement('span');
+      name.textContent = type;
+      row.appendChild(swatch);
+      row.appendChild(name);
+
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onBeforeDiscreteChange?.();
+        entity.enemyType = type;
+        panel.classList.remove('open');
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+
+      panel.appendChild(row);
+    }
+
+    container.appendChild(panel);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.tex-dropdown-panel.open').forEach((p) => {
+        if (p !== panel) p.classList.remove('open');
+      });
+      panel.classList.toggle('open');
+    });
+
+    const closeHandler = (e: MouseEvent) => {
+      if (!container.contains(e.target as Node)) {
+        panel.classList.remove('open');
+      }
+    };
+    document.addEventListener('click', closeHandler);
+    const observer = new MutationObserver(() => {
+      if (!container.isConnected) {
+        document.removeEventListener('click', closeHandler);
+        observer.disconnect();
+      }
+    });
+    observer.observe(this.container, { childList: true, subtree: true });
+
+    wrapper.appendChild(container);
+    this.container.appendChild(wrapper);
+  }
+
+  private createEnemySwatch(type: string): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'tex-swatch';
+    canvas.width = 20;
+    canvas.height = 20;
+    const ctx = canvas.getContext('2d')!;
+    const img = getEnemySpriteImage(type);
+    if (img) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, 20, 20);
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, 20, 20);
+    }
+    return canvas;
   }
 
   private addEnemyDetails(def: import('../enemies/enemyTypes').EnemyDef): void {
@@ -496,6 +592,12 @@ export class Inspector {
     if (!icon) {
       ctx.fillStyle = '#333';
       ctx.fillRect(0, 0, 20, 20);
+      ctx.strokeStyle = '#882222';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(4, 4); ctx.lineTo(16, 16);
+      ctx.moveTo(16, 4); ctx.lineTo(4, 16);
+      ctx.stroke();
       return canvas;
     }
     const img = getItemImage(icon);
