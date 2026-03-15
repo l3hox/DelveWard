@@ -40,6 +40,13 @@ export interface PickModeState {
   validEntityType?: string;
 }
 
+export interface AreaDragState {
+  startCol: number;
+  startRow: number;
+  currentCol: number;
+  currentRow: number;
+}
+
 export class EditorApp {
   level: DungeonLevel | null = null;
   viewport: Viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -59,6 +66,9 @@ export class EditorApp {
   selectedEntityType = 'enemy';
   pickMode: PickModeState | null = null;
   coordPickCallback: ((col: number, row: number) => void) | null = null;
+  coordDragCallback: ((fromCol: number, fromRow: number, toCol: number, toRow: number) => void) | null = null;
+  areaDragState: AreaDragState | null = null;
+  statusHint: string | null = null;
   showCeiling = false;
   showItemPreview = true;
   selectedEquipmentId = 'sword_iron';
@@ -83,6 +93,9 @@ export class EditorApp {
     this.selectionIndex = 0;
     this.lastClickCell = '';
     this.pickMode = null;
+    this.coordDragCallback = null;
+    this.areaDragState = null;
+    this.statusHint = null;
     this.dirty = false;
     this.cleanSnapshot = JSON.stringify(level);
 
@@ -131,6 +144,9 @@ export class EditorApp {
     this.selectionIndex = 0;
     this.lastClickCell = '';
     this.pickMode = null;
+    this.coordDragCallback = null;
+    this.areaDragState = null;
+    this.statusHint = null;
 
     this.cleanSnapshot = this.levelCleanSnapshots[index];
     this.dirty = this.isDungeonDirty();

@@ -596,7 +596,7 @@
       #error-banner {
         display: none;
         background: #2a1515;
-        border-bottom: 1px solid #663333;
+        border-top: 1px solid #663333;
         color: #ff8888;
         font-size: 12px;
         padding: 4px 12px;
@@ -760,6 +760,19 @@
         background: #3a3a3a;
         border-color: #888;
       }
+
+      #status-hint {
+        display: none;
+        background: #152030;
+        border-top: 1px solid #334466;
+        color: #88bbff;
+        font-size: 12px;
+        padding: 4px 12px;
+        flex-shrink: 0;
+      }
+      #status-hint.visible {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -770,7 +783,6 @@
     </div>
     <div id="char-palette" class="dimmed"></div>
     <div id="entity-palette" class="dimmed"></div>
-    <div id="error-banner"></div>
     <div id="main-area">
       <div id="level-properties">
         <div id="level-list"></div>
@@ -781,6 +793,8 @@
       </div>
       <div id="inspector"></div>
     </div>
+    <div id="error-banner"></div>
+    <div id="status-hint"></div>
     <script type="module" src="/src/editor/main.ts"></script>
   </body>
 </html>

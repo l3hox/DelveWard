@@ -11,6 +11,7 @@ export class LevelProperties {
   private onBeforeDiscreteChange: (() => void) | null = null;
   private onBeginTextEdit: (() => void) | null = null;
   private onCommitTextEdit: (() => void) | null = null;
+  private onStatusHintChanged: (() => void) | null = null;
 
   private expandedSections = new Set<string>(['level', 'environment', 'defaults']);
   private expandedCharDefs = new Set<number>();
@@ -35,6 +36,10 @@ export class LevelProperties {
 
   setCommitTextEditCallback(cb: () => void): void {
     this.onCommitTextEdit = cb;
+  }
+
+  setStatusHintChangedCallback(cb: () => void): void {
+    this.onStatusHintChanged = cb;
   }
 
   refresh(): void {
@@ -182,9 +187,18 @@ export class LevelProperties {
       addBtn.textContent = 'Add Area';
       addBtn.addEventListener('click', () => {
         this.onBeforeDiscreteChange?.();
-        areas.push({ fromCol: 0, toCol: 0, fromRow: 0, toRow: 0 });
+        const defaults = this.app.level?.defaults;
+        const newArea: TextureArea = { fromCol: 0, toCol: 0, fromRow: 0, toRow: 0 };
+        if (defaults?.wallTexture) newArea.wallTexture = defaults.wallTexture;
+        if (defaults?.floorTexture) newArea.floorTexture = defaults.floorTexture;
+        if (defaults?.ceilingTexture) newArea.ceilingTexture = defaults.ceilingTexture;
+        areas.push(newArea);
+        const newIndex = areas.length - 1;
+        this.expandedAreas.add(newIndex);
+        if (!this.expandedSections.has('areas')) this.expandedSections.add('areas');
         this.onChanged?.();
         this.refresh();
+        this.startAreaDragPick(newArea);
       });
       body.appendChild(addBtn);
     });
@@ -341,13 +355,22 @@ export class LevelProperties {
       const detail = document.createElement('div');
       detail.className = 'props-array-detail';
 
+      const setAreaRect = (fromCol: number, fromRow: number, toCol: number, toRow: number) => {
+        area.fromCol = fromCol;
+        area.fromRow = fromRow;
+        area.toCol = toCol;
+        area.toRow = toRow;
+        this.onChanged?.();
+        this.refresh();
+      };
+
       // From corner: fromCol, fromRow + pick button
       this.addCoordPairField(detail, 'from', area.fromCol, area.fromRow, (col, row) => {
         area.fromCol = col;
         area.fromRow = row;
         this.onChanged?.();
         this.refresh();
-      });
+      }, setAreaRect);
 
       // To corner: toCol, toRow + pick button
       this.addCoordPairField(detail, 'to', area.toCol, area.toRow, (col, row) => {
@@ -355,7 +378,7 @@ export class LevelProperties {
         area.toRow = row;
         this.onChanged?.();
         this.refresh();
-      });
+      }, setAreaRect);
 
       this.addOptionalDropdownField(detail, 'wallTexture', area.wallTexture, WALL_TEXTURES, (val) => {
         if (val === undefined) {
@@ -709,7 +732,8 @@ export class LevelProperties {
     label: string,
     col: number,
     row: number,
-    onChange: (col: number, row: number) => void
+    onChange: (col: number, row: number) => void,
+    onDragArea?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => void
   ): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field coord-pair-field';
@@ -750,19 +774,53 @@ export class LevelProperties {
     rowInput.addEventListener('blur', () => this.onCommitTextEdit?.());
     row_.appendChild(rowInput);
 
-    const isPicking = this.app.coordPickCallback !== null;
+    const isPicking = this.app.coordPickCallback !== null || this.app.coordDragCallback !== null;
     const pickBtn = document.createElement('button');
     pickBtn.className = isPicking ? 'btn-pick active' : 'btn-pick';
     pickBtn.textContent = isPicking ? '...' : 'Pick';
     pickBtn.addEventListener('click', () => {
-      this.app.coordPickCallback = (c, r) => {
-        this.onBeforeDiscreteChange?.();
-        onChange(c, r);
-      };
+      if (onDragArea) {
+        this.app.statusHint = `Click to pick '${label}', or drag to select area rectangle (Esc to cancel)`;
+        this.onStatusHintChanged?.();
+        this.app.coordDragCallback = (fromCol, fromRow, toCol, toRow) => {
+          this.app.statusHint = null;
+          this.onStatusHintChanged?.();
+          this.onBeforeDiscreteChange?.();
+          if (fromCol === toCol && fromRow === toRow) {
+            onChange(fromCol, fromRow);
+          } else {
+            onDragArea(fromCol, fromRow, toCol, toRow);
+          }
+        };
+      } else {
+        this.app.statusHint = `Click a cell to pick the '${label}' coordinate (Esc to cancel)`;
+        this.onStatusHintChanged?.();
+        this.app.coordPickCallback = (c, r) => {
+          this.app.statusHint = null;
+          this.onStatusHintChanged?.();
+          this.onBeforeDiscreteChange?.();
+          onChange(c, r);
+        };
+      }
     });
     row_.appendChild(pickBtn);
 
     wrapper.appendChild(row_);
     parent.appendChild(wrapper);
+  }
+
+  private startAreaDragPick(area: TextureArea): void {
+    this.app.statusHint = 'Click and drag to select area rectangle (Esc to cancel)';
+    this.onStatusHintChanged?.();
+    this.app.coordDragCallback = (fromCol, fromRow, toCol, toRow) => {
+      area.fromCol = fromCol;
+      area.fromRow = fromRow;
+      area.toCol = toCol;
+      area.toRow = toRow;
+      this.app.statusHint = null;
+      this.onStatusHintChanged?.();
+      this.onChanged?.();
+      this.refresh();
+    };
   }
 }

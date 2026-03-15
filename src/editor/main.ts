@@ -19,6 +19,7 @@ const btnOpen = document.getElementById('btn-open') as HTMLButtonElement;
 const levelNameEl = document.getElementById('level-name') as HTMLSpanElement;
 const coordEl = document.getElementById('coord-display') as HTMLSpanElement;
 const errorBannerEl = document.getElementById('error-banner') as HTMLElement;
+const statusHintEl = document.getElementById('status-hint') as HTMLElement;
 
 const gridCanvas = new GridCanvas(canvas, container, app);
 const toolbar = new Toolbar(document.getElementById('toolbar')!);
@@ -40,6 +41,16 @@ function updateDirtyDisplay(): void {
   document.title = `${prefix}DelveWard — Dungeon Editor`;
 }
 
+function updateStatusHint(): void {
+  if (app.statusHint) {
+    statusHintEl.textContent = app.statusHint;
+    statusHintEl.classList.add('visible');
+  } else {
+    statusHintEl.textContent = '';
+    statusHintEl.classList.remove('visible');
+  }
+}
+
 function refreshAllUI(): void {
   toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
   toolbar.enableExport();
@@ -50,6 +61,7 @@ function refreshAllUI(): void {
   gridCanvas.markDirty();
   updateDirtyDisplay();
   updateErrorBanner();
+  updateStatusHint();
 }
 
 // --- Undo/Redo: onLevelRestored callback ---
@@ -326,6 +338,12 @@ levelProps.setCommitTextEditCallback(() => {
   if (app.level) app.undo.commitBatch(app.level);
 });
 
+levelProps.setStatusHintChangedCallback(() => {
+  updateStatusHint();
+  gridCanvas.updateCursor();
+  gridCanvas.markDirty();
+});
+
 // Pick mode entry
 inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) => {
   app.enterPickMode(entity, field, validChar, validEntityType);
@@ -335,10 +353,12 @@ inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) =
 
 // Pick mode completion (success or cancel via right-click)
 gridCanvas.setPickCompleteCallback(() => {
+  app.statusHint = null;
   inspector.refresh();
   levelProps.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
+  updateStatusHint();
 });
 
 // GridCanvas undo callbacks — paint drag coalescing
@@ -425,11 +445,23 @@ function updateErrorBanner(): void {
 
 // Keyboard listeners
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && app.coordPickCallback) {
-    app.coordPickCallback = null;
+  if (e.key === 'Escape' && (app.coordDragCallback || app.areaDragState)) {
+    app.coordDragCallback = null;
+    app.areaDragState = null;
+    app.statusHint = null;
     levelProps.refresh();
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
+    updateStatusHint();
+    return;
+  }
+  if (e.key === 'Escape' && app.coordPickCallback) {
+    app.coordPickCallback = null;
+    app.statusHint = null;
+    levelProps.refresh();
+    gridCanvas.updateCursor();
+    gridCanvas.markDirty();
+    updateStatusHint();
     return;
   }
   if (e.key === 'Escape' && app.pickMode) {

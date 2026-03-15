@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-15 — Area Editing UX Improvements
+
+**Goal**: Make area editing feel more direct and visual — reduce clicks, provide visual feedback during coordinate picking, support rectangle drag selection.
+
+**Key decisions**:
+- **Status hint bar** — blue-tinted `#status-hint` div at the bottom of the screen (alongside error banner). Shows context-aware messages during pick/drag operations. Hidden by default, shown via `.visible` class. Placed at bottom to avoid layout jumping when shown/hidden.
+- **Error banner relocated** — moved from above `#main-area` to bottom of screen (after main area, before status hint). Same reason: prevent layout jumping.
+- **Default textures on new area** — "Add Area" copies `wallTexture`/`floorTexture`/`ceilingTexture` from `level.defaults` into the new area object. Saves repeated manual selection.
+- **Auto-expand + auto-drag-pick** — new area is immediately expanded in the sidebar and editor enters rectangle drag mode. User can define the area bounds in one gesture right after creation.
+- **Rectangle drag selection** — new `coordDragCallback` + `areaDragState` on EditorApp. mousedown starts drag, mousemove updates live rectangle (blue dashed border + fill), mouseup normalizes with min/max and clamps to grid bounds. Single click (same cell) treated as 1×1 selection.
+- **Dual-mode area Pick buttons** — from/to Pick buttons in area entries use drag mode (`onDragArea` parameter on `addCoordPairField`). Single click sets just that one coordinate; drag sets all four area coordinates. Hint text reflects both options.
+- **Blue hover for pick modes** — `coordPickCallback` and `coordDragCallback` both show blue hover highlight (distinct from green entity pick mode). Hover suppressed during active drag (the rectangle provides feedback). Crosshair cursor for all pick/drag modes.
+- **Cancel mechanisms** — Escape key, right-click, and mouseleave all properly clean up drag/pick state. mouseleave clears visual drag but keeps callback so user can retry.
+
+**Files**: `editor.html` (status hint div + CSS, error banner relocated), `EditorApp.ts` (AreaDragState, coordDragCallback, areaDragState, statusHint), `GridCanvas.ts` (drag mouse events, drawDragRectangle, blue hover, cursor), `LevelProperties.ts` (default textures, auto-expand, startAreaDragPick, onDragArea in addCoordPairField, statusHintChanged callback), `main.ts` (updateStatusHint, Escape handlers, pick complete wiring).
+
+---
+
 ## 2026-03-15 — Editor Phase 8: Multi-Level Dungeon Support
 
 **Goal**: Make the editor dungeon-aware — load all levels, switch between them, add/remove/reorder, export as full dungeon JSON, validate cross-level stair references.

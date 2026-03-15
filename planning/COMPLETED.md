@@ -166,6 +166,18 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Duplicate entity ID validation, non-existent target rejection
   - 529 tests (14 new)
 
+- [x] **Area Editing UX Improvements**:
+  - Status hint bar: blue-tinted `#status-hint` at bottom of screen, context messages during pick/drag operations, hidden by default, `.visible` class toggle
+  - Error banner relocated to bottom of screen (alongside status hint) to prevent layout jumping
+  - Default textures on new area: copies wall/floor/ceiling textures from `level.defaults`
+  - Auto-expand + auto-drag-pick: new area expanded in sidebar, immediate rectangle drag mode entry
+  - Rectangle drag selection: `coordDragCallback` + `areaDragState` on EditorApp, live blue dashed rectangle on canvas, min/max normalization, grid bounds clamping
+  - Dual-mode area Pick buttons: single click sets one coordinate, drag sets all four; `onDragArea` optional parameter on `addCoordPairField`
+  - Blue hover highlight for coord pick/drag modes, suppressed during active drag
+  - Crosshair cursor for all pick/drag modes
+  - Cancel: Escape key, right-click, mouseleave (clears visual drag, keeps callback for retry)
+  - `statusHintChanged` callback on LevelProperties for DOM update wiring
+
 - [x] **Dungeon Editor Phase 7** — Final Polish:
   - Inline error banner: `#error-banner` div with red-tinted background below entity palette, hidden when no errors, `updateErrorBanner()` after every mutation path
   - Expanded validation in `EditorApp.validate()`: undefined grid chars, broken entity `target` references, player start OOB/non-walkable, entity OOB/non-walkable

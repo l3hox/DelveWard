@@ -115,6 +115,13 @@ export class GridCanvas {
         this.app.hover = null;
       }
 
+      // Update drag rectangle during area drag
+      if (this.app.areaDragState && this.app.hover) {
+        this.app.areaDragState.currentCol = this.app.hover.col;
+        this.app.areaDragState.currentRow = this.app.hover.row;
+        this.dirty = true;
+      }
+
       // Drag-paint: paint into cells as cursor moves while button is held
       if (this.isPainting && this.app.hover) {
         const tool = this.app.activeTool;
@@ -135,6 +142,16 @@ export class GridCanvas {
       }
 
       if (e.button === 0) {
+        if (this.app.coordDragCallback) {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const { col, row } = this.screenToGrid(screenX, screenY);
+          this.app.areaDragState = { startCol: col, startRow: row, currentCol: col, currentRow: row };
+          this.dirty = true;
+          return;
+        }
+
         if (this.app.coordPickCallback) {
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
@@ -199,6 +216,24 @@ export class GridCanvas {
         this.isPanning = false;
       }
       if (e.button === 0) {
+        if (this.app.areaDragState && this.app.coordDragCallback) {
+          const ds = this.app.areaDragState;
+          const level = this.app.level;
+          const maxCol = level ? level.grid[0].length - 1 : ds.currentCol;
+          const maxRow = level ? level.grid.length - 1 : ds.currentRow;
+          const fromCol = Math.max(0, Math.min(ds.startCol, ds.currentCol));
+          const fromRow = Math.max(0, Math.min(ds.startRow, ds.currentRow));
+          const toCol = Math.min(maxCol, Math.max(ds.startCol, ds.currentCol));
+          const toRow = Math.min(maxRow, Math.max(ds.startRow, ds.currentRow));
+          this.app.areaDragState = null;
+          this.onBeforePickComplete?.();
+          const cb = this.app.coordDragCallback;
+          this.app.coordDragCallback = null;
+          cb(fromCol, fromRow, toCol, toRow);
+          this.onPickComplete?.();
+          this.dirty = true;
+          return;
+        }
         if (this.isPainting) this.onAfterPaint?.();
         this.isPainting = false;
       }
@@ -208,6 +243,10 @@ export class GridCanvas {
       this.isPanning = false;
       if (this.isPainting) this.onAfterPaint?.();
       this.isPainting = false;
+      if (this.app.areaDragState) {
+        this.app.areaDragState = null;
+        // Keep coordDragCallback so user can retry on re-enter
+      }
       this.app.hover = null;
       this.onHoverChange?.();
       this.dirty = true;
@@ -234,8 +273,17 @@ export class GridCanvas {
 
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (this.app.coordDragCallback || this.app.areaDragState) {
+        this.app.coordDragCallback = null;
+        this.app.areaDragState = null;
+        this.app.statusHint = null;
+        this.onPickComplete?.();
+        this.dirty = true;
+        return;
+      }
       if (this.app.coordPickCallback) {
         this.app.coordPickCallback = null;
+        this.app.statusHint = null;
         this.onPickComplete?.();
         this.dirty = true;
         return;
@@ -333,6 +381,9 @@ export class GridCanvas {
 
     // Draw hover highlight
     this.drawHover(offsetX, offsetY, tileSize);
+
+    // Draw drag rectangle for area selection
+    this.drawDragRectangle(offsetX, offsetY, tileSize);
 
     // Draw selection highlight
     this.drawSelectionHighlight(offsetX, offsetY, tileSize);
@@ -742,6 +793,9 @@ export class GridCanvas {
     const { hover } = this.app;
     if (!hover) return;
 
+    // Suppress hover highlight during active drag (the rectangle provides feedback)
+    if (this.app.areaDragState) return;
+
     const { ctx } = this;
     const px = Math.floor(offsetX + hover.col * tileSize);
     const py = Math.floor(offsetY + hover.row * tileSize);
@@ -751,7 +805,11 @@ export class GridCanvas {
     let strokeColor: string;
     let fillColor: string;
 
-    if (this.app.pickMode) {
+    if (this.app.coordDragCallback || this.app.coordPickCallback) {
+      // Blue hover for coordinate picking modes
+      strokeColor = 'rgba(68, 136, 255, 0.8)';
+      fillColor = 'rgba(68, 136, 255, 0.15)';
+    } else if (this.app.pickMode) {
       const isValid = this.app.isValidPickTarget(hover.col, hover.row);
       strokeColor = isValid ? 'rgba(68, 255, 68, 0.8)' : 'rgba(255, 68, 68, 0.5)';
       fillColor = isValid ? 'rgba(68, 255, 68, 0.15)' : 'rgba(255, 68, 68, 0.05)';
@@ -785,6 +843,31 @@ export class GridCanvas {
     ctx.restore();
   }
 
+  private drawDragRectangle(offsetX: number, offsetY: number, tileSize: number): void {
+    const ds = this.app.areaDragState;
+    if (!ds) return;
+
+    const { ctx } = this;
+    const fromCol = Math.min(ds.startCol, ds.currentCol);
+    const fromRow = Math.min(ds.startRow, ds.currentRow);
+    const toCol = Math.max(ds.startCol, ds.currentCol);
+    const toRow = Math.max(ds.startRow, ds.currentRow);
+
+    const px = Math.floor(offsetX + fromCol * tileSize);
+    const py = Math.floor(offsetY + fromRow * tileSize);
+    const w = Math.ceil((toCol - fromCol + 1) * tileSize);
+    const h = Math.ceil((toRow - fromRow + 1) * tileSize);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(68, 136, 255, 0.15)';
+    ctx.fillRect(px, py, w, h);
+    ctx.strokeStyle = 'rgba(68, 136, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 3]);
+    ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+    ctx.restore();
+  }
+
   private drawSelectionHighlight(offsetX: number, offsetY: number, tileSize: number): void {
     const entity = this.app.selectedEntity;
     if (!entity) return;
@@ -803,7 +886,10 @@ export class GridCanvas {
   }
 
   updateCursor(): void {
-    if (this.app.pickMode) { this.canvas.style.cursor = 'crosshair'; return; }
+    if (this.app.pickMode || this.app.coordPickCallback || this.app.coordDragCallback) {
+      this.canvas.style.cursor = 'crosshair';
+      return;
+    }
     const tool = this.app.activeTool;
     this.canvas.style.cursor = tool === 'paint' || tool === 'erase' || tool === 'entity' ? 'crosshair' : 'default';
   }
