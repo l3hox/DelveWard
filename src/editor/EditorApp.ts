@@ -1,5 +1,6 @@
 import type { DungeonLevel, CharDef, Entity } from '../core/types';
 import { buildWalkableSet } from '../core/grid';
+import { UndoManager } from './UndoManager';
 
 export interface Viewport {
   offsetX: number;
@@ -51,6 +52,8 @@ export class EditorApp {
   showItemPreview = true;
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
+  undo = new UndoManager();
+  onLevelRestored: (() => void) | null = null;
 
   private selectionIndex = 0;
   private lastClickCell = '';
@@ -58,6 +61,7 @@ export class EditorApp {
   loadLevel(level: DungeonLevel): void {
     this.level = level;
     this.rebuildDerivedState();
+    this.undo.init(level);
 
     // Reset viewport and tool state
     this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -118,6 +122,17 @@ export class EditorApp {
       entities: [],
     };
     this.loadLevel(level);
+  }
+
+  restoreLevel(level: DungeonLevel): void {
+    this.level = level;
+    this.rebuildDerivedState();
+    // Preserve selection by matching id in restored level
+    if (this.selectedEntity) {
+      const id = this.selectedEntity.id;
+      this.selectedEntity = id ? level.entities.find(e => e.id === id) ?? null : null;
+    }
+    this.onLevelRestored?.();
   }
 
   paintCell(col: number, row: number, char: string): boolean {

@@ -8,6 +8,9 @@ export class LevelProperties {
   private container: HTMLElement;
   private app: EditorApp;
   private onChanged: (() => void) | null = null;
+  private onBeforeDiscreteChange: (() => void) | null = null;
+  private onBeginTextEdit: (() => void) | null = null;
+  private onCommitTextEdit: (() => void) | null = null;
 
   private expandedSections = new Set<string>(['level', 'environment', 'defaults']);
   private expandedCharDefs = new Set<number>();
@@ -20,6 +23,18 @@ export class LevelProperties {
 
   setChangedCallback(cb: () => void): void {
     this.onChanged = cb;
+  }
+
+  setBeforeDiscreteChangeCallback(cb: () => void): void {
+    this.onBeforeDiscreteChange = cb;
+  }
+
+  setBeginTextEditCallback(cb: () => void): void {
+    this.onBeginTextEdit = cb;
+  }
+
+  setCommitTextEditCallback(cb: () => void): void {
+    this.onCommitTextEdit = cb;
   }
 
   refresh(): void {
@@ -145,6 +160,7 @@ export class LevelProperties {
       addBtn.className = 'btn-add';
       addBtn.textContent = 'Add CharDef';
       addBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
         charDefs.push({ char: '?', solid: false });
         this.onChanged?.();
         this.refresh();
@@ -165,6 +181,7 @@ export class LevelProperties {
       addBtn.className = 'btn-add';
       addBtn.textContent = 'Add Area';
       addBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
         areas.push({ fromCol: 0, toCol: 0, fromRow: 0, toRow: 0 });
         this.onChanged?.();
         this.refresh();
@@ -203,6 +220,7 @@ export class LevelProperties {
     removeBtn.textContent = 'Remove';
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      this.onBeforeDiscreteChange?.();
       charDefs.splice(index, 1);
       this.expandedCharDefs.delete(index);
       this.onChanged?.();
@@ -300,6 +318,7 @@ export class LevelProperties {
     removeBtn.textContent = 'Remove';
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      this.onBeforeDiscreteChange?.();
       areas.splice(index, 1);
       this.expandedAreas.delete(index);
       this.onChanged?.();
@@ -425,7 +444,11 @@ export class LevelProperties {
     input.type = 'text';
     input.value = value;
     if (maxLength !== undefined) input.maxLength = maxLength;
-    input.addEventListener('input', () => onChange(input.value));
+    input.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
+      onChange(input.value);
+    });
+    input.addEventListener('blur', () => this.onCommitTextEdit?.());
     wrapper.appendChild(input);
 
     parent.appendChild(wrapper);
@@ -448,9 +471,11 @@ export class LevelProperties {
     input.type = 'number';
     input.value = String(value);
     input.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
       const parsed = parseInt(input.value, 10);
       if (!isNaN(parsed)) onChange(parsed);
     });
+    input.addEventListener('blur', () => this.onCommitTextEdit?.());
     wrapper.appendChild(input);
 
     parent.appendChild(wrapper);
@@ -478,7 +503,10 @@ export class LevelProperties {
       if (opt === value) option.selected = true;
       select.appendChild(option);
     }
-    select.addEventListener('change', () => onChange(select.value));
+    select.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      onChange(select.value);
+    });
     wrapper.appendChild(select);
 
     parent.appendChild(wrapper);
@@ -497,7 +525,10 @@ export class LevelProperties {
     input.type = 'checkbox';
     input.checked = checked;
     input.style.width = 'auto';
-    input.addEventListener('change', () => onChange(input.checked));
+    input.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      onChange(input.checked);
+    });
     wrapper.appendChild(input);
 
     const lbl = document.createElement('label');
@@ -542,6 +573,7 @@ export class LevelProperties {
       }
 
       select.addEventListener('change', () => {
+        this.onBeforeDiscreteChange?.();
         onChange(select.value === 'none' ? undefined : select.value);
       });
       wrapper.appendChild(select);
@@ -588,6 +620,7 @@ export class LevelProperties {
 
       row.addEventListener('click', (e) => {
         e.stopPropagation();
+        this.onBeforeDiscreteChange?.();
         // Update trigger display
         triggerSwatch.replaceWith(this.createSwatch(category, opt));
         triggerText.textContent = opt ?? 'none';
@@ -687,9 +720,11 @@ export class LevelProperties {
     colInput.value = String(col);
     colInput.title = 'col';
     colInput.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
       const v = parseInt(colInput.value, 10);
       if (!isNaN(v)) onChange(v, parseInt(rowInput.value, 10) || 0);
     });
+    colInput.addEventListener('blur', () => this.onCommitTextEdit?.());
     row_.appendChild(colInput);
 
     const sep = document.createElement('span');
@@ -702,9 +737,11 @@ export class LevelProperties {
     rowInput.value = String(row);
     rowInput.title = 'row';
     rowInput.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
       const v = parseInt(rowInput.value, 10);
       if (!isNaN(v)) onChange(parseInt(colInput.value, 10) || 0, v);
     });
+    rowInput.addEventListener('blur', () => this.onCommitTextEdit?.());
     row_.appendChild(rowInput);
 
     const isPicking = this.app.coordPickCallback !== null;
@@ -713,6 +750,7 @@ export class LevelProperties {
     pickBtn.textContent = isPicking ? '...' : 'Pick';
     pickBtn.addEventListener('click', () => {
       this.app.coordPickCallback = (c, r) => {
+        this.onBeforeDiscreteChange?.();
         onChange(c, r);
       };
     });

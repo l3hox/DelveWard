@@ -155,3 +155,50 @@ Editor modules live in `src/editor/`:
 **Negative / Risks:**
 - **Module boundary discipline:** Editor must only read from shared modules, never modify game runtime state. Currently enforced by code review — no runtime enforcement. If shared modules gain side effects (e.g., texture caching that assumes single-context), the editor could trigger unexpected state.
 - **No 3D preview:** The 2D grid view doesn't show how the level looks in-game. A future "3D preview" feature would need to embed a subset of the game renderer. Deferred — the 2D view is sufficient for layout and wiring.
+
+---
+
+## ADR-ED-04 — Full-Snapshot Undo/Redo
+
+**Status:** Accepted
+**Date:** 2026-03-15
+
+### Context
+
+The editor had no undo/redo. Every mutation (grid painting, entity CRUD, property edits) was permanent until export/reimport. One misclick could require manual JSON repair.
+
+The editor state is a single `DungeonLevel` object (2–16 KB as JSON). Two approaches were considered: command-pattern (reversible command objects per mutation type) and full-snapshot (clone entire level before each mutation).
+
+### Decision
+
+Full-snapshot undo via `JSON.parse(JSON.stringify(level))`. A standalone `UndoManager` class manages two stacks (undo/redo, max 100 entries).
+
+**Snapshot granularity:**
+- **Discrete mutations** (dropdown change, checkbox toggle, entity add/delete, pick mode complete, array add/remove): `snapshot()` captures state before the mutation. Each is its own undo step.
+- **Paint drags** (mouse down → drag → mouse up): `beginBatch()` on mousedown, `commitBatch()` on mouseup. Entire drag coalesced into one undo step.
+- **Text/number field edits**: `beginBatch()` on first `input` event (idempotent — safe to call on every keystroke), `commitBatch()` on `blur`. Entire editing session is one undo step.
+
+**Callback architecture:** Components (Inspector, LevelProperties, GridCanvas) expose typed callbacks (`onBeforeDiscreteChange`, `onBeginTextEdit`, `onCommitTextEdit`, `onBeforePaint`, `onAfterPaint`, `onBeforeEntityAdd`, `onBeforePickComplete`). `main.ts` wires these to `UndoManager` methods. The UndoManager has no knowledge of UI components.
+
+**Level restoration:** `EditorApp.restoreLevel(level)` sets the level, rebuilds derived state (charDefMap, walkableSet, validation), preserves entity selection by ID match, and fires `onLevelRestored` for UI refresh.
+
+### Alternatives Considered
+
+**Command pattern (reversible command objects):** Each mutation type (paint cell, add entity, change property) would have an `execute()` and `undo()` method. Rejected — high implementation cost (one command class per mutation type, must handle every edge case), error-prone (an incomplete `undo()` silently corrupts state), and unnecessary given the small level sizes. Full-snapshot is ~5 lines per mutation site vs ~30+ lines per command class.
+
+**Structural sharing / immutable state:** Store immutable level snapshots with shared subtrees (like Immer). Rejected — the level object is small enough that deep cloning via JSON is negligible in cost. Structural sharing adds complexity (must ensure no mutation of shared nodes) for no measurable benefit at this scale.
+
+**Diff-based undo:** Store JSON diffs between states. Rejected — JSON diff/patch libraries add dependency weight, and the space savings are marginal (100 × 16 KB = 1.6 MB worst case vs perhaps 0.5 MB with diffs). Diffing is also slower than cloning for small objects.
+
+### Consequences
+
+**Positive:**
+- Simple, correct implementation (~70 lines for UndoManager)
+- Every mutation type gets undo for free — no per-type command logic
+- JSON roundtrip acts as an implicit deep clone — no shared references between snapshots
+- Coalescing (paint drags, text edits) keeps the undo stack meaningful — users don't have to press Ctrl+Z 50 times after typing a level name
+
+**Negative / Risks:**
+- **JSON roundtrip strips `undefined`:** Properties set to `undefined` become absent after `JSON.parse`. This is fine — the codebase uses `??` defaults everywhere, and `undefined` vs absent is semantically equivalent.
+- **Memory:** 100 × 16 KB = 1.6 MB worst case. Negligible for a desktop browser editor. The max can be tuned if levels grow significantly.
+- **No selective undo:** Can't undo "just the last entity move" while keeping a paint change. Full-snapshot means all-or-nothing. Acceptable for a level editor — users expect linear undo.

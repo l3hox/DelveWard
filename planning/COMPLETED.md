@@ -166,6 +166,17 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Duplicate entity ID validation, non-existent target rejection
   - 529 tests (14 new)
 
+- [x] **Dungeon Editor — Undo/Redo System**:
+  - `UndoManager` class: two stacks (undo/redo, max 100), full JSON snapshot approach, pending slot for batch ops
+  - Paint drag coalescing: `beginBatch` on mousedown, `commitBatch` on mouseup/mouseleave — entire drag = one undo step
+  - Text input batching: `beginBatch` on first input, `commitBatch` on blur — entire editing session = one undo step
+  - Discrete mutations: `snapshot` before dropdown/checkbox/entity-add/entity-delete/pick-complete/array-add/array-remove
+  - Keyboard shortcuts: Ctrl+Z (undo), Ctrl+Shift+Z / Ctrl+Y (redo), guarded against text input focus
+  - Entity selection preserved across undo/redo by ID match in restored level
+  - Stacks reset on level load/new
+  - `EditorApp.restoreLevel()` — restores level, rebuilds derived state, fires `onLevelRestored` callback
+  - Callback wiring: Inspector/LevelProperties expose 3 undo callbacks each, GridCanvas exposes 4
+
 - [x] **Dungeon Editor Phase 6** — Visual Toolbars + Inspector Polish:
   - Texture swatch dropdowns: custom dropdown component with 20×20 canvas swatches for all 9 texture fields (defaults, charDefs, areas) in LevelProperties
   - Char palette rewrite: two-group toolbar — Floors (walkable charDefs, 28×57 ceiling+floor swatches) and Walls (solid charDefs, 28×28 wall swatches), void button

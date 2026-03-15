@@ -22,6 +22,16 @@ const toolbar = new Toolbar(document.getElementById('toolbar')!);
 const inspector = new Inspector(document.getElementById('inspector')!, app);
 const levelProps = new LevelProperties(document.getElementById('level-properties')!, app);
 
+// --- Undo/Redo: onLevelRestored callback ---
+app.onLevelRestored = () => {
+  inspector.refresh();
+  levelProps.refresh();
+  toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
+  levelNameEl.textContent = app.level!.name;
+  gridCanvas.markDirty();
+  gridCanvas.updateCursor();
+};
+
 // Toolbar callbacks — cancel pick mode on tool switch
 toolbar.setToolChangeCallback((tool) => {
   if (app.pickMode) { app.cancelPickMode(); inspector.refresh(); }
@@ -113,11 +123,39 @@ inspector.setEntityChangedCallback(() => {
 });
 
 inspector.setDeleteCallback(() => {
+  if (!app.level) return;
   if (app.pickMode) app.cancelPickMode();
+  app.undo.snapshot(app.level);
   app.deleteSelectedEntity();
   inspector.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
+});
+
+// Inspector undo callbacks
+inspector.setBeforeDiscreteChangeCallback(() => {
+  if (app.level) app.undo.snapshot(app.level);
+});
+
+inspector.setBeginTextEditCallback(() => {
+  if (app.level) app.undo.beginBatch(app.level);
+});
+
+inspector.setCommitTextEditCallback(() => {
+  if (app.level) app.undo.commitBatch(app.level);
+});
+
+// LevelProperties undo callbacks
+levelProps.setBeforeDiscreteChangeCallback(() => {
+  if (app.level) app.undo.snapshot(app.level);
+});
+
+levelProps.setBeginTextEditCallback(() => {
+  if (app.level) app.undo.beginBatch(app.level);
+});
+
+levelProps.setCommitTextEditCallback(() => {
+  if (app.level) app.undo.commitBatch(app.level);
 });
 
 // Pick mode entry
@@ -133,6 +171,25 @@ gridCanvas.setPickCompleteCallback(() => {
   levelProps.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
+});
+
+// GridCanvas undo callbacks — paint drag coalescing
+gridCanvas.setBeforePaintCallback(() => {
+  if (app.level) app.undo.beginBatch(app.level);
+});
+
+gridCanvas.setAfterPaintCallback(() => {
+  if (app.level) app.undo.commitBatch(app.level);
+});
+
+// Entity add snapshot
+gridCanvas.setBeforeEntityAddCallback(() => {
+  if (app.level) app.undo.snapshot(app.level);
+});
+
+// Pick complete snapshot
+gridCanvas.setBeforePickCompleteCallback(() => {
+  if (app.level) app.undo.snapshot(app.level);
 });
 
 // Reference click → select that entity
@@ -171,10 +228,42 @@ document.addEventListener('keydown', (e) => {
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (app.pickMode) app.cancelPickMode();
+    if (app.level) app.undo.snapshot(app.level);
     app.deleteSelectedEntity();
     inspector.refresh();
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
+    return;
+  }
+
+  // Undo/Redo: Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const tag = (document.activeElement as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+    if (e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      if (!app.level) return;
+      // Cancel pick modes before undo
+      if (app.coordPickCallback) { app.coordPickCallback = null; }
+      if (app.pickMode) { app.cancelPickMode(); }
+      // Flush any pending batch
+      if (app.undo.hasPending) app.undo.commitBatch(app.level);
+      const restored = app.undo.undo(app.level);
+      if (restored) app.restoreLevel(restored);
+      return;
+    }
+
+    if ((e.key === 'z' && e.shiftKey) || (e.key === 'y' && !e.shiftKey)) {
+      e.preventDefault();
+      if (!app.level) return;
+      if (app.coordPickCallback) { app.coordPickCallback = null; }
+      if (app.pickMode) { app.cancelPickMode(); }
+      if (app.undo.hasPending) app.undo.commitBatch(app.level);
+      const restored = app.undo.redo(app.level);
+      if (restored) app.restoreLevel(restored);
+      return;
+    }
   }
 });
 

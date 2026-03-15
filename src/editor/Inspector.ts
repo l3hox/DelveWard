@@ -11,6 +11,9 @@ export class Inspector {
   private onDelete: (() => void) | null = null;
   private onPickRequested: ((entity: Entity, field: string, validChar?: string, validEntityType?: string) => void) | null = null;
   private onRefClicked: ((entity: Entity) => void) | null = null;
+  private onBeforeDiscreteChange: (() => void) | null = null;
+  private onBeginTextEdit: (() => void) | null = null;
+  private onCommitTextEdit: (() => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -31,6 +34,18 @@ export class Inspector {
 
   setRefClickedCallback(cb: (entity: Entity) => void): void {
     this.onRefClicked = cb;
+  }
+
+  setBeforeDiscreteChangeCallback(cb: () => void): void {
+    this.onBeforeDiscreteChange = cb;
+  }
+
+  setBeginTextEditCallback(cb: () => void): void {
+    this.onBeginTextEdit = cb;
+  }
+
+  setCommitTextEditCallback(cb: () => void): void {
+    this.onCommitTextEdit = cb;
   }
 
   refresh(): void {
@@ -215,7 +230,10 @@ export class Inspector {
       if (opt === value) option.selected = true;
       select.appendChild(option);
     }
-    select.addEventListener('change', () => onChange(select.value));
+    select.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      onChange(select.value);
+    });
     wrapper.appendChild(select);
 
     this.container.appendChild(wrapper);
@@ -236,7 +254,11 @@ export class Inspector {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = value;
-    input.addEventListener('input', () => onChange(input.value));
+    input.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
+      onChange(input.value);
+    });
+    input.addEventListener('blur', () => this.onCommitTextEdit?.());
     wrapper.appendChild(input);
 
     this.container.appendChild(wrapper);
@@ -258,9 +280,11 @@ export class Inspector {
     input.type = 'number';
     input.value = String(value);
     input.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
       const parsed = parseInt(input.value, 10);
       if (!isNaN(parsed)) onChange(parsed);
     });
+    input.addEventListener('blur', () => this.onCommitTextEdit?.());
     wrapper.appendChild(input);
 
     this.container.appendChild(wrapper);
@@ -290,7 +314,11 @@ export class Inspector {
     input.type = 'text';
     input.style.flex = '1';
     input.value = value;
-    input.addEventListener('input', () => onChange(input.value));
+    input.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
+      onChange(input.value);
+    });
+    input.addEventListener('blur', () => this.onCommitTextEdit?.());
     row.appendChild(input);
 
     const pickBtn = document.createElement('button');
@@ -310,6 +338,8 @@ export class Inspector {
   private addEnemyDetails(def: import('../enemies/enemyTypes').EnemyDef): void {
     const section = document.createElement('div');
     section.className = 'item-details';
+
+    this.addSpritePreview(section, `/sprites/${def.type}.png`, 1);
 
     this.addReadonlyField(section, 'hp', String(def.maxHp));
     this.addReadonlyField(section, 'atk / def', `${def.atk} / ${def.def}`);
@@ -375,6 +405,7 @@ export class Inspector {
     noneRow.appendChild(noneLabel);
     noneRow.addEventListener('click', (e) => {
       e.stopPropagation();
+      this.onBeforeDiscreteChange?.();
       entity.itemId = '';
       triggerSwatch.replaceWith(this.createItemSwatch(undefined));
       triggerText.textContent = '(none)';
@@ -410,6 +441,7 @@ export class Inspector {
 
         row.addEventListener('click', (e) => {
           e.stopPropagation();
+          this.onBeforeDiscreteChange?.();
           entity.itemId = item.id;
           triggerSwatch.replaceWith(this.createItemSwatch(item.icon));
           triggerText.textContent = item.id;
@@ -481,6 +513,8 @@ export class Inspector {
     const section = document.createElement('div');
     section.className = 'item-details';
 
+    this.addSpritePreview(section, `/sprites/items/${item.icon}.png`);
+
     this.addReadonlyField(section, 'name', item.name);
     this.addReadonlyField(section, 'type', `${item.type} / ${item.subtype}`);
     this.addReadonlyField(section, 'quality', item.quality);
@@ -523,6 +557,17 @@ export class Inspector {
     }
 
     this.container.appendChild(section);
+  }
+
+  private addSpritePreview(parent: HTMLElement, src: string, scale: number = 2): void {
+    const img = document.createElement('img');
+    img.src = src;
+    img.className = 'sprite-preview';
+    img.onload = () => {
+      img.style.width = `${img.naturalWidth * scale}px`;
+      img.style.height = `${img.naturalHeight * scale}px`;
+    };
+    parent.appendChild(img);
   }
 
   private addReadonlyField(parent: HTMLElement, label: string, value: string): void {

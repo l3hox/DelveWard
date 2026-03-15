@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-15 — Editor Undo/Redo System
+
+**Goal**: Make editor mutations reversible — one misclick shouldn't require manual repair or reimport.
+
+**Key decisions**:
+- **Full-snapshot undo** — `JSON.parse(JSON.stringify(level))` captures entire `DungeonLevel` before each mutation. At 2–16 KB per level, 100 snapshots = 1.6 MB worst case. Simple, correct, no partial-delta bookkeeping.
+- **Standalone `UndoManager` class** — no UI dependencies, ~70 lines. Two stacks (undo/redo), max 100 entries. Pending slot for batch operations.
+- **Paint drag coalescing** — `beginBatch` on mousedown, `commitBatch` on mouseup/mouseleave. Entire drag is one undo step.
+- **Text input batching** — `beginBatch` on first input event (idempotent), `commitBatch` on blur. Typing in a text field is one undo step regardless of keystroke count.
+- **Discrete mutations** — `snapshot` called before dropdown/checkbox/entity-add/entity-delete/pick-complete/array-add/array-remove. Each is its own undo step.
+- **Callback wiring** — Inspector and LevelProperties expose `onBeforeDiscreteChange`, `onBeginTextEdit`, `onCommitTextEdit`. GridCanvas exposes `onBeforePaint`/`onAfterPaint`, `onBeforeEntityAdd`, `onBeforePickComplete`. All wired in `main.ts`.
+- **Entity selection preservation** — `restoreLevel()` matches `selectedEntity` by `id` in restored level; clears if entity no longer exists.
+- **Keyboard shortcuts** — Ctrl+Z (undo), Ctrl+Shift+Z / Ctrl+Y (redo). Guarded: skips when activeElement is INPUT/SELECT/TEXTAREA. Cancels pick modes before undo/redo. Flushes pending batch first.
+
+**Files**: New `UndoManager.ts`. Modified `EditorApp.ts`, `GridCanvas.ts`, `Inspector.ts`, `LevelProperties.ts`, `main.ts`.
+
+---
+
 ## 2026-03-15 — Editor Phase 6: Visual Toolbars + Inspector Polish
 
 **Goal**: Make the editor visually informative — replace text-only dropdowns and simple shape icons with texture previews, sprite-based entity icons, and item database integration.

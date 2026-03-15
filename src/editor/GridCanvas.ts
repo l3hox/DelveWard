@@ -37,6 +37,10 @@ export class GridCanvas {
   private onHoverChange: (() => void) | null = null;
   private onSelectionChange: (() => void) | null = null;
   private onPickComplete: (() => void) | null = null;
+  private onBeforePaint: (() => void) | null = null;
+  private onAfterPaint: (() => void) | null = null;
+  private onBeforeEntityAdd: (() => void) | null = null;
+  private onBeforePickComplete: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
     this.canvas = canvas;
@@ -58,6 +62,22 @@ export class GridCanvas {
 
   setPickCompleteCallback(cb: () => void): void {
     this.onPickComplete = cb;
+  }
+
+  setBeforePaintCallback(cb: () => void): void {
+    this.onBeforePaint = cb;
+  }
+
+  setAfterPaintCallback(cb: () => void): void {
+    this.onAfterPaint = cb;
+  }
+
+  setBeforeEntityAddCallback(cb: () => void): void {
+    this.onBeforeEntityAdd = cb;
+  }
+
+  setBeforePickCompleteCallback(cb: () => void): void {
+    this.onBeforePickComplete = cb;
   }
 
   markDirty(): void {
@@ -120,6 +140,7 @@ export class GridCanvas {
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
+          this.onBeforePickComplete?.();
           const cb = this.app.coordPickCallback;
           this.app.coordPickCallback = null;
           cb(col, row);
@@ -133,6 +154,7 @@ export class GridCanvas {
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
+          this.onBeforePickComplete?.();
           const success = this.app.completePickMode(col, row);
           if (success) this.onPickComplete?.();
           this.dirty = true;
@@ -141,6 +163,7 @@ export class GridCanvas {
 
         const tool = this.app.activeTool;
         if (tool === 'paint' || tool === 'erase') {
+          this.onBeforePaint?.();
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
@@ -163,6 +186,7 @@ export class GridCanvas {
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
+          this.onBeforeEntityAdd?.();
           this.app.addEntity(col, row, this.app.selectedEntityType);
           this.onSelectionChange?.();
           this.dirty = true;
@@ -175,12 +199,14 @@ export class GridCanvas {
         this.isPanning = false;
       }
       if (e.button === 0) {
+        if (this.isPainting) this.onAfterPaint?.();
         this.isPainting = false;
       }
     });
 
     canvas.addEventListener('mouseleave', () => {
       this.isPanning = false;
+      if (this.isPainting) this.onAfterPaint?.();
       this.isPainting = false;
       this.app.hover = null;
       this.onHoverChange?.();
