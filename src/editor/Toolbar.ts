@@ -39,6 +39,7 @@ export class Toolbar {
   onExport: (() => void) | null = null;
   onEntityTypeSelect: ((type: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
+  onNewDungeon: (() => void) | null = null;
   onViewToggle: ((flag: 'showCeiling' | 'showItemPreview', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
 
@@ -75,6 +76,10 @@ export class Toolbar {
 
   setNewLevelCallback(cb: () => void): void {
     this.onNewLevel = cb;
+  }
+
+  setNewDungeonCallback(cb: () => void): void {
+    this.onNewDungeon = cb;
   }
 
   setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview', value: boolean) => void): void {
@@ -197,6 +202,12 @@ export class Toolbar {
     btnNew.textContent = 'New';
     btnNew.addEventListener('click', () => this.onNewLevel?.());
     btnOpen.insertAdjacentElement('beforebegin', btnNew);
+
+    const btnNewDungeon = document.createElement('button');
+    btnNewDungeon.id = 'btn-new-dungeon';
+    btnNewDungeon.textContent = 'New Dungeon';
+    btnNewDungeon.addEventListener('click', () => this.onNewDungeon?.());
+    btnNew.insertAdjacentElement('afterend', btnNewDungeon);
 
     // Separator after Open File
     const sep1 = this.makeSep();

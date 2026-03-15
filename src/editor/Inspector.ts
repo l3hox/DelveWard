@@ -194,10 +194,21 @@ export class Inspector {
           entity.direction = val;
           this.onEntityChanged?.();
         });
-        this.addTextField('targetLevel', (entity.targetLevel as string) ?? '', (val) => {
-          entity.targetLevel = val;
-          this.onEntityChanged?.();
-        });
+        // targetLevel: dropdown in dungeon mode, text field otherwise
+        if (this.app.isDungeonMode()) {
+          const levels = this.app.dungeon!.levels;
+          const options = levels.map(l => l.id ?? '');
+          const labels = levels.map(l => `${l.name} (${l.id ?? '?'})`);
+          this.addLabeledDropdownField('targetLevel', (entity.targetLevel as string) ?? '', options, labels, (val) => {
+            entity.targetLevel = val;
+            this.onEntityChanged?.();
+          });
+        } else {
+          this.addTextField('targetLevel', (entity.targetLevel as string) ?? '', (val) => {
+            entity.targetLevel = val;
+            this.onEntityChanged?.();
+          });
+        }
         this.addNumberField('targetCol', (entity.targetCol as number) ?? 0, (val) => {
           entity.targetCol = val;
           this.onEntityChanged?.();
@@ -229,6 +240,45 @@ export class Inspector {
       option.value = opt;
       option.textContent = opt;
       if (opt === value) option.selected = true;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      onChange(select.value);
+    });
+    wrapper.appendChild(select);
+
+    this.container.appendChild(wrapper);
+  }
+
+  private addLabeledDropdownField(
+    label: string,
+    value: string,
+    options: string[],
+    labels: string[],
+    onChange: (val: string) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const select = document.createElement('select');
+
+    // Empty option
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '(none)';
+    if (!value) emptyOpt.selected = true;
+    select.appendChild(emptyOpt);
+
+    for (let i = 0; i < options.length; i++) {
+      const option = document.createElement('option');
+      option.value = options[i];
+      option.textContent = labels[i];
+      if (options[i] === value) option.selected = true;
       select.appendChild(option);
     }
     select.addEventListener('change', () => {

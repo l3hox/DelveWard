@@ -1,4 +1,4 @@
-import type { DungeonLevel, CharDef, Entity } from '../core/types';
+import type { DungeonLevel, CharDef, Entity, Dungeon } from '../core/types';
 import { buildWalkableSet } from '../core/grid';
 import { UndoManager } from './UndoManager';
 
@@ -44,6 +44,10 @@ export class EditorApp {
   errors: string[] = [];
   dirty = false;
   cleanSnapshot = '';
+  dungeon: Dungeon | null = null;
+  activeLevelIndex = 0;
+  levelCleanSnapshots: string[] = [];
+  dirtyLevelIndices = new Set<number>();
   activeTool: EditorTool = 'select';
   selectedChar = '.';
   selectedEntity: Entity | null = null;
@@ -76,6 +80,165 @@ export class EditorApp {
     this.pickMode = null;
     this.dirty = false;
     this.cleanSnapshot = JSON.stringify(level);
+
+    this.dungeon = null;
+    this.activeLevelIndex = 0;
+    this.levelCleanSnapshots = [];
+    this.dirtyLevelIndices = new Set();
+  }
+
+  loadDungeon(dungeon: Dungeon): void {
+    this.dungeon = dungeon;
+    // Auto-generate missing level IDs
+    for (let i = 0; i < dungeon.levels.length; i++) {
+      const level = dungeon.levels[i];
+      if (!level.id) {
+        level.id = `level_${i}`;
+      }
+    }
+    // Populate clean snapshots
+    this.levelCleanSnapshots = dungeon.levels.map(level => JSON.stringify(level));
+    this.dirtyLevelIndices = new Set();
+    this.switchToLevel(0);
+  }
+
+  switchToLevel(index: number): void {
+    if (this.dungeon === null || index < 0 || index >= this.dungeon.levels.length) return;
+
+    // Snapshot-compare outgoing level if there is one
+    if (this.level !== null) {
+      if (JSON.stringify(this.level) !== this.levelCleanSnapshots[this.activeLevelIndex]) {
+        this.dirtyLevelIndices.add(this.activeLevelIndex);
+      } else {
+        this.dirtyLevelIndices.delete(this.activeLevelIndex);
+      }
+    }
+
+    this.activeLevelIndex = index;
+    this.level = this.dungeon.levels[index];
+
+    this.rebuildDerivedState();
+    this.undo.init(this.level);
+    this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
+    this.hover = null;
+    this.activeTool = 'select';
+    this.selectedChar = '.';
+    this.selectedEntity = null;
+    this.selectionIndex = 0;
+    this.lastClickCell = '';
+    this.pickMode = null;
+
+    this.cleanSnapshot = this.levelCleanSnapshots[index];
+    this.dirty = this.isDungeonDirty();
+  }
+
+  addLevelToDungeon(cols: number, rows: number): number {
+    if (!this.dungeon) return -1;
+
+    // Build wall-bordered grid
+    const grid: string[] = [];
+    for (let r = 0; r < rows; r++) {
+      if (r === 0 || r === rows - 1) {
+        grid.push('#'.repeat(cols));
+      } else {
+        grid.push('#' + '.'.repeat(cols - 2) + '#');
+      }
+    }
+
+    // Find an unused id of the form level_N
+    const existingIds = new Set(this.dungeon.levels.map(l => l.id).filter(Boolean));
+    let n = 1;
+    while (existingIds.has(`level_${n}`)) n++;
+    const id = `level_${n}`;
+
+    const newLevel: DungeonLevel = {
+      id,
+      name: 'Untitled',
+      grid,
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [],
+    };
+
+    this.dungeon.levels.push(newLevel);
+    this.levelCleanSnapshots.push(JSON.stringify(newLevel));
+
+    return this.dungeon.levels.length - 1;
+  }
+
+  removeLevelFromDungeon(index: number): boolean {
+    if (!this.dungeon || this.dungeon.levels.length <= 1) return false;
+
+    this.dungeon.levels.splice(index, 1);
+    this.levelCleanSnapshots.splice(index, 1);
+
+    // Remove and shift dirty indices
+    this.dirtyLevelIndices.delete(index);
+    const shifted = new Set<number>();
+    for (const i of this.dirtyLevelIndices) {
+      shifted.add(i > index ? i - 1 : i);
+    }
+    this.dirtyLevelIndices = shifted;
+
+    if (this.activeLevelIndex >= this.dungeon.levels.length) {
+      this.activeLevelIndex = this.dungeon.levels.length - 1;
+    }
+    this.switchToLevel(this.activeLevelIndex);
+    return true;
+  }
+
+  moveLevelInDungeon(from: number, to: number): void {
+    if (!this.dungeon) return;
+    const len = this.dungeon.levels.length;
+    if (from < 0 || from >= len || to < 0 || to >= len) return;
+
+    // Snapshot-compare active level before reshuffling
+    if (this.level !== null) {
+      if (JSON.stringify(this.level) !== this.levelCleanSnapshots[this.activeLevelIndex]) {
+        this.dirtyLevelIndices.add(this.activeLevelIndex);
+      } else {
+        this.dirtyLevelIndices.delete(this.activeLevelIndex);
+      }
+    }
+
+    // Swap levels and snapshots
+    const tmpLevel = this.dungeon.levels[from];
+    this.dungeon.levels[from] = this.dungeon.levels[to];
+    this.dungeon.levels[to] = tmpLevel;
+
+    const tmpSnap = this.levelCleanSnapshots[from];
+    this.levelCleanSnapshots[from] = this.levelCleanSnapshots[to];
+    this.levelCleanSnapshots[to] = tmpSnap;
+
+    // Rebuild dirty set: swap from/to dirty state
+    const fromDirty = this.dirtyLevelIndices.has(from);
+    const toDirty = this.dirtyLevelIndices.has(to);
+    if (fromDirty) {
+      this.dirtyLevelIndices.add(to);
+    } else {
+      this.dirtyLevelIndices.delete(to);
+    }
+    if (toDirty) {
+      this.dirtyLevelIndices.add(from);
+    } else {
+      this.dirtyLevelIndices.delete(from);
+    }
+
+    // Track active level through the swap
+    if (this.activeLevelIndex === from) {
+      this.activeLevelIndex = to;
+    } else if (this.activeLevelIndex === to) {
+      this.activeLevelIndex = from;
+    }
+  }
+
+  isDungeonDirty(): boolean {
+    if (this.dirtyLevelIndices.size > 0) return true;
+    if (this.level && JSON.stringify(this.level) !== this.levelCleanSnapshots[this.activeLevelIndex]) return true;
+    return false;
+  }
+
+  isDungeonMode(): boolean {
+    return this.dungeon !== null;
   }
 
   rebuildDerivedState(): void {
@@ -160,6 +323,34 @@ export class EditorApp {
       }
     }
 
+    // Cross-level stair validation (dungeon mode only)
+    if (this.dungeon) {
+      const levelIds = new Set(this.dungeon.levels.map(l => l.id).filter(Boolean));
+      for (const e of level.entities) {
+        if (e.type !== 'stairs') continue;
+        const targetId = e.targetLevel as string;
+        if (!targetId) continue;
+        if (!levelIds.has(targetId)) {
+          errors.push(`Stairs '${e.id ?? '?'}' targets non-existent level '${targetId}'`);
+          continue;
+        }
+        const targetLevel = this.dungeon.levels.find(l => l.id === targetId);
+        if (targetLevel) {
+          const tc = e.targetCol as number ?? 0;
+          const tr = e.targetRow as number ?? 0;
+          if (tr < 0 || tr >= targetLevel.grid.length || tc < 0 || tc >= (targetLevel.grid[tr]?.length ?? 0)) {
+            errors.push(`Stairs '${e.id ?? '?'}' target (${tc},${tr}) is out of bounds on level '${targetId}'`);
+          } else {
+            const targetWalkable = buildWalkableSet(targetLevel.charDefs);
+            const targetChar = targetLevel.grid[tr][tc];
+            if (!targetWalkable.has(targetChar)) {
+              errors.push(`Stairs '${e.id ?? '?'}' target (${tc},${tr}) is on non-walkable cell '${targetChar}' on level '${targetId}'`);
+            }
+          }
+        }
+      }
+    }
+
     return errors;
   }
 
@@ -183,6 +374,9 @@ export class EditorApp {
 
   restoreLevel(level: DungeonLevel): void {
     this.level = level;
+    if (this.dungeon) {
+      this.dungeon.levels[this.activeLevelIndex] = level;
+    }
     this.rebuildDerivedState();
     // Preserve selection by matching id in restored level
     if (this.selectedEntity) {
