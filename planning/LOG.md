@@ -4,6 +4,26 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-15 — Editor Phase 8: Multi-Level Dungeon Support
+
+**Goal**: Make the editor dungeon-aware — load all levels, switch between them, add/remove/reorder, export as full dungeon JSON, validate cross-level stair references.
+
+**Key decisions**:
+- **Shared object reference** — `app.level` always points into `dungeon.levels[activeLevelIndex]`. Mutations to `this.level` are automatically reflected in the dungeon array. No "save back" step needed.
+- **Per-level dirty tracking** — `levelCleanSnapshots[]` stores JSON at load/export time for each level. `dirtyLevelIndices` Set tracks which levels have unsaved changes. `isDungeonDirty()` checks both the set and the active level's snapshot.
+- **Cross-level undo/redo** — UndoManager entries tagged with `levelIndex`. On undo/redo, if the entry belongs to a different level, the editor auto-switches to that level before restoring. `switchToLevel()` no longer resets the undo stack — only `loadLevel`/`loadDungeon` do.
+- **Discriminated union for open** — `openLevelFile()` returns `{ type: 'level', level } | { type: 'dungeon', dungeon } | null`. Callers branch on `type` to call `loadLevel` or `loadDungeon`.
+- **Dungeon-wide export validation** — before exporting, iterates all levels and collects errors. Aborts if any level has errors, showing `[levelName] error` format.
+- **Cross-level stair validation** — checks `targetLevel` exists in dungeon, target position in-bounds and walkable on the target level. Builds walkable set per target level.
+- **Clickable error banner** — `ValidationError` type (message + optional entity ref). Entity-related errors show a green "→select" link that auto-selects the offending entity in the inspector.
+- **Entity selection preserved across level switches** — `selectedEntity` not cleared on `switchToLevel()` or `restoreLevelAtIndex()`. Prerequisite for cross-level editing features.
+- **LevelList component** — dungeon name text field, scrollable level entries with green active highlight, move up/down/remove buttons, Add Level button. Hidden when `app.dungeon` is null.
+- **Inspector targetLevel dropdown** — in dungeon mode, replaces plain text field with dropdown populated from `dungeon.levels` IDs. Falls back to text field in single-level mode.
+
+**Files**: `EditorApp.ts` (dungeon state, switchToLevel, cross-level validation, ValidationError), `UndoManager.ts` (levelIndex-tagged entries, peek getters), `io.ts` (OpenResult union, exportDungeonFile), `LevelList.ts` (new component), `Inspector.ts` (targetLevel dropdown), `Toolbar.ts` (New Dungeon button), `main.ts` (full wiring), `editor.html` (sidebar split, level list CSS, error-goto CSS).
+
+---
+
 ## 2026-03-15 — Editor Phase 7: Final Polish
 
 **Goal**: Close usability gaps that make the editor feel unfinished — errors only shown on export, no keyboard shortcuts, no dirty-state feedback, palette overflow.

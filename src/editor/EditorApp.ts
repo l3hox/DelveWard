@@ -128,7 +128,6 @@ export class EditorApp {
     this.hover = null;
     this.activeTool = 'select';
     this.selectedChar = '.';
-    this.selectedEntity = null;
     this.selectionIndex = 0;
     this.lastClickCell = '';
     this.pickMode = null;
@@ -404,10 +403,9 @@ export class EditorApp {
       }
       this.activeLevelIndex = levelIndex;
       this.cleanSnapshot = this.levelCleanSnapshots[levelIndex];
-      // Reset viewport/selection for the new level
+      // Reset viewport for the new level (preserve selectedEntity for cross-level inspection)
       this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
       this.hover = null;
-      this.selectedEntity = null;
       this.selectionIndex = 0;
       this.lastClickCell = '';
       this.pickMode = null;
