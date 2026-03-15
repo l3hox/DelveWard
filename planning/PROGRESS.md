@@ -44,6 +44,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Phase 7: Final polish + validation (error display, dirty state, shortcuts, scrollable palettes)
 - [x] Phase 8: Multi-level dungeon support (load/switch/add/remove/reorder levels, dungeon export, cross-level stair validation, targetLevel dropdown, level list UI)
 - [x] Area editing UX improvements (status hint bar, default textures, auto-expand + drag pick, rectangle drag selection)
+- [ ] Editor UX round 2: cross-level dependency visualization, tool mode cleanup, drag-to-wire (drag from source entity to target to auto-associate)
 
 ---
 
