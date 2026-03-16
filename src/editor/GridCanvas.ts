@@ -671,13 +671,20 @@ export class GridCanvas {
         ctx.font = `bold ${fontSize * 2}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        // Main direction arrow
         ctx.fillText(isDown ? '\u2193' : '\u2191', cx, cy);
-        // Small facing indicator
-        const facingArrows: Record<string, string> = { N: '\u25b2', S: '\u25bc', E: '\u25b6', W: '\u25c0' };
-        ctx.font = `${Math.max(6, fontSize * 0.5)}px monospace`;
-        ctx.fillStyle = 'rgba(128, 192, 255, 0.7)';
-        ctx.fillText(facingArrows[facing] ?? '', cx + tw * 0.3, cy + th * 0.3);
+        // Facing indicator: bar along the wall edge the stair opens toward
+        const barThick = Math.max(2, Math.min(tw, th) * 0.1);
+        const barPad = Math.min(tw, th) * 0.15;
+        ctx.fillStyle = 'rgba(128, 192, 255, 0.8)';
+        if (facing === 'N') {
+          ctx.fillRect(px + barPad, py, tw - barPad * 2, barThick);
+        } else if (facing === 'S') {
+          ctx.fillRect(px + barPad, py + th - barThick, tw - barPad * 2, barThick);
+        } else if (facing === 'E') {
+          ctx.fillRect(px + tw - barThick, py + barPad, barThick, th - barPad * 2);
+        } else if (facing === 'W') {
+          ctx.fillRect(px, py + barPad, barThick, th - barPad * 2);
+        }
         break;
       }
 
