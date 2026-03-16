@@ -71,6 +71,7 @@ export class EditorApp {
   statusHint: string | null = null;
   showCeiling = false;
   showItemPreview = true;
+  selectedEnemyType = 'rat';
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
   undo = new UndoManager();
@@ -499,8 +500,10 @@ export class EditorApp {
 
     const defaults = ENTITY_DEFAULTS[type] ?? {};
     const entity: Entity = { col, row, type, id: this.generateEntityId(type), ...defaults };
-    // Inject remembered itemId for equipment/consumable
-    if (type === 'equipment' && this.selectedEquipmentId) {
+    // Inject remembered subtypes for entity placement
+    if (type === 'enemy' && this.selectedEnemyType) {
+      entity.enemyType = this.selectedEnemyType;
+    } else if (type === 'equipment' && this.selectedEquipmentId) {
       entity.itemId = this.selectedEquipmentId;
     } else if (type === 'consumable' && this.selectedConsumableId) {
       entity.itemId = this.selectedConsumableId;

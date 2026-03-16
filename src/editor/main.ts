@@ -294,6 +294,13 @@ gridCanvas.setSelectionCallback(() => {
 // Inspector callbacks
 inspector.setEntityChangedCallback(() => {
   app.rebuildDerivedState();
+  // Sync remembered subtypes from the edited entity for next placement
+  const e = app.selectedEntity;
+  if (e) {
+    if (e.type === 'enemy' && typeof e.enemyType === 'string') app.selectedEnemyType = e.enemyType;
+    if (e.type === 'equipment' && typeof e.itemId === 'string') app.selectedEquipmentId = e.itemId;
+    if (e.type === 'consumable' && typeof e.itemId === 'string') app.selectedConsumableId = e.itemId;
+  }
   markDirty();
   gridCanvas.markDirty();
   updateErrorBanner();

@@ -30,6 +30,7 @@ export class Toolbar {
   private entityPalette!: HTMLElement;
   private selectedChar = '.';
   private selectedEntityType = 'enemy';
+  private activeTool: EditorTool = 'select';
   private equipmentIcon = 'sword';
   private consumableIcon = 'red-potion';
   private activeContextMenu: HTMLElement | null = null;
@@ -99,11 +100,18 @@ export class Toolbar {
   }
 
   setActiveTool(tool: EditorTool): void {
+    this.activeTool = tool;
     for (const [t, btn] of this.toolBtns) {
       btn.classList.toggle('active', t === tool);
     }
-    // Dim entity palette when not in entity mode
-    this.entityPalette.classList.toggle('dimmed', tool !== 'entity');
+    // Char selection visible only in paint mode
+    for (const [char, btn] of this.charBtns) {
+      btn.classList.toggle('selected', tool === 'paint' && char === this.selectedChar);
+    }
+    // Entity selection visible only in entity mode
+    for (const [type, btn] of this.entityBtns) {
+      btn.classList.toggle('selected', tool === 'entity' && type === this.selectedEntityType);
+    }
   }
 
   updatePalette(charDefs?: CharDef[], defaults?: TextureSet): void {
@@ -180,12 +188,14 @@ export class Toolbar {
     // Void button (plain text, special case)
     this.addVoidBtn();
 
-    // Mark '.' as selected
-    this.charBtns.get('.')?.classList.add('selected');
-
-    // Re-enable palette now that a level is loaded
+    // Re-enable palettes now that a level is loaded
     this.palette.classList.remove('dimmed');
     this.entityPalette.classList.remove('dimmed');
+
+    // Apply selection highlights based on active tool
+    if (this.activeTool === 'paint') {
+      this.charBtns.get(this.selectedChar)?.classList.add('selected');
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -268,8 +278,7 @@ export class Toolbar {
       this.addEntityBtn(type);
     }
 
-    // Mark default as selected
-    this.entityBtns.get('enemy')?.classList.add('selected');
+    // Entity selection highlight is managed by setActiveTool — not shown initially (starts in select mode)
 
     // Spacer pushes view toggles to the right
     const spacer = document.createElement('span');
