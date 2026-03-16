@@ -166,6 +166,21 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Duplicate entity ID validation, non-existent target rejection
   - 529 tests (14 new)
 
+- [x] **Stair Entity Pairing**:
+  - Stairs reference paired stair entities by ID (`target`) instead of `targetLevel`/`targetCol`/`targetRow`
+  - Explicit `facing` field (N/S/E/W) on stairs — controls stair orientation and player spawn direction
+  - Player spawns one cell in target stair's facing direction, facing away from stairs
+  - `StairInstance` gains `facing: Facing` field in GameState
+  - `buildStairMeshes` uses explicit facing instead of `detectStairFacing` auto-detection
+  - `triggerLevelTransition` resolves target stair across dungeon levels, computes spawn position from facing
+  - Loader: per-level validation for `facing` and `target`, cross-level validation for target entity existence, type, and spawn cell walkability
+  - Editor: `ENTITY_DEFAULTS.stairs` updated, validation skips stairs in generic target check, dedicated cross-level stair validation
+  - Inspector: `facing` dropdown, `target` dropdown of all stair IDs from other levels (dungeon mode)
+  - GridCanvas: stair icon shows small facing direction indicator triangle
+  - `dungeon_m1.json` migrated: 4 stairs with IDs and paired targets
+  - `DUNGEON-DESIGNER.md` updated with new stair schema
+  - 531 tests passing
+
 - [x] **Area Editing UX Improvements**:
   - Status hint bar: blue-tinted `#status-hint` at bottom of screen, context messages during pick/drag operations, hidden by default, `.visible` class toggle
   - Error banner relocated to bottom of screen (alongside status hint) to prevent layout jumping

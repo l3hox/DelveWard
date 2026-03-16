@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-16 — Stair Entity Pairing
+
+**Goal**: Make stairs reference each other by entity ID instead of target positions. Player spawns in front of the target stair (not on it), with stairs at their back.
+
+**Key decisions**:
+- **Entity-to-entity reference** — stairs use `target: stairEntityId` instead of `targetLevel`/`targetCol`/`targetRow`. Consistent with how levers reference doors. The target level is derived from which level the target entity lives on.
+- **Explicit facing** — stairs gain a `facing` field (N/S/E/W) indicating which direction the stair opening faces. Previously auto-detected from adjacent walkable cells in stairRenderer. Explicit facing gives the designer full control and works correctly in open areas with multiple walkable neighbors.
+- **Spawn-in-front logic** — on transition, player spawns one cell in the target stair's facing direction, facing that direction (stairs at their back). E.g., target stair facing N → player at (col, row-1) facing N.
+- **Cross-level validation** — both loader and editor verify: target entity exists on another level, is a stairs type, and the spawn cell (one step in facing direction) is in-bounds and walkable.
+- **Editor inspector** — facing dropdown (N/S/E/W) and target dropdown showing all stair IDs from other levels with labels like "stairs_1 on Level 2". Falls back to text field in single-level mode.
+- **Grid icon** — stair icon now shows a small facing triangle indicator in addition to the up/down arrow.
+- **Stair renderer** — `buildStairMeshes` uses `StairInstance.facing` directly instead of calling `detectStairFacing`. Function kept exported as a utility.
+- **Skipped stairs in generic target check** — EditorApp.validate() generic target reference check now skips stairs entities (their targets live on other levels, validated separately).
+
+**Files**: `gameState.ts` (StairInstance.facing), `stairRenderer.ts` (explicit facing), `main.ts` (spawn-in-front transition), `levelLoader.ts` + tests (validation), `EditorApp.ts` (defaults, validation), `Inspector.ts` (facing + target fields), `GridCanvas.ts` (facing icon), `dungeon_m1.json` (migration), `DUNGEON-DESIGNER.md`.
+
+---
+
 ## 2026-03-15 — Area Editing UX Improvements
 
 **Goal**: Make area editing feel more direct and visual — reduce clicks, provide visual feedback during coordinate picking, support rectangle drag selection.

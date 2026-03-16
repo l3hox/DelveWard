@@ -54,6 +54,7 @@ export interface StairInstance {
   col: number;
   row: number;
   direction: 'up' | 'down';
+  facing: Facing;
 }
 
 export interface SconceInstance {
@@ -237,6 +238,7 @@ export class GameState {
           col: e.col,
           row: e.row,
           direction: e.direction as 'up' | 'down',
+          facing: e.facing as Facing,
         });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;

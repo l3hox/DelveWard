@@ -748,11 +748,12 @@ describe('GameState', () => {
   describe('stairs', () => {
     it('parses stairs entities into stairs map', () => {
       const gs = new GameState([
-        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+        { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
       expect(gs.stairs.size).toBe(1);
       expect(gs.getStair(2, 1)).toBeDefined();
       expect(gs.getStair(2, 1)!.direction).toBe('down');
+      expect(gs.getStair(2, 1)!.facing).toBe('S');
     });
 
     it('getStair returns undefined for non-existent position', () => {
@@ -762,7 +763,7 @@ describe('GameState', () => {
 
     it('stairs are included in level snapshots', () => {
       const gs = new GameState([
-        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+        { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
       const snap = gs.saveLevelState();
       expect(snap.stairs.size).toBe(1);
@@ -770,7 +771,7 @@ describe('GameState', () => {
 
     it('stairs are restored from level snapshots', () => {
       const gs = new GameState([
-        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+        { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
       const snap = gs.saveLevelState();
       const gs2 = new GameState([]);
@@ -780,7 +781,7 @@ describe('GameState', () => {
 
     it('stairs are reset in loadNewLevel', () => {
       const gs = new GameState([
-        { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 },
+        { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
       gs.loadNewLevel([]);
       expect(gs.stairs.size).toBe(0);

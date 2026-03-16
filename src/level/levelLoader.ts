@@ -298,14 +298,15 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.direction !== 'up' && e.direction !== 'down') {
         throw new Error(`Level ${source}: entities[${i}] stairs must have direction "up" or "down"`);
       }
+      const VALID_FACINGS = ['N', 'S', 'E', 'W'];
+      if (typeof e.facing !== 'string' || !VALID_FACINGS.includes(e.facing as string)) {
+        throw new Error(`Level ${source}: entities[${i}] stairs must have facing "N", "S", "E", or "W"`);
+      }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] stairs must be on a walkable cell, found '${cellAtEntity}'`);
       }
-      if (typeof e.targetLevel !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] stairs must have a string targetLevel`);
-      }
-      if (typeof e.targetCol !== 'number' || typeof e.targetRow !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] stairs must have numeric targetCol and targetRow`);
+      if (typeof e.target !== 'string') {
+        throw new Error(`Level ${source}: entities[${i}] stairs must have a string target (paired stair entity ID)`);
       }
     }
   }
@@ -420,32 +421,54 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
     levels.push(level);
   }
 
-  // Cross-level validation: stairs entities must reference valid levels and walkable positions
+  // Cross-level validation: stairs must reference valid stair entities on other levels
+  // and the spawn cell (one step in facing direction from target) must be walkable
   for (let i = 0; i < levels.length; i++) {
     const level = levels[i];
     for (let j = 0; j < level.entities.length; j++) {
       const e = level.entities[j];
       if (e.type === 'stairs') {
-        const targetId = e.targetLevel as string;
-        if (!levelIds.has(targetId)) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs targetLevel "${targetId}" does not match any level id`);
+        const targetId = e.target as string;
+
+        // Find the target stair entity across all OTHER levels
+        let targetStair: Entity | undefined;
+        let targetLevel: DungeonLevel | undefined;
+        for (const otherLevel of levels) {
+          if (otherLevel === level) continue; // target must be on a different level
+          targetStair = otherLevel.entities.find(oe => oe.id === targetId);
+          if (targetStair) {
+            targetLevel = otherLevel;
+            break;
+          }
         }
-        // Find target level and check if target position is walkable
-        const targetLevel = levels.find(l => l.id === targetId)!;
-        const tc = e.targetCol as number;
-        const tr = e.targetRow as number;
-        if (tr < 0 || tr >= targetLevel.grid.length || tc < 0 || tc >= targetLevel.grid[0].length) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target position (${tc},${tr}) is out of bounds on level "${targetId}"`);
+
+        if (!targetStair || !targetLevel) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target "${targetId}" does not match any stair entity on another level`);
         }
-        // Build walkable set for target level
+        if (targetStair.type !== 'stairs') {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target "${targetId}" is not a stairs entity`);
+        }
+
+        // Validate spawn cell: one step in target stair's facing direction
+        const FACING_OFFSETS: Record<string, [number, number]> = {
+          N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
+        };
+        const [dc, dr] = FACING_OFFSETS[targetStair.facing as string] ?? [0, 0];
+        const spawnCol = targetStair.col + dc;
+        const spawnRow = targetStair.row + dr;
+
+        if (spawnRow < 0 || spawnRow >= targetLevel.grid.length || spawnCol < 0 || spawnCol >= targetLevel.grid[0].length) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs spawn position (${spawnCol},${spawnRow}) is out of bounds on level "${targetLevel.id}"`);
+        }
+
         const walkableChars = new Set(WALKABLE_CELLS);
         if (targetLevel.charDefs) {
           for (const def of targetLevel.charDefs) {
             if (!def.solid) walkableChars.add(def.char);
           }
         }
-        if (!walkableChars.has(targetLevel.grid[tr][tc])) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target position (${tc},${tr}) is not walkable on level "${targetId}"`);
+        if (!walkableChars.has(targetLevel.grid[spawnRow][spawnCol])) {
+          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs spawn position (${spawnCol},${spawnRow}) is not walkable on level "${targetLevel.id}"`);
         }
       }
     }

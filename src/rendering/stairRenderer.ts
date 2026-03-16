@@ -283,17 +283,13 @@ export interface StairMeshes {
 
 export function buildStairMeshes(
   stairs: Map<string, StairInstance>,
-  grid: string[],
-  walkable: Set<string>,
   defaults?: TextureSet,
   areas?: TextureArea[],
 ): StairMeshes {
   const group = new THREE.Group();
 
-  const stairPositions = new Set(stairs.keys());
   for (const [, stair] of stairs) {
-    const { col, row, direction } = stair;
-    const facing = detectStairFacing(grid, col, row, walkable, stairPositions);
+    const { col, row, direction, facing } = stair;
     const tex = resolveStairTextures(col, row, defaults, areas);
     const stepMat = getStairStepMaterial(tex.floor);
     const sideMat = getStairSideMaterial(tex.wall);

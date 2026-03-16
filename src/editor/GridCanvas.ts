@@ -666,11 +666,18 @@ export class GridCanvas {
 
       case 'stairs': {
         const isDown = entity.direction === 'down';
+        const facing = (entity.facing as string) ?? 'S';
         ctx.fillStyle = '#80c0ff';
         ctx.font = `bold ${fontSize * 2}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        // Main direction arrow
         ctx.fillText(isDown ? '\u2193' : '\u2191', cx, cy);
+        // Small facing indicator
+        const facingArrows: Record<string, string> = { N: '\u25b2', S: '\u25bc', E: '\u25b6', W: '\u25c0' };
+        ctx.font = `${Math.max(6, fontSize * 0.5)}px monospace`;
+        ctx.fillStyle = 'rgba(128, 192, 255, 0.7)';
+        ctx.fillText(facingArrows[facing] ?? '', cx + tw * 0.3, cy + th * 0.3);
         break;
       }
 

@@ -133,7 +133,7 @@ function buildLevelScene(
   const sconceMeshes = buildSconceMeshes(gameState);
   scene.add(sconceMeshes.group);
 
-  const stairMeshes = buildStairMeshes(gameState.stairs, level.grid, walkable, level.defaults, level.areas);
+  const stairMeshes = buildStairMeshes(gameState.stairs, level.defaults, level.areas);
   scene.add(stairMeshes.group);
 
   const enemyMeshes = buildEnemyMeshes(gameState);
@@ -454,10 +454,7 @@ async function init(): Promise<void> {
   }
 
   function triggerLevelTransition(stairEntity: Entity): void {
-    const targetId = stairEntity.targetLevel as string;
-    const targetCol = stairEntity.targetCol as number;
-    const targetRow = stairEntity.targetRow as number;
-    const targetFacing: Facing = ls.player.getState().facing;
+    const targetStairId = stairEntity.target as string;
 
     // Save current level state
     levelSnapshots.set(currentLevelId, gameState.saveLevelState());
@@ -466,24 +463,45 @@ async function init(): Promise<void> {
       // --- Midpoint: swap level ---
       teardownLevelScene(ls, scene);
 
-      const targetLevel = dungeon.levels.find((l) => l.id === targetId)!;
-      const snapshot = levelSnapshots.get(targetId);
+      // Find target stair across all dungeon levels
+      let targetLevel: DungeonLevel | undefined;
+      let targetStair: Entity | undefined;
+      for (const level of dungeon.levels) {
+        targetStair = level.entities.find(e => e.type === 'stairs' && e.id === targetStairId);
+        if (targetStair) {
+          targetLevel = level;
+          break;
+        }
+      }
+      if (!targetLevel || !targetStair) return; // shouldn't happen if validated
+
+      const targetLevelId = targetLevel.id ?? targetLevel.name;
+      const snapshot = levelSnapshots.get(targetLevelId);
       if (snapshot) {
         gameState.loadLevelState(snapshot);
       } else {
-        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevel.id ?? targetLevel.name);
+        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevelId);
       }
 
-      currentLevelId = targetId;
+      // Compute spawn position: one cell in front of target stair, facing away from stairs
+      const targetFacing = targetStair.facing as Facing;
+      const FACING_OFFSETS: Record<Facing, [number, number]> = {
+        N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
+      };
+      const [dc, dr] = FACING_OFFSETS[targetFacing];
+      const spawnCol = (targetStair.col as number) + dc;
+      const spawnRow = (targetStair.row as number) + dr;
+
+      currentLevelId = targetLevelId;
       applyEnvironment(targetLevel.environment, scene, ambient);
-      ls = buildLevelScene(targetLevel, gameState, camera, scene, targetCol, targetRow, targetFacing);
+      ls = buildLevelScene(targetLevel, gameState, camera, scene, spawnCol, spawnRow, targetFacing);
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(targetLevel.dustMotes !== false);
       waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
       waterDrips.setVisible(targetLevel.waterDrips === true);
 
-      gameState.revealAround(targetCol, targetRow, targetFacing, targetLevel.grid);
+      gameState.revealAround(spawnCol, spawnRow, targetFacing, targetLevel.grid);
     });
   }
 

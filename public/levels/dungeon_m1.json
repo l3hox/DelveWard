@@ -58,13 +58,13 @@
           "type": "door"
         },
         {
+          "id": "stairs_1",
           "col": 13,
           "row": 15,
           "type": "stairs",
           "direction": "down",
-          "targetLevel": "level_2",
-          "targetCol": 13,
-          "targetRow": 2
+          "facing": "N",
+          "target": "stairs_2"
         },
         {
           "col": 2,
@@ -239,22 +239,22 @@
       },
       "entities": [
         {
+          "id": "stairs_2",
           "col": 13,
           "row": 1,
           "type": "stairs",
           "direction": "up",
-          "targetLevel": "level_1",
-          "targetCol": 13,
-          "targetRow": 14
+          "facing": "S",
+          "target": "stairs_1"
         },
         {
+          "id": "stairs_3",
           "col": 12,
           "row": 17,
           "type": "stairs",
           "direction": "down",
-          "targetLevel": "level_3",
-          "targetCol": 2,
-          "targetRow": 3
+          "facing": "N",
+          "target": "stairs_4"
         },
         {
           "id": "door_1",
@@ -508,13 +508,13 @@
       },
       "entities": [
         {
+          "id": "stairs_4",
           "col": 2,
           "row": 2,
           "type": "stairs",
           "direction": "up",
-          "targetLevel": "level_2",
-          "targetCol": 12,
-          "targetRow": 16
+          "facing": "S",
+          "target": "stairs_3"
         },
         {
           "id": "door_1",

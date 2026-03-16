@@ -194,29 +194,35 @@ export class Inspector {
           entity.direction = val;
           this.onEntityChanged?.();
         });
-        // targetLevel: dropdown in dungeon mode, text field otherwise
+        this.addDropdownField('facing', (entity.facing as string) ?? 'S', ['N', 'S', 'E', 'W'], (val) => {
+          entity.facing = val;
+          this.onEntityChanged?.();
+        });
+        // target: dropdown of stair IDs from other levels in dungeon mode, text field otherwise
         if (this.app.isDungeonMode()) {
-          const levels = this.app.dungeon!.levels;
-          const options = levels.map(l => l.id ?? '');
-          const labels = levels.map(l => `${l.name} (${l.id ?? '?'})`);
-          this.addLabeledDropdownField('targetLevel', (entity.targetLevel as string) ?? '', options, labels, (val) => {
-            entity.targetLevel = val;
+          // Collect all stair entities from OTHER levels
+          const currentLevel = this.app.level;
+          const stairOptions: string[] = [''];
+          const stairLabels: string[] = ['(none)'];
+          for (const otherLevel of this.app.dungeon!.levels) {
+            if (otherLevel === currentLevel) continue;
+            for (const oe of otherLevel.entities) {
+              if (oe.type === 'stairs' && oe.id) {
+                stairOptions.push(oe.id);
+                stairLabels.push(`${oe.id} on ${otherLevel.name}`);
+              }
+            }
+          }
+          this.addLabeledDropdownField('target', (entity.target as string) ?? '', stairOptions, stairLabels, (val) => {
+            entity.target = val;
             this.onEntityChanged?.();
           });
         } else {
-          this.addTextField('targetLevel', (entity.targetLevel as string) ?? '', (val) => {
-            entity.targetLevel = val;
+          this.addTextField('target', (entity.target as string) ?? '', (val) => {
+            entity.target = val;
             this.onEntityChanged?.();
           });
         }
-        this.addNumberField('targetCol', (entity.targetCol as number) ?? 0, (val) => {
-          entity.targetCol = val;
-          this.onEntityChanged?.();
-        });
-        this.addNumberField('targetRow', (entity.targetRow as number) ?? 0, (val) => {
-          entity.targetRow = val;
-          this.onEntityChanged?.();
-        });
         break;
     }
   }

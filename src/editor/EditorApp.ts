@@ -25,7 +25,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   enemy:          { enemyType: 'rat' },
   equipment:      { itemId: '' },
   consumable:     { itemId: '' },
-  stairs:         { direction: 'down', targetLevel: '', targetCol: 0, targetRow: 0 },
+  stairs:         { direction: 'down', facing: 'S', target: '' },
 };
 
 export interface ValidationError {
@@ -312,6 +312,7 @@ export class EditorApp {
       if (e.id) entityIds.add(e.id);
     }
     for (const e of level.entities) {
+      if (e.type === 'stairs') continue; // stairs.target points to another level — validated separately below
       const target = (e as Record<string, unknown>).target;
       if (typeof target === 'string' && target && !entityIds.has(target)) {
         errors.push({ message: `${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`, entity: e });
@@ -345,27 +346,48 @@ export class EditorApp {
 
     // Cross-level stair validation (dungeon mode only)
     if (this.dungeon) {
-      const levelIds = new Set(this.dungeon.levels.map(l => l.id).filter(Boolean));
       for (const e of level.entities) {
         if (e.type !== 'stairs') continue;
-        const targetId = e.targetLevel as string;
+        const targetId = e.target as string;
         if (!targetId) continue;
-        if (!levelIds.has(targetId)) {
-          errors.push({ message: `Stairs '${e.id ?? '?'}' targets non-existent level '${targetId}'`, entity: e });
+
+        // Find target stair on another level
+        let targetStair: Entity | undefined;
+        let targetLevel: DungeonLevel | undefined;
+        for (const otherLevel of this.dungeon.levels) {
+          if (otherLevel === level) continue;
+          targetStair = otherLevel.entities.find(oe => oe.id === targetId);
+          if (targetStair) {
+            targetLevel = otherLevel;
+            break;
+          }
+        }
+
+        if (!targetStair || !targetLevel) {
+          errors.push({ message: `Stairs '${e.id ?? '?'}' targets non-existent entity '${targetId}'`, entity: e });
           continue;
         }
-        const targetLevel = this.dungeon.levels.find(l => l.id === targetId);
-        if (targetLevel) {
-          const tc = e.targetCol as number ?? 0;
-          const tr = e.targetRow as number ?? 0;
-          if (tr < 0 || tr >= targetLevel.grid.length || tc < 0 || tc >= (targetLevel.grid[tr]?.length ?? 0)) {
-            errors.push({ message: `Stairs '${e.id ?? '?'}' target (${tc},${tr}) is out of bounds on level '${targetId}'`, entity: e });
-          } else {
-            const targetWalkable = buildWalkableSet(targetLevel.charDefs);
-            const targetChar = targetLevel.grid[tr][tc];
-            if (!targetWalkable.has(targetChar)) {
-              errors.push({ message: `Stairs '${e.id ?? '?'}' target (${tc},${tr}) is on non-walkable cell '${targetChar}' on level '${targetId}'`, entity: e });
-            }
+        if (targetStair.type !== 'stairs') {
+          errors.push({ message: `Stairs '${e.id ?? '?'}' target '${targetId}' is not a stairs entity`, entity: e });
+          continue;
+        }
+
+        // Validate spawn cell (one step in target stair's facing direction)
+        const FACING_OFFSETS: Record<string, [number, number]> = {
+          N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
+        };
+        const targetFacing = targetStair.facing as string;
+        const [dc, dr] = FACING_OFFSETS[targetFacing] ?? [0, 0];
+        const spawnCol = targetStair.col + dc;
+        const spawnRow = targetStair.row + dr;
+
+        if (spawnRow < 0 || spawnRow >= targetLevel.grid.length || spawnCol < 0 || spawnCol >= (targetLevel.grid[spawnRow]?.length ?? 0)) {
+          errors.push({ message: `Stairs '${e.id ?? '?'}' spawn position (${spawnCol},${spawnRow}) is out of bounds on level '${targetLevel.id}'`, entity: e });
+        } else {
+          const targetWalkable = buildWalkableSet(targetLevel.charDefs);
+          const targetChar = targetLevel.grid[spawnRow][spawnCol];
+          if (!targetWalkable.has(targetChar)) {
+            errors.push({ message: `Stairs '${e.id ?? '?'}' spawn position (${spawnCol},${spawnRow}) is on non-walkable cell '${targetChar}' on level '${targetLevel.id}'`, entity: e });
           }
         }
       }

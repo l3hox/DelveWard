@@ -82,7 +82,7 @@ A dungeon file wraps multiple levels with stair connections between them.
 - Each level must have a unique `id` (non-empty string)
 - The first level in the array is loaded on game start
 - `playerStart` is used only when loading the level directly (not when arriving via stairs)
-- Stairs entities connect levels — see the Stairs entity type below
+- Stairs come in pairs — each stair references its paired stair on another level by entity ID
 
 ---
 
@@ -200,22 +200,22 @@ The targeted door is marked **mechanical** — same as lever-targeted doors.
 { "col": 4, "row": 9, "type": "pressure_plate", "id": "plate_1", "target": "door_4" }
 ```
 
-**Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space).
+**Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space). Stairs come in pairs — each stair references its paired stair on another level by entity ID.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `direction` | string | Yes | `"down"` or `"up"` |
-| `targetLevel` | string | Yes | `id` of the destination level |
-| `targetCol` | number | Yes | Column on the destination level where player arrives |
-| `targetRow` | number | Yes | Row on the destination level where player arrives |
+| `facing` | string | Yes | `"N"`, `"S"`, `"E"`, or `"W"` — the direction the stair opening faces |
+| `target` | string | Yes | `id` of the paired stairs entity on another level |
 
-The target position must be a walkable cell on the target level. Typically, stairs down target stairs up on the lower level and vice versa.
+When the player uses stairs, they arrive one cell in front of the target stair (in the target stair's `facing` direction), facing that direction with the stairs at their back. The spawn cell must be walkable and in-bounds on the target level.
 
 ```json
-{ "col": 4, "row": 8, "type": "stairs", "direction": "down", "targetLevel": "lower_vault", "targetCol": 4, "targetRow": 0 }
+{ "id": "stairs_1", "col": 4, "row": 8, "type": "stairs", "direction": "down", "facing": "N", "target": "stairs_2" }
+{ "id": "stairs_2", "col": 4, "row": 1, "type": "stairs", "direction": "up", "facing": "S", "target": "stairs_1" }
 ```
 
-**Verification**: Use the coordinate counting method above to confirm that `targetCol`/`targetRow` land on the expected cell in the target level's grid.
+**Verification**: Ensure the cell in the `facing` direction from each stair is walkable (that's where the player spawns on arrival).
 
 **Enemy** (`type: "enemy"`) — placed on walkable cells. Enemies are hostile — they pursue the player and attack in melee range.
 

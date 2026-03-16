@@ -544,14 +544,14 @@ describe('stair entity validation', () => {
 
   it('accepts valid stairs-down entity', () => {
     const level = validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+      { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1' },
     ]), 'test');
     expect(level.entities).toHaveLength(1);
   });
 
   it('accepts valid stairs-up entity', () => {
     const level = validateLevel(stairLevel([
-      { col: 2, row: 3, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 1, targetRow: 1 },
+      { col: 2, row: 3, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1' },
     ]), 'test');
     expect(level.entities).toHaveLength(1);
   });
@@ -560,32 +560,38 @@ describe('stair entity validation', () => {
     expect(() => validateLevel(validLevel({
       grid: ['#####', '#.#.#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'E' },
-      entities: [{ col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 1, targetRow: 1 }],
+      entities: [{ col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1' }],
     }), 'test')).toThrow('stairs must be on a walkable cell');
   });
 
   it('rejects stairs without direction', () => {
     expect(() => validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+      { col: 2, row: 1, type: 'stairs', facing: 'S', target: 'stair_up_1' },
     ]), 'test')).toThrow('stairs must have direction "up" or "down"');
   });
 
   it('rejects stairs with invalid direction', () => {
     expect(() => validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', direction: 'left', targetLevel: 'level2', targetCol: 1, targetRow: 3 },
+      { col: 2, row: 1, type: 'stairs', direction: 'left', facing: 'S', target: 'stair_up_1' },
     ]), 'test')).toThrow('stairs must have direction "up" or "down"');
   });
 
-  it('rejects stairs without targetLevel', () => {
+  it('rejects stairs without facing', () => {
     expect(() => validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', direction: 'down', targetCol: 1, targetRow: 3 },
-    ]), 'test')).toThrow('stairs must have a string targetLevel');
+      { col: 2, row: 1, type: 'stairs', direction: 'down', target: 'stair_up_1' },
+    ]), 'test')).toThrow('stairs must have facing "N", "S", "E", or "W"');
   });
 
-  it('rejects stairs without targetCol/targetRow', () => {
+  it('rejects stairs with invalid facing', () => {
     expect(() => validateLevel(stairLevel([
-      { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2' },
-    ]), 'test')).toThrow('stairs must have numeric targetCol and targetRow');
+      { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'X', target: 'stair_up_1' },
+    ]), 'test')).toThrow('stairs must have facing "N", "S", "E", or "W"');
+  });
+
+  it('rejects stairs without target', () => {
+    expect(() => validateLevel(stairLevel([
+      { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S' },
+    ]), 'test')).toThrow('stairs must have a string target (paired stair entity ID)');
   });
 });
 
@@ -656,56 +662,97 @@ describe('validateDungeon', () => {
     }), 'test')).toThrow('must have a non-empty string "id"');
   });
 
-  it('rejects stair with invalid targetLevel', () => {
+  it('rejects stair whose target ID is not found on any other level', () => {
     expect(() => validateDungeon(validDungeon({
       levels: [
         validDungeonLevel('level1', {
           entities: [
-            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'nonexistent', targetCol: 1, targetRow: 1 },
+            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'nonexistent_stair', id: 'stair_down_1' },
           ],
         }),
         validDungeonLevel('level2'),
       ],
-    }), 'test')).toThrow('stairs targetLevel "nonexistent" does not match any level id');
+    }), 'test')).toThrow('stairs target "nonexistent_stair" does not match any stair entity on another level');
   });
 
-  it('rejects stair targeting non-walkable cell', () => {
+  it('rejects stair whose target entity is not a stairs type', () => {
     expect(() => validateDungeon(validDungeon({
       levels: [
         validDungeonLevel('level1', {
           entities: [
-            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 0, targetRow: 0 },
-          ],
-        }),
-        validDungeonLevel('level2'),
-      ],
-    }), 'test')).toThrow('is not walkable on level "level2"');
-  });
-
-  it('rejects stair targeting out-of-bounds position', () => {
-    expect(() => validateDungeon(validDungeon({
-      levels: [
-        validDungeonLevel('level1', {
-          entities: [
-            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 99, targetRow: 99 },
-          ],
-        }),
-        validDungeonLevel('level2'),
-      ],
-    }), 'test')).toThrow('is out of bounds on level "level2"');
-  });
-
-  it('accepts stairs with valid cross-references', () => {
-    const dungeon = validateDungeon(validDungeon({
-      levels: [
-        validDungeonLevel('level1', {
-          entities: [
-            { col: 2, row: 1, type: 'stairs', direction: 'down', targetLevel: 'level2', targetCol: 2, targetRow: 3 },
+            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'some_door', id: 'stair_down_1' },
           ],
         }),
         validDungeonLevel('level2', {
           entities: [
-            { col: 2, row: 3, type: 'stairs', direction: 'up', targetLevel: 'level1', targetCol: 2, targetRow: 1 },
+            { col: 2, row: 1, type: 'door', state: 'closed', id: 'some_door' },
+          ],
+        }),
+      ],
+    }), 'test')).toThrow('stairs target "some_door" is not a stairs entity');
+  });
+
+  it('rejects stair whose spawn position is out of bounds', () => {
+    // Target stair on level2 is at col:1, row:1 (walkable), facing N → spawn would be col:1, row:0
+    // level2 uses a grid where row:0 is the only row, so row:-1 would be out of bounds.
+    // Use a grid where the stair sits at the top walkable row and faces N so spawn goes negative.
+    // Grid: ['#.#', '#.#', '###'] — stair at col:1, row:0, but row:0 is '.' here
+    expect(() => validateDungeon({
+      name: 'Test Dungeon',
+      levels: [
+        {
+          id: 'level1',
+          name: 'Level level1',
+          grid: ['#####', '#...#', '#...#', '#...#', '#####'],
+          playerStart: { col: 1, row: 1, facing: 'S' },
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
+          ],
+        },
+        {
+          id: 'level2',
+          name: 'Level level2',
+          // stair at col:1, row:0 (walkable), facing N → spawn col:1, row:-1 (out of bounds)
+          grid: ['.....', '#####'],
+          playerStart: { col: 2, row: 0, facing: 'S' },
+          entities: [
+            { col: 1, row: 0, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
+          ],
+        },
+      ],
+    }, 'test')).toThrow('stairs spawn position (1,-1) is out of bounds on level "level2"');
+  });
+
+  it('rejects stair whose spawn position is not walkable', () => {
+    // Target stair is at col:1, row:1, facing N → spawn would be col:1, row:0 which is '#'
+    expect(() => validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
+          ],
+        }),
+        validDungeonLevel('level2', {
+          entities: [
+            { col: 1, row: 1, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
+          ],
+        }),
+      ],
+    }), 'test')).toThrow('stairs spawn position (1,0) is not walkable on level "level2"');
+  });
+
+  it('accepts stairs with valid cross-references', () => {
+    // Target stair on level2 is at col:2, row:3, facing N → spawn is col:2, row:2 which is '.'
+    const dungeon = validateDungeon(validDungeon({
+      levels: [
+        validDungeonLevel('level1', {
+          entities: [
+            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
+          ],
+        }),
+        validDungeonLevel('level2', {
+          entities: [
+            { col: 2, row: 3, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
           ],
         }),
       ],
