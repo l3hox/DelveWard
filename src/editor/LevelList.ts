@@ -4,6 +4,8 @@ export class LevelList {
   private container: HTMLElement;
   private app: EditorApp;
 
+  highlightedLevelIndex: number | null = null;
+
   onLevelSwitch: ((index: number) => void) | null = null;
   onAddLevel: (() => void) | null = null;
   onRemoveLevel: ((index: number) => void) | null = null;
@@ -61,6 +63,7 @@ export class LevelList {
       const entry = document.createElement('div');
       entry.className = 'level-entry';
       if (i === this.app.activeLevelIndex) entry.classList.add('active');
+      if (i === this.highlightedLevelIndex && i !== this.app.activeLevelIndex) entry.classList.add('highlight');
 
       const name = document.createElement('span');
       name.className = 'level-entry-name';

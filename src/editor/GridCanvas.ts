@@ -666,23 +666,35 @@ export class GridCanvas {
       case 'stairs': {
         const isDown = entity.direction === 'down';
         const facing = (entity.facing as string) ?? 'S';
-        ctx.fillStyle = '#80c0ff';
-        ctx.font = `bold ${fontSize * 2}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(isDown ? '\u2193' : '\u2191', cx, cy);
-        // Facing indicator: bar along the wall edge the stair opens toward
-        const barThick = Math.max(2, Math.min(tw, th) * 0.1);
-        const barPad = Math.min(tw, th) * 0.15;
-        ctx.fillStyle = 'rgba(128, 192, 255, 0.8)';
-        if (facing === 'N') {
-          ctx.fillRect(px + barPad, py, tw - barPad * 2, barThick);
-        } else if (facing === 'S') {
-          ctx.fillRect(px + barPad, py + th - barThick, tw - barPad * 2, barThick);
-        } else if (facing === 'E') {
-          ctx.fillRect(px + tw - barThick, py + barPad, barThick, th - barPad * 2);
-        } else if (facing === 'W') {
-          ctx.fillRect(px, py + barPad, barThick, th - barPad * 2);
+        const STEPS = 5;
+        const isHorz = facing === 'N' || facing === 'S';
+        const span = isHorz ? th : tw;
+        const barThick = span / STEPS;
+        const stepGap = Math.max(1, barThick * 0.4);
+        const sidePad = Math.min(tw, th) * 0.08;
+        const inward = facing === 'N' ? 1 : facing === 'S' ? -1 : facing === 'W' ? 1 : -1;
+        for (let i = 0; i < STEPS; i++) {
+          const t = i / (STEPS - 1);
+          const shrink = t * 0.35;
+          const bright = { r: 90, g: 134, b: 179 };
+          const dark = { r: 16, g: 24, b: 48 };
+          const ct = isDown ? t : 1 - t;
+          const r = Math.round(bright.r + (dark.r - bright.r) * ct);
+          const g = Math.round(bright.g + (dark.g - bright.g) * ct);
+          const b = Math.round(bright.b + (dark.b - bright.b) * ct);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          const drawThick = barThick - stepGap;
+          if (isHorz) {
+            const w = (tw - sidePad * 2) * (1 - shrink);
+            const startY = facing === 'N' ? py : py + th - barThick;
+            const y = startY + inward * i * barThick;
+            ctx.fillRect(px + (tw - w) / 2, y, w, Math.ceil(drawThick));
+          } else {
+            const h = (th - sidePad * 2) * (1 - shrink);
+            const startX = facing === 'W' ? px : px + tw - barThick;
+            const x = startX + inward * i * barThick;
+            ctx.fillRect(x, py + (th - h) / 2, Math.ceil(drawThick), h);
+          }
         }
         break;
       }
@@ -880,6 +892,8 @@ export class GridCanvas {
   private drawSelectionHighlight(offsetX: number, offsetY: number, tileSize: number): void {
     const entity = this.app.selectedEntity;
     if (!entity) return;
+    // Don't draw highlight if entity is on a different level
+    if (this.app.level && !this.app.level.entities.includes(entity)) return;
 
     const { ctx } = this;
     const px = Math.floor(offsetX + entity.col * tileSize);
@@ -936,6 +950,14 @@ export class GridCanvas {
         );
         arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
       }
+      if (e.type === 'stairs' && e.target) {
+        const targetId = e.target as string;
+        const targetEntity = level.entities.find(t => t.id === targetId);
+        if (targetEntity) {
+          const isActive = selected !== null && (e === selected || targetEntity === selected);
+          arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+        }
+      }
       if (e.type === 'key' && (e as Record<string, unknown>).keyId) {
         const keyId = (e as Record<string, unknown>).keyId as string;
         for (const other of level.entities) {
@@ -944,6 +966,35 @@ export class GridCanvas {
             arrows.push({ fromCol: e.col, fromRow: e.row, toCol: other.col, toRow: other.row, active: isActive });
           }
         }
+      }
+    }
+
+    // Cross-level stair: selected stair is on another level, its target is on this level
+    if (selected?.type === 'stairs' && selected.target && !level.entities.includes(selected)) {
+      const targetEntity = level.entities.find(e => e.id === selected.target);
+      if (targetEntity) {
+        const cx = offsetX + (targetEntity.col + 0.5) * tileSize;
+        const cy = offsetY + (targetEntity.row + 0.5) * tileSize;
+        const d = tileSize * 0.48;
+        const headSize = 7;
+        const tailLen = tileSize * 0.12;
+        ctx.save();
+        ctx.fillStyle = '#ffaa00';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 2;
+        const dirs: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+        for (const [dx, dy] of dirs) {
+          const tipX = cx + dx * (d - tailLen);
+          const tipY = cy + dy * (d - tailLen);
+          const fromX = cx + dx * d;
+          const fromY = cy + dy * d;
+          this.drawArrowhead(fromX, fromY, tipX, tipY, headSize);
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(fromX + dx * tailLen, fromY + dy * tailLen);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
 

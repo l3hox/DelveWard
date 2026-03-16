@@ -4,6 +4,25 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-16 — Stair Cross-Level Visual Feedback
+
+**Goal**: When a stairs entity is selected, visually indicate where its target stair lives — in the level list, on the grid, and with a quick "go to" link in the inspector. Also improve the stair creation workflow.
+
+**Key decisions**:
+- **Level list highlight** — when a stair is selected, the level containing its target stair gets a yellow highlight (`.highlight` CSS class with `#ffaa00` border/text). Skipped if the target is on the active level.
+- **Same-level wiring arrows** — stairs with same-level targets use the existing wiring arrow system (dashed lines with arrowheads, yellow when active, gray when inactive). Reuses lever→door arrow code.
+- **Cross-level target marker** — when the selected stair is on a different level, four small yellow arrowheads with tails converge on the target stair's cell from all four directions (celtic cross pattern). No connecting line since the source is off-screen.
+- **Inspector "go to" link** — clickable `→ stairId on LevelName` link below the target field. Commits pending undo, switches to the target level, selects the target stair, refreshes all UI.
+- **Pick mode for stair target** — uses cross-level pick mode (persists across level switches). Inspector Pick button and newly placed stairs both enter this mode. Walkable empty cells are valid targets — auto-creates a new stairs entity there.
+- **Auto-create stair on pick** — clicking an empty walkable cell during cross-level stair pick creates a new stairs with the opposite direction (up↔down) and mutually links both stairs.
+- **Auto-pick on placement** — placing a new stairs entity in dungeon mode immediately enters cross-level pick mode so the user can link it in one gesture.
+- **Dungeon-wide unique entity IDs** — `generateEntityId()` now scans all levels in dungeon mode, preventing duplicate IDs like `stairs_1` on two different levels.
+- **Stair icon overhaul** — grid and toolbar stair icons replaced with perspective step bars (5 steps, narrowing with depth, color gradient from bright to dark based on up/down direction). Facing indicated by step orientation rather than a separate bar.
+
+**Files**: `editor.html` (`.level-entry.highlight` CSS), `LevelList.ts` (`highlightedLevelIndex` field), `GridCanvas.ts` (same-level stair arrows, cross-level celtic cross marker, stair step icon, selection highlight cross-level guard), `Inspector.ts` (`onStairGoTo` callback, "go to" link, pickable target field replacing dropdown), `EditorApp.ts` (`crossLevel` on PickModeState, auto-create stair in `completePickMode`, walkable cell validation in `isValidPickTarget`, dungeon-wide `generateEntityId`, cross-level pick preserve in `switchToLevel`), `Toolbar.ts` (stair step icon), `main.ts` (`updateStairHighlight`, auto-pick on stair placement, stair go-to callback, cross-level pick mode wiring, highlight refresh in all mutation callbacks).
+
+---
+
 ## 2026-03-16 — Stair Entity Pairing
 
 **Goal**: Make stairs reference each other by entity ID instead of target positions. Player spawns in front of the target stair (not on it), with stairs at their back.

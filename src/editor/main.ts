@@ -51,10 +51,27 @@ function updateStatusHint(): void {
   }
 }
 
+function updateStairHighlight(): void {
+  let hlIndex: number | null = null;
+  const sel = app.selectedEntity;
+  if (sel?.type === 'stairs' && sel.target && app.dungeon) {
+    const targetId = sel.target as string;
+    for (let i = 0; i < app.dungeon.levels.length; i++) {
+      if (i === app.activeLevelIndex) continue;
+      if (app.dungeon.levels[i].entities.some(e => e.id === targetId)) {
+        hlIndex = i;
+        break;
+      }
+    }
+  }
+  levelList.highlightedLevelIndex = hlIndex;
+}
+
 function refreshAllUI(): void {
   toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
   toolbar.enableExport();
   inspector.refresh();
+  updateStairHighlight();
   levelProps.refresh();
   levelList.refresh();
   gridCanvas.updateCursor();
@@ -67,6 +84,7 @@ function refreshAllUI(): void {
 // --- Undo/Redo: onLevelRestored callback ---
 app.onLevelRestored = () => {
   inspector.refresh();
+  updateStairHighlight();
   levelProps.refresh();
   levelList.refresh();
   toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
@@ -287,8 +305,20 @@ levelList.onCommitTextEdit = () => {
 // Selection callback — update inspector
 gridCanvas.setSelectionCallback(() => {
   inspector.refresh();
+  updateStairHighlight();
+  levelList.refresh();
   gridCanvas.markDirty();
   updateErrorBanner();
+  // Auto-enter pick mode when placing a new stairs in dungeon mode
+  const sel = app.selectedEntity;
+  if (app.activeTool === 'entity' && sel?.type === 'stairs' && !sel.target && app.dungeon) {
+    app.enterPickMode(sel, 'target', undefined, 'stairs');
+    app.pickMode!.crossLevel = true;
+    app.statusHint = 'Click a stairs entity or empty cell on another level to link (Esc to cancel)';
+    inspector.refresh();
+    gridCanvas.updateCursor();
+    updateStatusHint();
+  }
 });
 
 // Inspector callbacks
@@ -301,6 +331,8 @@ inspector.setEntityChangedCallback(() => {
     if (e.type === 'equipment' && typeof e.itemId === 'string') app.selectedEquipmentId = e.itemId;
     if (e.type === 'consumable' && typeof e.itemId === 'string') app.selectedConsumableId = e.itemId;
   }
+  updateStairHighlight();
+  levelList.refresh();
   markDirty();
   gridCanvas.markDirty();
   updateErrorBanner();
@@ -313,6 +345,8 @@ inspector.setDeleteCallback(() => {
   app.deleteSelectedEntity();
   markDirty();
   inspector.refresh();
+  updateStairHighlight();
+  levelList.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
   app.rebuildDerivedState();
@@ -354,6 +388,12 @@ levelProps.setStatusHintChangedCallback(() => {
 // Pick mode entry
 inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) => {
   app.enterPickMode(entity, field, validChar, validEntityType);
+  // Cross-level pick for stairs targets — persists across level switches
+  if (entity.type === 'stairs' && field === 'target') {
+    app.pickMode!.crossLevel = true;
+    app.statusHint = 'Switch to target level and click a stairs entity to link (Esc to cancel)';
+    updateStatusHint();
+  }
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
 });
@@ -362,7 +402,9 @@ inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) =
 gridCanvas.setPickCompleteCallback(() => {
   app.statusHint = null;
   inspector.refresh();
+  updateStairHighlight();
   levelProps.refresh();
+  levelList.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
   updateStatusHint();
@@ -397,6 +439,21 @@ inspector.setRefClickedCallback((entity) => {
   app.selectedEntity = entity;
   inspector.refresh();
   gridCanvas.markDirty();
+});
+
+// Stair "go to" — switch to target level and select target stair
+inspector.setStairGoToCallback((targetId) => {
+  if (!app.dungeon) return;
+  for (let i = 0; i < app.dungeon.levels.length; i++) {
+    const targetStair = app.dungeon.levels[i].entities.find(e => e.id === targetId);
+    if (targetStair) {
+      if (app.level && app.undo.hasPending) app.undo.commitBatch(app.level);
+      app.switchToLevel(i);
+      app.selectedEntity = targetStair;
+      refreshAllUI();
+      return;
+    }
+  }
 });
 
 // Hover callback — update coordinate display
@@ -473,9 +530,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape' && app.pickMode) {
     app.cancelPickMode();
+    app.statusHint = null;
     inspector.refresh();
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
+    updateStatusHint();
     return;
   }
   if (e.key === 'Delete' && app.selectedEntity) {

@@ -38,6 +38,7 @@ export interface PickModeState {
   field: string;
   validChar?: string;
   validEntityType?: string;
+  crossLevel?: boolean;
 }
 
 export interface AreaDragState {
@@ -144,10 +145,13 @@ export class EditorApp {
     this.selectedChar = '.';
     this.selectionIndex = 0;
     this.lastClickCell = '';
-    this.pickMode = null;
+    // Preserve cross-level pick mode (e.g. stair target picking across levels)
+    if (!this.pickMode?.crossLevel) {
+      this.pickMode = null;
+      this.statusHint = null;
+    }
     this.coordDragCallback = null;
     this.areaDragState = null;
-    this.statusHint = null;
 
     this.cleanSnapshot = this.levelCleanSnapshots[index];
     this.dirty = this.isDungeonDirty();
@@ -558,7 +562,16 @@ export class EditorApp {
 
     const pm = this.pickMode;
     if (pm.validChar && grid[row][col] !== pm.validChar) return false;
-    if (pm.validEntityType && !this.getEntitiesAt(col, row).some(e => e.type === pm.validEntityType)) return false;
+    if (pm.validEntityType) {
+      const hasEntity = this.getEntitiesAt(col, row).some(e => e.type === pm.validEntityType);
+      // Cross-level stair pick: also accept walkable cells (will auto-create a stair)
+      if (!hasEntity) {
+        if (pm.crossLevel && pm.validEntityType === 'stairs' && this.walkableSet.has(grid[row][col])) {
+          return true;
+        }
+        return false;
+      }
+    }
     return pm.validChar !== undefined || pm.validEntityType !== undefined;
   }
 
@@ -570,13 +583,31 @@ export class EditorApp {
 
     if (pm.field === 'target' && pm.validEntityType) {
       // ID-based pick: find target entity, ensure it has an ID, write ID into source's target field
-      const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      let targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      // Cross-level stair pick: auto-create a stair on empty walkable cell
+      if (targets.length === 0 && pm.crossLevel && pm.validEntityType === 'stairs') {
+        const sourceDir = (pm.entity as Record<string, unknown>).direction as string;
+        const oppositeDir = sourceDir === 'up' ? 'down' : 'up';
+        const defaults = { direction: oppositeDir, facing: 'S', target: '' };
+        const newStair: Entity = { col, row, type: 'stairs', id: this.generateEntityId('stairs'), ...defaults };
+        this.level!.entities.push(newStair);
+        targets = [newStair];
+      }
       if (targets.length === 0) { this.pickMode = null; return false; }
       const target = targets[0];
       if (!target.id) {
         target.id = this.generateEntityId(target.type);
       }
+      // Ensure source has an ID too
+      if (!pm.entity.id) {
+        pm.entity.id = this.generateEntityId(pm.entity.type);
+      }
       (pm.entity as Record<string, unknown>)[pm.field] = target.id;
+      // Cross-level: mutually link and select the target entity
+      if (pm.crossLevel) {
+        (target as Record<string, unknown>)[pm.field] = pm.entity.id;
+        this.selectedEntity = target;
+      }
     } else {
       // keyId sync: sync field value between source and target entities
       const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
@@ -606,10 +637,17 @@ export class EditorApp {
   }
 
   private generateEntityId(type: string): string {
-    if (!this.level) return `${type}_1`;
     const existing = new Set<string>();
-    for (const e of this.level.entities) {
-      if (typeof e.id === 'string' && e.id) existing.add(e.id);
+    if (this.dungeon) {
+      for (const level of this.dungeon.levels) {
+        for (const e of level.entities) {
+          if (typeof e.id === 'string' && e.id) existing.add(e.id);
+        }
+      }
+    } else if (this.level) {
+      for (const e of this.level.entities) {
+        if (typeof e.id === 'string' && e.id) existing.add(e.id);
+      }
     }
     let n = 1;
     while (existing.has(`${type}_${n}`)) n++;

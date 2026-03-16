@@ -553,11 +553,25 @@ export class Toolbar {
         break;
       }
       case 'stairs': {
-        ctx.fillStyle = '#80c0ff';
-        ctx.font = `bold ${fontSize * 2}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('\u2195', cx, cy);
+        // Steps going down, facing north — matches grid icon style
+        const size = cx * 2;
+        const STEPS = 5;
+        const stepH = size / STEPS;
+        const stepGap = Math.max(0.5, stepH * 0.4);
+        const sidePad = size * 0.08;
+        for (let i = 0; i < STEPS; i++) {
+          const t = i / (STEPS - 1);
+          const shrink = t * 0.35;
+          const bright = { r: 90, g: 134, b: 179 };
+          const dark = { r: 16, g: 24, b: 48 };
+          const cr = Math.round(bright.r + (dark.r - bright.r) * t);
+          const cg = Math.round(bright.g + (dark.g - bright.g) * t);
+          const cb = Math.round(bright.b + (dark.b - bright.b) * t);
+          ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+          const w = (size - sidePad * 2) * (1 - shrink);
+          const y = i * stepH;
+          ctx.fillRect((size - w) / 2, y, w, Math.ceil(stepH - stepGap));
+        }
         break;
       }
     }

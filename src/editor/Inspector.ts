@@ -24,6 +24,7 @@ export class Inspector {
   private onBeforeDiscreteChange: (() => void) | null = null;
   private onBeginTextEdit: (() => void) | null = null;
   private onCommitTextEdit: (() => void) | null = null;
+  private onStairGoTo: ((targetId: string) => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -56,6 +57,10 @@ export class Inspector {
 
   setCommitTextEditCallback(cb: () => void): void {
     this.onCommitTextEdit = cb;
+  }
+
+  setStairGoToCallback(cb: (targetId: string) => void): void {
+    this.onStairGoTo = cb;
   }
 
   refresh(): void {
@@ -189,7 +194,7 @@ export class Inspector {
         this.addItemDropdown(entity, 'consumable');
         break;
 
-      case 'stairs':
+      case 'stairs': {
         this.addDropdownField('direction', (entity.direction as string) ?? 'down', ['up', 'down'], (val) => {
           entity.direction = val;
           this.onEntityChanged?.();
@@ -198,32 +203,27 @@ export class Inspector {
           entity.facing = val;
           this.onEntityChanged?.();
         });
-        // target: dropdown of stair IDs from other levels in dungeon mode, text field otherwise
-        if (this.app.isDungeonMode()) {
-          // Collect all stair entities from OTHER levels
-          const currentLevel = this.app.level;
-          const stairOptions: string[] = [''];
-          const stairLabels: string[] = ['(none)'];
-          for (const otherLevel of this.app.dungeon!.levels) {
-            if (otherLevel === currentLevel) continue;
-            for (const oe of otherLevel.entities) {
-              if (oe.type === 'stairs' && oe.id) {
-                stairOptions.push(oe.id);
-                stairLabels.push(`${oe.id} on ${otherLevel.name}`);
-              }
+        this.addPickableField('target', (entity.target as string) ?? '', entity, 'target', (val) => {
+          entity.target = val;
+          this.onEntityChanged?.();
+        }, undefined, 'stairs');
+        // "Go to" link for stair target
+        const stairTargetId = entity.target as string;
+        if (stairTargetId && this.app.dungeon) {
+          for (const otherLevel of this.app.dungeon.levels) {
+            const targetStair = otherLevel.entities.find(e => e.id === stairTargetId);
+            if (targetStair) {
+              const goToItem = document.createElement('div');
+              goToItem.className = 'inspector-ref-item';
+              goToItem.textContent = `\u2192 ${stairTargetId} on ${otherLevel.name}`;
+              goToItem.addEventListener('click', () => this.onStairGoTo?.(stairTargetId));
+              this.container.appendChild(goToItem);
+              break;
             }
           }
-          this.addLabeledDropdownField('target', (entity.target as string) ?? '', stairOptions, stairLabels, (val) => {
-            entity.target = val;
-            this.onEntityChanged?.();
-          });
-        } else {
-          this.addTextField('target', (entity.target as string) ?? '', (val) => {
-            entity.target = val;
-            this.onEntityChanged?.();
-          });
         }
         break;
+      }
     }
   }
 
