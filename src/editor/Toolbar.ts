@@ -101,9 +101,9 @@ export class Toolbar {
 
   setActiveTool(tool: EditorTool): void {
     this.activeTool = tool;
-    for (const [t, btn] of this.toolBtns) {
-      btn.classList.toggle('active', t === tool);
-    }
+    // Select button highlight
+    const selectBtn = this.toolBtns.get('select');
+    selectBtn?.classList.toggle('selected', tool === 'select');
     // Char selection visible only in paint mode
     for (const [char, btn] of this.charBtns) {
       btn.classList.toggle('selected', tool === 'paint' && char === this.selectedChar);
@@ -223,37 +223,6 @@ export class Toolbar {
     const sep1 = this.makeSep();
     btnOpen.insertAdjacentElement('afterend', sep1);
 
-    // Tool button group
-    const toolGroup = document.createElement('div');
-    toolGroup.className = 'tool-group';
-
-    const tools: Array<{ tool: EditorTool; label: string }> = [
-      { tool: 'select', label: 'Select' },
-      { tool: 'paint', label: 'Paint' },
-      { tool: 'entity', label: 'Entity' },
-    ];
-
-    for (const { tool, label } of tools) {
-      const btn = document.createElement('button');
-      btn.className = 'tool-btn';
-      btn.textContent = label;
-      if (tool === 'select') btn.classList.add('active');
-
-      btn.addEventListener('click', () => {
-        this.setActiveTool(tool);
-        this.onToolChange?.(tool);
-      });
-
-      this.toolBtns.set(tool, btn);
-      toolGroup.appendChild(btn);
-    }
-
-    sep1.insertAdjacentElement('afterend', toolGroup);
-
-    // Separator after tool group
-    const sep2 = this.makeSep();
-    toolGroup.insertAdjacentElement('afterend', sep2);
-
     // Export button — insert before coord-display (which has margin-left: auto)
     const exportBtn = document.createElement('button');
     exportBtn.id = 'btn-export';
@@ -268,16 +237,43 @@ export class Toolbar {
   }
 
   private buildEntityPalette(): void {
-    const label = document.createElement('span');
-    label.className = 'palette-label';
-    label.textContent = 'Entities';
-    this.entityPalette.appendChild(label);
+    // Select tool button (mouse cursor icon)
+    const selectBtn = document.createElement('button');
+    selectBtn.className = 'entity-swatch-btn';
+    selectBtn.title = 'Select (1)';
+    const selectCanvas = document.createElement('canvas');
+    selectCanvas.width = 24;
+    selectCanvas.height = 24;
+    const sCtx = selectCanvas.getContext('2d')!;
+    // Draw mouse cursor arrow
+    sCtx.fillStyle = '#ccc';
+    sCtx.beginPath();
+    sCtx.moveTo(5, 3);
+    sCtx.lineTo(5, 19);
+    sCtx.lineTo(9, 15);
+    sCtx.lineTo(13, 21);
+    sCtx.lineTo(15, 20);
+    sCtx.lineTo(11, 14);
+    sCtx.lineTo(16, 13);
+    sCtx.closePath();
+    sCtx.fill();
+    sCtx.strokeStyle = '#333';
+    sCtx.lineWidth = 1;
+    sCtx.stroke();
+    selectBtn.appendChild(selectCanvas);
+    selectBtn.addEventListener('click', () => {
+      this.setActiveTool('select');
+      this.onToolChange?.('select');
+    });
+    this.toolBtns.set('select', selectBtn);
+    this.entityPalette.appendChild(selectBtn);
+
+    // Divider
+    this.entityPalette.appendChild(this.makePaletteSep());
 
     for (const type of ENTITY_TYPES) {
       this.addEntityBtn(type);
     }
-
-    // Entity selection highlight is managed by setActiveTool — not shown initially (starts in select mode)
 
     // Spacer pushes view toggles to the right
     const spacer = document.createElement('span');
