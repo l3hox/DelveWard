@@ -125,8 +125,7 @@ export class GridCanvas {
       // Drag-paint: paint into cells as cursor moves while button is held
       if (this.isPainting && this.app.hover) {
         const tool = this.app.activeTool;
-        const paintChar = tool === 'erase' ? ' ' : this.app.selectedChar;
-        this.app.paintCell(this.app.hover.col, this.app.hover.row, paintChar);
+        this.app.paintCell(this.app.hover.col, this.app.hover.row, this.app.selectedChar);
       }
 
       this.onHoverChange?.();
@@ -179,13 +178,13 @@ export class GridCanvas {
         }
 
         const tool = this.app.activeTool;
-        if (tool === 'paint' || tool === 'erase') {
+        if (tool === 'paint') {
           this.onBeforePaint?.();
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
-          const char = tool === 'erase' ? ' ' : this.app.selectedChar;
+          const char = this.app.selectedChar;
           this.app.paintCell(col, row, char);
           this.isPainting = true;
           this.dirty = true;
@@ -833,10 +832,6 @@ export class GridCanvas {
           strokeColor = 'rgba(68, 136, 255, 0.7)';
           fillColor = 'rgba(68, 136, 255, 0.1)';
           break;
-        case 'erase':
-          strokeColor = 'rgba(255, 68, 68, 0.7)';
-          fillColor = 'rgba(255, 68, 68, 0.1)';
-          break;
         case 'entity':
           strokeColor = 'rgba(68, 255, 68, 0.7)';
           fillColor = 'rgba(68, 255, 68, 0.1)';
@@ -905,7 +900,7 @@ export class GridCanvas {
       return;
     }
     const tool = this.app.activeTool;
-    this.canvas.style.cursor = tool === 'paint' || tool === 'erase' || tool === 'entity' ? 'crosshair' : 'default';
+    this.canvas.style.cursor = tool === 'paint' || tool === 'entity' ? 'crosshair' : 'default';
   }
 
   private drawArrowhead(x1: number, y1: number, x2: number, y2: number, size: number): void {

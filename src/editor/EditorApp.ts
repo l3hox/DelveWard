@@ -14,7 +14,7 @@ export interface HoverInfo {
   char: string;
 }
 
-export type EditorTool = 'select' | 'paint' | 'erase' | 'entity';
+export type EditorTool = 'select' | 'paint' | 'entity';
 
 const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   door:           { state: 'closed' },

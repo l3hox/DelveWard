@@ -230,7 +230,6 @@ export class Toolbar {
     const tools: Array<{ tool: EditorTool; label: string }> = [
       { tool: 'select', label: 'Select' },
       { tool: 'paint', label: 'Paint' },
-      { tool: 'erase', label: 'Erase' },
       { tool: 'entity', label: 'Entity' },
     ];
 
@@ -380,10 +379,23 @@ export class Toolbar {
 
   private addVoidBtn(): void {
     const btn = document.createElement('button');
-    btn.className = 'char-swatch-btn void';
+    btn.className = 'char-swatch-btn';
     btn.title = 'void (space) — empty cell';
-    btn.textContent = '_';
 
+    const size = 28;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    // 4x4 checkerboard matching the grid canvas void pattern
+    const cellSize = size / 4;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#1a1a1a' : '#222';
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+      }
+    }
+    btn.appendChild(canvas);
     btn.addEventListener('click', () => this.selectCharBtn(btn, ' '));
 
     this.charBtns.set(' ', btn);

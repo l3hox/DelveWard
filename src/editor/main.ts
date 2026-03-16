@@ -533,7 +533,7 @@ document.addEventListener('keydown', (e) => {
   if (!e.ctrlKey && !e.metaKey && !e.altKey) {
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    const toolMap: Record<string, EditorTool> = { '1': 'select', '2': 'paint', '3': 'erase', '4': 'entity' };
+    const toolMap: Record<string, EditorTool> = { '1': 'select', '2': 'paint', '3': 'entity' };
     const tool = toolMap[e.key];
     if (tool) {
       if (app.pickMode) { app.cancelPickMode(); inspector.refresh(); }
