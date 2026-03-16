@@ -268,8 +268,10 @@ export class Toolbar {
     this.toolBtns.set('select', selectBtn);
     this.entityPalette.appendChild(selectBtn);
 
-    // Divider
-    this.entityPalette.appendChild(this.makePaletteSep());
+    // Divider (small — matches entity button height)
+    const sep = document.createElement('span');
+    sep.className = 'palette-sep-sm';
+    this.entityPalette.appendChild(sep);
 
     for (const type of ENTITY_TYPES) {
       this.addEntityBtn(type);
