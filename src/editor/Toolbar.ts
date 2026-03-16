@@ -47,8 +47,9 @@ export class Toolbar {
   constructor(container: HTMLElement) {
     this.palette = document.getElementById('char-palette')!;
     this.entityPalette = document.getElementById('entity-palette')!;
-    // Preload item sprites for toolbar icons
+    // Preload sprites for toolbar icons
     const redraw = (type: string) => () => this.redrawEntityBtn(type);
+    getSprite('/editor/goblin-icon.png', redraw('enemy'));
     getSprite('/sprites/items/key.png', redraw('key'));
     getSprite(`/sprites/items/${this.equipmentIcon}.png`, redraw('equipment'));
     getSprite(`/sprites/items/${this.consumableIcon}.png`, redraw('consumable'));
@@ -455,10 +456,12 @@ export class Toolbar {
   ): void {
     switch (type) {
       case 'enemy': {
-        ctx.fillStyle = '#cc2222';
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
+        if (!this.drawSprite(ctx, '/editor/goblin-icon.png', cx, cy, r)) {
+          ctx.fillStyle = '#cc2222';
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
         break;
       }
       case 'key': {
@@ -486,13 +489,8 @@ export class Toolbar {
       }
       case 'pressure_plate': {
         ctx.fillStyle = '#aaaaaa';
-        const d = r * 1.2;
         ctx.beginPath();
-        ctx.moveTo(cx, cy - d);
-        ctx.lineTo(cx + d, cy);
-        ctx.lineTo(cx, cy + d);
-        ctx.lineTo(cx - d, cy);
-        ctx.closePath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fill();
         break;
       }

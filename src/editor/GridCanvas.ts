@@ -550,15 +550,9 @@ export class GridCanvas {
       }
 
       case 'pressure_plate': {
-        // Diamond shape
         ctx.fillStyle = '#aaaaaa';
-        const d = iconRadius * 1.2;
         ctx.beginPath();
-        ctx.moveTo(cx, cy - d);
-        ctx.lineTo(cx + d, cy);
-        ctx.lineTo(cx, cy + d);
-        ctx.lineTo(cx - d, cy);
-        ctx.closePath();
+        ctx.arc(cx, cy, iconRadius, 0, Math.PI * 2);
         ctx.fill();
         break;
       }
