@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 import { WALKABLE_CELLS, buildWalkableSet } from '../core/grid';
 import type { CharDef } from '../core/types';
+import type { Environment } from '../core/types';
 
 // --- Dust motes: warm-tinted particles drifting lazily near the player torch ---
 
@@ -596,5 +597,236 @@ export class WaterDrips {
     this.splashSprites.splice(splashStart, SPLASH_RING_COUNT);
 
     this.drips.splice(index, 1);
+  }
+}
+
+// --- Fireflies: warm glowing dots drifting low near the ground in forest environments ---
+
+const FLY_COUNT = 12;
+const FLY_FADE_DURATION = 1;    // seconds to fade in/out on visibility toggle
+const FLY_SPAWN_RADIUS = 5;       // world units around player
+const FLY_MIN_LIFETIME = 8;
+const FLY_MAX_LIFETIME = 20;
+const FLY_SIZE = 0.06;
+const FLY_DRIFT_SPEED = 0.2;
+const FLY_MAX_HEIGHT = 0.9;       // stay low — below knee level
+const FLY_MIN_HEIGHT = 0.05;
+const FLY_COLOR = new THREE.Color(0xccff44);
+
+// Dedicated glow texture — brighter center, softer falloff than dust
+let flyTexture: THREE.Texture | null = null;
+function getFlyTexture(): THREE.Texture {
+  if (flyTexture) return flyTexture;
+  const size = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(255,255,255,1)');
+  gradient.addColorStop(0.25, 'rgba(255,255,255,0.8)');
+  gradient.addColorStop(0.6, 'rgba(255,255,200,0.3)');
+  gradient.addColorStop(1, 'rgba(255,255,200,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  flyTexture = new THREE.CanvasTexture(canvas);
+  return flyTexture;
+}
+
+interface Firefly {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  age: number;
+  lifetime: number;
+  // Per-firefly blink — only some fireflies blink
+  blinks: boolean;
+  blinkPhase: number;
+  blinkSpeed: number;
+}
+
+export class Fireflies {
+  private flies: (Firefly | null)[] = [];
+  private respawnTimers: number[] = [];  // per-slot cooldown before spawning
+  private positions: Float32Array;
+  private opacities: Float32Array;
+  private geometry: THREE.BufferGeometry;
+  private points: THREE.Points;
+  private enabled = false;
+  private aliveCount = 0;
+
+  constructor() {
+    this.positions = new Float32Array(FLY_COUNT * 3);
+    this.opacities = new Float32Array(FLY_COUNT);
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    this.geometry.setAttribute('opacity', new THREE.BufferAttribute(this.opacities, 1));
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.merge([
+        THREE.UniformsLib.fog,
+        {
+          map: { value: getFlyTexture() },
+          color: { value: FLY_COLOR },
+          pointSize: { value: FLY_SIZE * 300 },
+        },
+      ]),
+      vertexShader: `
+        attribute float opacity;
+        varying float vOpacity;
+        uniform float pointSize;
+        #include <fog_pars_vertex>
+        void main() {
+          vOpacity = opacity;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = pointSize / -mvPosition.z;
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D map;
+        uniform vec3 color;
+        varying float vOpacity;
+        #include <common>
+        #include <fog_pars_fragment>
+        void main() {
+          vec4 tex = texture2D(map, gl_PointCoord);
+          if (tex.a < 0.01) discard;
+          gl_FragColor = vec4(color * tex.rgb * vOpacity, tex.a * vOpacity);
+          #include <fog_fragment>
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: true,
+    });
+
+    this.points = new THREE.Points(this.geometry, material);
+    this.points.frustumCulled = false;
+
+    for (let i = 0; i < FLY_COUNT; i++) {
+      this.flies.push(null);
+      this.respawnTimers.push(0);
+    }
+  }
+
+  getObject(): THREE.Points {
+    return this.points;
+  }
+
+  setVisible(visible: boolean): void {
+    this.enabled = visible;
+    if (visible) this.points.visible = true;
+  }
+
+  private createFly(cx: number, cz: number): Firefly {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * FLY_SPAWN_RADIUS;
+    return {
+      x: cx + Math.cos(angle) * dist,
+      y: FLY_MIN_HEIGHT + Math.random() * (FLY_MAX_HEIGHT - FLY_MIN_HEIGHT),
+      z: cz + Math.sin(angle) * dist,
+      vx: (Math.random() - 0.5) * FLY_DRIFT_SPEED,
+      vy: (Math.random() - 0.5) * FLY_DRIFT_SPEED * 0.3,
+      vz: (Math.random() - 0.5) * FLY_DRIFT_SPEED,
+      age: 0,
+      lifetime: FLY_MIN_LIFETIME + Math.random() * (FLY_MAX_LIFETIME - FLY_MIN_LIFETIME),
+      blinks: Math.random() < 0.33,
+      blinkPhase: Math.random() * Math.PI * 2,
+      blinkSpeed: 1.5 + Math.random() * 2.5,
+    };
+  }
+
+  update(delta: number, playerX: number, playerZ: number): void {
+    this.aliveCount = 0;
+
+    for (let i = 0; i < FLY_COUNT; i++) {
+      const f = this.flies[i];
+
+      if (f === null) {
+        // Empty slot — count down respawn timer, then spawn
+        if (this.enabled) {
+          this.respawnTimers[i] -= delta;
+          if (this.respawnTimers[i] <= 0) {
+            this.flies[i] = this.createFly(playerX, playerZ);
+            this.aliveCount++;
+          }
+        }
+        this.positions[i * 3 + 1] = -10;
+        this.opacities[i] = 0;
+        continue;
+      }
+
+      f.age += delta;
+      f.blinkPhase += f.blinkSpeed * delta;
+
+      if (f.age >= f.lifetime) {
+        // Expired — null the slot, start respawn cooldown
+        this.flies[i] = null;
+        this.respawnTimers[i] = 0.5 + Math.random() * 1.5;
+        this.positions[i * 3 + 1] = -10;
+        this.opacities[i] = 0;
+        continue;
+      }
+
+      this.aliveCount++;
+
+      // Gentle drift with occasional direction changes
+      f.x += f.vx * delta;
+      f.y += f.vy * delta;
+      f.z += f.vz * delta;
+
+      // Clamp height to stay low
+      if (f.y < FLY_MIN_HEIGHT) { f.y = FLY_MIN_HEIGHT; f.vy = Math.abs(f.vy); }
+      if (f.y > FLY_MAX_HEIGHT) { f.y = FLY_MAX_HEIGHT; f.vy = -Math.abs(f.vy); }
+
+      // Slow random drift changes
+      f.vx += (Math.random() - 0.5) * 0.3 * delta;
+      f.vz += (Math.random() - 0.5) * 0.3 * delta;
+      const speed = Math.sqrt(f.vx * f.vx + f.vz * f.vz);
+      if (speed > FLY_DRIFT_SPEED) {
+        f.vx *= FLY_DRIFT_SPEED / speed;
+        f.vz *= FLY_DRIFT_SPEED / speed;
+      }
+
+      // Pulsing blink (sin wave 0..1) — only 1 in 3 fireflies blink
+      const blink = f.blinks ? 0.5 + 0.5 * Math.sin(f.blinkPhase) : 1;
+
+      // Per-particle fade in/out over FLY_FADE_DURATION at start and end of life
+      const fadeInEnd = FLY_FADE_DURATION;
+      const fadeOutStart = f.lifetime - FLY_FADE_DURATION;
+      let lifeFade: number;
+      if (f.age < fadeInEnd) {
+        lifeFade = f.age / fadeInEnd;
+      } else if (f.age > fadeOutStart) {
+        lifeFade = (f.lifetime - f.age) / FLY_FADE_DURATION;
+      } else {
+        lifeFade = 1;
+      }
+
+      // Distance fade
+      const offX = f.x - playerX;
+      const offZ = f.z - playerZ;
+      const distSq = offX * offX + offZ * offZ;
+      const distFade = Math.max(0, 1 - distSq / (FLY_SPAWN_RADIUS * FLY_SPAWN_RADIUS));
+
+      this.positions[i * 3] = f.x;
+      this.positions[i * 3 + 1] = f.y;
+      this.positions[i * 3 + 2] = f.z;
+      this.opacities[i] = blink * lifeFade * distFade * 0.8;
+    }
+
+    // Hide Points object entirely when no particles alive and disabled
+    if (this.aliveCount === 0 && !this.enabled) {
+      this.points.visible = false;
+    }
+
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.opacity.needsUpdate = true;
   }
 }

@@ -31,7 +31,7 @@ import { LevelUpNotification } from './hud/levelUpNotification';
 import { DamageNumberManager } from './rendering/damageNumbers';
 import { EnemyHealthBarManager } from './rendering/enemyHealthBar';
 import { SwordSwingAnimator } from './rendering/swordSwing';
-import { DustMotes, SconceEmbers, WaterDrips } from './rendering/particles';
+import { DustMotes, SconceEmbers, WaterDrips, Fireflies } from './rendering/particles';
 import type { DungeonLevel, Dungeon, Entity } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
@@ -335,6 +335,8 @@ async function init(): Promise<void> {
   scene.add(sconceEmbers.getObject());
   const waterDrips = new WaterDrips();
   scene.add(waterDrips.getObject());
+  const fireflies = new Fireflies();
+  scene.add(fireflies.getObject());
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
@@ -377,6 +379,7 @@ async function init(): Promise<void> {
       dustMotes.setVisible(currentLevel.dustMotes !== false);
       waterDrips.setLevel(currentLevel.grid, currentLevel.charDefs);
       waterDrips.setVisible(currentLevel.waterDrips === true);
+      fireflies.setVisible(currentLevel.fireflies === true);
       gameState.revealAround(
         currentLevel.playerStart.col,
         currentLevel.playerStart.row,
@@ -507,6 +510,7 @@ async function init(): Promise<void> {
       dustMotes.setVisible(targetLevel.dustMotes !== false);
       waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
       waterDrips.setVisible(targetLevel.waterDrips === true);
+      fireflies.setVisible(targetLevel.fireflies === true);
 
       gameState.revealAround(spawnCol, spawnRow, targetFacing, targetLevel.grid);
     });
@@ -518,6 +522,7 @@ async function init(): Promise<void> {
   dustMotes.setVisible(ls.level.dustMotes !== false);
   waterDrips.setLevel(ls.level.grid, ls.level.charDefs);
   waterDrips.setVisible(ls.level.waterDrips === true);
+  fireflies.setVisible(ls.level.fireflies === true);
 
   // Reveal initial position
   const ps = ls.player.getState();
@@ -802,6 +807,7 @@ async function init(): Promise<void> {
     dustMotes.update(delta, camPos2.x, camPos2.y, camPos2.z);
     sconceEmbers.update(delta);
     waterDrips.update(delta, camPos2.x, camPos2.z);
+    fireflies.update(delta, camPos2.x, camPos2.z);
 
     const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen();
 

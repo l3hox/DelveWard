@@ -33,6 +33,7 @@ export interface DungeonLevel {
   skybox?: Skybox;               // procedural skybox visible through ceiling openings
   dustMotes?: boolean;           // enable floating dust particles (default: true)
   waterDrips?: boolean;          // enable ceiling water drip effect (default: false)
+  fireflies?: boolean;           // enable ground-level firefly particles (default: false)
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];

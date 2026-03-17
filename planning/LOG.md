@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-17 — Outdoor Forest Environment + Fireflies
+
+**Goal**: Add an outdoor forest environment with dense tree-filled cells and atmospheric firefly particles.
+
+**Key decisions**:
+- **`seeThrough` CharDef property** — generic mechanism for solid-but-rendered cells. `solid: true, seeThrough: true` renders floor/ceiling without wall faces toward renderable neighbors. Extensible to future visual fill types (stalactite caverns, etc).
+- **Two-layer forest** — hard forest walls (`F`, opaque) + see-through tree cells (`T`, non-walkable but visually open, filled with billboard sprites) + walkable clearings (`.`). Creates depth gradient.
+- **Billboard material extraction** — `createNeutralLitMaterial` moved from enemyRenderer to shared `billboardMaterial.ts`, used by both enemy sprites and tree billboards.
+- **Dungeon builder `renderable` set** — walkable + seeThrough chars. Controls floor/ceiling rendering and wall face decisions. Game movement still uses the original walkable set.
+- **Forest renderer** — seeded PRNG placement (deterministic per cell/face), 4 procedural tree variants (pine, oak, birch, bush). Edge trees on walkable cells near forest faces + fill trees inside see-through cells.
+- **Fireflies** — custom ShaderMaterial (PointsMaterial ignores per-vertex opacity attributes). Per-particle fade in/out over 1s, respawn delay 0.5–2s, 1/3 blink chance. Controlled by `level.fireflies` flag, not auto-enabled.
+
+---
+
 ## 2026-03-16 — Stair Cross-Level Visual Feedback
 
 **Goal**: When a stairs entity is selected, visually indicate where its target stair lives — in the level list, on the grid, and with a quick "go to" link in the inspector. Also improve the stair creation workflow.

@@ -116,6 +116,15 @@ export class LevelProperties {
         }
         this.onChanged?.();
       });
+
+      this.addCheckboxField(body, 'fireflies', level.fireflies ?? false, (val) => {
+        if (!val) {
+          delete level.fireflies;
+        } else {
+          level.fireflies = true;
+        }
+        this.onChanged?.();
+      });
     });
 
     this.addCollapsibleSection('Defaults', 'defaults', (body) => {

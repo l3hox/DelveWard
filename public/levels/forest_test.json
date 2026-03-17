@@ -5,6 +5,8 @@
       "id": "forest_clearing",
       "name": "Forest Clearing",
       "environment": "forest",
+      "fireflies": true,
+      "dustMotes": false,
       "grid": [
         "FFFFFFFFFFFF",
         "FTTTTTTTTTTF",
