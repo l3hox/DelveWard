@@ -1,8 +1,8 @@
 // Texture name constants — no Three.js, safe for test imports
 
-export const WALL_TEXTURES = ['stone', 'brick', 'mossy', 'wood'] as const;
-export const FLOOR_TEXTURES = ['stone_tile', 'dirt', 'cobblestone'] as const;
-export const CEILING_TEXTURES = ['dark_rock', 'wooden_beams'] as const;
+export const WALL_TEXTURES = ['stone', 'brick', 'mossy', 'wood', 'forest'] as const;
+export const FLOOR_TEXTURES = ['stone_tile', 'dirt', 'cobblestone', 'grass'] as const;
+export const CEILING_TEXTURES = ['dark_rock', 'wooden_beams', 'canopy'] as const;
 
 export type WallTextureName = (typeof WALL_TEXTURES)[number];
 export type FloorTextureName = (typeof FLOOR_TEXTURES)[number];

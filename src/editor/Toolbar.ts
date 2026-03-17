@@ -2,6 +2,7 @@ import type { EditorTool } from './EditorApp';
 import type { CharDef, TextureSet } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
+import { getTreeOverlayCanvas } from './treeOverlay';
 import { itemDatabase } from '../core/itemDatabase';
 
 // Simple sprite image cache
@@ -124,9 +125,10 @@ export class Toolbar {
     const defFloor = (defaults?.floorTexture ?? 'stone_tile') as FloorTextureName;
     const defCeil = (defaults?.ceilingTexture ?? 'dark_rock') as CeilingTextureName;
 
-    // Collect walkable and wall entries
+    // Collect walkable, wall, and see-through entries
     const walkable: Array<{ char: string; floor: FloorTextureName; ceiling: CeilingTextureName }> = [];
     const walls: Array<{ char: string; wall: WallTextureName }> = [];
+    const seeThrough: Array<{ char: string; floor: FloorTextureName }> = [];
 
     // Built-in '.' = walkable floor
     walkable.push({ char: '.', floor: defFloor, ceiling: defCeil });
@@ -139,7 +141,12 @@ export class Toolbar {
     if (charDefs) {
       for (const def of charDefs) {
         if (builtinSet.has(def.char)) continue;
-        if (def.solid) {
+        if (def.solid && def.seeThrough) {
+          seeThrough.push({
+            char: def.char,
+            floor: (def.floorTexture ?? defaults?.floorTexture ?? 'stone_tile') as FloorTextureName,
+          });
+        } else if (def.solid) {
           walls.push({
             char: def.char,
             wall: (def.wallTexture ?? defaults?.wallTexture ?? 'stone') as WallTextureName,
@@ -180,6 +187,9 @@ export class Toolbar {
     wallGroup.className = 'palette-group';
     for (const entry of walls) {
       this.addWallBtn(wallGroup, entry.char, entry.wall);
+    }
+    for (const entry of seeThrough) {
+      this.addSeeThruBtn(wallGroup, entry.char, entry.floor);
     }
     this.palette.appendChild(wallGroup);
 
@@ -368,6 +378,28 @@ export class Toolbar {
 
     const wallSrc = getWallTexture(wall).image as HTMLCanvasElement;
     ctx.drawImage(wallSrc, 0, 0, size, size);
+
+    btn.appendChild(canvas);
+    btn.addEventListener('click', () => this.selectCharBtn(btn, char));
+
+    this.charBtns.set(char, btn);
+    parent.appendChild(btn);
+  }
+
+  private addSeeThruBtn(parent: HTMLElement, char: string, floor: FloorTextureName): void {
+    const btn = document.createElement('button');
+    btn.className = 'char-swatch-btn wall';
+    btn.title = `'${char}' — see-through: ${floor}`;
+
+    const canvas = document.createElement('canvas');
+    const size = 28;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const floorSrc = getFloorTexture(floor).image as HTMLCanvasElement;
+    ctx.drawImage(floorSrc, 0, 0, size, size);
+    ctx.drawImage(getTreeOverlayCanvas(), 0, 0, size, size);
 
     btn.appendChild(canvas);
     btn.addEventListener('click', () => this.selectCharBtn(btn, char));

@@ -11,6 +11,7 @@ import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
+import { buildForestMeshes, updateForestBillboards, type ForestMeshes } from './rendering/forestRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, SPRITE_SIZES, DEFAULT_SPRITE_SIZE } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
@@ -81,6 +82,7 @@ interface LevelScene {
   healthBarManager: EnemyHealthBarManager;
   itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  forestMeshes: ForestMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
 }
@@ -135,6 +137,9 @@ function buildLevelScene(
 
   const stairMeshes = buildStairMeshes(gameState.stairs, level.defaults, level.areas);
   scene.add(stairMeshes.group);
+
+  const forestMeshes = buildForestMeshes(level.grid, level.charDefs);
+  scene.add(forestMeshes.group);
 
   const enemyMeshes = buildEnemyMeshes(gameState);
   scene.add(enemyMeshes.group);
@@ -191,6 +196,7 @@ function buildLevelScene(
     leverAnimator,
     sconceMeshes,
     stairMeshes,
+    forestMeshes,
     enemyMeshes,
     enemyAnimator,
     healthBarManager,
@@ -210,6 +216,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.leverMeshes.group,
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
+    ls.forestMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
@@ -781,6 +788,7 @@ async function init(): Promise<void> {
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
+    updateForestBillboards(ls.forestMeshes, camera);
 
     // Sync health bar positions (enemies animate with hit shake and lunge)
     ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);

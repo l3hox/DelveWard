@@ -172,6 +172,59 @@ function generateWoodWall(): THREE.CanvasTexture {
   return makeTexture(canvas);
 }
 
+function generateForestWall(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Green-brown foliage base with noise
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(40, 12);
+      const g = vary(65, 18);
+      const b = vary(30, 10);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Vertical dark brown trunk lines (3-4 trunks, 6-8px wide)
+  const trunkPositions = [6, 22, 40, 55];
+  for (const tx of trunkPositions) {
+    const w = 6 + Math.floor(Math.random() * 3);
+    for (let y = 0; y < SIZE; y++) {
+      for (let dx = 0; dx < w; dx++) {
+        const r = vary(35, 8);
+        const g = vary(22, 6);
+        const b = vary(12, 4);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(tx + dx, y, 1, 1);
+      }
+    }
+  }
+
+  // Bottom third darker (undergrowth)
+  ctx.fillStyle = 'rgba(10, 20, 8, 0.35)';
+  ctx.fillRect(0, 42, SIZE, SIZE - 42);
+
+  // Top lighter
+  ctx.fillStyle = 'rgba(70, 110, 40, 0.15)';
+  ctx.fillRect(0, 0, SIZE, 20);
+
+  // Scattered dark and bright green leaf blobs
+  for (let i = 0; i < 40; i++) {
+    const lx = Math.floor(Math.random() * SIZE);
+    const ly = Math.floor(Math.random() * SIZE);
+    const bright = Math.random() > 0.5;
+    const r = bright ? vary(50, 12) : vary(20, 8);
+    const g = bright ? vary(110, 20) : vary(55, 12);
+    const b = bright ? vary(30, 10) : vary(15, 6);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.75)`;
+    const sz = 2 + Math.floor(Math.random() * 4);
+    ctx.fillRect(lx, ly, sz, sz);
+  }
+
+  return makeTexture(canvas);
+}
+
 // ---------------------------------------------------------------------------
 // Floor generators
 // ---------------------------------------------------------------------------
@@ -262,6 +315,48 @@ function generateCobblestoneFloor(): THREE.CanvasTexture {
   return makeTexture(canvas);
 }
 
+function generateGrassFloor(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Green grass base with per-pixel noise
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(55, 14);
+      const g = vary(100, 20);
+      const b = vary(35, 10);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Dark green grass tuft blobs (2-3px)
+  for (let i = 0; i < 50; i++) {
+    const tx = Math.floor(Math.random() * SIZE);
+    const ty = Math.floor(Math.random() * SIZE);
+    const r = vary(30, 8);
+    const g = vary(70, 12);
+    const b = vary(20, 6);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+    const sz = 2 + Math.floor(Math.random() * 2);
+    ctx.fillRect(tx, ty, sz, sz);
+  }
+
+  // Occasional yellow-brown dry patches
+  for (let i = 0; i < 8; i++) {
+    const px = Math.floor(Math.random() * SIZE);
+    const py = Math.floor(Math.random() * SIZE);
+    const r = vary(130, 16);
+    const g = vary(105, 14);
+    const b = vary(45, 10);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
+    const sw = 3 + Math.floor(Math.random() * 4);
+    const sh = 2 + Math.floor(Math.random() * 3);
+    ctx.fillRect(px, py, sw, sh);
+  }
+
+  return makeTexture(canvas);
+}
+
 // ---------------------------------------------------------------------------
 // Ceiling generators
 // ---------------------------------------------------------------------------
@@ -324,6 +419,47 @@ function generateWoodenBeamsCeiling(): THREE.CanvasTexture {
   return makeTexture(canvas);
 }
 
+function generateCanopyCeiling(): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas();
+
+  // Dark green canopy base
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const r = vary(25, 8);
+      const g = vary(55, 14);
+      const b = vary(18, 6);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Irregular lighter leaf patches
+  for (let i = 0; i < 25; i++) {
+    const px = Math.floor(Math.random() * SIZE);
+    const py = Math.floor(Math.random() * SIZE);
+    const r = vary(40, 10);
+    const g = vary(80, 16);
+    const b = vary(28, 8);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
+    const pw = 4 + Math.floor(Math.random() * 8);
+    const ph = 3 + Math.floor(Math.random() * 6);
+    ctx.fillRect(px, py, pw, ph);
+  }
+
+  // A few bright spots — filtered sunlight
+  for (let i = 0; i < 5; i++) {
+    const sx = Math.floor(Math.random() * SIZE);
+    const sy = Math.floor(Math.random() * SIZE);
+    ctx.fillStyle = `rgba(80, 120, 50, 0.7)`;
+    const sr = 1 + Math.floor(Math.random() * 3);
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return makeTexture(canvas);
+}
+
 // ---------------------------------------------------------------------------
 // Registry — cached getters by name
 // ---------------------------------------------------------------------------
@@ -333,17 +469,20 @@ const wallGenerators: Record<WallTextureName, () => THREE.CanvasTexture> = {
   brick: generateBrickWall,
   mossy: generateMossyWall,
   wood: generateWoodWall,
+  forest: generateForestWall,
 };
 
 const floorGenerators: Record<FloorTextureName, () => THREE.CanvasTexture> = {
   stone_tile: generateStoneTileFloor,
   dirt: generateDirtFloor,
   cobblestone: generateCobblestoneFloor,
+  grass: generateGrassFloor,
 };
 
 const ceilingGenerators: Record<CeilingTextureName, () => THREE.CanvasTexture> = {
   dark_rock: generateDarkRockCeiling,
   wooden_beams: generateWoodenBeamsCeiling,
+  canopy: generateCanopyCeiling,
 };
 
 const wallCache = new Map<string, THREE.CanvasTexture>();

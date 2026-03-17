@@ -133,6 +133,16 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
         walkableChars.add(def.char);
       }
 
+      // seeThrough (optional)
+      if (def.seeThrough !== undefined) {
+        if (typeof def.seeThrough !== 'boolean') {
+          throw new Error(`Level ${source}: charDefs[${i}].seeThrough must be a boolean`);
+        }
+        if (def.seeThrough && !def.solid) {
+          throw new Error(`Level ${source}: charDefs[${i}].seeThrough requires solid to be true`);
+        }
+      }
+
       // textures
       validateTextures(def, `charDefs[${i}]`, source);
     }
@@ -313,7 +323,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
 
   // environment (optional)
   if (obj.environment !== undefined) {
-    const validEnvs = ['dungeon', 'mist'];
+    const validEnvs = ['dungeon', 'mist', 'forest'];
     if (!validEnvs.includes(obj.environment as string)) {
       throw new Error(`Level ${source}: "environment" must be one of ${validEnvs.join(', ')}`);
     }

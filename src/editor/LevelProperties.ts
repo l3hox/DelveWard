@@ -66,8 +66,8 @@ export class LevelProperties {
     });
 
     this.addCollapsibleSection('Environment', 'environment', (body) => {
-      this.addDropdownField(body, 'environment', level.environment ?? 'dungeon', ['dungeon', 'mist'], (val) => {
-        level.environment = val as 'dungeon' | 'mist';
+      this.addDropdownField(body, 'environment', level.environment ?? 'dungeon', ['dungeon', 'mist', 'forest'], (val) => {
+        level.environment = val as 'dungeon' | 'mist' | 'forest';
         this.onChanged?.();
       });
 
@@ -269,9 +269,22 @@ export class LevelProperties {
 
       this.addCheckboxField(detail, 'solid', def.solid, (val) => {
         def.solid = val;
+        if (!val) delete def.seeThrough;
         this.onChanged?.();
         this.refresh();
       });
+
+      if (def.solid) {
+        this.addCheckboxField(detail, 'seeThrough', def.seeThrough ?? false, (val) => {
+          if (val) {
+            def.seeThrough = true;
+          } else {
+            delete def.seeThrough;
+          }
+          this.onChanged?.();
+          this.refresh();
+        });
+      }
 
       this.addOptionalDropdownField(detail, 'wallTexture', def.wallTexture, WALL_TEXTURES, (val) => {
         if (val === undefined) {

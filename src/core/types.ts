@@ -9,6 +9,7 @@ export interface TextureSet {
 export interface CharDef extends TextureSet {
   char: string;      // single ASCII character, not a built-in char
   solid: boolean;    // true = wall-like, false = walkable
+  seeThrough?: boolean; // solid but renders floor/ceiling, no wall faces toward renderable neighbors
 }
 
 export interface TextureArea extends TextureSet {
@@ -18,7 +19,7 @@ export interface TextureArea extends TextureSet {
   toRow: number;
 }
 
-export type Environment = 'dungeon' | 'mist';
+export type Environment = 'dungeon' | 'mist' | 'forest';
 export type Skybox = 'starry-night';
 
 export interface DungeonLevel {

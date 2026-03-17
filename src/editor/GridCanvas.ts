@@ -2,7 +2,8 @@ import { EditorApp } from './EditorApp';
 import { resolveTextures } from '../core/textureResolver';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
-import type { Entity } from '../core/types';
+import type { Entity, CharDef } from '../core/types';
+import { getTreeOverlayCanvas } from './treeOverlay';
 import type { Facing } from '../core/grid';
 import { itemDatabase } from '../core/itemDatabase';
 
@@ -413,8 +414,15 @@ export class GridCanvas {
 
     const charDef = app.charDefMap.get(char);
     const isSolid = char === '#' || (charDef !== undefined && charDef.solid);
+    const isSeeThrough = charDef !== undefined && charDef.solid && charDef.seeThrough;
 
-    if (isSolid) {
+    if (isSeeThrough) {
+      // See-through solid — show floor texture + tree overlay
+      const { floor } = resolveTextures(col, row, char, level.defaults, app.charDefMap, level.areas);
+      const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
+      ctx.drawImage(texImage, px, py, tw, th);
+      ctx.drawImage(getTreeOverlayCanvas(), px, py, tw, th);
+    } else if (isSolid) {
       // Wall — resolve wall texture, draw with dark overlay
       const { wall } = resolveTextures(col, row, char, level.defaults, app.charDefMap, level.areas);
       const texImage = getWallTexture(wall as WallTextureName).image as HTMLCanvasElement;

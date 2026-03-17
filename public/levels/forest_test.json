@@ -1,0 +1,29 @@
+{
+  "name": "Forest Test",
+  "levels": [
+    {
+      "id": "forest_clearing",
+      "name": "Forest Clearing",
+      "environment": "forest",
+      "grid": [
+        "FFFFFFFFFFFF",
+        "FTTTTTTTTTTF",
+        "FT........TF",
+        "FT........TF",
+        "FT...##...TF",
+        "FT...##...TF",
+        "FT........TF",
+        "FT........TF",
+        "FTTTTTTTTTTF",
+        "FFFFFFFFFFFF"
+      ],
+      "playerStart": { "col": 5, "row": 3, "facing": "S" },
+      "entities": [],
+      "defaults": { "floorTexture": "grass", "ceilingTexture": "canopy" },
+      "charDefs": [
+        { "char": "F", "solid": true, "wallTexture": "forest" },
+        { "char": "T", "solid": true, "seeThrough": true, "wallTexture": "forest", "floorTexture": "grass", "ceilingTexture": "canopy" }
+      ]
+    }
+  ]
+}

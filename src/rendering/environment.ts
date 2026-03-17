@@ -23,6 +23,12 @@ const ENVIRONMENTS: Record<Environment, EnvironmentConfig> = {
     fogFar: 14,
     ambientColor: 0x8899aa,
   },
+  forest: {
+    fogColor: 0x1a2e1a,
+    fogNear: 4,
+    fogFar: 20,
+    ambientColor: 0x3a5530,
+  },
 };
 
 let currentEnv: Environment = 'dungeon';
