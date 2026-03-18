@@ -25,6 +25,7 @@ export class Inspector {
   private onBeginTextEdit: (() => void) | null = null;
   private onCommitTextEdit: (() => void) | null = null;
   private onStairGoTo: ((targetId: string) => void) | null = null;
+  private onRefHovered: ((entity: Entity | null) => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -61,6 +62,10 @@ export class Inspector {
 
   setStairGoToCallback(cb: (targetId: string) => void): void {
     this.onStairGoTo = cb;
+  }
+
+  setRefHoveredCallback(cb: (entity: Entity | null) => void): void {
+    this.onRefHovered = cb;
   }
 
   refresh(): void {
@@ -109,15 +114,17 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
-        this.addDropdownField('gateMode', (entity.gateMode as string) ?? '', ['', 'or', 'and', 'xor'], (val) => {
-          if (val) {
-            entity.gateMode = val;
-          } else {
-            delete (entity as Record<string, unknown>).gateMode;
-          }
-          this.onEntityChanged?.();
-        });
         this.addReferencedBySection(entity);
+        // Only show gateMode when door has multiple incoming connections
+        {
+          const refs = this.app.getReferencingEntities(entity);
+          if (refs.length > 1) {
+            this.addDropdownField('gateMode', (entity.gateMode as string) ?? 'or', ['or', 'and', 'xor'], (val) => {
+              entity.gateMode = val;
+              this.onEntityChanged?.();
+            });
+          }
+        }
         {
           // Also show key peers as references
           const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'key');
@@ -127,6 +134,7 @@ export class Inspector {
               peerItem.className = 'inspector-ref-item';
               peerItem.textContent = `key @ (${peer.col}, ${peer.row})`;
               peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
+              this.attachHoverHighlight(peerItem, peer);
               this.container.appendChild(peerItem);
             }
           }
@@ -150,6 +158,7 @@ export class Inspector {
             peerItem.className = 'inspector-ref-item';
             peerItem.textContent = `${peer.type} @ (${peer.col}, ${peer.row})`;
             peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
+            this.attachHoverHighlight(peerItem, peer);
             this.container.appendChild(peerItem);
           }
         }
@@ -316,6 +325,7 @@ export class Inspector {
               goToItem.textContent = `stairs @ (${targetStair.col}, ${targetStair.row}) on ${otherLevel.name}`;
               goToItem.title = stairTargetId;
               goToItem.addEventListener('click', () => this.onStairGoTo?.(stairTargetId));
+              this.attachHoverHighlight(goToItem, targetStair);
               this.container.appendChild(goToItem);
               break;
             }
@@ -502,11 +512,39 @@ export class Inspector {
     refHeader.textContent = `Referenced by (${refs.length})`;
     this.container.appendChild(refHeader);
     for (const ref of refs) {
-      const refItem = document.createElement('div');
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '4px';
+      row.style.alignItems = 'center';
+
+      const refItem = document.createElement('span');
       refItem.className = 'inspector-ref-item';
+      refItem.style.flex = '1';
       refItem.textContent = `${ref.type} @ (${ref.col}, ${ref.row})`;
       refItem.addEventListener('click', () => this.onRefClicked?.(ref));
-      this.container.appendChild(refItem);
+      this.attachHoverHighlight(refItem, ref);
+      row.appendChild(refItem);
+
+      // Remove button: removes this entity's ID from the referencing entity's targets
+      const rec = ref as Record<string, unknown>;
+      const targets = rec.targets as string[] | undefined;
+      if (targets && entity.id && targets.includes(entity.id)) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-pick';
+        removeBtn.textContent = '\u00d7';
+        removeBtn.style.padding = '0 4px';
+        removeBtn.style.minWidth = 'auto';
+        removeBtn.addEventListener('click', () => {
+          this.onBeforeDiscreteChange?.();
+          const idx = targets.indexOf(entity.id!);
+          if (idx >= 0) targets.splice(idx, 1);
+          this.onEntityChanged?.();
+          this.refresh();
+        });
+        row.appendChild(removeBtn);
+      }
+
+      this.container.appendChild(row);
     }
   }
 
@@ -517,6 +555,12 @@ export class Inspector {
     'one_shot':  { label: 'one_shot', tooltip: 'Fires once and cannot be re-activated' },
     'timed':     { label: 'timed', tooltip: 'Activates for a set duration, then auto-deactivates' },
   };
+
+  /** Attach mouseenter/mouseleave to highlight an entity on the grid canvas. */
+  private attachHoverHighlight(element: HTMLElement, entity: Entity): void {
+    element.addEventListener('mouseenter', () => this.onRefHovered?.(entity));
+    element.addEventListener('mouseleave', () => this.onRefHovered?.(null));
+  }
 
   /** Signal mode dropdown with display labels and hover tooltips. */
   private addSignalModeField(
@@ -640,6 +684,7 @@ export class Inspector {
       span.addEventListener('click', () => {
         if (targetEntity) this.onRefClicked?.(targetEntity);
       });
+      if (targetEntity) this.attachHoverHighlight(span, targetEntity);
       row.appendChild(span);
 
       const removeBtn = document.createElement('button');

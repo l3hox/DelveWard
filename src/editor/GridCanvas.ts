@@ -450,6 +450,9 @@ export class GridCanvas {
     // Draw selection highlight
     this.drawSelectionHighlight(offsetX, offsetY, tileSize);
 
+    // Draw inspector hover highlight
+    this.drawInspectorHoverHighlight(offsetX, offsetY, tileSize);
+
     // Draw wiring lines for lever/pressure_plate -> door connections
     this.drawWiringLines(offsetX, offsetY, tileSize);
 
@@ -1054,6 +1057,27 @@ export class GridCanvas {
 
     ctx.save();
     ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px + 1, py + 1, tw - 2, th - 2);
+    ctx.restore();
+  }
+
+  private drawInspectorHoverHighlight(offsetX: number, offsetY: number, tileSize: number): void {
+    const entity = this.app.highlightedEntity;
+    if (!entity) return;
+    // Only highlight if the entity is on the current level
+    if (this.app.level && !this.app.level.entities.includes(entity)) return;
+
+    const { ctx } = this;
+    const px = Math.floor(offsetX + entity.col * tileSize);
+    const py = Math.floor(offsetY + entity.row * tileSize);
+    const tw = Math.ceil(tileSize);
+    const th = Math.ceil(tileSize);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(80, 160, 255, 0.3)';
+    ctx.fillRect(px, py, tw, th);
+    ctx.strokeStyle = 'rgba(80, 160, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.strokeRect(px + 1, py + 1, tw - 2, th - 2);
     ctx.restore();

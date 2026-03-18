@@ -582,7 +582,21 @@ gridCanvas.setBeforePickCompleteCallback(() => {
 // Reference click → select that entity
 inspector.setRefClickedCallback((entity) => {
   app.selectedEntity = entity;
+  app.highlightedEntity = null;
   inspector.refresh();
+  gridCanvas.markDirty();
+});
+
+inspector.setRefHoveredCallback((entity) => {
+  app.highlightedEntity = entity;
+  // If entity is on a different level, highlight that level in the list
+  if (entity && app.dungeon) {
+    const idx = app.dungeon.levels.findIndex(l => l.entities.includes(entity));
+    levelList.hoverHighlightLevelIndex = idx >= 0 && idx !== app.activeLevelIndex ? idx : null;
+  } else {
+    levelList.hoverHighlightLevelIndex = null;
+  }
+  levelList.refresh();
   gridCanvas.markDirty();
 });
 

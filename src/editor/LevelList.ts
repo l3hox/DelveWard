@@ -5,6 +5,7 @@ export class LevelList {
   private app: EditorApp;
 
   highlightedLevelIndex: number | null = null;
+  hoverHighlightLevelIndex: number | null = null;
 
   onLevelSwitch: ((index: number) => void) | null = null;
   onAddLevel: (() => void) | null = null;
@@ -64,6 +65,7 @@ export class LevelList {
       entry.className = 'level-entry';
       if (i === this.app.activeLevelIndex) entry.classList.add('active');
       if (i === this.highlightedLevelIndex && i !== this.app.activeLevelIndex) entry.classList.add('highlight');
+      if (i === this.hoverHighlightLevelIndex && i !== this.app.activeLevelIndex) entry.classList.add('hover-highlight');
 
       const name = document.createElement('span');
       name.className = 'level-entry-name';

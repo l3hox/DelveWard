@@ -17,7 +17,7 @@ export interface HoverInfo {
 export type EditorTool = 'select' | 'paint' | 'entity';
 
 const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
-  door:           { state: 'closed' },
+  door:           { state: 'closed', gateMode: 'or' },
   key:            { keyId: '' },
   lever:          { targets: [], wall: 'N' },
   pressure_plate: { targets: [] },
@@ -94,6 +94,7 @@ export class EditorApp {
   activeTool: EditorTool = 'select';
   selectedChar = '.';
   selectedEntity: Entity | null = null;
+  highlightedEntity: Entity | null = null;
   selectedEntityType = 'enemy';
   pickMode: PickModeState | null = null;
   coordPickCallback: ((col: number, row: number) => void) | null = null;
