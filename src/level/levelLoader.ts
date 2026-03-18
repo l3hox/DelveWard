@@ -255,8 +255,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'lever') {
-      if (!Array.isArray(e.targets) || e.targets.length === 0) {
-        throw new Error(`Level ${source}: entities[${i}] lever must have a non-empty targets array`);
+      if (!Array.isArray(e.targets)) {
+        throw new Error(`Level ${source}: entities[${i}] lever must have a targets array`);
       }
       for (const t of e.targets as string[]) {
         if (typeof t !== 'string' || t === '') {
@@ -279,8 +279,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'pressure_plate') {
-      if (!Array.isArray(e.targets) || e.targets.length === 0) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a non-empty targets array`);
+      if (!Array.isArray(e.targets)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a targets array`);
       }
       for (const t of e.targets as string[]) {
         if (typeof t !== 'string' || t === '') {
@@ -303,8 +303,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'trigger') {
-      if (!Array.isArray(e.targets) || e.targets.length === 0) {
-        throw new Error(`Level ${source}: entities[${i}] trigger must have a non-empty targets array`);
+      if (!Array.isArray(e.targets)) {
+        throw new Error(`Level ${source}: entities[${i}] trigger must have a targets array`);
       }
       for (const t of e.targets as string[]) {
         if (typeof t !== 'string' || t === '') {
@@ -324,8 +324,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'tripwire') {
-      if (!Array.isArray(e.targets) || e.targets.length === 0) {
-        throw new Error(`Level ${source}: entities[${i}] tripwire must have a non-empty targets array`);
+      if (!Array.isArray(e.targets)) {
+        throw new Error(`Level ${source}: entities[${i}] tripwire must have a targets array`);
       }
       for (const t of e.targets as string[]) {
         if (typeof t !== 'string' || t === '') {
@@ -347,8 +347,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'gate') {
-      if (!Array.isArray(e.targets) || e.targets.length === 0) {
-        throw new Error(`Level ${source}: entities[${i}] gate must have a non-empty targets array`);
+      if (!Array.isArray(e.targets)) {
+        throw new Error(`Level ${source}: entities[${i}] gate must have a targets array`);
       }
       for (const t of e.targets as string[]) {
         if (typeof t !== 'string' || t === '') {

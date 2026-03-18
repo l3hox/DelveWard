@@ -164,7 +164,7 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTargetsArrayField(entity, 'door');
+        this.addTargetsArrayField(entity, 'door,gate');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
           ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             if (val) {
@@ -184,7 +184,7 @@ export class Inspector {
         break;
 
       case 'pressure_plate':
-        this.addTargetsArrayField(entity, 'door');
+        this.addTargetsArrayField(entity, 'door,gate');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
           ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             if (val) {
@@ -229,7 +229,7 @@ export class Inspector {
         break;
 
       case 'trigger':
-        this.addTargetsArrayField(entity, 'door');
+        this.addTargetsArrayField(entity, 'door,gate');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -245,7 +245,7 @@ export class Inspector {
         break;
 
       case 'tripwire':
-        this.addTargetsArrayField(entity, 'door');
+        this.addTargetsArrayField(entity, 'door,gate');
         this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
           entity.orientation = val;
           this.onEntityChanged?.();
@@ -275,7 +275,7 @@ export class Inspector {
             this.onEntityChanged?.();
             this.refresh();
           });
-        this.addTargetsArrayField(entity, 'door');
+        this.addTargetsArrayField(entity, 'door,gate');
         if ((entity.gateType as string) === 'delay') {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;

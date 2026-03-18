@@ -412,7 +412,16 @@ describe('validateLevel', () => {
       grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever' }],
-    }), 'test')).toThrow('lever must have a non-empty targets array');
+    }), 'test')).toThrow('lever must have a targets array');
+  });
+
+  it('accepts lever with empty targets array', () => {
+    const level = validateLevel(validLevel({
+      grid: ['#####', '#...#', '#...#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [{ col: 2, row: 2, type: 'lever', id: 'lever_1', targets: [] }],
+    }), 'test');
+    expect(level.entities).toHaveLength(1);
   });
 
   it('rejects lever target referencing non-existent entity ID', () => {
@@ -458,7 +467,14 @@ describe('validateLevel', () => {
   it('rejects pressure_plate with no target and no targetDoor', () => {
     expect(() => validateLevel(doorLevel([
       { col: 1, row: 2, type: 'pressure_plate' },
-    ]), 'test')).toThrow('pressure_plate must have a non-empty targets array');
+    ]), 'test')).toThrow('pressure_plate must have a targets array');
+  });
+
+  it('accepts pressure_plate with empty targets array', () => {
+    const level = validateLevel(doorLevel([
+      { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', targets: [] },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
   });
 
   it('rejects pressure_plate target referencing non-existent entity ID', () => {

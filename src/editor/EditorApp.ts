@@ -68,11 +68,11 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door' },
-  pressure_plate: { field: 'targets', validEntityType: 'door' },
-  trigger:        { field: 'targets', validEntityType: 'door' },
-  tripwire:       { field: 'targets', validEntityType: 'door' },
-  gate:           { field: 'targets', validEntityType: 'door' },
+  lever:          { field: 'targets', validEntityType: 'door,gate' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate' },
+  gate:           { field: 'targets', validEntityType: 'door,gate' },
   key:            { field: 'keyId',  validEntityType: 'door' },
   door:           { field: 'keyId',  validEntityType: 'key' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
@@ -370,6 +370,18 @@ export class EditorApp {
       }
     }
 
+    // Entities with empty targets (warning — not blocking)
+    const TARGETS_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
+    for (const e of level.entities) {
+      if (TARGETS_ENTITY_TYPES.has(e.type)) {
+        const rec = e as Record<string, unknown>;
+        const targets = rec.targets as string[] | undefined;
+        if (!targets || targets.length === 0) {
+          errors.push({ message: `${e.type} '${e.id ?? '?'}' has no targets`, entity: e });
+        }
+      }
+    }
+
     // Player start out of bounds
     const ps = level.playerStart;
     if (ps.row < 0 || ps.row >= level.grid.length ||
@@ -559,6 +571,20 @@ export class EditorApp {
     } else if (type === 'consumable' && this.selectedConsumableId) {
       entity.itemId = this.selectedConsumableId;
     }
+    // Auto-detect wall orientation for wall-mounted entities
+    if ((type === 'lever' || type === 'torch_sconce') && this.level) {
+      const detected = this.autoDetectWall(col, row);
+      if (detected) {
+        entity.wall = detected;
+      }
+    }
+    // Copy targets from the previously selected entity of the same type
+    if (this.selectedEntity && this.selectedEntity.type === type) {
+      const prev = this.selectedEntity as Record<string, unknown>;
+      if (Array.isArray(prev.targets) && (prev.targets as string[]).length > 0) {
+        (entity as Record<string, unknown>).targets = [...prev.targets as string[]];
+      }
+    }
     this.level.entities.push(entity);
     this.selectedEntity = entity;
     return entity;
@@ -610,10 +636,11 @@ export class EditorApp {
     const pm = this.pickMode;
     if (pm.validChar && grid[row][col] !== pm.validChar) return false;
     if (pm.validEntityType) {
-      const hasEntity = this.getEntitiesAt(col, row).some(e => e.type === pm.validEntityType);
+      const validTypes = pm.validEntityType.split(',');
+      const hasEntity = this.getEntitiesAt(col, row).some(e => validTypes.includes(e.type));
       // Cross-level stair pick: also accept walkable cells (will auto-create a stair)
       if (!hasEntity) {
-        if (pm.crossLevel && pm.validEntityType === 'stairs' && this.walkableSet.has(grid[row][col])) {
+        if (pm.crossLevel && validTypes.includes('stairs') && this.walkableSet.has(grid[row][col])) {
           return true;
         }
         return false;
@@ -630,9 +657,10 @@ export class EditorApp {
 
     if ((pm.field === 'target' || pm.field === 'targets') && pm.validEntityType) {
       // ID-based pick: find target entity, ensure it has an ID, write ID into source's field
-      let pickedTargets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      const validTypes = pm.validEntityType!.split(',');
+      let pickedTargets = this.getEntitiesAt(col, row).filter(e => validTypes.includes(e.type));
       // Cross-level stair pick: auto-create a stair on empty walkable cell
-      if (pickedTargets.length === 0 && pm.crossLevel && pm.validEntityType === 'stairs') {
+      if (pickedTargets.length === 0 && pm.crossLevel && validTypes.includes('stairs')) {
         const sourceDir = (pm.entity as Record<string, unknown>).direction as string;
         const oppositeDir = sourceDir === 'up' ? 'down' : 'up';
         const defaults = { direction: oppositeDir, facing: 'S', target: '' };
@@ -711,12 +739,13 @@ export class EditorApp {
     if (col === ws.startCol && row === ws.startRow) return false;
 
     const targets = this.getEntitiesAt(col, row);
-    // Forward match: target cell has an entity of the expected type
-    if (targets.some(e => e.type === ws.validEntityType)) return true;
+    // Forward match: target cell has an entity of one of the expected types
+    const wsValidTypes = ws.validEntityType.split(',');
+    if (targets.some(e => wsValidTypes.includes(e.type))) return true;
     // Reverse match: target cell has an entity that can wire to the source entity's type
     for (const t of targets) {
       const info = WIRE_SOURCE_MAP[t.type];
-      if (info && info.validEntityType === ws.sourceEntity.type) return true;
+      if (info && info.validEntityType.split(',').includes(ws.sourceEntity.type)) return true;
     }
     return false;
   }
@@ -729,7 +758,8 @@ export class EditorApp {
     if (targets.length === 0) return false;
 
     // Try forward wiring: source.field = target.id
-    const forwardTarget = targets.find(e => e.type === ws.validEntityType);
+    const wsValidTypes2 = ws.validEntityType.split(',');
+    const forwardTarget = targets.find(e => wsValidTypes2.includes(e.type));
     if (forwardTarget) {
       return this.applyWire(ws.sourceEntity, forwardTarget, ws.field);
     }
@@ -737,7 +767,7 @@ export class EditorApp {
     // Try reverse wiring: target.field = source.id
     for (const t of targets) {
       const info = WIRE_SOURCE_MAP[t.type];
-      if (info && info.validEntityType === ws.sourceEntity.type) {
+      if (info && info.validEntityType.split(',').includes(ws.sourceEntity.type)) {
         return this.applyWire(t, ws.sourceEntity, info.field);
       }
     }
@@ -768,6 +798,24 @@ export class EditorApp {
       (source as Record<string, unknown>)[field] = target.id;
     }
     return true;
+  }
+
+  /** Auto-detect which wall a wall-mounted entity should face based on adjacent solid cells. */
+  private autoDetectWall(col: number, row: number): string | null {
+    if (!this.level) return null;
+    const grid = this.level.grid;
+    const rows = grid.length;
+    const cols = grid[0].length;
+    type Candidate = { facing: string; solid: boolean };
+    const candidates: Candidate[] = [
+      { facing: 'N', solid: row - 1 >= 0 && !this.walkableSet.has(grid[row - 1][col]) && grid[row - 1][col] !== ' ' },
+      { facing: 'S', solid: row + 1 < rows && !this.walkableSet.has(grid[row + 1][col]) && grid[row + 1][col] !== ' ' },
+      { facing: 'E', solid: col + 1 < cols && !this.walkableSet.has(grid[row][col + 1]) && grid[row][col + 1] !== ' ' },
+      { facing: 'W', solid: col - 1 >= 0 && !this.walkableSet.has(grid[row][col - 1]) && grid[row][col - 1] !== ' ' },
+    ];
+    const solidWalls = candidates.filter(c => c.solid);
+    if (solidWalls.length >= 1) return solidWalls[0].facing;
+    return null;
   }
 
   private generateEntityId(type: string): string {
