@@ -562,7 +562,7 @@ export class EditorApp {
     if (!this.canPlaceEntityType(col, row, type)) return null;
 
     const defaults = ENTITY_DEFAULTS[type] ?? {};
-    const entity: Entity = { col, row, type, id: this.generateEntityId(type), ...defaults };
+    const entity: Entity = { col, row, type, id: this.generateEntityId(type), ...JSON.parse(JSON.stringify(defaults)) };
     // Inject remembered subtypes for entity placement
     if (type === 'enemy' && this.selectedEnemyType) {
       entity.enemyType = this.selectedEnemyType;
