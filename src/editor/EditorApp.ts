@@ -370,33 +370,41 @@ export class EditorApp {
       }
     }
 
-    // Signal chain loop detection
+    // Signal chain loop detection — DFS with proper cycle detection
     const SIGNAL_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
     const entityMap = new Map<string, Entity>();
     for (const e of level.entities) {
       if (e.id) entityMap.set(e.id, e);
     }
+    const reportedLoops = new Set<string>(); // avoid duplicate loop errors
     for (const e of level.entities) {
       if (!SIGNAL_ENTITY_TYPES.has(e.type) || !e.id) continue;
+      // DFS: check if any path from e leads back to e
       const visited = new Set<string>();
-      const stack = [e.id];
-      while (stack.length > 0) {
+      const stack: string[] = [];
+      // Seed with direct targets (not e.id itself)
+      const startRec = e as Record<string, unknown>;
+      if (Array.isArray(startRec.targets)) {
+        for (const t of startRec.targets as string[]) stack.push(t);
+      }
+      let foundLoop = false;
+      while (stack.length > 0 && !foundLoop) {
         const cur = stack.pop()!;
-        if (visited.has(cur)) {
-          errors.push({ message: `Signal loop detected: '${e.id}' reaches itself through '${cur}'`, entity: e });
+        if (cur === e.id) {
+          if (!reportedLoops.has(e.id)) {
+            errors.push({ message: `Signal loop detected: '${e.id}' is part of a cycle`, entity: e });
+            reportedLoops.add(e.id);
+          }
+          foundLoop = true;
           break;
         }
+        if (visited.has(cur)) continue;
         visited.add(cur);
         const curEntity = entityMap.get(cur);
         if (!curEntity) continue;
         const rec = curEntity as Record<string, unknown>;
         if (Array.isArray(rec.targets)) {
           for (const t of rec.targets as string[]) {
-            if (t === e.id) {
-              errors.push({ message: `Signal loop detected: '${e.id}' reaches itself through '${cur}'`, entity: e });
-              stack.length = 0;
-              break;
-            }
             if (!visited.has(t)) stack.push(t);
           }
         }
