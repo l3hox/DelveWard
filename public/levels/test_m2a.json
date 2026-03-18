@@ -1,0 +1,312 @@
+{
+  "name": "Test M2A",
+  "levels": [
+    {
+      "id": "level_1",
+      "name": "Level 1",
+      "grid": [
+        "################",
+        "#....#.#.......#",
+        "#....#.#.......#",
+        "#..............#",
+        "#....#.#.......#",
+        "#....#.#.......#",
+        "#....###.......#",
+        "#..............#",
+        "###.####.......#",
+        "#.#.#..........#",
+        "#.#.##.##......#",
+        "#.#.#...#......#",
+        "#.#.#...#......#",
+        "#.#.....#......#",
+        "#.#######......#",
+        "################"
+      ],
+      "playerStart": {
+        "col": 1,
+        "row": 1,
+        "facing": "S"
+      },
+      "entities": [
+        {
+          "col": 5,
+          "row": 3,
+          "type": "door",
+          "id": "door_1",
+          "state": "closed",
+          "gateMode": "xor"
+        },
+        {
+          "col": 4,
+          "row": 5,
+          "type": "lever",
+          "id": "lever_1",
+          "targets": [
+            "door_1",
+            "door_2"
+          ],
+          "wall": "E",
+          "signalMode": "toggle",
+          "signalDuration": 3
+        },
+        {
+          "col": 7,
+          "row": 3,
+          "type": "door",
+          "id": "door_2",
+          "state": "closed",
+          "gateMode": "or"
+        },
+        {
+          "col": 3,
+          "row": 7,
+          "type": "pressure_plate",
+          "id": "pressure_plate_1",
+          "targets": [
+            "door_3"
+          ],
+          "signalMode": "toggle"
+        },
+        {
+          "col": 3,
+          "row": 8,
+          "type": "door",
+          "id": "door_3",
+          "state": "closed"
+        },
+        {
+          "col": 4,
+          "row": 2,
+          "type": "lever",
+          "id": "lever_2",
+          "targets": [
+            "door_1",
+            "door_2"
+          ],
+          "wall": "E"
+        },
+        {
+          "col": 5,
+          "row": 7,
+          "type": "trigger",
+          "id": "trigger_1",
+          "targets": [
+            "door_4"
+          ],
+          "signalMode": "timed",
+          "signalDelay": 2
+        },
+        {
+          "col": 7,
+          "row": 7,
+          "type": "door",
+          "id": "door_4",
+          "state": "closed"
+        },
+        {
+          "col": 3,
+          "row": 10,
+          "type": "tripwire",
+          "id": "tripwire_1",
+          "targets": [
+            "door_5"
+          ],
+          "signalMode": "one_shot",
+          "visibilityThreshold": 3,
+          "orientation": "EW"
+        },
+        {
+          "col": 3,
+          "row": 12,
+          "type": "door",
+          "id": "door_5",
+          "state": "closed"
+        },
+        {
+          "col": 6,
+          "row": 10,
+          "type": "door",
+          "id": "door_6",
+          "state": "closed"
+        },
+        {
+          "col": 5,
+          "row": 11,
+          "type": "lever",
+          "id": "lever_3",
+          "targets": [
+            "gate_1"
+          ],
+          "wall": "N"
+        },
+        {
+          "col": 7,
+          "row": 11,
+          "type": "lever",
+          "id": "lever_4",
+          "targets": [
+            "gate_1"
+          ],
+          "wall": "N"
+        },
+        {
+          "col": 6,
+          "row": 13,
+          "type": "gate",
+          "id": "gate_1",
+          "gateType": "and",
+          "targets": [
+            "door_6"
+          ]
+        },
+        {
+          "col": 4,
+          "row": 1,
+          "type": "torch_sconce",
+          "id": "torch_sconce_1",
+          "wall": "N"
+        },
+        {
+          "col": 2,
+          "row": 1,
+          "type": "torch_sconce",
+          "id": "torch_sconce_2",
+          "wall": "N"
+        },
+        {
+          "col": 1,
+          "row": 3,
+          "type": "torch_sconce",
+          "id": "torch_sconce_3",
+          "wall": "W"
+        },
+        {
+          "col": 1,
+          "row": 5,
+          "type": "torch_sconce",
+          "id": "torch_sconce_4",
+          "wall": "W"
+        },
+        {
+          "col": 2,
+          "row": 7,
+          "type": "torch_sconce",
+          "id": "torch_sconce_5",
+          "wall": "S"
+        },
+        {
+          "col": 4,
+          "row": 6,
+          "type": "torch_sconce",
+          "id": "torch_sconce_6",
+          "wall": "E"
+        },
+        {
+          "col": 6,
+          "row": 5,
+          "type": "torch_sconce",
+          "id": "torch_sconce_7",
+          "wall": "S"
+        },
+        {
+          "col": 6,
+          "row": 1,
+          "type": "torch_sconce",
+          "id": "torch_sconce_8",
+          "wall": "N"
+        },
+        {
+          "col": 8,
+          "row": 2,
+          "type": "torch_sconce",
+          "id": "torch_sconce_9",
+          "wall": "W"
+        },
+        {
+          "col": 8,
+          "row": 4,
+          "type": "torch_sconce",
+          "id": "torch_sconce_10",
+          "wall": "W"
+        },
+        {
+          "col": 8,
+          "row": 8,
+          "type": "torch_sconce",
+          "id": "torch_sconce_11",
+          "wall": "W"
+        },
+        {
+          "col": 8,
+          "row": 9,
+          "type": "torch_sconce",
+          "id": "torch_sconce_12",
+          "wall": "S"
+        },
+        {
+          "col": 3,
+          "row": 9,
+          "type": "torch_sconce",
+          "id": "torch_sconce_13",
+          "wall": "E"
+        },
+        {
+          "col": 3,
+          "row": 11,
+          "type": "torch_sconce",
+          "id": "torch_sconce_14",
+          "wall": "E"
+        },
+        {
+          "col": 4,
+          "row": 13,
+          "type": "torch_sconce",
+          "id": "torch_sconce_15",
+          "wall": "N"
+        },
+        {
+          "col": 7,
+          "row": 12,
+          "type": "torch_sconce",
+          "id": "torch_sconce_16",
+          "wall": "E"
+        },
+        {
+          "col": 5,
+          "row": 12,
+          "type": "torch_sconce",
+          "id": "torch_sconce_17",
+          "wall": "W"
+        }
+      ]
+    },
+    {
+      "id": "level_2",
+      "name": "Untitled",
+      "grid": [
+        "################",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "################"
+      ],
+      "playerStart": {
+        "col": 1,
+        "row": 1,
+        "facing": "S"
+      },
+      "entities": []
+    }
+  ]
+}
