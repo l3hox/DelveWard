@@ -676,8 +676,8 @@ export class Toolbar {
         break;
       }
       case 'gate': {
-        // Diamond with letter
-        const gd = r * 0.85;
+        // Diamond with letter — larger to fill the button
+        const gd = r * 1.4;
         ctx.fillStyle = '#6688ff';
         ctx.beginPath();
         ctx.moveTo(cx, cy - gd);
@@ -690,7 +690,7 @@ export class Toolbar {
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.max(6, gd * 0.8)}px monospace`;
+        ctx.font = `bold ${Math.max(7, gd * 0.65)}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('G', cx, cy);

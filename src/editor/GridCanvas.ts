@@ -818,8 +818,8 @@ export class GridCanvas {
       }
 
       case 'gate': {
-        // Logic gate symbol (diamond)
-        const gd = iconRadius * 0.9;
+        // Logic gate symbol (diamond) — sized to fill most of the tile
+        const gd = Math.max(5, Math.min(tw, th) * 0.38);
         ctx.fillStyle = '#6688ff';
         ctx.beginPath();
         ctx.moveTo(cx, cy - gd);
@@ -829,12 +829,12 @@ export class GridCanvas {
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#3344aa';
-        ctx.lineWidth = Math.max(1, gd * 0.2);
+        ctx.lineWidth = Math.max(1, gd * 0.15);
         ctx.stroke();
         // Label
         const gateLabel = ((entity.gateType as string) ?? 'and').toUpperCase().charAt(0);
         ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.max(6, gd * 0.8)}px monospace`;
+        ctx.font = `bold ${Math.max(8, gd * 0.9)}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(gateLabel, cx, cy);
