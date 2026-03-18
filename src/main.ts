@@ -406,15 +406,60 @@ async function init(): Promise<void> {
   let lastPlayerCol = firstLevel.playerStart.col;
   let lastPlayerRow = firstLevel.playerStart.row;
 
+  // Blocked doors: doors that tried to close while occupied. Retry every 2s.
+  const DOOR_RETRY_INTERVAL = 1.5;
+  const blockedDoors = new Map<string, { col: number; row: number; timer: number }>();
+
+  function isDoorCellOccupied(col: number, row: number): 'player' | 'enemy' | null {
+    if (lastPlayerCol === col && lastPlayerRow === row) return 'player';
+    if (gameState.isEnemyAt(col, row)) return 'enemy';
+    return null;
+  }
+
+  function tickBlockedDoors(delta: number): void {
+    for (const [key, entry] of blockedDoors) {
+      entry.timer -= delta;
+      if (entry.timer > 0) continue;
+
+      const occupant = isDoorCellOccupied(entry.col, entry.row);
+      if (!occupant) {
+        // Cell is clear — close the door for real
+        blockedDoors.delete(key);
+        const door = gameState.getDoor(entry.col, entry.row);
+        if (door) door.state = 'closed';
+        updateDoorMesh(ls.doorMeshes.panelMap, entry.col, entry.row, false, ls.doorAnimator);
+      } else {
+        // Still blocked — bounce animation and retry
+        entry.timer = DOOR_RETRY_INTERVAL;
+        const dk = doorKey(entry.col, entry.row);
+        ls.doorAnimator.bounce(dk);
+      }
+    }
+  }
+
   function wireCallbacks(): void {
     ls.player.setOnMove((col, row) => {
-      // Deactivate momentary sources at the cell we just left
-      if (col !== lastPlayerCol || row !== lastPlayerRow) {
-        gameState.deactivatePressurePlate(lastPlayerCol, lastPlayerRow);
-        gameState.deactivateTrigger(lastPlayerCol, lastPlayerRow);
-      }
+      const prevCol = lastPlayerCol;
+      const prevRow = lastPlayerRow;
+      // Update position BEFORE deactivating sources so that
+      // isDoorCellOccupied sees the player at their new cell
       lastPlayerCol = col;
       lastPlayerRow = row;
+
+      // Deactivate momentary sources at the cell we just left
+      if (col !== prevCol || row !== prevRow) {
+        gameState.deactivatePressurePlate(prevCol, prevRow);
+        gameState.deactivateTrigger(prevCol, prevRow);
+      }
+
+      // Safety: if player ended up on a closed door, force it open and block it
+      const doorAtPlayer = gameState.getDoor(col, row);
+      if (doorAtPlayer && doorAtPlayer.state === 'closed') {
+        doorAtPlayer.state = 'open';
+        const dk = doorKey(col, row);
+        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator);
+        blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
+      }
 
       // Reveal explored cells on move
       gameState.revealAround(col, row, ls.player.getState().facing, ls.level.grid);
@@ -478,7 +523,25 @@ async function init(): Promise<void> {
 
     // Signal-driven door state changes → animate door mesh
     gameState.onDoorSignalChanged = (col, row, open) => {
-      updateDoorMesh(ls.doorMeshes.panelMap, col, row, open, ls.doorAnimator);
+      const dk = doorKey(col, row);
+      if (open) {
+        // Opening — clear any blocked retry and open normally
+        blockedDoors.delete(dk);
+        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator);
+      } else {
+        // Closing — check if cell is occupied
+        const occupant = isDoorCellOccupied(col, row);
+        if (occupant) {
+          // Keep door open in game state, start retry cycle
+          const door = gameState.getDoor(col, row);
+          if (door) door.state = 'open';
+          blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
+          ls.doorAnimator.bounce(dk);
+        } else {
+          blockedDoors.delete(dk);
+          updateDoorMesh(ls.doorMeshes.panelMap, col, row, false, ls.doorAnimator);
+        }
+      }
     };
 
     // Timed source deactivation → animate lever reset
@@ -497,6 +560,7 @@ async function init(): Promise<void> {
     const targetStairId = stairEntity.target as string;
 
     // Save current level state
+    blockedDoors.clear();
     levelSnapshots.set(currentLevelId, gameState.saveLevelState());
 
     transition.startTransition(() => {
@@ -820,6 +884,7 @@ async function init(): Promise<void> {
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
     gameState.signalManager.tick(delta);
+    tickBlockedDoors(delta);
     transition.update(delta);
     damageNumbers.update(delta);
     swordSwing.update(delta);

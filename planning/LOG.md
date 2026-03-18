@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — Post-Phase-A: Signal Behavior Fixes, Editor Hover Highlights, Door Blocking
+
+**Signal state persistence**: `SignalManager.saveState()`/`loadState()` now included in `LevelSnapshot`. Fixes AND/XOR gates losing source active flags on level transition (door stayed open but wouldn't respond to lever toggles).
+
+**Lever signal modes**: Removed `momentary` (nonsensical for physical switches) and empty default. Options: toggle, one_shot, timed. Timed levers auto-reset to 'up' with animation via new `onSourceDeactivated` → `onLeverReset` callback chain.
+
+**Pressure plate modes fixed**: Toggle now properly flips on/off each step-on (was acting as one_shot). Timed plates start countdown on step-off, not step-on (momentary with delayed reset). Momentary plates show visual feedback (releasePlate mesh reset) on step-off. Removed empty default option.
+
+**Door gateMode cleanup**: Removed empty/default option (was identical to 'or'). New doors preset to 'or'. Dropdown only shown when door has 2+ incoming connections.
+
+**Editor hover highlights**: Hovering any entity link in inspector (targets, referenced-by, key peers, stair go-to) highlights the entity's cell on the grid canvas (blue translucent overlay). Cross-level entity refs highlight the target level name in the level list (blue). Remove buttons (×) added to Referenced By section.
+
+**Door blocking on occupied cells**: Signal-driven doors that try to close on a player or enemy bounce open and retry every 1.5s. Player position updated before source deactivation to prevent timing race. Safety check: if player ends up on a closed door, force it open. Door state correctly set to 'closed' when cell finally clears (fixes walk-through bug). Door panel edge UVs fixed (proportional scaling on thin side/bottom faces only, front/back untouched).
+
+**Files**: `src/core/signalManager.ts`, `src/core/gameState.ts`, `src/main.ts`, `src/editor/Inspector.ts`, `src/editor/EditorApp.ts`, `src/editor/GridCanvas.ts`, `src/editor/LevelList.ts`, `src/editor/main.ts`, `src/rendering/plateRenderer.ts`, `src/rendering/doorRenderer.ts`, `src/rendering/doorAnimator.ts`, `editor.html`, `DUNGEON-DESIGNER.md`
+
+---
+
 ## 2026-03-18 — Phase A: Signal System Foundation (Implementation + Polish)
 
 **Goal**: Build the entire M2 signal system — multi-target migration, centralized signal evaluation, gate logic, new entity types, full editor support. Then polish editor UX.

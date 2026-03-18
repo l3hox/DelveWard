@@ -144,7 +144,30 @@ export function buildDoorMeshes(
 
   const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
   const panelHeight = WALL_HEIGHT - FRAME_WIDTH;
-  const panelGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.08);
+  const panelDepth = 0.08;
+  const panelGeo = new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth);
+  // Fix UVs only on thin edges (sides ±x, top/bottom ±y) — leave front/back ±z as default
+  {
+    const uv = panelGeo.getAttribute('uv');
+    const sd = panelDepth / CELL_SIZE;
+    const sh = panelHeight / CELL_SIZE;
+    const sw = panelWidth / CELL_SIZE;
+    // ±x (side edges): U across depth, V across height
+    for (const s of [0, 4]) {
+      for (let j = 0; j < 4; j++) {
+        uv.setX(s + j, uv.getX(s + j) * sd);
+        uv.setY(s + j, uv.getY(s + j) * sh);
+      }
+    }
+    // ±y (top/bottom edges): U across width, V across depth
+    for (const s of [8, 12]) {
+      for (let j = 0; j < 4; j++) {
+        uv.setX(s + j, uv.getX(s + j) * sw);
+        uv.setY(s + j, uv.getY(s + j) * sd);
+      }
+    }
+    uv.needsUpdate = true;
+  }
   const doorMat = new THREE.MeshLambertMaterial({
     map: getDoorTexture(),
     side: THREE.DoubleSide,

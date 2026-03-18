@@ -36,6 +36,16 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - `dungeon_m1.json` lever migrated to `targets: ["door_4"]`
   - `DUNGEON-DESIGNER.md` updated with trigger, tripwire, gate, gateMode, signalDelay docs
   - 569 tests (20 new SignalManager tests + entity validation tests updated for soft validation)
+- [x] **Post-Phase-A: Signal Behavior Fixes + Editor Hover Highlights + Door Blocking**:
+  - Signal state (`SignalManager.saveState()`) now persisted in `LevelSnapshot` — fixes AND/XOR gates breaking after level transition
+  - Lever signal modes restricted to toggle/one_shot/timed (removed nonsensical momentary). Timed levers auto-reset with mesh animation (`onSourceDeactivated` → `onLeverReset` callback chain)
+  - Pressure plate toggle mode: properly flips on/off each step-on (was one_shot). Timed: countdown starts on step-off, not step-on. Momentary: visual plate mesh reset on step-off via `releasePlate()`
+  - Door gateMode: removed empty default (identical to 'or'), new doors preset to 'or', dropdown only shown with 2+ incoming connections
+  - Editor hover highlights: hovering entity links in inspector highlights target cell on grid (blue overlay) and cross-level target level in level list (blue)
+  - Remove buttons (×) on Referenced By section items
+  - Door blocking: signal-driven doors bounce open when cell occupied (player or enemy), retry every 1.5s. Player position updated before source deactivation. Safety net: force open if player on closed door. Door state correctly restored to 'closed' when cell clears
+  - Door panel edge UVs: proportional scaling on thin side/bottom faces only (front/back untouched)
+  - 572 tests
 
 ---
 

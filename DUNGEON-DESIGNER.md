@@ -158,11 +158,13 @@ Entities can have an optional `id` field — a stable identifier used for cross-
 |-------|------|----------|-------------|
 | `state` | string | No | `"closed"` (default) or `"open"` |
 | `keyId` | string | No | If set, the door requires the matching key to open. Must match a key entity's `keyId`. |
-| `gateMode` | string | No | How multiple incoming signals combine: `"or"` (default — any signal opens), `"and"` (all signals required), `"xor"` (odd count toggles) |
+| `gateMode` | string | No | How multiple incoming signals combine: `"or"` (default — any signal opens), `"and"` (all signals required), `"xor"` (odd count toggles). Only meaningful with 2+ incoming connections. |
 
 ```json
 { "col": 5, "row": 2, "type": "door", "id": "door_1", "state": "closed", "keyId": "gold_key" }
 ```
+
+**Door blocking**: When a signal-driven door attempts to close on an occupied cell (player or enemy), it bounces open and retries every 1.5 seconds. The door only actually closes once the cell is clear. This prevents the player from being trapped inside a closing door.
 
 **Key** (`type: "key"`) — placed on walkable cells. Auto-picked up when player steps on it.
 
@@ -180,8 +182,8 @@ Entities can have an optional `id` field — a stable identifier used for cross-
 |-------|------|----------|-------------|
 | `targets` | string[] | Yes | Entity IDs of doors/gates to toggle (e.g., `["door_1"]` or `["door_1", "gate_1"]`) |
 | `wall` | string | No | Which wall the lever is on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
-| `signalMode` | string | No | `"toggle"` (default), `"momentary"`, `"one_shot"`, or `"timed"` |
-| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `signalMode` | string | No | `"toggle"` (default), `"one_shot"`, or `"timed"`. No `"momentary"` (levers are physical switches). |
+| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode). Timed levers auto-reset to the up position when the timer expires. |
 | `signalDelay` | number | No | Delay in seconds before the signal activates. Composes with any signal mode. |
 
 All targeted doors are marked **mechanical** — they cannot be opened or closed by player interaction (Space key). They can only be operated by the lever. A single lever can control multiple doors and gates.
@@ -191,12 +193,12 @@ All targeted doors are marked **mechanical** — they cannot be opened or closed
 { "col": 7, "row": 8, "type": "lever", "id": "lever_1", "targets": ["door_3"], "wall": "E" }
 ```
 
-**Pressure plate** (`type: "pressure_plate"`) — placed on walkable cells. Triggers automatically when player steps on it. One-way (stays open).
+**Pressure plate** (`type: "pressure_plate"`) — placed on walkable cells. Triggers automatically when player steps on it.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `targets` | string[] | Yes | Entity IDs of doors/gates to open (e.g., `["door_4"]`) |
-| `signalMode` | string | No | `"toggle"` (default), `"momentary"`, `"one_shot"`, or `"timed"` |
+| `signalMode` | string | No | `"toggle"` (default — each step-on flips on/off), `"momentary"` (active only while standing on it), `"one_shot"` (fires once), or `"timed"` (activates on step-on, countdown starts on step-off) |
 | `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
 | `signalDelay` | number | No | Delay in seconds before the signal activates |
 
