@@ -12,7 +12,7 @@ import type { ItemDef } from './itemDatabase';
 export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
 import { SignalManager } from './signalManager';
-import type { GateMode, SignalMode } from './signalManager';
+import type { GateMode, GateType, SignalMode } from './signalManager';
 
 export type DoorState = 'open' | 'closed';
 
@@ -57,6 +57,37 @@ export interface PlateInstance {
   signalDuration?: number;
 }
 
+export interface TriggerInstance {
+  id?: string;
+  col: number;
+  row: number;
+  targets: string[];
+  signalMode: SignalMode;
+  signalDuration?: number;
+  fired: boolean;
+}
+
+export interface TripwireInstance {
+  id?: string;
+  col: number;
+  row: number;
+  targets: string[];
+  signalMode: SignalMode;
+  signalDuration?: number;
+  visibilityThreshold: number;
+  triggered: boolean;
+}
+
+export interface GateInstance {
+  id?: string;
+  col: number;
+  row: number;
+  gateType: GateType;
+  targets: string[];
+  delay?: number;
+  interval?: number;
+}
+
 export interface StairInstance {
   id?: string;
   col: number;
@@ -99,6 +130,9 @@ export interface LevelSnapshot {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  triggers: Map<string, TriggerInstance>;
+  tripwires: Map<string, TripwireInstance>;
+  gates: Map<string, GateInstance>;
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
@@ -112,6 +146,9 @@ export class GameState {
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
   plates: Map<string, PlateInstance>;
+  triggers: Map<string, TriggerInstance>;
+  tripwires: Map<string, TripwireInstance>;
+  gates: Map<string, GateInstance>;
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
@@ -153,6 +190,9 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.triggers = new Map();
+    this.tripwires = new Map();
+    this.gates = new Map();
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
@@ -239,6 +279,40 @@ export class GameState {
           signalMode: e.signalMode as SignalMode | undefined,
           signalDuration: e.signalDuration as number | undefined,
         });
+      } else if (e.type === 'trigger') {
+        const targets = (e.targets as string[] | undefined) ?? [];
+        this.triggers.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          targets,
+          signalMode: (e.signalMode as SignalMode) ?? 'momentary',
+          signalDuration: e.signalDuration as number | undefined,
+          fired: false,
+        });
+      } else if (e.type === 'tripwire') {
+        const targets = (e.targets as string[] | undefined) ?? [];
+        this.tripwires.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          targets,
+          signalMode: (e.signalMode as SignalMode) ?? 'one_shot',
+          signalDuration: e.signalDuration as number | undefined,
+          visibilityThreshold: (e.visibilityThreshold as number) ?? 8,
+          triggered: false,
+        });
+      } else if (e.type === 'gate') {
+        const targets = (e.targets as string[] | undefined) ?? [];
+        this.gates.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          gateType: (e.gateType as GateType) ?? 'and',
+          targets,
+          delay: e.delay as number | undefined,
+          interval: e.interval as number | undefined,
+        });
       } else if (e.type === 'torch_sconce') {
         const wall = (e.wall as Facing | undefined) ??
           autoDetectLeverWall(e.col, e.row, grid);
@@ -285,26 +359,23 @@ export class GameState {
       }
     }
 
-    // Mark doors targeted by levers/plates as mechanical (resolve via entityById)
+    // Mark doors targeted by signal sources as mechanical (resolve via entityById)
     this._rebuildEntityIndex();
-    for (const lever of this.levers.values()) {
-      for (const t of lever.targets) {
+    const markMechanical = (targets: string[]) => {
+      for (const t of targets) {
         const pos = this.resolveEntityPosition(t);
         if (pos) {
           const door = this.getDoor(pos.col, pos.row);
           if (door) door.mechanical = true;
         }
       }
-    }
-    for (const plate of this.plates.values()) {
-      for (const t of plate.targets) {
-        const pos = this.resolveEntityPosition(t);
-        if (pos) {
-          const door = this.getDoor(pos.col, pos.row);
-          if (door) door.mechanical = true;
-        }
-      }
-    }
+    };
+    for (const lever of this.levers.values()) markMechanical(lever.targets);
+    for (const plate of this.plates.values()) markMechanical(plate.targets);
+    for (const trigger of this.triggers.values()) markMechanical(trigger.targets);
+    for (const tripwire of this.tripwires.values()) markMechanical(tripwire.targets);
+    // Gates target doors indirectly; mark their direct targets
+    for (const gate of this.gates.values()) markMechanical(gate.targets);
 
     this._initSignalManager();
   }
@@ -328,6 +399,36 @@ export class GameState {
           plate.id, plate.targets,
           plate.signalMode ?? 'toggle',
           plate.signalDuration,
+        );
+      }
+    }
+
+    // Register triggers and tripwires as sources
+    for (const trigger of this.triggers.values()) {
+      if (trigger.id) {
+        this.signalManager.registerSource(
+          trigger.id, trigger.targets,
+          trigger.signalMode,
+          trigger.signalDuration,
+        );
+      }
+    }
+    for (const tripwire of this.tripwires.values()) {
+      if (tripwire.id) {
+        this.signalManager.registerSource(
+          tripwire.id, tripwire.targets,
+          tripwire.signalMode,
+          tripwire.signalDuration,
+        );
+      }
+    }
+
+    // Register standalone gates
+    for (const gate of this.gates.values()) {
+      if (gate.id) {
+        this.signalManager.registerGate(
+          gate.id, gate.gateType, gate.targets,
+          gate.delay, gate.interval,
         );
       }
     }
@@ -358,6 +459,9 @@ export class GameState {
     for (const k of this.keys.values()) register(k, 'key');
     for (const l of this.levers.values()) register(l, 'lever');
     for (const p of this.plates.values()) register(p, 'pressure_plate');
+    for (const t of this.triggers.values()) register(t, 'trigger');
+    for (const tw of this.tripwires.values()) register(tw, 'tripwire');
+    for (const g of this.gates.values()) register(g, 'gate');
     for (const s of this.sconces.values()) register(s, 'torch_sconce');
     for (const s of this.stairs.values()) register(s, 'stairs');
   }
@@ -383,6 +487,18 @@ export class GameState {
     for (const [k, v] of this.plates) {
       plates.set(k, { ...v });
     }
+    const triggers = new Map<string, TriggerInstance>();
+    for (const [k, v] of this.triggers) {
+      triggers.set(k, { ...v });
+    }
+    const tripwires = new Map<string, TripwireInstance>();
+    for (const [k, v] of this.tripwires) {
+      tripwires.set(k, { ...v });
+    }
+    const gates = new Map<string, GateInstance>();
+    for (const [k, v] of this.gates) {
+      gates.set(k, { ...v });
+    }
     const sconces = new Map<string, SconceInstance>();
     for (const [k, v] of this.sconces) {
       sconces.set(k, { ...v });
@@ -398,8 +514,8 @@ export class GameState {
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
     return {
-      doors, keys, levers, plates, sconces, stairs, enemies,
-      exploredCells, registrySnapshot,
+      doors, keys, levers, plates, triggers, tripwires, gates,
+      sconces, stairs, enemies, exploredCells, registrySnapshot,
     };
   }
 
@@ -419,6 +535,18 @@ export class GameState {
     this.plates = new Map<string, PlateInstance>();
     for (const [k, v] of snapshot.plates) {
       this.plates.set(k, { ...v });
+    }
+    this.triggers = new Map<string, TriggerInstance>();
+    for (const [k, v] of snapshot.triggers) {
+      this.triggers.set(k, { ...v });
+    }
+    this.tripwires = new Map<string, TripwireInstance>();
+    for (const [k, v] of snapshot.tripwires) {
+      this.tripwires.set(k, { ...v });
+    }
+    this.gates = new Map<string, GateInstance>();
+    for (const [k, v] of snapshot.gates) {
+      this.gates.set(k, { ...v });
     }
     this.sconces = new Map<string, SconceInstance>();
     for (const [k, v] of snapshot.sconces) {
@@ -447,6 +575,9 @@ export class GameState {
     this.keys = new Map();
     this.levers = new Map();
     this.plates = new Map();
+    this.triggers = new Map();
+    this.tripwires = new Map();
+    this.gates = new Map();
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
@@ -572,6 +703,40 @@ export class GameState {
     if (plate.id && this.signalManager.getSource(plate.id)) {
       this.signalManager.deactivateSource(plate.id);
     }
+  }
+
+  /** Activate a trigger at the given position (called on player move). */
+  activateTrigger(col: number, row: number): boolean {
+    const trigger = this.triggers.get(doorKey(col, row));
+    if (!trigger) return false;
+    if (trigger.signalMode === 'one_shot' && trigger.fired) return false;
+    trigger.fired = true;
+    if (trigger.id && this.signalManager.getSource(trigger.id)) {
+      this.signalManager.setSourceActive(trigger.id, true);
+    }
+    return true;
+  }
+
+  /** Deactivate a momentary trigger when the player steps off. */
+  deactivateTrigger(col: number, row: number): void {
+    const trigger = this.triggers.get(doorKey(col, row));
+    if (!trigger) return;
+    if (trigger.signalMode !== 'momentary') return;
+    trigger.fired = false;
+    if (trigger.id && this.signalManager.getSource(trigger.id)) {
+      this.signalManager.deactivateSource(trigger.id);
+    }
+  }
+
+  /** Activate a tripwire at the given position (called on player move). */
+  activateTripwire(col: number, row: number): boolean {
+    const tripwire = this.tripwires.get(doorKey(col, row));
+    if (!tripwire || tripwire.triggered) return false;
+    tripwire.triggered = true;
+    if (tripwire.id && this.signalManager.getSource(tripwire.id)) {
+      this.signalManager.setSourceActive(tripwire.id, true);
+    }
+    return true;
   }
 
   getSconce(col: number, row: number): SconceInstance | undefined {

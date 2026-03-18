@@ -302,6 +302,74 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       }
     }
 
+    if (e.type === 'trigger') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] trigger must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] trigger targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] trigger target "${t}" must reference an existing entity id`);
+        }
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] trigger must be on a walkable cell`);
+      }
+      const validTriggerSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validTriggerSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] trigger signalMode must be one of ${validTriggerSignalModes.join(', ')}`);
+      }
+    }
+
+    if (e.type === 'tripwire') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] tripwire must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] tripwire targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] tripwire target "${t}" must reference an existing entity id`);
+        }
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] tripwire must be on a walkable cell`);
+      }
+      if (e.visibilityThreshold !== undefined && typeof e.visibilityThreshold !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] tripwire visibilityThreshold must be a number`);
+      }
+    }
+
+    if (e.type === 'gate') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] gate must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] gate targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] gate target "${t}" must reference an existing entity id`);
+        }
+      }
+      const validGateTypes = ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'];
+      if (!validGateTypes.includes(e.gateType as string)) {
+        throw new Error(`Level ${source}: entities[${i}] gate must have a valid gateType (${validGateTypes.join(', ')})`);
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] gate must be on a walkable cell`);
+      }
+      if (e.delay !== undefined && typeof e.delay !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] gate delay must be a number`);
+      }
+      if (e.interval !== undefined && typeof e.interval !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] gate interval must be a number`);
+      }
+    }
+
     if (e.type === 'enemy') {
       if (typeof e.enemyType !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] enemy must have a string enemyType`);

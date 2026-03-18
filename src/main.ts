@@ -408,9 +408,10 @@ async function init(): Promise<void> {
 
   function wireCallbacks(): void {
     ls.player.setOnMove((col, row) => {
-      // Deactivate momentary plates at the cell we just left
+      // Deactivate momentary sources at the cell we just left
       if (col !== lastPlayerCol || row !== lastPlayerRow) {
         gameState.deactivatePressurePlate(lastPlayerCol, lastPlayerRow);
+        gameState.deactivateTrigger(lastPlayerCol, lastPlayerRow);
       }
       lastPlayerCol = col;
       lastPlayerRow = row;
@@ -440,6 +441,10 @@ async function init(): Promise<void> {
         console.log(`Picked up: ${pickedUpConsumable.name}`);
         hideConsumableMesh(ls.consumableMeshes.meshMap, col, row);
       }
+
+      // Trigger / tripwire activation
+      gameState.activateTrigger(col, row);
+      gameState.activateTripwire(col, row);
 
       // Pressure plate activation
       const plateTargets = gameState.activatePressurePlate(col, row);
