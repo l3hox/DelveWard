@@ -146,24 +146,24 @@ The visual leap. Multiple levels visible at once. Outdoor sections. Decorative 3
 
 ---
 
-## Milestone 6: The Toolmaker
+## Milestone 6: The Toolmaker — COMPLETE (pulled forward, shipped with v0.1.5)
 
 **Theme:** "I built a dungeon in 20 minutes and my friend played it."
 
-The level editor. Now content creation scales. Build dungeons visually, wire signals, place entities, test-play instantly. This is where the project becomes a *platform* for building adventures, not just one adventure.
+The level editor was pulled forward and built alongside M1. Core editor features are complete. D4 (live 3D preview) and D6 (test play from editor) deferred as future enhancements — editor will continue evolving alongside future milestones.
 
-| # | Feature | From |
+| # | Feature | Status |
 |---|---|---|
-| D1 | Grid painting | T4 |
-| D2 | Multi-layer view | T4 |
-| D3 | Entity placement | T4 |
-| D4 | Live 3D preview | T4 |
-| D5 | Signal wiring UI | T4 |
-| D6 | Test play | T4 |
-| D7 | CharDef & texture painting | T4 |
-| D10 | Undo/redo | T4 |
+| D1 | Grid painting | **Done** |
+| D2 | Multi-layer view | **Done** (multi-level dungeon support) |
+| D3 | Entity placement | **Done** |
+| D4 | Live 3D preview | Deferred (future enhancement) |
+| D5 | Signal wiring UI | **Done** (pick mode + wiring arrows + drag-to-wire) |
+| D6 | Test play | Deferred (future enhancement) |
+| D7 | CharDef & texture painting | **Done** |
+| D10 | Undo/redo | **Done** |
 
-**Playable moment:** Open the editor, paint a dungeon, drop enemies and items, wire a trap, hit play, test it, tweak, share the JSON with a friend.
+**Playable moment:** Open the editor, paint a dungeon, drop enemies and items, wire a trap, export/save JSON, load in game.
 
 ---
 
@@ -246,7 +246,7 @@ No milestone should take more than a few weeks of sessions. If one feels endless
 | 3 | The Living World | NPCs, dialog, trading, quests |
 | 4 | The Arcane Arts | Magic, ranged combat, spell-world interaction |
 | 5 | The Vertical World | Multi-level rendering, outdoor, decorative meshes |
-| 6 | The Toolmaker | Level editor |
+| 6 | The Toolmaker | Level editor (COMPLETE — pulled forward) |
 | 7 | Scripting & Advanced | Script system, boss encounters, advanced AI |
 | 8 | Sound & Feel | Audio, camera polish, atmosphere |
 | 9+ | The Deep End | Classes, procgen, day/night, ambition |

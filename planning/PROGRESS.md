@@ -8,7 +8,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Versioning
 
-`0.milestone` — e.g. `0.1` when Milestone 1 ships. Current tag: **v0.0.9**.
+`0.milestone` — e.g. `0.1` when Milestone 1 ships. Current tag: **v0.1.5**.
 
 ---
 
