@@ -489,6 +489,10 @@ export class GameState {
         plate.activated = false;
         this.onPlateReset?.(pos.col, pos.row);
       }
+      const trigger = this.triggers.get(doorKey(pos.col, pos.row));
+      if (trigger && trigger.fired) {
+        trigger.fired = false;
+      }
     });
   }
 
@@ -796,22 +800,48 @@ export class GameState {
   activateTrigger(col: number, row: number): boolean {
     const trigger = this.triggers.get(doorKey(col, row));
     if (!trigger) return false;
-    if (trigger.signalMode === 'one_shot' && trigger.fired) return false;
+    const mode = trigger.signalMode ?? 'momentary';
+
+    if (mode === 'toggle') {
+      trigger.fired = !trigger.fired;
+      if (trigger.id && this.signalManager.getSource(trigger.id)) {
+        this.signalManager.setSourceActive(trigger.id, trigger.fired);
+      }
+      return true;
+    }
+
+    // All other modes: activate on first step-on only
+    if (mode === 'one_shot' && trigger.fired) return false;
+    if (trigger.fired) return false;
     trigger.fired = true;
     if (trigger.id && this.signalManager.getSource(trigger.id)) {
       this.signalManager.setSourceActive(trigger.id, true);
+      // Timed triggers: clear timer — countdown starts on step-off
+      if (mode === 'timed') {
+        const source = this.signalManager.getSource(trigger.id);
+        if (source) source.timer = 0;
+      }
     }
     return true;
   }
 
-  /** Deactivate a momentary trigger when the player steps off. */
+  /** Deactivate a trigger when the player steps off.
+   *  Momentary: deactivates immediately. Timed: starts the countdown timer. */
   deactivateTrigger(col: number, row: number): void {
     const trigger = this.triggers.get(doorKey(col, row));
-    if (!trigger) return;
-    if (trigger.signalMode !== 'momentary') return;
-    trigger.fired = false;
-    if (trigger.id && this.signalManager.getSource(trigger.id)) {
-      this.signalManager.deactivateSource(trigger.id);
+    if (!trigger || !trigger.fired) return;
+    const mode = trigger.signalMode ?? 'momentary';
+    if (mode === 'momentary') {
+      trigger.fired = false;
+      if (trigger.id && this.signalManager.getSource(trigger.id)) {
+        this.signalManager.deactivateSource(trigger.id);
+      }
+    } else if (mode === 'timed') {
+      // Start the timed countdown — signal stays active until timer expires
+      const source = trigger.id ? this.signalManager.getSource(trigger.id) : undefined;
+      if (source && source.active && source.duration) {
+        source.timer = source.duration;
+      }
     }
   }
 
