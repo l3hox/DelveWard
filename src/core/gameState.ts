@@ -155,6 +155,7 @@ export interface LevelSnapshot {
   enemies: Map<string, EnemyInstance>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
+  signalState?: ReturnType<SignalManager['saveState']>;
 }
 
 
@@ -541,9 +542,11 @@ export class GameState {
     }
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
+    const signalState = this.signalManager.saveState();
     return {
       doors, keys, levers, plates, triggers, tripwires, gates,
       sconces, stairs, enemies, exploredCells, registrySnapshot,
+      signalState,
     };
   }
 
@@ -594,6 +597,12 @@ export class GameState {
     }
     this._rebuildEntityIndex();
     this._initSignalManager();
+
+    // Restore saved signal state (source active flags, timers, gate states)
+    // so that signal evaluation works correctly after returning to a level.
+    if (snapshot.signalState) {
+      this.signalManager.loadState(snapshot.signalState);
+    }
   }
 
   loadNewLevel(entities: Entity[], grid?: string[], levelId?: string): void {

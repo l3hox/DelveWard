@@ -1012,6 +1012,61 @@ describe('GameState', () => {
     });
   });
 
+  // --- Signal state persistence across level transitions ---
+
+  describe('signal state preserved across save/load', () => {
+    it('AND gate door stays responsive after level reload', () => {
+      // Reproduce the bug: 4 levers → AND door, pull all, save/load, toggle one off
+      const entities: Entity[] = [
+        { col: 1, row: 0, type: 'lever', id: 'lev_1', targets: ['door_1'], wall: 'N', state: 'up' },
+        { col: 2, row: 0, type: 'lever', id: 'lev_2', targets: ['door_1'], wall: 'N', state: 'up' },
+        { col: 3, row: 0, type: 'lever', id: 'lev_3', targets: ['door_1'], wall: 'N', state: 'up' },
+        { col: 4, row: 0, type: 'lever', id: 'lev_4', targets: ['door_1'], wall: 'N', state: 'up' },
+        { col: 5, row: 0, type: 'door', id: 'door_1', state: 'closed', gateMode: 'and' },
+      ];
+      const gs = new GameState(entities);
+
+      // Pull all 4 levers down
+      gs.activateLever(1, 0);
+      gs.activateLever(2, 0);
+      gs.activateLever(3, 0);
+      gs.activateLever(4, 0);
+      expect(gs.getDoor(5, 0)!.state).toBe('open');
+
+      // Save and restore (simulates level transition)
+      const snap = gs.saveLevelState();
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+
+      // Door should still be open
+      expect(gs2.getDoor(5, 0)!.state).toBe('open');
+
+      // Toggle one lever off — door should close (AND requires all active)
+      gs2.activateLever(1, 0); // toggles lev_1 back to 'up' → inactive
+      expect(gs2.getDoor(5, 0)!.state).toBe('closed');
+    });
+
+    it('standalone gate state preserved across save/load', () => {
+      const entities: Entity[] = [
+        { col: 0, row: 0, type: 'lever', id: 'lev_1', targets: ['gate_1'], wall: 'N', state: 'up' },
+        { col: 1, row: 0, type: 'gate', id: 'gate_1', gateType: 'and', targets: ['door_1'] },
+        { col: 2, row: 0, type: 'door', id: 'door_1', state: 'closed' },
+      ];
+      const gs = new GameState(entities);
+
+      gs.activateLever(0, 0); // lever → gate → door
+      expect(gs.getDoor(2, 0)!.state).toBe('open');
+
+      const snap = gs.saveLevelState();
+      const gs2 = new GameState([]);
+      gs2.loadLevelState(snap);
+
+      expect(gs2.getDoor(2, 0)!.state).toBe('open');
+      gs2.activateLever(0, 0); // toggle off
+      expect(gs2.getDoor(2, 0)!.state).toBe('closed');
+    });
+  });
+
   // --- Stats & Leveling (Phase B) ---
 
   describe('xpForLevel', () => {
