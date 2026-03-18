@@ -177,27 +177,27 @@ Entities can have an optional `id` field — a stable identifier used for cross-
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `target` | string | Yes | Entity ID of the door to toggle (e.g., `"door_1"`) |
+| `targets` | string[] | Yes | Entity IDs of doors to toggle (e.g., `["door_1"]` or `["door_1", "door_2"]`) |
 | `wall` | string | No | Which wall the lever is on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
 
-The targeted door is marked **mechanical** — it cannot be opened or closed by player interaction (Space key). It can only be operated by the lever.
+All targeted doors are marked **mechanical** — they cannot be opened or closed by player interaction (Space key). They can only be operated by the lever. A single lever can control multiple doors.
 
 ```json
 { "col": 8, "row": 5, "type": "door", "id": "door_3" },
-{ "col": 7, "row": 8, "type": "lever", "id": "lever_1", "target": "door_3", "wall": "E" }
+{ "col": 7, "row": 8, "type": "lever", "id": "lever_1", "targets": ["door_3"], "wall": "E" }
 ```
 
 **Pressure plate** (`type: "pressure_plate"`) — placed on walkable cells. Triggers automatically when player steps on it. One-way (stays open).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `target` | string | Yes | Entity ID of the door to open (e.g., `"door_4"`) |
+| `targets` | string[] | Yes | Entity IDs of doors to open (e.g., `["door_4"]`) |
 
-The targeted door is marked **mechanical** — same as lever-targeted doors.
+All targeted doors are marked **mechanical** — same as lever-targeted doors.
 
 ```json
 { "col": 4, "row": 7, "type": "door", "id": "door_4" },
-{ "col": 4, "row": 9, "type": "pressure_plate", "id": "plate_1", "target": "door_4" }
+{ "col": 4, "row": 9, "type": "pressure_plate", "id": "plate_1", "targets": ["door_4"] }
 ```
 
 **Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space). Stairs come in pairs — each stair references its paired stair on another level by entity ID.

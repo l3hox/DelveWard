@@ -5,7 +5,7 @@ import type { GameState } from '../core/gameState';
 export interface InteractionResult {
   type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
   message?: string;
-  target?: string; // entity ID of affected door (for mesh updates)
+  targets?: string[]; // entity IDs of affected doors (for mesh updates)
 }
 
 export function interact(
@@ -49,9 +49,9 @@ export function interact(
   // Lever interaction — player stands on lever cell, faces the wall
   const lever = gameState.getLever(playerState.col, playerState.row);
   if (lever && lever.wall === playerState.facing) {
-    const target = gameState.activateLever(playerState.col, playerState.row);
-    if (target) {
-      return { type: 'lever_activated', message: 'Lever pulled.', target };
+    const targets = gameState.activateLever(playerState.col, playerState.row);
+    if (targets) {
+      return { type: 'lever_activated', message: 'Lever pulled.', targets };
     }
   }
 

@@ -156,17 +156,11 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addPickableField('target', (entity.target as string) ?? '', entity, 'target', (val) => {
-          entity.target = val;
-          this.onEntityChanged?.();
-        }, undefined, 'door');
+        this.addTargetsArrayField(entity, 'door');
         break;
 
       case 'pressure_plate':
-        this.addPickableField('target', (entity.target as string) ?? '', entity, 'target', (val) => {
-          entity.target = val;
-          this.onEntityChanged?.();
-        }, undefined, 'door');
+        this.addTargetsArrayField(entity, 'door');
         break;
 
       case 'torch_sconce':
@@ -389,6 +383,64 @@ export class Inspector {
     row.appendChild(pickBtn);
 
     wrapper.appendChild(row);
+    this.container.appendChild(wrapper);
+  }
+
+  private addTargetsArrayField(entity: Entity, validEntityType: string): void {
+    const targets = (entity.targets as string[] | undefined) ?? [];
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'targets';
+    wrapper.appendChild(lbl);
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '2px';
+
+    for (let i = 0; i < targets.length; i++) {
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '4px';
+
+      const span = document.createElement('span');
+      span.style.flex = '1';
+      span.style.fontSize = '0.85em';
+      span.style.overflow = 'hidden';
+      span.style.textOverflow = 'ellipsis';
+      span.textContent = targets[i];
+      row.appendChild(span);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-pick';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.style.padding = '0 4px';
+      removeBtn.style.minWidth = 'auto';
+      const idx = i;
+      removeBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
+        targets.splice(idx, 1);
+        (entity as Record<string, unknown>).targets = targets;
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-pick';
+    addBtn.textContent = targets.length === 0 ? 'Pick Target' : '+ Add Target';
+    addBtn.addEventListener('click', () => {
+      this.onPickRequested?.(entity, 'targets', undefined, validEntityType);
+    });
+    list.appendChild(addBtn);
+
+    wrapper.appendChild(list);
     this.container.appendChild(wrapper);
   }
 

@@ -432,12 +432,14 @@ async function init(): Promise<void> {
       }
 
       // Pressure plate activation
-      const plateTarget = gameState.activatePressurePlate(col, row);
-      if (plateTarget) {
+      const plateTargets = gameState.activatePressurePlate(col, row);
+      if (plateTargets) {
         console.log('Pressure plate activated.');
-        const targetPos = gameState.resolveEntityPosition(plateTarget);
-        if (targetPos) {
-          updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
+        for (const t of plateTargets) {
+          const targetPos = gameState.resolveEntityPosition(t);
+          if (targetPos) {
+            updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
+          }
         }
         pressPlate(ls.plateMeshes.meshMap, col, row);
       }
@@ -642,10 +644,12 @@ async function init(): Promise<void> {
             const bk = doorKey(facing.col, facing.row);
             ls.doorAnimator.bounce(bk);
           }
-          if (result.type === 'lever_activated' && result.target) {
-            const targetPos = gameState.resolveEntityPosition(result.target);
-            if (targetPos) {
-              updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+          if (result.type === 'lever_activated' && result.targets) {
+            for (const t of result.targets) {
+              const targetPos = gameState.resolveEntityPosition(t);
+              if (targetPos) {
+                updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+              }
             }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);

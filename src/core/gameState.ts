@@ -37,7 +37,7 @@ export interface LeverInstance {
   id?: string;
   col: number;
   row: number;
-  target: string; // entity ID of the door to toggle
+  targets: string[]; // entity IDs of doors to toggle
   wall: Facing;       // which wall the lever is mounted on
   state: LeverState;
 }
@@ -46,7 +46,7 @@ export interface PlateInstance {
   id?: string;
   col: number;
   row: number;
-  target: string; // entity ID of the door to open
+  targets: string[]; // entity IDs of doors to open
   activated: boolean;
 }
 
@@ -204,23 +204,25 @@ export class GameState {
       } else if (e.type === 'lever') {
         const wall = (e.wall as Facing | undefined) ??
           autoDetectLeverWall(e.col, e.row, grid);
-        // Support both `target` (new) and `targetDoor` (legacy) fields
-        const target = (e.target as string | undefined) ?? (e.targetDoor as string);
+        // Support targets[] (new), target (single, M1 compat), and targetDoor (legacy)
+        const targets = (e.targets as string[] | undefined) ??
+          (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
         this.levers.set(doorKey(e.col, e.row), {
           id: e.id as string | undefined,
           col: e.col,
           row: e.row,
-          target,
+          targets,
           wall,
           state: 'up',
         });
       } else if (e.type === 'pressure_plate') {
-        const target = (e.target as string | undefined) ?? (e.targetDoor as string);
+        const targets = (e.targets as string[] | undefined) ??
+          (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
         this.plates.set(doorKey(e.col, e.row), {
           id: e.id as string | undefined,
           col: e.col,
           row: e.row,
-          target,
+          targets,
           activated: false,
         });
       } else if (e.type === 'torch_sconce') {
@@ -272,17 +274,21 @@ export class GameState {
     // Mark doors targeted by levers/plates as mechanical (resolve via entityById)
     this._rebuildEntityIndex();
     for (const lever of this.levers.values()) {
-      const pos = this.resolveEntityPosition(lever.target);
-      if (pos) {
-        const door = this.getDoor(pos.col, pos.row);
-        if (door) door.mechanical = true;
+      for (const t of lever.targets) {
+        const pos = this.resolveEntityPosition(t);
+        if (pos) {
+          const door = this.getDoor(pos.col, pos.row);
+          if (door) door.mechanical = true;
+        }
       }
     }
     for (const plate of this.plates.values()) {
-      const pos = this.resolveEntityPosition(plate.target);
-      if (pos) {
-        const door = this.getDoor(pos.col, pos.row);
-        if (door) door.mechanical = true;
+      for (const t of plate.targets) {
+        const pos = this.resolveEntityPosition(t);
+        if (pos) {
+          const door = this.getDoor(pos.col, pos.row);
+          if (door) door.mechanical = true;
+        }
       }
     }
   }
@@ -462,28 +468,32 @@ export class GameState {
     return this.levers.get(doorKey(col, row));
   }
 
-  activateLever(col: number, row: number): string | undefined {
+  activateLever(col: number, row: number): string[] | undefined {
     const lever = this.levers.get(doorKey(col, row));
     if (!lever) return undefined;
     lever.state = lever.state === 'up' ? 'down' : 'up';
-    const pos = this.resolveEntityPosition(lever.target);
-    if (pos) this.toggleDoor(pos.col, pos.row);
-    return lever.target;
+    for (const t of lever.targets) {
+      const pos = this.resolveEntityPosition(t);
+      if (pos) this.toggleDoor(pos.col, pos.row);
+    }
+    return lever.targets;
   }
 
-  activatePressurePlate(col: number, row: number): string | undefined {
+  activatePressurePlate(col: number, row: number): string[] | undefined {
     const plate = this.plates.get(doorKey(col, row));
     if (!plate || plate.activated) return undefined;
     plate.activated = true;
-    const pos = this.resolveEntityPosition(plate.target);
-    if (pos) {
-      // Bypass openDoor check — mechanisms can always operate their doors
-      const door = this.getDoor(pos.col, pos.row);
-      if (door && door.state === 'closed') {
-        door.state = 'open';
+    for (const t of plate.targets) {
+      const pos = this.resolveEntityPosition(t);
+      if (pos) {
+        // Bypass openDoor check — mechanisms can always operate their doors
+        const door = this.getDoor(pos.col, pos.row);
+        if (door && door.state === 'closed') {
+          door.state = 'open';
+        }
       }
     }
-    return plate.target;
+    return plate.targets;
   }
 
   getSconce(col: number, row: number): SconceInstance | undefined {

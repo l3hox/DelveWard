@@ -299,7 +299,7 @@
           "col": 13,
           "row": 11,
           "type": "lever",
-          "target": "door_4",
+          "targets": ["door_4"],
           "wall": "E"
         },
         {

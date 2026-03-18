@@ -1036,15 +1036,16 @@ export class GridCanvas {
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
-      if ((e.type === 'lever' || e.type === 'pressure_plate') && e.target) {
-        const targetId = e.target as string;
-        const targetEntity = level.entities.find(t => t.id === targetId);
-        if (!targetEntity) continue;
-        const isActive = selected !== null && (
-          e === selected ||
-          (selected.id !== undefined && selected.id === targetId)
-        );
-        arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+      if ((e.type === 'lever' || e.type === 'pressure_plate') && Array.isArray(e.targets)) {
+        for (const targetId of e.targets as string[]) {
+          const targetEntity = level.entities.find(t => t.id === targetId);
+          if (!targetEntity) continue;
+          const isActive = selected !== null && (
+            e === selected ||
+            (selected.id !== undefined && selected.id === targetId)
+          );
+          arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+        }
       }
       if (e.type === 'stairs' && e.target) {
         const targetId = e.target as string;
