@@ -8,6 +8,7 @@ import { interact } from './level/interaction';
 import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate, releasePlate } from './rendering/plateRenderer';
+import { buildTripwireMeshes, hideTripwire } from './rendering/tripwireRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
@@ -73,6 +74,7 @@ interface LevelScene {
   doorAnimator: DoorAnimator;
   keyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  tripwireMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   leverMeshes: { group: THREE.Group; handleMap: Map<string, THREE.Group> };
   leverAnimator: LeverAnimator;
   sconceMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group>; lightMap: Map<string, THREE.PointLight> };
@@ -122,6 +124,9 @@ function buildLevelScene(
 
   const plateMeshes = buildPlateMeshes(gameState);
   scene.add(plateMeshes.group);
+
+  const tripwireMeshes = buildTripwireMeshes(gameState);
+  scene.add(tripwireMeshes.group);
 
   const leverMeshes = buildLeverMeshes(gameState);
   scene.add(leverMeshes.group);
@@ -192,6 +197,7 @@ function buildLevelScene(
     doorAnimator,
     keyMeshes,
     plateMeshes,
+    tripwireMeshes,
     leverMeshes,
     leverAnimator,
     sconceMeshes,
@@ -213,6 +219,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.doorMeshes.group,
     ls.keyMeshes.group,
     ls.plateMeshes.group,
+    ls.tripwireMeshes.group,
     ls.leverMeshes.group,
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
@@ -489,7 +496,9 @@ async function init(): Promise<void> {
 
       // Trigger / tripwire activation
       gameState.activateTrigger(col, row);
-      gameState.activateTripwire(col, row);
+      if (gameState.activateTripwire(col, row)) {
+        hideTripwire(ls.tripwireMeshes.meshMap, col, row);
+      }
 
       // Pressure plate activation
       const plateTargets = gameState.activatePressurePlate(col, row);

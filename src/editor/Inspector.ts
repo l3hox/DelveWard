@@ -251,22 +251,10 @@ export class Inspector {
           entity.orientation = val;
           this.onEntityChanged?.();
         });
-        this.addSignalModeField(entity, (entity.signalMode as string) ?? 'one_shot',
-          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
-            entity.signalMode = val;
-            this.onEntityChanged?.();
-            this.refresh();
-          });
         this.addNumberField('visibilityThreshold', (entity.visibilityThreshold as number) ?? 8, (val) => {
           entity.visibilityThreshold = val;
           this.onEntityChanged?.();
         });
-        if ((entity.signalMode as string) === 'timed') {
-          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
-            entity.signalDuration = val;
-            this.onEntityChanged?.();
-          }, { step: '0.1' });
-        }
         this.addSignalDelayField(entity);
         break;
 
