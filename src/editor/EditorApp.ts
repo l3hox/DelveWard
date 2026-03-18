@@ -592,11 +592,33 @@ export class EditorApp {
 
   deleteSelectedEntity(): void {
     if (!this.level || !this.selectedEntity) return;
+    const deletedId = this.selectedEntity.id;
     const idx = this.level.entities.indexOf(this.selectedEntity);
     if (idx >= 0) {
       this.level.entities.splice(idx, 1);
     }
     this.selectedEntity = null;
+
+    // Clean up all references to the deleted entity
+    if (deletedId) {
+      for (const e of this.level.entities) {
+        const rec = e as Record<string, unknown>;
+        // Scalar target field (stairs)
+        if (rec.target === deletedId) {
+          rec.target = '';
+        }
+        // Array targets field (lever, plate, trigger, tripwire, gate)
+        if (Array.isArray(rec.targets)) {
+          const arr = rec.targets as string[];
+          const i = arr.indexOf(deletedId);
+          if (i >= 0) arr.splice(i, 1);
+        }
+        // keyId sync (key ↔ door)
+        if (rec.keyId === deletedId) {
+          rec.keyId = '';
+        }
+      }
+    }
   }
 
   canPlaceEntityType(col: number, row: number, type: string): boolean {
