@@ -907,6 +907,11 @@ export class EditorApp {
     return chain;
   }
 
+  /** Public auto-detect wall for hover preview. */
+  autoDetectWallAt(col: number, row: number): string | null {
+    return this.autoDetectWall(col, row);
+  }
+
   /** Auto-detect which wall a wall-mounted entity should face based on adjacent solid cells. */
   private autoDetectWall(col: number, row: number): string | null {
     if (!this.level) return null;

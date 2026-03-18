@@ -223,12 +223,18 @@ export class GridCanvas {
           const { col, row } = this.screenToGrid(screenX, screenY);
           const entity = this.app.selectEntityAt(col, row);
           if (!entity) this.app.deselectEntity();
-          // Record potential wire drag source if the selected entity is wirable
+          // Record potential wire drag source — try selected entity first,
+          // then fall back to any wirable entity at this cell
+          let wireSource: Entity | null = null;
           if (entity && this.app.getWireSourceInfo(entity)) {
-            this.potentialWireSource = { entity, col, row };
+            wireSource = entity;
           } else {
-            this.potentialWireSource = null;
+            const allAt = this.app.getEntitiesAt(col, row);
+            for (const e of allAt) {
+              if (this.app.getWireSourceInfo(e)) { wireSource = e; break; }
+            }
           }
+          this.potentialWireSource = wireSource ? { entity: wireSource, col, row } : null;
           this.onSelectionChange?.();
           this.dirty = true;
         } else if (tool === 'entity') {
@@ -903,7 +909,9 @@ export class GridCanvas {
 
   /** Auto-detect tripwire orientation: NS if E/W neighbors are walls. */
   private isTripwireNS(col: number, row: number): boolean {
-    return this.isDoorEW(col, row);
+    // Tripwire runs perpendicular to passage: if passage is N-S (E/W walls), wire is EW.
+    // So NS tripwire = passage is E-W = N/S walls.
+    return !this.isDoorEW(col, row);
   }
 
   /** Detect door orientation: EW means bar runs east-west (horizontal). */
@@ -1016,6 +1024,34 @@ export class GridCanvas {
     ctx.fillStyle = fillColor;
     ctx.fillRect(px, py, tw, th);
     ctx.restore();
+
+    // Entity mode: draw ghost icon of the entity type that would be placed
+    if (this.app.activeTool === 'entity' && !this.app.pickMode && !this.app.wireDragState) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      const eType = this.app.selectedEntityType;
+      const ghostEntity: Record<string, unknown> = {
+        col: hover.col,
+        row: hover.row,
+        type: eType,
+      };
+      // Auto-detect wall orientation for lever/sconce
+      if (eType === 'lever' || eType === 'torch_sconce') {
+        ghostEntity.wall = this.app.autoDetectWallAt(hover.col, hover.row) ?? 'N';
+      }
+      if (eType === 'tripwire') {
+        ghostEntity.orientation = this.isTripwireNS(hover.col, hover.row) ? 'NS' : 'EW';
+      }
+      // Inject remembered subtypes for sprite preview
+      if (eType === 'enemy') ghostEntity.enemyType = this.app.selectedEnemyType;
+      if (eType === 'equipment') ghostEntity.itemId = this.app.selectedEquipmentId;
+      if (eType === 'consumable') ghostEntity.itemId = this.app.selectedConsumableId;
+      // Try sprite first (always, regardless of showItemPreview toggle)
+      if (!this.drawEntitySprite(ghostEntity as Entity, px, py, tw, th)) {
+        this.drawEntityIcon(ghostEntity as Entity, px, py, tw, th);
+      }
+      ctx.restore();
+    }
   }
 
   private drawDragRectangle(offsetX: number, offsetY: number, tileSize: number): void {
@@ -1138,13 +1174,24 @@ export class GridCanvas {
     // Compute full signal chain for highlighting
     const signalChain = selected ? this.app.getSignalChain(selected) : new Set<string>();
 
-    // Collect all wiring arrows
+    // Collect all wiring arrows (fractional col/row for sub-cell origin offset)
     type Arrow = { fromCol: number; fromRow: number; toCol: number; toRow: number; active: boolean };
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
       const hasTargetsArray = e.type === 'lever' || e.type === 'pressure_plate' || e.type === 'trigger' || e.type === 'tripwire' || e.type === 'gate';
       if (hasTargetsArray && Array.isArray(e.targets)) {
+        // Lever arrows originate from the bar center, not cell center
+        let fromCol = e.col;
+        let fromRow = e.row;
+        if (e.type === 'lever') {
+          const wall = (e.wall as string) || 'N';
+          const barOffset = 0.35; // bar center offset from wall edge
+          if (wall === 'N') fromRow = e.row + barOffset - 0.5;
+          else if (wall === 'S') fromRow = e.row + 0.5 - barOffset;
+          else if (wall === 'W') fromCol = e.col + barOffset - 0.5;
+          else if (wall === 'E') fromCol = e.col + 0.5 - barOffset;
+        }
         for (const targetId of e.targets as string[]) {
           const targetEntity = level.entities.find(t => t.id === targetId);
           if (!targetEntity) continue;
@@ -1153,7 +1200,7 @@ export class GridCanvas {
             (e.id !== undefined && signalChain.has(e.id)) ||
             (targetEntity.id !== undefined && signalChain.has(targetEntity.id!))
           );
-          arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+          arrows.push({ fromCol, fromRow, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
         }
       }
       if (e.type === 'stairs' && e.target) {

@@ -133,13 +133,15 @@ function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing 
 }
 
 // Auto-detect tripwire orientation from adjacent walls (same logic as door orientation).
-// If E/W neighbors are walls → tripwire runs N-S (vertical). Otherwise E-W (horizontal).
+// Tripwire runs perpendicular to the passage to block it.
+// If E/W neighbors are walls → passage runs N-S → wire runs E-W (horizontal).
+// If N/S neighbors are walls → passage runs E-W → wire runs N-S (vertical).
 function autoDetectTripwireOrientation(col: number, row: number, grid?: string[]): TripwireOrientation {
   if (!grid) return 'EW';
-  const cols = grid[0].length;
-  const eastSolid = col + 1 >= cols || grid[row][col + 1] === '#';
-  const westSolid = col - 1 < 0 || grid[row][col - 1] === '#';
-  return (eastSolid && westSolid) ? 'NS' : 'EW';
+  const rows = grid.length;
+  const northSolid = row - 1 < 0 || grid[row - 1][col] === '#';
+  const southSolid = row + 1 >= rows || grid[row + 1][col] === '#';
+  return (northSolid && southSolid) ? 'NS' : 'EW';
 }
 
 export interface LevelSnapshot {

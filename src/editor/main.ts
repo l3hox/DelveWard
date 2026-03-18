@@ -29,6 +29,7 @@ const statusHintEl = document.getElementById('status-hint') as HTMLElement;
 
 const gridCanvas = new GridCanvas(canvas, container, app);
 const toolbar = new Toolbar(document.getElementById('toolbar')!);
+toolbar.setActiveTool('select');
 const inspector = new Inspector(document.getElementById('inspector')!, app);
 const levelProps = new LevelProperties(document.getElementById('level-props-content')!, app);
 const levelList = new LevelList(document.getElementById('level-list')!, app);
@@ -702,6 +703,13 @@ document.addEventListener('keydown', (e) => {
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
     updateStatusHint();
+    return;
+  }
+  if (e.key === 'Escape' && app.activeTool === 'entity') {
+    app.activeTool = 'select';
+    toolbar.setActiveTool('select');
+    gridCanvas.updateCursor();
+    gridCanvas.markDirty();
     return;
   }
   if (e.key === 'Delete' && app.selectedEntity) {
