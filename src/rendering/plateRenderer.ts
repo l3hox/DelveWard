@@ -91,3 +91,16 @@ export function pressPlate(
   mesh.material = pressedMat;
   mesh.position.y = PLATE_Y_PRESSED;
 }
+
+export function releasePlate(
+  meshMap: Map<string, THREE.Mesh>,
+  col: number,
+  row: number,
+): void {
+  const key = doorKey(col, row);
+  const mesh = meshMap.get(key);
+  if (!mesh) return;
+  if (!normalMat) normalMat = new THREE.MeshLambertMaterial({ map: generatePlateTexture(false) });
+  mesh.material = normalMat;
+  mesh.position.y = PLATE_Y;
+}

@@ -415,10 +415,21 @@ describe('GameState', () => {
       expect(gs.getDoor(5, 3)!.state).toBe('open');
     });
 
-    it('activatePressurePlate returns undefined for already activated plate', () => {
+    it('toggle plate toggles off on second activation', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
         { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
+      ]);
+      gs.activatePressurePlate(2, 2);
+      expect(gs.plates.get('2,2')!.activated).toBe(true);
+      gs.activatePressurePlate(2, 2);
+      expect(gs.plates.get('2,2')!.activated).toBe(false);
+    });
+
+    it('non-toggle plate returns undefined for already activated plate', () => {
+      const gs = new GameState([
+        { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
+        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'], signalMode: 'one_shot' },
       ]);
       gs.activatePressurePlate(2, 2);
       const result = gs.activatePressurePlate(2, 2);

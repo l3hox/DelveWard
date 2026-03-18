@@ -20,7 +20,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   door:           { state: 'closed', gateMode: 'or' },
   key:            { keyId: '' },
   lever:          { targets: [], wall: 'N', signalMode: 'toggle' },
-  pressure_plate: { targets: [] },
+  pressure_plate: { targets: [], signalMode: 'toggle' },
   trigger:        { targets: [], signalMode: 'momentary' },
   tripwire:       { targets: [], signalMode: 'one_shot', visibilityThreshold: 8, orientation: 'EW' },
   gate:           { gateType: 'and', targets: [] },

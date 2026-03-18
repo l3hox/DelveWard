@@ -7,7 +7,7 @@ import { GameState, doorKey } from './core/gameState';
 import { interact } from './level/interaction';
 import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
-import { buildPlateMeshes, pressPlate } from './rendering/plateRenderer';
+import { buildPlateMeshes, pressPlate, releasePlate } from './rendering/plateRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
@@ -449,14 +449,10 @@ async function init(): Promise<void> {
       // Pressure plate activation
       const plateTargets = gameState.activatePressurePlate(col, row);
       if (plateTargets) {
-        console.log('Pressure plate activated.');
-        for (const t of plateTargets) {
-          const targetPos = gameState.resolveEntityPosition(t);
-          if (targetPos) {
-            updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
-          }
+        const plate = gameState.plates.get(doorKey(col, row));
+        if (plate?.activated) {
+          pressPlate(ls.plateMeshes.meshMap, col, row);
         }
-        pressPlate(ls.plateMeshes.meshMap, col, row);
       }
 
       // Torch fuel drain (mist environments have ambient light — no torch needed)
@@ -489,6 +485,11 @@ async function init(): Promise<void> {
     gameState.onLeverReset = (col, row) => {
       const leverKey = doorKey(col, row);
       ls.leverAnimator.setState(leverKey, 'up');
+    };
+
+    // Plate reset (momentary step-off or timed expiry) → animate plate release
+    gameState.onPlateReset = (col, row) => {
+      releasePlate(ls.plateMeshes.meshMap, col, row);
     };
   }
 

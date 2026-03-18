@@ -475,7 +475,7 @@ export class GameState {
       this.onDoorSignalChanged?.(pos.col, pos.row, active);
     });
 
-    // Wire source-deactivated callback to reset timed levers
+    // Wire source-deactivated callback to reset timed sources
     this.signalManager.setSourceDeactivatedCallback((entityId) => {
       const pos = this.resolveEntityPosition(entityId);
       if (!pos) return;
@@ -483,6 +483,11 @@ export class GameState {
       if (lever && lever.state === 'down') {
         lever.state = 'up';
         this.onLeverReset?.(pos.col, pos.row);
+      }
+      const plate = this.plates.get(doorKey(pos.col, pos.row));
+      if (plate && plate.activated) {
+        plate.activated = false;
+        this.onPlateReset?.(pos.col, pos.row);
       }
     });
   }
@@ -492,6 +497,9 @@ export class GameState {
 
   /** External callback for timed lever auto-reset (for mesh animation). */
   onLeverReset: ((col: number, row: number) => void) | null = null;
+
+  /** External callback for pressure plate reset (for mesh animation). */
+  onPlateReset: ((col: number, row: number) => void) | null = null;
 
   private _rebuildEntityIndex(): void {
     this.entityById.clear();
@@ -726,11 +734,29 @@ export class GameState {
 
   activatePressurePlate(col: number, row: number): string[] | undefined {
     const plate = this.plates.get(doorKey(col, row));
-    if (!plate || plate.activated) return undefined;
+    if (!plate) return undefined;
+    const mode = plate.signalMode ?? 'toggle';
+
+    if (mode === 'toggle') {
+      // Toggle: flip on each step-on
+      plate.activated = !plate.activated;
+      if (plate.id && this.signalManager.getSource(plate.id)) {
+        this.signalManager.setSourceActive(plate.id, plate.activated);
+      }
+      if (!plate.activated) this.onPlateReset?.(col, row);
+      return plate.targets;
+    }
+
+    // All other modes: activate on first step-on only
+    if (plate.activated) return undefined;
     plate.activated = true;
-    // Route through SignalManager if source is registered, else direct open
     if (plate.id && this.signalManager.getSource(plate.id)) {
       this.signalManager.setSourceActive(plate.id, true);
+      // Timed plates: clear the timer — countdown starts on step-off, not step-on
+      if (mode === 'timed') {
+        const source = this.signalManager.getSource(plate.id);
+        if (source) source.timer = 0;
+      }
     } else {
       for (const t of plate.targets) {
         const pos = this.resolveEntityPosition(t);
@@ -745,14 +771,24 @@ export class GameState {
     return plate.targets;
   }
 
-  /** Deactivate a momentary pressure plate when the player steps off. */
+  /** Deactivate a pressure plate when the player steps off.
+   *  Momentary: deactivates immediately. Timed: starts the countdown timer. */
   deactivatePressurePlate(col: number, row: number): void {
     const plate = this.plates.get(doorKey(col, row));
-    if (!plate) return;
-    if (plate.signalMode !== 'momentary') return;
-    plate.activated = false;
-    if (plate.id && this.signalManager.getSource(plate.id)) {
-      this.signalManager.deactivateSource(plate.id);
+    if (!plate || !plate.activated) return;
+    const mode = plate.signalMode ?? 'toggle';
+    if (mode === 'momentary') {
+      plate.activated = false;
+      if (plate.id && this.signalManager.getSource(plate.id)) {
+        this.signalManager.deactivateSource(plate.id);
+      }
+      this.onPlateReset?.(col, row);
+    } else if (mode === 'timed') {
+      // Start the timed countdown — signal stays active until timer expires
+      const source = plate.id ? this.signalManager.getSource(plate.id) : undefined;
+      if (source && source.active && source.duration) {
+        source.timer = source.duration;
+      }
     }
   }
 

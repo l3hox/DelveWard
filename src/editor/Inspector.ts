@@ -188,13 +188,9 @@ export class Inspector {
 
       case 'pressure_plate':
         this.addTargetsArrayField(entity, 'door,gate');
-        this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
-          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
-            if (val) {
-              entity.signalMode = val;
-            } else {
-              delete (entity as Record<string, unknown>).signalMode;
-            }
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
+          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
             this.onEntityChanged?.();
             this.refresh();
           });
@@ -545,7 +541,6 @@ export class Inspector {
   }
 
   private static SIGNAL_MODE_INFO: Record<string, { label: string; tooltip: string }> = {
-    '':          { label: '(default)', tooltip: 'Uses the entity-type default signal mode' },
     'toggle':    { label: 'toggle', tooltip: 'Each activation flips the signal on/off' },
     'momentary': { label: 'momentary', tooltip: 'Active only while standing on it; deactivates on step-off' },
     'one_shot':  { label: 'one_shot', tooltip: 'Fires once and cannot be re-activated' },
