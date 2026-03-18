@@ -271,6 +271,47 @@ toolbar.setSaveAsCallback(() => {
   performSave(filename);
 });
 
+function showFilePicker(files: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'file-picker-overlay';
+
+    const picker = document.createElement('div');
+    picker.className = 'file-picker';
+
+    const title = document.createElement('div');
+    title.className = 'file-picker-title';
+    title.textContent = 'Open from server';
+    picker.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'file-picker-list';
+    for (const file of files) {
+      const item = document.createElement('div');
+      item.className = 'file-picker-item';
+      item.textContent = file;
+      item.addEventListener('click', () => { overlay.remove(); resolve(file); });
+      list.appendChild(item);
+    }
+    picker.appendChild(list);
+
+    const cancel = document.createElement('div');
+    cancel.className = 'file-picker-cancel';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => { overlay.remove(); resolve(null); });
+    cancel.appendChild(cancelBtn);
+    picker.appendChild(cancel);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { overlay.remove(); resolve(null); }
+    });
+
+    overlay.appendChild(picker);
+    document.body.appendChild(overlay);
+  });
+}
+
 toolbar.setOpenFromServerCallback(async () => {
   try {
     const files = await listServerFiles();
@@ -278,20 +319,9 @@ toolbar.setOpenFromServerCallback(async () => {
       alert('No level files found on server.');
       return;
     }
-    const list = files.map((f, i) => `${i + 1}. ${f}`).join('\n');
-    const choice = prompt(`Open from server:\n\n${list}\n\nEnter number or filename:`);
-    if (!choice) return;
 
-    let filename: string;
-    const num = parseInt(choice, 10);
-    if (!isNaN(num) && num >= 1 && num <= files.length) {
-      filename = files[num - 1];
-    } else if (files.includes(choice)) {
-      filename = choice;
-    } else {
-      alert('Invalid selection.');
-      return;
-    }
+    const filename = await showFilePicker(files);
+    if (!filename) return;
 
     const result = await loadFromServer(filename);
     if (!result) return;
@@ -645,6 +675,12 @@ function updateErrorBanner(): void {
 
 // Keyboard listeners
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.wireDragState) {
+    app.wireDragState = null;
+    gridCanvas.updateCursor();
+    gridCanvas.markDirty();
+    return;
+  }
   if (e.key === 'Escape' && (app.coordDragCallback || app.areaDragState)) {
     app.coordDragCallback = null;
     app.areaDragState = null;

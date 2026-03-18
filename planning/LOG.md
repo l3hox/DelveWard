@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — Editor UX Round 2 (Drag-to-Wire + File Picker)
+
+**Goal**: Make entity wiring faster (drag instead of Pick button) and replace the unfriendly `prompt()` file picker with a clickable modal.
+
+**Key decisions**:
+- **Drag-to-wire in select mode only** — mousedown on a wirable entity records a potential drag source. If the cursor moves to a different cell, it transitions to wire-drag mode with an orange dashed arrow following the cursor. Mouseup on a valid target completes the wiring. No conflict with paint/entity modes.
+- **Bidirectional wiring** — dragging door→lever is equivalent to dragging lever→door. At completion, the system checks both forward (source.field = target.id) and reverse (target has a field pointing to source's type). This means users don't need to remember which direction to drag.
+- **Wire source map** — a static `WIRE_SOURCE_MAP` maps entity types to their wiring field and valid target type (lever→door via `target`, key↔door via `keyId`, stairs→stairs via `target`).
+- **Clickable file picker** — `showFilePicker()` creates a DOM modal overlay with a title, scrollable file list, and Cancel button. Click a file to open it, click outside or Cancel to dismiss. Returns a Promise<string | null>.
+
+**Files**: `src/editor/EditorApp.ts` (WireDragState, getWireSourceInfo, isValidWireTarget, completeWireDrag, applyWire), `src/editor/GridCanvas.ts` (potentialWireSource, drag detection, drawWireDragLine, hover validation, cursor), `src/editor/main.ts` (Escape handler, showFilePicker, rewritten openFromServer callback), `editor.html` (file-picker CSS).
+
+---
+
 ## 2026-03-18 — Enemy Database (Data-Driven Enemy Definitions)
 
 **Goal**: Move all hardcoded enemy definitions to a JSON database, enabling future editor-based enemy creation/editing. Prerequisite for items/monsters editor.

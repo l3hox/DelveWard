@@ -48,6 +48,30 @@ export interface AreaDragState {
   currentRow: number;
 }
 
+export interface WireDragState {
+  sourceEntity: Entity;
+  field: string;
+  validEntityType: string;
+  startCol: number;
+  startRow: number;
+  mouseX: number;
+  mouseY: number;
+}
+
+/** Wiring info for an entity type: what field it uses and what target type it accepts. */
+interface WireSourceInfo {
+  field: string;
+  validEntityType: string;
+}
+
+const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
+  lever:          { field: 'target', validEntityType: 'door' },
+  pressure_plate: { field: 'target', validEntityType: 'door' },
+  key:            { field: 'keyId',  validEntityType: 'door' },
+  door:           { field: 'keyId',  validEntityType: 'key' },
+  stairs:         { field: 'target', validEntityType: 'stairs' },
+};
+
 export class EditorApp {
   level: DungeonLevel | null = null;
   viewport: Viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -69,6 +93,7 @@ export class EditorApp {
   coordPickCallback: ((col: number, row: number) => void) | null = null;
   coordDragCallback: ((fromCol: number, fromRow: number, toCol: number, toRow: number) => void) | null = null;
   areaDragState: AreaDragState | null = null;
+  wireDragState: WireDragState | null = null;
   statusHint: string | null = null;
   sourcePath: string | null = null;
   showCeiling = false;
@@ -98,6 +123,7 @@ export class EditorApp {
     this.pickMode = null;
     this.coordDragCallback = null;
     this.areaDragState = null;
+    this.wireDragState = null;
     this.statusHint = null;
     this.dirty = false;
     this.cleanSnapshot = JSON.stringify(level);
@@ -155,6 +181,7 @@ export class EditorApp {
     }
     this.coordDragCallback = null;
     this.areaDragState = null;
+    this.wireDragState = null;
 
     this.cleanSnapshot = this.levelCleanSnapshots[index];
     this.dirty = this.isDungeonDirty();
@@ -638,6 +665,70 @@ export class EditorApp {
     const keyId = (entity as Record<string, unknown>).keyId as string;
     if (!keyId) return [];
     return this.level.entities.filter(e => e !== entity && (e as Record<string, unknown>).keyId === keyId);
+  }
+
+  getWireSourceInfo(entity: Entity): WireSourceInfo | null {
+    return WIRE_SOURCE_MAP[entity.type] ?? null;
+  }
+
+  isValidWireTarget(col: number, row: number): boolean {
+    const ws = this.wireDragState;
+    if (!ws || !this.level) return false;
+    const grid = this.level.grid;
+    if (row < 0 || row >= grid.length || col < 0 || col >= grid[row].length) return false;
+    if (col === ws.startCol && row === ws.startRow) return false;
+
+    const targets = this.getEntitiesAt(col, row);
+    // Forward match: target cell has an entity of the expected type
+    if (targets.some(e => e.type === ws.validEntityType)) return true;
+    // Reverse match: target cell has an entity that can wire to the source entity's type
+    for (const t of targets) {
+      const info = WIRE_SOURCE_MAP[t.type];
+      if (info && info.validEntityType === ws.sourceEntity.type) return true;
+    }
+    return false;
+  }
+
+  completeWireDrag(col: number, row: number): boolean {
+    const ws = this.wireDragState;
+    if (!ws || !this.level) return false;
+
+    const targets = this.getEntitiesAt(col, row);
+    if (targets.length === 0) return false;
+
+    // Try forward wiring: source.field = target.id
+    const forwardTarget = targets.find(e => e.type === ws.validEntityType);
+    if (forwardTarget) {
+      return this.applyWire(ws.sourceEntity, forwardTarget, ws.field);
+    }
+
+    // Try reverse wiring: target.field = source.id
+    for (const t of targets) {
+      const info = WIRE_SOURCE_MAP[t.type];
+      if (info && info.validEntityType === ws.sourceEntity.type) {
+        return this.applyWire(t, ws.sourceEntity, info.field);
+      }
+    }
+
+    return false;
+  }
+
+  private applyWire(source: Entity, target: Entity, field: string): boolean {
+    if (!source.id) source.id = this.generateEntityId(source.type);
+    if (!target.id) target.id = this.generateEntityId(target.type);
+
+    if (field === 'keyId') {
+      // keyId sync: match keyId between source and target
+      const sourceVal = (source as Record<string, unknown>)[field] as string || '';
+      const targetVal = (target as Record<string, unknown>)[field] as string || '';
+      const syncedVal = targetVal || sourceVal || this.generateKeyId();
+      (source as Record<string, unknown>)[field] = syncedVal;
+      (target as Record<string, unknown>)[field] = syncedVal;
+    } else {
+      // target field: write target's id into source's field
+      (source as Record<string, unknown>)[field] = target.id;
+    }
+    return true;
   }
 
   private generateEntityId(type: string): string {

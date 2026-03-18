@@ -250,6 +250,16 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Centralized `validate()` on EditorApp — duplicate charDef detection, export gated on zero errors
   - Refactored `loadLevel()` to use extracted `rebuildDerivedState()`
 
+- [x] **Editor UX Round 2** — Drag-to-wire + clickable file picker:
+  - Drag-to-wire: in select mode, drag from a wirable entity (lever, pressure_plate, key, door, stairs) to a valid target to auto-create the wiring reference
+  - `WireDragState` on EditorApp, `WIRE_SOURCE_MAP` for entity type → field/target mapping
+  - Bidirectional: dragging door→lever sets lever.target, dragging key→door syncs keyId
+  - Visual feedback: orange dashed arrow from source to cursor, green/red hover validation on target cells
+  - Cancel via right-click, Escape, or mouseleave
+  - `applyWire()` helper handles both `target` (ID-based) and `keyId` (sync) wiring patterns
+  - Clickable server file picker: replaced `prompt()` with modal overlay (`showFilePicker()`), file list as clickable rows, Cancel button, click-outside dismiss
+  - CSS: `.file-picker-overlay`, `.file-picker`, `.file-picker-item`, `.file-picker-cancel`
+
 - [x] **Enemy Database** — Data-driven enemy definitions:
   - All 9 enemy types extracted from hardcoded `ENEMY_DEFS` to `public/data/enemies.json`
   - `EnemyDatabase` class (`src/enemies/enemyDatabase.ts`) — mirrors `ItemDatabase` pattern with `load()`, `getEnemy()`, `getAllEnemies()`, `getAllEnemyIds()`, `hasBehavior()`, `getBehavior()`

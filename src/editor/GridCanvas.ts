@@ -42,6 +42,7 @@ export class GridCanvas {
   private onAfterPaint: (() => void) | null = null;
   private onBeforeEntityAdd: (() => void) | null = null;
   private onBeforePickComplete: (() => void) | null = null;
+  private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
     this.canvas = canvas;
@@ -123,9 +124,35 @@ export class GridCanvas {
         this.dirty = true;
       }
 
+      // Transition potential wire source to active wire drag when cursor leaves the source cell
+      if (this.potentialWireSource && this.app.hover) {
+        const pw = this.potentialWireSource;
+        if (this.app.hover.col !== pw.col || this.app.hover.row !== pw.row) {
+          const info = this.app.getWireSourceInfo(pw.entity);
+          if (info) {
+            this.app.wireDragState = {
+              sourceEntity: pw.entity,
+              field: info.field,
+              validEntityType: info.validEntityType,
+              startCol: pw.col,
+              startRow: pw.row,
+              mouseX: screenX,
+              mouseY: screenY,
+            };
+            this.canvas.style.cursor = 'crosshair';
+          }
+          this.potentialWireSource = null;
+        }
+      }
+
+      // Update wire drag mouse position
+      if (this.app.wireDragState) {
+        this.app.wireDragState.mouseX = screenX;
+        this.app.wireDragState.mouseY = screenY;
+      }
+
       // Drag-paint: paint into cells as cursor moves while button is held
       if (this.isPainting && this.app.hover) {
-        const tool = this.app.activeTool;
         this.app.paintCell(this.app.hover.col, this.app.hover.row, this.app.selectedChar);
       }
 
@@ -196,6 +223,12 @@ export class GridCanvas {
           const { col, row } = this.screenToGrid(screenX, screenY);
           const entity = this.app.selectEntityAt(col, row);
           if (!entity) this.app.deselectEntity();
+          // Record potential wire drag source if the selected entity is wirable
+          if (entity && this.app.getWireSourceInfo(entity)) {
+            this.potentialWireSource = { entity, col, row };
+          } else {
+            this.potentialWireSource = null;
+          }
           this.onSelectionChange?.();
           this.dirty = true;
         } else if (tool === 'entity') {
@@ -216,6 +249,23 @@ export class GridCanvas {
         this.isPanning = false;
       }
       if (e.button === 0) {
+        this.potentialWireSource = null;
+        if (this.app.wireDragState) {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const { col, row } = this.screenToGrid(screenX, screenY);
+          if (this.app.isValidWireTarget(col, row)) {
+            this.onBeforePickComplete?.();
+            this.app.completeWireDrag(col, row);
+            this.app.selectedEntity = this.app.wireDragState.sourceEntity;
+          }
+          this.app.wireDragState = null;
+          this.updateCursor();
+          this.onPickComplete?.();
+          this.dirty = true;
+          return;
+        }
         if (this.app.areaDragState && this.app.coordDragCallback) {
           const ds = this.app.areaDragState;
           const level = this.app.level;
@@ -243,6 +293,11 @@ export class GridCanvas {
       this.isPanning = false;
       if (this.isPainting) this.onAfterPaint?.();
       this.isPainting = false;
+      this.potentialWireSource = null;
+      if (this.app.wireDragState) {
+        this.app.wireDragState = null;
+        this.updateCursor();
+      }
       if (this.app.areaDragState) {
         this.app.areaDragState = null;
         // Keep coordDragCallback so user can retry on re-enter
@@ -273,6 +328,13 @@ export class GridCanvas {
 
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (this.app.wireDragState) {
+        this.app.wireDragState = null;
+        this.potentialWireSource = null;
+        this.updateCursor();
+        this.dirty = true;
+        return;
+      }
       if (this.app.coordDragCallback || this.app.areaDragState) {
         this.app.coordDragCallback = null;
         this.app.areaDragState = null;
@@ -390,6 +452,9 @@ export class GridCanvas {
 
     // Draw wiring lines for lever/pressure_plate -> door connections
     this.drawWiringLines(offsetX, offsetY, tileSize);
+
+    // Draw wire drag line (active drag-to-wire)
+    this.drawWireDragLine(offsetX, offsetY, tileSize);
   }
 
   private drawCell(
@@ -832,7 +897,11 @@ export class GridCanvas {
     let strokeColor: string;
     let fillColor: string;
 
-    if (this.app.coordDragCallback || this.app.coordPickCallback) {
+    if (this.app.wireDragState) {
+      const isValid = this.app.isValidWireTarget(hover.col, hover.row);
+      strokeColor = isValid ? 'rgba(68, 255, 68, 0.8)' : 'rgba(255, 68, 68, 0.5)';
+      fillColor = isValid ? 'rgba(68, 255, 68, 0.15)' : 'rgba(255, 68, 68, 0.05)';
+    } else if (this.app.coordDragCallback || this.app.coordPickCallback) {
       // Blue hover for coordinate picking modes
       strokeColor = 'rgba(68, 136, 255, 0.8)';
       fillColor = 'rgba(68, 136, 255, 0.15)';
@@ -911,7 +980,7 @@ export class GridCanvas {
   }
 
   updateCursor(): void {
-    if (this.app.pickMode || this.app.coordPickCallback || this.app.coordDragCallback) {
+    if (this.app.wireDragState || this.app.pickMode || this.app.coordPickCallback || this.app.coordDragCallback) {
       this.canvas.style.cursor = 'crosshair';
       return;
     }
@@ -928,6 +997,31 @@ export class GridCanvas {
     ctx.lineTo(x2 - size * Math.cos(angle + Math.PI / 6), y2 - size * Math.sin(angle + Math.PI / 6));
     ctx.closePath();
     ctx.fill();
+  }
+
+  private drawWireDragLine(offsetX: number, offsetY: number, tileSize: number): void {
+    const ws = this.app.wireDragState;
+    if (!ws) return;
+
+    const { ctx } = this;
+    const x1 = offsetX + (ws.startCol + 0.5) * tileSize;
+    const y1 = offsetY + (ws.startRow + 0.5) * tileSize;
+    const x2 = ws.mouseX;
+    const y2 = ws.mouseY;
+
+    ctx.save();
+    ctx.strokeStyle = '#ffaa00';
+    ctx.fillStyle = '#ffaa00';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    this.drawArrowhead(x1, y1, x2, y2, 8);
+    ctx.restore();
   }
 
   private drawWiringLines(offsetX: number, offsetY: number, tileSize: number): void {

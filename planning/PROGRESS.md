@@ -48,7 +48,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 - [x] Stair cross-level visual feedback: level list highlight, same-level wiring arrows, cross-level celtic cross marker, inspector "go to" link, auto-pick on placement, auto-create stair on pick, dungeon-wide unique entity IDs
 - [x] Editor direct file save: Vite dev server API plugin for reading/writing level JSON directly to `public/levels/`, Save/Save As/Open Server buttons, Ctrl+S shortcut, CSRF token security, watcher suppression
 - [x] Enemy Database: extract hardcoded enemy definitions to JSON data file + EnemyDatabase class
-- [ ] Editor UX round 2: drag-to-wire (drag from source entity to target to auto-associate)
+- [x] Editor UX round 2: drag-to-wire, clickable server file picker
 
 ---
 
@@ -69,6 +69,7 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Recent Changes
 
+- **Editor UX Round 2**: Drag-to-wire — in select mode, drag from a wirable entity (lever, plate, key, door, stairs) to a valid target to auto-create the reference. Orange dashed arrow follows cursor during drag, green/red hover validation. Supports forward and reverse wiring (e.g. drag door→lever sets lever.target). Clickable server file picker — replaced `prompt()` with a modal overlay listing files as clickable rows.
 - **Enemy Database**: Extracted all hardcoded enemy definitions from code to `public/data/enemies.json`. New `EnemyDatabase` class (mirrors `ItemDatabase` pattern) with `load()`, `getEnemy()`, `getAllEnemies()`, `hasBehavior()`, `getBehavior()`. Enemy stats, sprite data (path/size/yOffset), and AI behaviors (regen/flee/erratic) are now data-driven with typed params. Removed `ENEMY_DEFS`, `SPRITE_SIZES`, `SPRITE_PATHS`, `SPRITE_Y_OFFSETS` constants. All 12 consumer files updated. 541 tests passing.
 - **Editor Direct File Save**: Vite dev server plugin (`editorApiPlugin`) with 3 API routes (`/api/editor/list`, `/load`, `/save`) for reading/writing level JSON directly to `public/levels/`. CSRF token injected into `editor.html`, validated on every API call. Filename validation blocks path traversal. File watcher suppression prevents page reload on save. Client-side: `isDevServer()`, `listServerFiles()`, `loadFromServer()`, `saveToServer()` in io.ts. Extracted `serializeLevel()`/`serializeDungeon()` helpers (deduplicated field-ordering, added `fireflies` field). Toolbar: Save, Save As, Open Server buttons (hidden in production). `sourcePath` tracking on EditorApp. Ctrl+S shortcut. `performSave()` with validation, concurrent-save guard, dirty state reset.
 - **Outdoor Forest Environment**: New forest environment with green fog, brighter ambient, procedural textures (forest wall, grass floor, canopy ceiling). `seeThrough` CharDef property — solid cells that render floor/ceiling without walls, filled with tree billboard sprites. Two-layer forest: hard forest walls (`F`) + dense see-through tree cells (`T`) + walkable clearings (`.`). Billboard material extracted to shared module. Editor: seeThrough checkbox, floor+tree overlay in grid/palette. Test level: `forest_test.json`.
