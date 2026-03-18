@@ -19,6 +19,7 @@ function getSprite(path: string, onLoad?: () => void): HTMLImageElement | null {
 
 const ENTITY_TYPES = [
   'enemy', 'door', 'key', 'lever', 'pressure_plate',
+  'trigger', 'tripwire', 'gate',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
 ] as const;
 
@@ -642,6 +643,57 @@ export class Toolbar {
         ctx.fillStyle = '#555';
         ctx.fillRect(bx, cy - hingeSize, hingeSize, hingeSize * 2);
         ctx.fillRect(bx + bw - hingeSize, cy - hingeSize, hingeSize, hingeSize * 2);
+        break;
+      }
+      case 'trigger': {
+        // Dashed circle
+        ctx.strokeStyle = '#ff6600';
+        ctx.lineWidth = Math.max(1, r * 0.2);
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+      }
+      case 'tripwire': {
+        // Dashed horizontal line with small end dots
+        const pad = r * 0.3;
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = Math.max(1, r * 0.2);
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        ctx.moveTo(cx - r - pad, cy);
+        ctx.lineTo(cx + r + pad, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // End dots
+        ctx.fillStyle = '#ff3366';
+        ctx.beginPath();
+        ctx.arc(cx - r - pad, cy, 1.5, 0, Math.PI * 2);
+        ctx.arc(cx + r + pad, cy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'gate': {
+        // Diamond with letter
+        const gd = r * 0.85;
+        ctx.fillStyle = '#6688ff';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - gd);
+        ctx.lineTo(cx + gd, cy);
+        ctx.lineTo(cx, cy + gd);
+        ctx.lineTo(cx - gd, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#3344aa';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(6, gd * 0.8)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('G', cx, cy);
         break;
       }
       case 'stairs': {

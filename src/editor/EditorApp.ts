@@ -22,7 +22,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   lever:          { targets: [], wall: 'N' },
   pressure_plate: { targets: [] },
   trigger:        { targets: [], signalMode: 'momentary' },
-  tripwire:       { targets: [], signalMode: 'one_shot', visibilityThreshold: 8 },
+  tripwire:       { targets: [], signalMode: 'one_shot', visibilityThreshold: 8, orientation: 'EW' },
   gate:           { gateType: 'and', targets: [] },
   torch_sconce:   { wall: 'N' },
   enemy:          { enemyType: 'rat' },

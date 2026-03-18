@@ -67,6 +67,8 @@ export interface TriggerInstance {
   fired: boolean;
 }
 
+export type TripwireOrientation = 'EW' | 'NS';
+
 export interface TripwireInstance {
   id?: string;
   col: number;
@@ -75,6 +77,7 @@ export interface TripwireInstance {
   signalMode: SignalMode;
   signalDuration?: number;
   visibilityThreshold: number;
+  orientation: TripwireOrientation;
   triggered: boolean;
 }
 
@@ -123,6 +126,16 @@ function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing 
   if (col + 1 < cols && grid[row][col + 1] === '#') return 'E';
   if (col - 1 >= 0 && grid[row][col - 1] === '#') return 'W';
   return 'N';
+}
+
+// Auto-detect tripwire orientation from adjacent walls (same logic as door orientation).
+// If E/W neighbors are walls → tripwire runs N-S (vertical). Otherwise E-W (horizontal).
+function autoDetectTripwireOrientation(col: number, row: number, grid?: string[]): TripwireOrientation {
+  if (!grid) return 'EW';
+  const cols = grid[0].length;
+  const eastSolid = col + 1 >= cols || grid[row][col + 1] === '#';
+  const westSolid = col - 1 < 0 || grid[row][col - 1] === '#';
+  return (eastSolid && westSolid) ? 'NS' : 'EW';
 }
 
 export interface LevelSnapshot {
@@ -292,6 +305,8 @@ export class GameState {
         });
       } else if (e.type === 'tripwire') {
         const targets = (e.targets as string[] | undefined) ?? [];
+        const orientation = (e.orientation as TripwireOrientation | undefined) ??
+          autoDetectTripwireOrientation(e.col, e.row, grid);
         this.tripwires.set(doorKey(e.col, e.row), {
           id: e.id as string | undefined,
           col: e.col,
@@ -300,6 +315,7 @@ export class GameState {
           signalMode: (e.signalMode as SignalMode) ?? 'one_shot',
           signalDuration: e.signalDuration as number | undefined,
           visibilityThreshold: (e.visibilityThreshold as number) ?? 8,
+          orientation,
           triggered: false,
         });
       } else if (e.type === 'gate') {

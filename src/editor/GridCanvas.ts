@@ -779,16 +779,41 @@ export class GridCanvas {
       }
 
       case 'tripwire': {
-        // Dashed horizontal line
-        const pad = Math.min(tw, th) * 0.15;
+        // Dashed line — orientation-aware (EW = horizontal, NS = vertical)
+        const twOrient = (entity.orientation as string) ??
+          (this.isTripwireNS(entity.col, entity.row) ? 'NS' : 'EW');
+        const pad = Math.min(tw, th) * 0.1;
+        const dotR = Math.max(1.5, iconRadius * 0.15);
         ctx.strokeStyle = '#ff3366';
         ctx.lineWidth = Math.max(1, iconRadius * 0.25);
         ctx.setLineDash([4, 2]);
         ctx.beginPath();
-        ctx.moveTo(px + pad, cy);
-        ctx.lineTo(px + tw - pad, cy);
+        if (twOrient === 'NS') {
+          ctx.moveTo(cx, py + pad);
+          ctx.lineTo(cx, py + th - pad);
+        } else {
+          ctx.moveTo(px + pad, cy);
+          ctx.lineTo(px + tw - pad, cy);
+        }
         ctx.stroke();
         ctx.setLineDash([]);
+        // End dots
+        ctx.fillStyle = '#ff3366';
+        if (twOrient === 'NS') {
+          ctx.beginPath();
+          ctx.arc(cx, py + pad, dotR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, py + th - pad, dotR, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(px + pad, cy, dotR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(px + tw - pad, cy, dotR, 0, Math.PI * 2);
+          ctx.fill();
+        }
         break;
       }
 
@@ -871,6 +896,11 @@ export class GridCanvas {
     ctx.drawImage(img, px + pad, py + pad, tw - pad * 2, th - pad * 2);
     ctx.restore();
     return true;
+  }
+
+  /** Auto-detect tripwire orientation: NS if E/W neighbors are walls. */
+  private isTripwireNS(col: number, row: number): boolean {
+    return this.isDoorEW(col, row);
   }
 
   /** Detect door orientation: EW means bar runs east-west (horizontal). */

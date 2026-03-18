@@ -246,6 +246,10 @@ export class Inspector {
 
       case 'tripwire':
         this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
+          entity.orientation = val;
+          this.onEntityChanged?.();
+        });
         this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'one_shot',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;

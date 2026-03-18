@@ -341,6 +341,9 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.visibilityThreshold !== undefined && typeof e.visibilityThreshold !== 'number') {
         throw new Error(`Level ${source}: entities[${i}] tripwire visibilityThreshold must be a number`);
       }
+      if (e.orientation !== undefined && e.orientation !== 'EW' && e.orientation !== 'NS') {
+        throw new Error(`Level ${source}: entities[${i}] tripwire orientation must be "EW" or "NS"`);
+      }
     }
 
     if (e.type === 'gate') {
