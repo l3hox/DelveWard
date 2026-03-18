@@ -543,13 +543,16 @@ inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) =
 // Pick mode completion (success or cancel via right-click)
 gridCanvas.setPickCompleteCallback(() => {
   app.statusHint = null;
+  app.rebuildDerivedState();
   inspector.refresh();
   updateStairHighlight();
   levelProps.refresh();
   levelList.refresh();
+  markDirty();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
   updateStatusHint();
+  updateErrorBanner();
 });
 
 // GridCanvas undo callbacks — paint drag coalescing
