@@ -158,6 +158,7 @@ Entities can have an optional `id` field — a stable identifier used for cross-
 |-------|------|----------|-------------|
 | `state` | string | No | `"closed"` (default) or `"open"` |
 | `keyId` | string | No | If set, the door requires the matching key to open. Must match a key entity's `keyId`. |
+| `gateMode` | string | No | How multiple incoming signals combine: `"or"` (default — any signal opens), `"and"` (all signals required), `"xor"` (odd count toggles) |
 
 ```json
 { "col": 5, "row": 2, "type": "door", "id": "door_1", "state": "closed", "keyId": "gold_key" }
@@ -198,6 +199,46 @@ All targeted doors are marked **mechanical** — same as lever-targeted doors.
 ```json
 { "col": 4, "row": 7, "type": "door", "id": "door_4" },
 { "col": 4, "row": 9, "type": "pressure_plate", "id": "plate_1", "targets": ["door_4"] }
+```
+
+**Trigger** (`type: "trigger"`) — placed on walkable cells. Invisible floor trigger that activates when the player steps on it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targets` | string[] | Yes | Entity IDs of doors/gates to activate |
+| `signalMode` | string | No | `"momentary"` (default), `"toggle"`, `"one_shot"`, or `"timed"` |
+| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+
+```json
+{ "col": 3, "row": 5, "type": "trigger", "id": "trigger_1", "targets": ["door_1"], "signalMode": "momentary" }
+```
+
+**Tripwire** (`type: "tripwire"`) — placed on walkable cells. One-shot invisible trigger with a visibility threshold (future use for perception checks).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targets` | string[] | Yes | Entity IDs of doors/gates to activate |
+| `signalMode` | string | No | `"one_shot"` (default), `"toggle"`, `"momentary"`, or `"timed"` |
+| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `visibilityThreshold` | number | No | Perception threshold to detect the tripwire (default 8, future use) |
+
+```json
+{ "col": 5, "row": 3, "type": "tripwire", "id": "tripwire_1", "targets": ["gate_1"], "visibilityThreshold": 10 }
+```
+
+**Gate** (`type: "gate"`) — placed on walkable cells. Standalone logic gate that receives signals and transforms them before forwarding to targets.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `gateType` | string | Yes | `"and"`, `"or"`, `"not"`, `"delay"`, `"pulse_edge"`, or `"pulse_repeat"` |
+| `targets` | string[] | Yes | Entity IDs of doors/gates to output to |
+| `delay` | number | No | Delay in seconds (for `"delay"` gate type) |
+| `interval` | number | No | Interval in seconds (for `"pulse_repeat"` gate type) |
+
+Gates are wired between sources (levers, triggers) and receivers (doors). Use them for puzzles: e.g., both levers must be down → AND gate → door opens.
+
+```json
+{ "col": 2, "row": 2, "type": "gate", "id": "gate_1", "gateType": "and", "targets": ["door_1"] }
 ```
 
 **Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space). Stairs come in pairs — each stair references its paired stair on another level by entity ID.

@@ -109,6 +109,14 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
+        this.addDropdownField('gateMode', (entity.gateMode as string) ?? '', ['', 'or', 'and', 'xor'], (val) => {
+          if (val) {
+            entity.gateMode = val;
+          } else {
+            delete (entity as Record<string, unknown>).gateMode;
+          }
+          this.onEntityChanged?.();
+        });
         const refs = [
           ...this.app.getReferencingEntities(entity),
           ...this.app.getKeyIdPeers(entity).filter(e => e.type === 'key'),
@@ -157,10 +165,42 @@ export class Inspector {
           this.onEntityChanged?.();
         });
         this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            if (val) {
+              entity.signalMode = val;
+            } else {
+              delete (entity as Record<string, unknown>).signalMode;
+            }
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'pressure_plate':
         this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            if (val) {
+              entity.signalMode = val;
+            } else {
+              delete (entity as Record<string, unknown>).signalMode;
+            }
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'torch_sconce':
@@ -186,6 +226,64 @@ export class Inspector {
 
       case 'consumable':
         this.addItemDropdown(entity, 'consumable');
+        break;
+
+      case 'trigger':
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'momentary',
+          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+
+      case 'tripwire':
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'one_shot',
+          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        this.addNumberField('visibilityThreshold', (entity.visibilityThreshold as number) ?? 8, (val) => {
+          entity.visibilityThreshold = val;
+          this.onEntityChanged?.();
+        });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+
+      case 'gate':
+        this.addDropdownField('gateType', (entity.gateType as string) ?? 'and',
+          ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'], (val) => {
+            entity.gateType = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        this.addTargetsArrayField(entity, 'door');
+        if ((entity.gateType as string) === 'delay') {
+          this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
+            entity.delay = val;
+            this.onEntityChanged?.();
+          });
+        }
+        if ((entity.gateType as string) === 'pulse_repeat') {
+          this.addNumberField('interval', (entity.interval as number) ?? 1, (val) => {
+            entity.interval = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'stairs': {
