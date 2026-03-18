@@ -239,6 +239,10 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.keyId !== undefined && typeof e.keyId !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] door keyId must be a string`);
       }
+      const validGateModes = ['or', 'and', 'xor'];
+      if (e.gateMode !== undefined && !validGateModes.includes(e.gateMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] door gateMode must be one of ${validGateModes.join(', ')}`);
+      }
     }
 
     if (e.type === 'key') {
@@ -265,6 +269,13 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
       }
+      const validSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever signalMode must be one of ${validSignalModes.join(', ')}`);
+      }
+      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] lever signalDuration must be a number`);
+      }
     }
 
     if (e.type === 'pressure_plate') {
@@ -281,6 +292,13 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
+      }
+      const validPlateSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validPlateSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalMode must be one of ${validPlateSignalModes.join(', ')}`);
+      }
+      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalDuration must be a number`);
       }
     }
 

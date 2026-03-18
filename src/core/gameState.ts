@@ -12,7 +12,7 @@ import type { ItemDef } from './itemDatabase';
 export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
 import { SignalManager } from './signalManager';
-import type { GateMode } from './signalManager';
+import type { GateMode, SignalMode } from './signalManager';
 
 export type DoorState = 'open' | 'closed';
 
@@ -43,6 +43,8 @@ export interface LeverInstance {
   targets: string[]; // entity IDs of doors to toggle
   wall: Facing;       // which wall the lever is mounted on
   state: LeverState;
+  signalMode?: SignalMode;
+  signalDuration?: number;
 }
 
 export interface PlateInstance {
@@ -51,6 +53,8 @@ export interface PlateInstance {
   row: number;
   targets: string[]; // entity IDs of doors to open
   activated: boolean;
+  signalMode?: SignalMode;
+  signalDuration?: number;
 }
 
 export interface StairInstance {
@@ -197,6 +201,7 @@ export class GameState {
           state,
           keyId,
           mechanical: false,
+          gateMode: e.gateMode as GateMode | undefined,
         });
       } else if (e.type === 'key') {
         this.keys.set(doorKey(e.col, e.row), {
@@ -219,6 +224,8 @@ export class GameState {
           targets,
           wall,
           state: 'up',
+          signalMode: e.signalMode as SignalMode | undefined,
+          signalDuration: e.signalDuration as number | undefined,
         });
       } else if (e.type === 'pressure_plate') {
         const targets = (e.targets as string[] | undefined) ??
@@ -229,6 +236,8 @@ export class GameState {
           row: e.row,
           targets,
           activated: false,
+          signalMode: e.signalMode as SignalMode | undefined,
+          signalDuration: e.signalDuration as number | undefined,
         });
       } else if (e.type === 'torch_sconce') {
         const wall = (e.wall as Facing | undefined) ??
@@ -306,12 +315,20 @@ export class GameState {
     // Register levers and plates as sources
     for (const lever of this.levers.values()) {
       if (lever.id) {
-        this.signalManager.registerSource(lever.id, lever.targets, 'toggle');
+        this.signalManager.registerSource(
+          lever.id, lever.targets,
+          lever.signalMode ?? 'toggle',
+          lever.signalDuration,
+        );
       }
     }
     for (const plate of this.plates.values()) {
       if (plate.id) {
-        this.signalManager.registerSource(plate.id, plate.targets, 'toggle');
+        this.signalManager.registerSource(
+          plate.id, plate.targets,
+          plate.signalMode ?? 'toggle',
+          plate.signalDuration,
+        );
       }
     }
 
@@ -544,6 +561,17 @@ export class GameState {
       }
     }
     return plate.targets;
+  }
+
+  /** Deactivate a momentary pressure plate when the player steps off. */
+  deactivatePressurePlate(col: number, row: number): void {
+    const plate = this.plates.get(doorKey(col, row));
+    if (!plate) return;
+    if (plate.signalMode !== 'momentary') return;
+    plate.activated = false;
+    if (plate.id && this.signalManager.getSource(plate.id)) {
+      this.signalManager.deactivateSource(plate.id);
+    }
   }
 
   getSconce(col: number, row: number): SconceInstance | undefined {

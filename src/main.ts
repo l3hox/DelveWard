@@ -403,8 +403,18 @@ async function init(): Promise<void> {
 
   // --- Callbacks ---
 
+  let lastPlayerCol = firstLevel.playerStart.col;
+  let lastPlayerRow = firstLevel.playerStart.row;
+
   function wireCallbacks(): void {
     ls.player.setOnMove((col, row) => {
+      // Deactivate momentary plates at the cell we just left
+      if (col !== lastPlayerCol || row !== lastPlayerRow) {
+        gameState.deactivatePressurePlate(lastPlayerCol, lastPlayerRow);
+      }
+      lastPlayerCol = col;
+      lastPlayerRow = row;
+
       // Reveal explored cells on move
       gameState.revealAround(col, row, ls.player.getState().facing, ls.level.grid);
 
