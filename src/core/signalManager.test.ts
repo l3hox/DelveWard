@@ -236,6 +236,57 @@ describe('SignalManager', () => {
     expect(sm2.isReceiverActive('door_1')).toBe(true);
   });
 
+  // --- Signal delay ---
+
+  it('delayed source activates after delay elapses', () => {
+    const sm = new SignalManager();
+    sm.registerSource('plate_1', ['door_1'], 'toggle', undefined, 1.5);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('plate_1', true);
+    // Should not activate immediately
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+    expect(sm.isSourceActive('plate_1')).toBe(false);
+
+    sm.tick(1.0);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    sm.tick(0.6);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+    expect(sm.isSourceActive('plate_1')).toBe(true);
+  });
+
+  it('delayed timed source starts duration after delay', () => {
+    const sm = new SignalManager();
+    sm.registerSource('trigger_1', ['door_1'], 'timed', 1.0, 0.5);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('trigger_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // After delay elapses, source activates with timed duration
+    sm.tick(0.6);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+
+    // After timed duration elapses, source deactivates
+    sm.tick(1.1);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+  });
+
+  it('deactivation cancels pending delay', () => {
+    const sm = new SignalManager();
+    sm.registerSource('plate_1', ['door_1'], 'momentary', undefined, 1.0);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('plate_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // Deactivate before delay elapses
+    sm.deactivateSource('plate_1');
+    sm.tick(1.5);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+  });
+
   // --- Clear ---
 
   it('clear removes all registrations', () => {

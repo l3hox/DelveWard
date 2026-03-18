@@ -18,6 +18,9 @@ export interface SignalSource {
   fired: boolean;          // for one_shot: already triggered
   duration?: number;       // for timed: total duration in seconds
   timer: number;           // for timed: remaining time
+  delay?: number;          // optional activation delay in seconds
+  delayTimer: number;      // countdown for pending delayed activation
+  delayPending: boolean;   // true while waiting for delay to elapse
 }
 
 export interface SignalReceiver {
@@ -54,6 +57,7 @@ export class SignalManager {
     targets: string[],
     signalMode: SignalMode = 'toggle',
     duration?: number,
+    delay?: number,
   ): void {
     this.sources.set(entityId, {
       entityId,
@@ -63,6 +67,9 @@ export class SignalManager {
       fired: false,
       duration,
       timer: 0,
+      delay,
+      delayTimer: 0,
+      delayPending: false,
     });
   }
 
@@ -100,9 +107,23 @@ export class SignalManager {
     // one_shot: ignore re-activation after first fire
     if (source.signalMode === 'one_shot' && source.fired) return;
 
+    // Delayed activation: start countdown instead of activating immediately
+    if (active && source.delay && source.delay > 0 && !source.delayPending && !source.active) {
+      source.delayPending = true;
+      source.delayTimer = source.delay;
+      if (source.signalMode === 'one_shot') source.fired = true;
+      return; // don't propagate yet — tick() will handle it
+    }
+
+    // Cancel pending delay on deactivation
+    if (!active) {
+      source.delayPending = false;
+      source.delayTimer = 0;
+    }
+
     source.active = active;
 
-    if (active && source.signalMode === 'one_shot') {
+    if (active && source.signalMode === 'one_shot' && !source.fired) {
       source.fired = true;
     }
 
@@ -117,12 +138,30 @@ export class SignalManager {
     const source = this.sources.get(entityId);
     if (!source) return;
     source.active = false;
+    source.delayPending = false;
+    source.delayTimer = 0;
     this.propagate();
   }
 
   /** Advance timed sources and delay/pulse gates. */
   tick(delta: number): void {
     let changed = false;
+
+    // Delayed source activation: countdown and activate
+    for (const source of this.sources.values()) {
+      if (source.delayPending) {
+        source.delayTimer -= delta;
+        if (source.delayTimer <= 0) {
+          source.delayTimer = 0;
+          source.delayPending = false;
+          source.active = true;
+          if (source.signalMode === 'timed' && source.duration) {
+            source.timer = source.duration;
+          }
+          changed = true;
+        }
+      }
+    }
 
     // Timed sources: countdown and deactivate
     for (const source of this.sources.values()) {

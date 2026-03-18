@@ -115,13 +115,16 @@ function validateEntity(
     return null;
   };
 
-  // Helper: validate optional signal mode
+  // Helper: validate optional signal mode and delay
   const checkSignalMode = (typeName: string): string | null => {
     if (e.signalMode !== undefined && !validSignalModes.has(e.signalMode as string)) {
       return `${pfx} ${typeName} signalMode must be one of ${[...validSignalModes].join(', ')}`;
     }
     if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
       return `${pfx} ${typeName} signalDuration must be a number`;
+    }
+    if (e.signalDelay !== undefined && typeof e.signalDelay !== 'number') {
+      return `${pfx} ${typeName} signalDelay must be a number`;
     }
     return null;
   };

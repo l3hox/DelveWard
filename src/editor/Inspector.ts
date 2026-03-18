@@ -181,6 +181,7 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addSignalDelayField(entity);
         break;
 
       case 'pressure_plate':
@@ -201,6 +202,7 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addSignalDelayField(entity);
         break;
 
       case 'torch_sconce':
@@ -242,6 +244,7 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addSignalDelayField(entity);
         break;
 
       case 'tripwire':
@@ -266,6 +269,7 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addSignalDelayField(entity);
         break;
 
       case 'gate':
@@ -527,6 +531,57 @@ export class Inspector {
       onChange(select.value);
     });
     wrapper.appendChild(select);
+
+    this.container.appendChild(wrapper);
+  }
+
+  /** Checkbox + number field for optional signal activation delay. */
+  private addSignalDelayField(entity: Entity): void {
+    const hasDelay = (entity.signalDelay as number | undefined) !== undefined;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.style.display = 'flex';
+    lbl.style.alignItems = 'center';
+    lbl.style.gap = '4px';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = hasDelay;
+    checkbox.title = 'Add a delay before the signal activates';
+    checkbox.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      if (checkbox.checked) {
+        entity.signalDelay = 1;
+      } else {
+        delete (entity as Record<string, unknown>).signalDelay;
+      }
+      this.onEntityChanged?.();
+      this.refresh();
+    });
+    lbl.appendChild(checkbox);
+
+    const text = document.createElement('span');
+    text.textContent = 'signalDelay';
+    lbl.appendChild(text);
+    wrapper.appendChild(lbl);
+
+    if (hasDelay) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = '0.1';
+      input.value = String(entity.signalDelay ?? 1);
+      input.style.width = '60px';
+      input.addEventListener('input', () => {
+        this.onBeginTextEdit?.();
+        const parsed = parseFloat(input.value);
+        if (!isNaN(parsed) && parsed >= 0) entity.signalDelay = parsed;
+      });
+      input.addEventListener('blur', () => this.onCommitTextEdit?.());
+      wrapper.appendChild(input);
+    }
 
     this.container.appendChild(wrapper);
   }

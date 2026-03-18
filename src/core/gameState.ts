@@ -45,6 +45,7 @@ export interface LeverInstance {
   state: LeverState;
   signalMode?: SignalMode;
   signalDuration?: number;
+  signalDelay?: number;
 }
 
 export interface PlateInstance {
@@ -55,6 +56,7 @@ export interface PlateInstance {
   activated: boolean;
   signalMode?: SignalMode;
   signalDuration?: number;
+  signalDelay?: number;
 }
 
 export interface TriggerInstance {
@@ -64,6 +66,7 @@ export interface TriggerInstance {
   targets: string[];
   signalMode: SignalMode;
   signalDuration?: number;
+  signalDelay?: number;
   fired: boolean;
 }
 
@@ -76,6 +79,7 @@ export interface TripwireInstance {
   targets: string[];
   signalMode: SignalMode;
   signalDuration?: number;
+  signalDelay?: number;
   visibilityThreshold: number;
   orientation: TripwireOrientation;
   triggered: boolean;
@@ -279,6 +283,7 @@ export class GameState {
           state: 'up',
           signalMode: e.signalMode as SignalMode | undefined,
           signalDuration: e.signalDuration as number | undefined,
+          signalDelay: e.signalDelay as number | undefined,
         });
       } else if (e.type === 'pressure_plate') {
         const targets = (e.targets as string[] | undefined) ??
@@ -291,6 +296,7 @@ export class GameState {
           activated: false,
           signalMode: e.signalMode as SignalMode | undefined,
           signalDuration: e.signalDuration as number | undefined,
+          signalDelay: e.signalDelay as number | undefined,
         });
       } else if (e.type === 'trigger') {
         const targets = (e.targets as string[] | undefined) ?? [];
@@ -301,6 +307,7 @@ export class GameState {
           targets,
           signalMode: (e.signalMode as SignalMode) ?? 'momentary',
           signalDuration: e.signalDuration as number | undefined,
+          signalDelay: e.signalDelay as number | undefined,
           fired: false,
         });
       } else if (e.type === 'tripwire') {
@@ -314,6 +321,7 @@ export class GameState {
           targets,
           signalMode: (e.signalMode as SignalMode) ?? 'one_shot',
           signalDuration: e.signalDuration as number | undefined,
+          signalDelay: e.signalDelay as number | undefined,
           visibilityThreshold: (e.visibilityThreshold as number) ?? 8,
           orientation,
           triggered: false,
@@ -405,7 +413,7 @@ export class GameState {
         this.signalManager.registerSource(
           lever.id, lever.targets,
           lever.signalMode ?? 'toggle',
-          lever.signalDuration,
+          lever.signalDuration, lever.signalDelay,
         );
       }
     }
@@ -414,7 +422,7 @@ export class GameState {
         this.signalManager.registerSource(
           plate.id, plate.targets,
           plate.signalMode ?? 'toggle',
-          plate.signalDuration,
+          plate.signalDuration, plate.signalDelay,
         );
       }
     }
@@ -425,7 +433,7 @@ export class GameState {
         this.signalManager.registerSource(
           trigger.id, trigger.targets,
           trigger.signalMode,
-          trigger.signalDuration,
+          trigger.signalDuration, trigger.signalDelay,
         );
       }
     }
@@ -434,7 +442,7 @@ export class GameState {
         this.signalManager.registerSource(
           tripwire.id, tripwire.targets,
           tripwire.signalMode,
-          tripwire.signalDuration,
+          tripwire.signalDuration, tripwire.signalDelay,
         );
       }
     }
