@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — Post-Phase-A Round 2: Trigger/Tripwire Fixes, Tripwire Rendering, Editor UX
+
+**Trigger modes fixed**: Toggle triggers flip on/off each step-on (was always activating). Timed triggers start countdown on step-off, not step-on. Fired state resets on timer expiry via `onSourceDeactivated`.
+
+**Tripwire simplified**: Removed signalMode from tripwire — always one_shot. Only `signalDelay` configurable in editor. Tripwire orientation auto-detect fixed in both editor and game: wire now runs perpendicular to passage (across it) instead of parallel.
+
+**Tripwire 3D rendering**: New `tripwireRenderer.ts`. Thin cylinder mesh at ankle height (0.25), wall-to-wall, dark grey with very low opacity (0.1). Disappears when triggered. Meshes included in level scene setup/teardown.
+
+**Editor ghost preview**: Entity mode hover shows semi-transparent (50%) icon of the entity that would be placed. Auto-detects wall orientation for lever/sconce and tripwire orientation per hover cell. Shows actual sprites for enemy/equipment/consumable (always, regardless of item preview toggle).
+
+**Editor UX**: Select tool button highlighted on page load. Escape in entity mode reverts to select mode. Drag-to-wire falls back to any wirable entity at cell if selected entity is not a wire source (e.g. sconce on same cell as plate). Lever wiring arrows originate from bar center instead of cell center.
+
+**Files**: `src/core/gameState.ts`, `src/main.ts`, `src/rendering/tripwireRenderer.ts` (new), `src/editor/GridCanvas.ts`, `src/editor/EditorApp.ts`, `src/editor/Inspector.ts`, `src/editor/main.ts`
+
+---
+
 ## 2026-03-18 — Post-Phase-A: Signal Behavior Fixes, Editor Hover Highlights, Door Blocking
 
 **Signal state persistence**: `SignalManager.saveState()`/`loadState()` now included in `LevelSnapshot`. Fixes AND/XOR gates losing source active flags on level transition (door stayed open but wouldn't respond to lever toggles).

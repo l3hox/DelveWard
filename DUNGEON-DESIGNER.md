@@ -222,16 +222,14 @@ All targeted doors are marked **mechanical** — same as lever-targeted doors.
 { "col": 3, "row": 5, "type": "trigger", "id": "trigger_1", "targets": ["door_1"], "signalMode": "momentary" }
 ```
 
-**Tripwire** (`type: "tripwire"`) — placed on walkable cells. One-shot invisible trigger with a visibility threshold (future use for perception checks). Orientation auto-detected from adjacent walls.
+**Tripwire** (`type: "tripwire"`) — placed on walkable cells. Always one-shot (fires once, cannot be re-triggered). Rendered as a faint thin wire at ankle height, disappears when triggered. Orientation auto-detected perpendicular to passage from adjacent walls.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `targets` | string[] | Yes | Entity IDs of doors/gates to activate |
-| `signalMode` | string | No | `"one_shot"` (default), `"toggle"`, `"momentary"`, or `"timed"` |
-| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
 | `signalDelay` | number | No | Delay in seconds before the signal activates |
 | `visibilityThreshold` | number | No | Perception threshold to detect the tripwire (default 8, future use) |
-| `orientation` | string | No | `"EW"` (horizontal, default) or `"NS"` (vertical). Auto-detected from adjacent walls if omitted. |
+| `orientation` | string | No | `"EW"` (horizontal, default) or `"NS"` (vertical). Auto-detected perpendicular to passage if omitted. |
 
 ```json
 { "col": 5, "row": 3, "type": "tripwire", "id": "tripwire_1", "targets": ["gate_1"], "visibilityThreshold": 10 }

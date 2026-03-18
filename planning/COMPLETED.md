@@ -45,6 +45,16 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Remove buttons (×) on Referenced By section items
   - Door blocking: signal-driven doors bounce open when cell occupied (player or enemy), retry every 1.5s. Player position updated before source deactivation. Safety net: force open if player on closed door. Door state correctly restored to 'closed' when cell clears
   - Door panel edge UVs: proportional scaling on thin side/bottom faces only (front/back untouched)
+- [x] **Post-Phase-A Round 2: Trigger/Tripwire Fixes, Tripwire Rendering, Editor UX**:
+  - Trigger toggle/timed modes fixed: toggle flips on/off each step-on, timed countdown starts on step-off, fired state resets on timer expiry
+  - Tripwire simplified to one_shot only, removed signalMode from editor UI. Only signalDelay configurable
+  - Tripwire orientation auto-detect fixed (perpendicular to passage) in both editor and game
+  - New `tripwireRenderer.ts`: thin cylinder mesh at ankle height, wall-to-wall, dark grey, very low opacity (0.1), disappears on trigger
+  - Editor entity mode ghost preview: semi-transparent icon at hover position, auto-detects wall orientation (lever/sconce) and tripwire orientation per cell, shows actual sprites for enemy/equipment/consumable
+  - Select tool button highlighted on page load
+  - Escape in entity mode reverts to select mode
+  - Drag-to-wire falls back to any wirable entity at cell if selected entity is not a wire source
+  - Lever wiring arrows originate from bar center instead of cell center
   - 572 tests
 
 ---
