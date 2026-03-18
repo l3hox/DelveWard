@@ -731,8 +731,8 @@ export class Toolbar {
     const img = getSprite(path);
     if (!img) return false;
     ctx.imageSmoothingEnabled = false;
-    const pad = r * 0.3;
-    const s = (r + pad) * 2;
+    // Fill most of the button area (cx*2 is canvas width)
+    const s = cx * 2 - 4;
     ctx.drawImage(img, cx - s / 2, cy - s / 2, s, s);
     return true;
   }
