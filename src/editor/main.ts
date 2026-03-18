@@ -694,10 +694,14 @@ document.addEventListener('keydown', (e) => {
     if (app.pickMode) app.cancelPickMode();
     if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
     app.deleteSelectedEntity();
+    app.rebuildDerivedState();
     markDirty();
     inspector.refresh();
+    updateStairHighlight();
+    levelList.refresh();
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
+    updateErrorBanner();
     return;
   }
 
