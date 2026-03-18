@@ -1,10 +1,50 @@
 import { validateLevel, validateDungeon } from '../level/levelLoader';
 import type { Dungeon, DungeonLevel } from '../core/types';
 
+declare global {
+  interface Window {
+    __EDITOR_TOKEN?: string;
+  }
+}
+
 export type OpenResult =
   | { type: 'level'; level: DungeonLevel }
   | { type: 'dungeon'; dungeon: Dungeon }
   | null;
+
+// ---------------------------------------------------------------------------
+// Serialization helpers (field ordering, omit absent optionals)
+// ---------------------------------------------------------------------------
+
+export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (level.id !== undefined) out.id = level.id;
+  out.name = level.name;
+  out.grid = level.grid;
+  out.playerStart = level.playerStart;
+  out.entities = level.entities;
+  if (level.environment !== undefined) out.environment = level.environment;
+  if (level.ceiling !== undefined) out.ceiling = level.ceiling;
+  if (level.skybox !== undefined) out.skybox = level.skybox;
+  if (level.fireflies !== undefined) out.fireflies = level.fireflies;
+  if (level.dustMotes !== undefined) out.dustMotes = level.dustMotes;
+  if (level.waterDrips !== undefined) out.waterDrips = level.waterDrips;
+  if (level.defaults !== undefined) out.defaults = level.defaults;
+  if (level.charDefs !== undefined && level.charDefs.length > 0) out.charDefs = level.charDefs;
+  if (level.areas !== undefined && level.areas.length > 0) out.areas = level.areas;
+  return out;
+}
+
+export function serializeDungeon(dungeon: Dungeon): Record<string, unknown> {
+  return {
+    name: dungeon.name,
+    levels: dungeon.levels.map(serializeLevel),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// File picker open / browser download export
+// ---------------------------------------------------------------------------
 
 export function openLevelFile(): Promise<OpenResult> {
   return new Promise((resolve) => {
@@ -21,7 +61,6 @@ export function openLevelFile(): Promise<OpenResult> {
         try {
           const data = JSON.parse(reader.result as string);
 
-          // Detect shape: multi-level dungeon or single level
           if (data.levels && Array.isArray(data.levels)) {
             const dungeon = validateDungeon(data, file.name);
             resolve({ type: 'dungeon', dungeon });
@@ -39,7 +78,6 @@ export function openLevelFile(): Promise<OpenResult> {
       reader.readAsText(file);
     });
 
-    // Handle cancel (no file selected)
     input.addEventListener('cancel', () => resolve(null));
 
     input.click();
@@ -47,26 +85,7 @@ export function openLevelFile(): Promise<OpenResult> {
 }
 
 export function exportLevelFile(level: DungeonLevel): void {
-  const output: Record<string, unknown> = {};
-
-  // Required fields in intentional order
-  if (level.id !== undefined) output.id = level.id;
-  output.name = level.name;
-  output.grid = level.grid;
-  output.playerStart = level.playerStart;
-  output.entities = level.entities;
-
-  // Optional fields — omit if absent
-  if (level.environment !== undefined) output.environment = level.environment;
-  if (level.ceiling !== undefined) output.ceiling = level.ceiling;
-  if (level.skybox !== undefined) output.skybox = level.skybox;
-  if (level.dustMotes !== undefined) output.dustMotes = level.dustMotes;
-  if (level.waterDrips !== undefined) output.waterDrips = level.waterDrips;
-  if (level.defaults !== undefined) output.defaults = level.defaults;
-  if (level.charDefs !== undefined && level.charDefs.length > 0) output.charDefs = level.charDefs;
-  if (level.areas !== undefined && level.areas.length > 0) output.areas = level.areas;
-
-  const json = JSON.stringify(output, null, 2);
+  const json = JSON.stringify(serializeLevel(level), null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
@@ -80,28 +99,7 @@ export function exportLevelFile(level: DungeonLevel): void {
 }
 
 export function exportDungeonFile(dungeon: Dungeon): void {
-  const output: Record<string, unknown> = {
-    name: dungeon.name,
-    levels: dungeon.levels.map(level => {
-      const out: Record<string, unknown> = {};
-      if (level.id !== undefined) out.id = level.id;
-      out.name = level.name;
-      out.grid = level.grid;
-      out.playerStart = level.playerStart;
-      out.entities = level.entities;
-      if (level.environment !== undefined) out.environment = level.environment;
-      if (level.ceiling !== undefined) out.ceiling = level.ceiling;
-      if (level.skybox !== undefined) out.skybox = level.skybox;
-      if (level.dustMotes !== undefined) out.dustMotes = level.dustMotes;
-      if (level.waterDrips !== undefined) out.waterDrips = level.waterDrips;
-      if (level.defaults !== undefined) out.defaults = level.defaults;
-      if (level.charDefs !== undefined && level.charDefs.length > 0) out.charDefs = level.charDefs;
-      if (level.areas !== undefined && level.areas.length > 0) out.areas = level.areas;
-      return out;
-    }),
-  };
-
-  const json = JSON.stringify(output, null, 2);
+  const json = JSON.stringify(serializeDungeon(dungeon), null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
@@ -112,4 +110,74 @@ export function exportDungeonFile(dungeon: Dungeon): void {
   a.click();
 
   URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// Dev server API client
+// ---------------------------------------------------------------------------
+
+let devServerAvailable: boolean | null = null;
+
+function editorHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (window.__EDITOR_TOKEN) {
+    headers['X-Editor-Token'] = window.__EDITOR_TOKEN;
+  }
+  return headers;
+}
+
+export async function isDevServer(): Promise<boolean> {
+  if (devServerAvailable !== null) return devServerAvailable;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2000);
+    const res = await fetch('/api/editor/list', {
+      headers: editorHeaders(),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    devServerAvailable = res.ok;
+  } catch {
+    devServerAvailable = false;
+  }
+  return devServerAvailable;
+}
+
+export async function listServerFiles(): Promise<string[]> {
+  const res = await fetch('/api/editor/list', { headers: editorHeaders() });
+  if (!res.ok) throw new Error(`List failed: ${res.status}`);
+  const data = await res.json();
+  return data.files as string[];
+}
+
+export async function loadFromServer(filename: string): Promise<OpenResult> {
+  const res = await fetch(`/api/editor/load?file=${encodeURIComponent(filename)}`, {
+    headers: editorHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Load failed: ${res.status}`);
+  }
+  const data = await res.json();
+
+  if (data.levels && Array.isArray(data.levels)) {
+    const dungeon = validateDungeon(data, filename);
+    return { type: 'dungeon', dungeon };
+  } else if (data.grid) {
+    return { type: 'level', level: validateLevel(data, filename) };
+  } else {
+    throw new Error('Unrecognized JSON format');
+  }
+}
+
+export async function saveToServer(filename: string, content: string): Promise<void> {
+  const res = await fetch('/api/editor/save', {
+    method: 'POST',
+    headers: editorHeaders(),
+    body: JSON.stringify({ file: filename, content }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Save failed: ${res.status}`);
+  }
 }

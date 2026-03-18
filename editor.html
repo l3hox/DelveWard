@@ -337,6 +337,26 @@
         cursor: not-allowed;
       }
 
+      #btn-save, #btn-save-as, #btn-open-server {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 4px 10px;
+        font-family: monospace;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      #btn-save:hover, #btn-save-as:hover, #btn-open-server:hover {
+        background: #3a3a3a;
+        border-color: #888;
+      }
+
+      #btn-save:disabled, #btn-save-as:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
       .toolbar-sep {
         width: 1px;
         height: 20px;

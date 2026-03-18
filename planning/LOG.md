@@ -4,6 +4,23 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — Editor Direct File Save
+
+**Goal**: Eliminate the browser-download friction loop when iterating on levels. Let the editor read/write JSON files directly to `public/levels/` during dev.
+
+**Key decisions**:
+- **Vite dev server plugin** — `editorApiPlugin()` uses `configureServer` hook, so it only runs during `npm run dev`. Production builds are unaffected (export-only workflow unchanged).
+- **CSRF token** — `crypto.randomUUID()` generated at server start, injected into `editor.html` via `transformIndexHtml`, required as `X-Editor-Token` header on all API calls. Custom headers trigger CORS preflight, blocking cross-origin attacks without needing same-origin cookies.
+- **Filename validation** — rejects null bytes, slashes, `..`, non-allowlist chars. `path.resolve` + `startsWith` check as final guard against path traversal.
+- **Watcher suppression** — `server.watcher.unwatch()` before write, `server.watcher.add()` after 100ms delay, prevents Vite HMR from reloading the game page when the editor saves.
+- **Serialization refactor** — extracted `serializeLevel()` / `serializeDungeon()` from duplicated field-ordering blocks in `exportLevelFile`/`exportDungeonFile`. Now includes `fireflies` field (was missing from export before this change).
+- **sourcePath tracking** — `EditorApp.sourcePath` tracks the server filename. Reset on load/create. Set after server load or first save. Save button enabled only when `sourcePath` is set and level is dirty.
+- **Save vs Save As** — Save writes to `sourcePath` (Ctrl+S), Save As prompts for filename. If `sourcePath` is null, Save falls through to Save As.
+
+**Files**: `vite.config.ts` (plugin + routes), `src/editor/io.ts` (serialization helpers + API client), `src/editor/EditorApp.ts` (`sourcePath` field), `src/editor/Toolbar.ts` (3 new buttons + methods), `src/editor/main.ts` (callbacks, `performSave`, Ctrl+S, dev server detection), `editor.html` (button CSS).
+
+---
+
 ## 2026-03-17 — Outdoor Forest Environment + Fireflies
 
 **Goal**: Add an outdoor forest environment with dense tree-filled cells and atmospheric firefly particles.

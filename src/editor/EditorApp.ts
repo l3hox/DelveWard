@@ -70,6 +70,7 @@ export class EditorApp {
   coordDragCallback: ((fromCol: number, fromRow: number, toCol: number, toRow: number) => void) | null = null;
   areaDragState: AreaDragState | null = null;
   statusHint: string | null = null;
+  sourcePath: string | null = null;
   showCeiling = false;
   showItemPreview = true;
   selectedEnemyType = 'rat';
@@ -100,6 +101,7 @@ export class EditorApp {
     this.statusHint = null;
     this.dirty = false;
     this.cleanSnapshot = JSON.stringify(level);
+    this.sourcePath = null;
 
     this.dungeon = null;
     this.activeLevelIndex = 0;
@@ -108,6 +110,7 @@ export class EditorApp {
   }
 
   loadDungeon(dungeon: Dungeon): void {
+    this.sourcePath = null;
     this.dungeon = dungeon;
     // Auto-generate missing level IDs
     for (let i = 0; i < dungeon.levels.length; i++) {
@@ -417,6 +420,7 @@ export class EditorApp {
       entities: [],
     };
     this.loadLevel(level);
+    // sourcePath already reset by loadLevel
   }
 
   restoreLevel(level: DungeonLevel): void {

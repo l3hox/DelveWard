@@ -27,6 +27,9 @@ export class Toolbar {
   private charBtns: Map<string, HTMLButtonElement> = new Map();
   private entityBtns: Map<string, HTMLButtonElement> = new Map();
   private exportBtn!: HTMLButtonElement;
+  private saveBtn!: HTMLButtonElement;
+  private saveAsBtn!: HTMLButtonElement;
+  private openServerBtn!: HTMLButtonElement;
   private palette!: HTMLElement;
   private entityPalette!: HTMLElement;
   private selectedChar = '.';
@@ -44,6 +47,9 @@ export class Toolbar {
   onNewDungeon: (() => void) | null = null;
   onViewToggle: ((flag: 'showCeiling' | 'showItemPreview', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
+  onSave: (() => void) | null = null;
+  onSaveAs: (() => void) | null = null;
+  onOpenFromServer: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.palette = document.getElementById('char-palette')!;
@@ -93,12 +99,38 @@ export class Toolbar {
     this.onItemIdChange = cb;
   }
 
+  setSaveCallback(cb: () => void): void {
+    this.onSave = cb;
+  }
+
+  setSaveAsCallback(cb: () => void): void {
+    this.onSaveAs = cb;
+  }
+
+  setOpenFromServerCallback(cb: () => void): void {
+    this.onOpenFromServer = cb;
+  }
+
   enableExport(): void {
     this.exportBtn.disabled = false;
   }
 
   disableExport(): void {
     this.exportBtn.disabled = true;
+  }
+
+  showServerButtons(): void {
+    this.saveBtn.style.display = '';
+    this.saveAsBtn.style.display = '';
+    this.openServerBtn.style.display = '';
+  }
+
+  enableSave(): void {
+    this.saveBtn.disabled = false;
+  }
+
+  disableSave(): void {
+    this.saveBtn.disabled = true;
   }
 
   setActiveTool(tool: EditorTool): void {
@@ -245,6 +277,36 @@ export class Toolbar {
 
     this.exportBtn = exportBtn;
     coordDisplay.insertAdjacentElement('beforebegin', exportBtn);
+
+    // Save button — next to Export, initially hidden
+    const saveBtn = document.createElement('button');
+    saveBtn.id = 'btn-save';
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = true;
+    saveBtn.style.display = 'none';
+    saveBtn.addEventListener('click', () => {
+      if (!saveBtn.disabled) this.onSave?.();
+    });
+    this.saveBtn = saveBtn;
+    exportBtn.insertAdjacentElement('afterend', saveBtn);
+
+    // Save As button — next to Save, initially hidden
+    const saveAsBtn = document.createElement('button');
+    saveAsBtn.id = 'btn-save-as';
+    saveAsBtn.textContent = 'Save As';
+    saveAsBtn.style.display = 'none';
+    saveAsBtn.addEventListener('click', () => this.onSaveAs?.());
+    this.saveAsBtn = saveAsBtn;
+    saveBtn.insertAdjacentElement('afterend', saveAsBtn);
+
+    // Open Server button — next to Open File, initially hidden
+    const openServerBtn = document.createElement('button');
+    openServerBtn.id = 'btn-open-server';
+    openServerBtn.textContent = 'Open Server';
+    openServerBtn.style.display = 'none';
+    openServerBtn.addEventListener('click', () => this.onOpenFromServer?.());
+    this.openServerBtn = openServerBtn;
+    sep1.insertAdjacentElement('beforebegin', openServerBtn);
   }
 
   private buildEntityPalette(): void {

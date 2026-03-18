@@ -4,7 +4,11 @@ import { Toolbar } from './Toolbar';
 import { Inspector } from './Inspector';
 import { LevelProperties } from './LevelProperties';
 import { LevelList } from './LevelList';
-import { openLevelFile, exportLevelFile, exportDungeonFile } from './io';
+import {
+  openLevelFile, exportLevelFile, exportDungeonFile,
+  serializeLevel, serializeDungeon,
+  isDevServer, listServerFiles, loadFromServer, saveToServer,
+} from './io';
 import { itemDatabase } from '../core/itemDatabase';
 import type { Dungeon } from '../core/types';
 
@@ -39,6 +43,15 @@ function updateDirtyDisplay(): void {
   const prefix = app.dirty ? '* ' : '';
   levelNameEl.textContent = `${prefix}${name}`;
   document.title = `${prefix}DelveWard — Dungeon Editor`;
+  updateSaveButton();
+}
+
+function updateSaveButton(): void {
+  if (app.sourcePath && app.dirty) {
+    toolbar.enableSave();
+  } else {
+    toolbar.disableSave();
+  }
 }
 
 function updateStatusHint(): void {
@@ -175,6 +188,127 @@ toolbar.setViewToggleCallback(async (flag, value) => {
     }
   }
   gridCanvas.markDirty();
+});
+
+// --- Server save/load ---
+
+let savingInProgress = false;
+
+function validateAllLevels(): string[] | null {
+  if (!app.isDungeonMode()) {
+    if (app.errors.length > 0) return app.errors.map(e => e.message);
+    return null;
+  }
+  const allErrors: string[] = [];
+  const savedIndex = app.activeLevelIndex;
+  for (let i = 0; i < app.dungeon!.levels.length; i++) {
+    const lvl = app.dungeon!.levels[i];
+    app.level = lvl;
+    app.rebuildDerivedState();
+    if (app.errors.length > 0) {
+      allErrors.push(...app.errors.map(e => `[${lvl.name}] ${e.message}`));
+    }
+  }
+  app.level = app.dungeon!.levels[savedIndex];
+  app.rebuildDerivedState();
+  return allErrors.length > 0 ? allErrors : null;
+}
+
+async function performSave(filename: string): Promise<void> {
+  if (savingInProgress) return;
+  if (!app.level) return;
+
+  const errors = validateAllLevels();
+  if (errors) {
+    alert('Cannot save \u2014 fix errors first:\n\n' + errors.join('\n'));
+    return;
+  }
+
+  const content = app.isDungeonMode()
+    ? JSON.stringify(serializeDungeon(app.dungeon!), null, 2)
+    : JSON.stringify(serializeLevel(app.level), null, 2);
+
+  savingInProgress = true;
+  try {
+    await saveToServer(filename, content);
+    app.sourcePath = filename;
+    if (app.isDungeonMode()) {
+      app.levelCleanSnapshots = app.dungeon!.levels.map(l => JSON.stringify(l));
+      app.dirtyLevelIndices = new Set();
+      app.cleanSnapshot = app.levelCleanSnapshots[app.activeLevelIndex];
+    } else {
+      app.cleanSnapshot = JSON.stringify(app.level);
+    }
+    app.dirty = false;
+    updateDirtyDisplay();
+  } catch (err) {
+    alert(`Save failed: ${(err as Error).message}`);
+  } finally {
+    savingInProgress = false;
+  }
+}
+
+toolbar.setSaveCallback(() => {
+  if (!app.sourcePath) {
+    toolbar.onSaveAs?.();
+    return;
+  }
+  performSave(app.sourcePath);
+});
+
+toolbar.setSaveAsCallback(() => {
+  const defaultName = app.sourcePath
+    ?? ((app.isDungeonMode() ? app.dungeon?.name : app.level?.name) || 'level')
+        .replace(/[^a-zA-Z0-9_\-]/g, '_') + '.json';
+  const filename = prompt('Save as:', defaultName);
+  if (!filename) return;
+  if (!/^[a-zA-Z0-9_\-()]+\.json$/.test(filename)) {
+    alert('Invalid filename. Use only letters, numbers, _, -, () and end with .json');
+    return;
+  }
+  performSave(filename);
+});
+
+toolbar.setOpenFromServerCallback(async () => {
+  try {
+    const files = await listServerFiles();
+    if (files.length === 0) {
+      alert('No level files found on server.');
+      return;
+    }
+    const list = files.map((f, i) => `${i + 1}. ${f}`).join('\n');
+    const choice = prompt(`Open from server:\n\n${list}\n\nEnter number or filename:`);
+    if (!choice) return;
+
+    let filename: string;
+    const num = parseInt(choice, 10);
+    if (!isNaN(num) && num >= 1 && num <= files.length) {
+      filename = files[num - 1];
+    } else if (files.includes(choice)) {
+      filename = choice;
+    } else {
+      alert('Invalid selection.');
+      return;
+    }
+
+    const result = await loadFromServer(filename);
+    if (!result) return;
+
+    if (result.type === 'dungeon') {
+      app.loadDungeon(result.dungeon);
+    } else {
+      app.loadLevel(result.level);
+    }
+    app.sourcePath = filename;
+    refreshAllUI();
+  } catch (err) {
+    alert(`Failed to load from server: ${(err as Error).message}`);
+  }
+});
+
+// Detect dev server on startup
+isDevServer().then(available => {
+  if (available) toolbar.showServerButtons();
 });
 
 // Level properties changed callback
@@ -550,8 +684,14 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Undo/Redo: Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y
+  // Ctrl+S save, Undo/Redo: Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y
   if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    if (e.key === 's') {
+      e.preventDefault();
+      toolbar.onSave?.();
+      return;
+    }
+
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
 
