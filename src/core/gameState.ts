@@ -471,8 +471,12 @@ export class GameState {
       const door = this.getDoor(pos.col, pos.row);
       if (!door) return;
       door.state = active ? 'open' : 'closed';
+      this.onDoorSignalChanged?.(pos.col, pos.row, active);
     });
   }
+
+  /** External callback for signal-driven door state changes (for mesh animation). */
+  onDoorSignalChanged: ((col: number, row: number, open: boolean) => void) | null = null;
 
   private _rebuildEntityIndex(): void {
     this.entityById.clear();

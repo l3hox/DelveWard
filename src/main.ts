@@ -293,7 +293,7 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/test_m2a.json');
   const firstLevel = dungeon.levels[0];
 
   let currentLevelId = firstLevel.id!;
@@ -479,6 +479,11 @@ async function init(): Promise<void> {
       const s = ls.player.getState();
       gameState.revealAround(s.col, s.row, s.facing, ls.level.grid);
     });
+
+    // Signal-driven door state changes → animate door mesh
+    gameState.onDoorSignalChanged = (col, row, open) => {
+      updateDoorMesh(ls.doorMeshes.panelMap, col, row, open, ls.doorAnimator);
+    };
   }
 
   function triggerLevelTransition(stairEntity: Entity): void {
