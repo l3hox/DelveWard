@@ -4,6 +4,34 @@ Detailed checklist of everything that's been built. For session-by-session notes
 
 ---
 
+## M2 — The Dangerous Dungeon
+
+- [x] **Phase A: Signal System Foundation**:
+  - Migrated lever/plate `target: string` → `targets: string[]` with migration layer (`targetDoor` → `target` → `targets[]`)
+  - New `SignalManager` class: sources → gates → receivers pipeline, OR/AND/XOR gate evaluation, cycle detection via visited set
+  - Signal modes on lever/plate/trigger/tripwire: toggle, momentary, one_shot, timed (with signalDuration)
+  - `signalDelay`: optional activation delay (checkbox + seconds), composes with any signal mode
+  - Gate modes on doors: or (default), and, xor — controls how multiple incoming signals combine
+  - New entity: **trigger** — invisible floor trigger (momentary/one_shot/timed), activates on player step
+  - New entity: **tripwire** — one-shot trigger with orientation (EW/NS, auto-detected from walls), visibilityThreshold
+  - New entity: **gate** — standalone logic gate (and/or/not/delay/pulse_edge/pulse_repeat), both receiver and source
+  - Sources can target both doors and gates (wiring, pick mode, drag-to-wire all support `door,gate`)
+  - Editor: toolbar buttons with icons (dashed circle, dashed line with end dots, diamond with label) for all new types
+  - Editor inspector: targets array with clickable IDs and remove buttons, signal mode dropdown with tooltips, signal delay checkbox, orientation dropdown for tripwire, gate type dropdown with conditional delay/interval fields
+  - Auto-detect wall facing on lever/sconce placement, auto-detect tripwire orientation from adjacent walls
+  - New entity placement copies targets from previously selected entity of same type
+  - Entity deletion cleans up all references (scalar target, targets array, keyId)
+  - Deep-copy entity defaults to prevent shared array references across entities
+  - Status hints shown during target picking ("Click a door to add as target")
+  - Soft entity validation: level loader warns and skips invalid entities (game still loads), editor shows warnings
+  - Export/save no longer gated on validation errors
+  - `onDoorSignalChanged` callback: signal-driven door state changes trigger mesh animation in game
+  - `dungeon_m1.json` lever migrated to `targets: ["door_4"]`
+  - `DUNGEON-DESIGNER.md` updated with trigger, tripwire, gate, gateMode, signalDelay docs
+  - 569 tests (20 new SignalManager tests + entity validation tests updated for soft validation)
+
+---
+
 - [x] CLAUDE.md created — auto-loads project context each session
 - [x] PLAN.md created — full implementation plan with all design decisions resolved
 - [x] Project scaffolded — Vite + TypeScript + Three.js

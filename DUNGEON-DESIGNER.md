@@ -178,10 +178,13 @@ Entities can have an optional `id` field — a stable identifier used for cross-
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `targets` | string[] | Yes | Entity IDs of doors to toggle (e.g., `["door_1"]` or `["door_1", "door_2"]`) |
+| `targets` | string[] | Yes | Entity IDs of doors/gates to toggle (e.g., `["door_1"]` or `["door_1", "gate_1"]`) |
 | `wall` | string | No | Which wall the lever is on: `"N"`, `"S"`, `"E"`, or `"W"`. Auto-detected from adjacent walls if omitted. |
+| `signalMode` | string | No | `"toggle"` (default), `"momentary"`, `"one_shot"`, or `"timed"` |
+| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `signalDelay` | number | No | Delay in seconds before the signal activates. Composes with any signal mode. |
 
-All targeted doors are marked **mechanical** — they cannot be opened or closed by player interaction (Space key). They can only be operated by the lever. A single lever can control multiple doors.
+All targeted doors are marked **mechanical** — they cannot be opened or closed by player interaction (Space key). They can only be operated by the lever. A single lever can control multiple doors and gates.
 
 ```json
 { "col": 8, "row": 5, "type": "door", "id": "door_3" },
@@ -192,7 +195,10 @@ All targeted doors are marked **mechanical** — they cannot be opened or closed
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `targets` | string[] | Yes | Entity IDs of doors to open (e.g., `["door_4"]`) |
+| `targets` | string[] | Yes | Entity IDs of doors/gates to open (e.g., `["door_4"]`) |
+| `signalMode` | string | No | `"toggle"` (default), `"momentary"`, `"one_shot"`, or `"timed"` |
+| `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `signalDelay` | number | No | Delay in seconds before the signal activates |
 
 All targeted doors are marked **mechanical** — same as lever-targeted doors.
 
@@ -208,19 +214,22 @@ All targeted doors are marked **mechanical** — same as lever-targeted doors.
 | `targets` | string[] | Yes | Entity IDs of doors/gates to activate |
 | `signalMode` | string | No | `"momentary"` (default), `"toggle"`, `"one_shot"`, or `"timed"` |
 | `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `signalDelay` | number | No | Delay in seconds before the signal activates |
 
 ```json
 { "col": 3, "row": 5, "type": "trigger", "id": "trigger_1", "targets": ["door_1"], "signalMode": "momentary" }
 ```
 
-**Tripwire** (`type: "tripwire"`) — placed on walkable cells. One-shot invisible trigger with a visibility threshold (future use for perception checks).
+**Tripwire** (`type: "tripwire"`) — placed on walkable cells. One-shot invisible trigger with a visibility threshold (future use for perception checks). Orientation auto-detected from adjacent walls.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `targets` | string[] | Yes | Entity IDs of doors/gates to activate |
 | `signalMode` | string | No | `"one_shot"` (default), `"toggle"`, `"momentary"`, or `"timed"` |
 | `signalDuration` | number | No | Duration in seconds (for `"timed"` mode) |
+| `signalDelay` | number | No | Delay in seconds before the signal activates |
 | `visibilityThreshold` | number | No | Perception threshold to detect the tripwire (default 8, future use) |
+| `orientation` | string | No | `"EW"` (horizontal, default) or `"NS"` (vertical). Auto-detected from adjacent walls if omitted. |
 
 ```json
 { "col": 5, "row": 3, "type": "tripwire", "id": "tripwire_1", "targets": ["gate_1"], "visibilityThreshold": 10 }
