@@ -4,14 +4,16 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
-## 2026-03-18 — Phase A: Signal System Foundation (Implementation)
+## 2026-03-18 — Phase A: Signal System Foundation (Implementation + Polish)
 
-**Goal**: Build the entire M2 signal system — multi-target migration, centralized signal evaluation, gate logic, new entity types, full editor support.
+**Goal**: Build the entire M2 signal system — multi-target migration, centralized signal evaluation, gate logic, new entity types, full editor support. Then polish editor UX.
 
 **Architecture decisions**:
 - `SignalManager` class owns all signal propagation. Sources → Gates → Receivers pipeline. GameState registers entities on init, routes lever/plate/trigger/tripwire activations through SM.
 - `onDoorSignalChanged` callback bridges SM-driven state changes to main.ts mesh animation (without this, doors opened by triggers/gates wouldn't animate).
 - Entity validation made soft/recoverable — invalid entities are console.warn'd and filtered out for game use, but preserved in JSON for editor. Export/save no longer gated on errors.
+- Signal chain highlighting: `getSignalChain()` does bidirectional BFS (forward through targets, backward through referencing entities) with cycle protection.
+- Loop detection: DFS from each signal entity, seeds with direct targets, reports cycle only when path leads back to starting entity.
 
 **Sub-phases completed**:
 - A1: `target: string` → `targets: string[]` migration (lever, plate). Migration layer: `targetDoor` → `target` → `targets[]`. All consumers updated.
@@ -21,7 +23,16 @@ Each entry records what was decided or changed — design decisions, architectur
 - A5: Standalone gate entities (and/or/not/delay/pulse_edge/pulse_repeat), gates as both receivers and sources.
 - A6: Editor — toolbar buttons, inspector fields (signal mode with tooltips, targets array with clickable IDs, delay checkbox, orientation dropdown), grid icons, wiring arrows, auto-detect wall/orientation, target copy on placement, reference cleanup on delete.
 
-**Files**: `src/core/signalManager.ts` (new), `src/core/signalManager.test.ts` (new), `src/core/gameState.ts`, `src/level/levelLoader.ts`, `src/level/interaction.ts`, `src/main.ts`, `src/editor/EditorApp.ts`, `src/editor/Inspector.ts`, `src/editor/GridCanvas.ts`, `src/editor/Toolbar.ts`, `DUNGEON-DESIGNER.md`
+**Post-A6 editor polish**:
+- Full signal chain highlighting: selecting any entity highlights all arrows in its chain (forward + backward)
+- Signal loop detection in editor validation with immediate feedback on wire add/remove and entity delete
+- "Referenced by" section on gates (and doors), extracted into `addReferencedBySection()` helper
+- Unified clickable entity link format: `type @ (col, row)` with ID tooltip, blue `#88aaff` color — consistent across inspector targets, referenced-by, stair go-to, and error banner links
+- Validation + error banner refresh on pick/wire complete, Delete key, and target removal
+- Sprite-based toolbar icons (enemy, key, equipment, consumable) enlarged for readability
+- Gate diamond icon enlarged on grid and toolbar
+
+**Files**: `src/core/signalManager.ts` (new), `src/core/signalManager.test.ts` (new), `src/core/gameState.ts`, `src/level/levelLoader.ts`, `src/level/interaction.ts`, `src/main.ts`, `src/editor/EditorApp.ts`, `src/editor/Inspector.ts`, `src/editor/GridCanvas.ts`, `src/editor/Toolbar.ts`, `editor.html`, `DUNGEON-DESIGNER.md`
 
 ---
 

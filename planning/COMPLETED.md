@@ -26,6 +26,13 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Soft entity validation: level loader warns and skips invalid entities (game still loads), editor shows warnings
   - Export/save no longer gated on validation errors
   - `onDoorSignalChanged` callback: signal-driven door state changes trigger mesh animation in game
+  - Full signal chain highlighting: selecting any signal entity highlights all arrows in its chain (bidirectional BFS)
+  - Signal loop detection in editor validation (DFS cycle check), immediate feedback on wire/delete
+  - "Referenced by" section on gates (and doors), refactored into `addReferencedBySection()` helper
+  - Unified clickable entity link format: `type @ (col, row)` with ID tooltip, blue `#88aaff` — across inspector targets, referenced-by, stair go-to, and error banner
+  - Validation + error banner refresh on pick/wire complete, Delete key, and target removal
+  - Sprite-based toolbar icons (enemy, key, equipment, consumable) enlarged for readability
+  - Gate diamond icon enlarged on grid canvas and toolbar
   - `dungeon_m1.json` lever migrated to `targets: ["door_4"]`
   - `DUNGEON-DESIGNER.md` updated with trigger, tripwire, gate, gateMode, signalDelay docs
   - 569 tests (20 new SignalManager tests + entity validation tests updated for soft validation)
