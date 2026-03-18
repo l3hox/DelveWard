@@ -4,6 +4,26 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — M2 Design & Planning
+
+**Goal**: Design M2 ("The Dangerous Dungeon") — traps, signals, secrets, puzzles, status effects, save/load. Produce design doc, ADRs, and implementation plan.
+
+**Key decisions (ADRs)**:
+- **ADR-M2-01 — Signal system**: Direct entity references with multi-target (`targets: string[]`), no named channels. Two-layer logic: built-in `gateMode` on receivers (OR/AND/XOR) for simple cases, standalone gate entities (AND, OR, NOT, DELAY, PULSE_EDGE, PULSE_REPEAT) for complex puzzles. Breaking migration from `target` → `targets`.
+- **ADR-M2-02 — Projectile system**: Design for both M2 traps and M4 ranged combat, implement traps only now. `ProjectileManager` with `source` field for future routing. Cardinal movement, fractional position, cell-boundary collision.
+- **ADR-M2-03 — Save/load**: localStorage with 5 manual slots + 1 auto-save + JSON export/import. Death → load last save (replaces M1 restart behavior).
+- **ADR-M2-04 — Status effects**: Array-based on both player and enemies. Three types: poison (tick damage), slow (move interval multiplier), burning (tick damage + visual). Same-type refreshes duration, different types stack.
+
+**Scoping decisions**:
+- E6 (sub-grid entity positioning) deferred from M2 → M5 (needed for multi-enemy rooms, spawners)
+- S5 (pit traps), V9 (rolling boulders), C7 (enemy spawners) confirmed in M5
+- R4 (lockpicking) confirmed in M4 as part of skills system
+- Editor support integrated into each implementation phase (not a separate phase)
+
+**Files**: `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning/m2/PLAN.md`, `planning/MILESTONES-V2.md` (E6 moved M2→M5)
+
+---
+
 ## 2026-03-18 — Editor UX Round 2 (Drag-to-Wire + File Picker)
 
 **Goal**: Make entity wiring faster (drag instead of Pick button) and replace the unfriendly `prompt()` file picker with a clickable modal.

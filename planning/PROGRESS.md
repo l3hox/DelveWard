@@ -14,41 +14,26 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Current Milestone
 
-**Dungeon Editor** (pulled forward from later milestones)
+**Milestone 2: The Dangerous Dungeon** (v0.2)
+
+Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning/m2/PLAN.md`.
 
 ---
 
 ## Next Steps
 
-### M1 Implementation
-- [x] Phase A: Entity registry + item loader
-- [x] Phase B: Stats & leveling
-- [x] Phase C: Equipment expansion (weapon subtypes, item requirements, effective stats)
-- [x] Phase D: Loot & drops (enemy death → loot roll → ground entities, gold)
-- [x] Phase E: UI (enemy health bars, inventory overlay, tooltips, attribute panel, legacy cleanup)
-- [x] Phase F: Content (new enemy types, AI behaviors, M1 test dungeon)
+### M2 Implementation
+- [ ] Phase A: Signal system foundation (targets[] migration, signal state, gate modes, behaviors, trigger/tripwire, standalone gates, editor support)
+- [ ] Phase B: Projectile system (ProjectileManager, collision, trap launchers, 3 projectile types, rendering, editor support)
+- [ ] Phase C: Status effects (data model, tick logic, poison/slow/burning, HUD icons + visual overlays)
+- [ ] Phase D: Environment entities (breakable walls, secret walls, pushable blocks, chests, signs, renderers, editor support)
+- [ ] Phase E: Save/load (serialization, localStorage slots, auto-save, UI, export/import, death → load)
+- [ ] Phase F: Content & polish (new textures, sprites, M2 test dungeon "The Architect's Tomb", balance pass)
 
-### Remaining for M1 ship
-- [x] F3: Enemy sprite art (6 new enemies)
-- [x] F5: Playtesting & balance pass
-- [x] Tag v0.1 (**shipped**)
-
-### Dungeon Editor
-- [x] Phase 1: Scaffold + grid canvas (2D textured view, pan/zoom, import JSON)
-- [x] Phase 2: Grid painting (char palette, paint/erase tools, export)
-- [x] Phase 3: Entity placement + inspector (select, CRUD, property editing)
-- [x] Phase 4: Level properties panel + new level + validation
-- [x] Phase 5: Target picking + wiring visualization (interactive references)
-- [x] Phase 6: Visual toolbars + inspector polish (texture swatches, entity icons, item database integration)
-- [x] Undo/redo system (Ctrl+Z / Ctrl+Shift+Z, full-snapshot, paint coalescing, text batching)
-- [x] Phase 7: Final polish + validation (error display, dirty state, shortcuts, scrollable palettes)
-- [x] Phase 8: Multi-level dungeon support (load/switch/add/remove/reorder levels, dungeon export, cross-level stair validation, targetLevel dropdown, level list UI)
-- [x] Area editing UX improvements (status hint bar, default textures, auto-expand + drag pick, rectangle drag selection)
-- [x] Stair entity pairing: entity-to-entity references with facing, spawn-in-front logic
-- [x] Stair cross-level visual feedback: level list highlight, same-level wiring arrows, cross-level celtic cross marker, inspector "go to" link, auto-pick on placement, auto-create stair on pick, dungeon-wide unique entity IDs
-- [x] Editor direct file save: Vite dev server API plugin for reading/writing level JSON directly to `public/levels/`, Save/Save As/Open Server buttons, Ctrl+S shortcut, CSRF token security, watcher suppression
-- [x] Enemy Database: extract hardcoded enemy definitions to JSON data file + EnemyDatabase class
-- [x] Editor UX round 2: drag-to-wire, clickable server file picker
+### Completed milestones
+- [x] M0: Proof of concept (v0.0.9)
+- [x] M1: The Loot Game (v0.1)
+- [x] M6: Dungeon Editor (v0.1.5, pulled forward)
 
 ---
 

@@ -63,7 +63,6 @@ The dungeon fights back. Traps, secrets, environmental hazards. Exploration beco
 | V6 | Treasure chests (with loot tables) | T2 |
 | V7 | Message signs / tablets | T2 |
 | C2 | Status effects (poison, slow, burning) | T2 |
-| E6 | Sub-grid entity positioning | T1 |
 | E7 | Save/load system | T1 |
 
 **Playable moment:** Walk down a corridor, hear a click, dodge a dart. Find a cracked wall, smash it open, discover a hidden treasure room. Pull levers in the right order to open a vault. Save your progress.
@@ -136,6 +135,7 @@ The visual leap. Multiple levels visible at once. Outdoor sections. Decorative 3
 | E3 | Outdoor cells (no ceiling, skybox, ambient light) | T1 |
 | E4 | Decorative 3D meshes (cavern ceilings, backdrops, set pieces) | T1 |
 | E5 | Thin walls (edge walls, fences, railings) | T1 |
+| E6 | Sub-grid entity positioning | T1 |
 | S5 | Pit traps (floor retracts, fall to level below) | T2 |
 | C7 | Enemy spawners | T2 |
 | V9 | Rolling boulders | T2 |
