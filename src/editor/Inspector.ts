@@ -313,7 +313,8 @@ export class Inspector {
             if (targetStair) {
               const goToItem = document.createElement('div');
               goToItem.className = 'inspector-ref-item';
-              goToItem.textContent = `\u2192 ${stairTargetId} on ${otherLevel.name}`;
+              goToItem.textContent = `stairs @ (${targetStair.col}, ${targetStair.row}) on ${otherLevel.name}`;
+              goToItem.title = stairTargetId;
               goToItem.addEventListener('click', () => this.onStairGoTo?.(stairTargetId));
               this.container.appendChild(goToItem);
               break;
@@ -627,12 +628,16 @@ export class Inspector {
       span.style.fontSize = '0.85em';
       span.style.overflow = 'hidden';
       span.style.textOverflow = 'ellipsis';
-      span.textContent = targets[i];
       const targetId = targets[i];
+      // Resolve to show type @ (col, row), fall back to just the ID
+      const targetEntity = this.app.level?.entities.find(e => e.id === targetId);
+      if (targetEntity) {
+        span.textContent = `${targetEntity.type} @ (${targetEntity.col}, ${targetEntity.row})`;
+        span.title = targetId;
+      } else {
+        span.textContent = targetId;
+      }
       span.addEventListener('click', () => {
-        const level = this.app.level;
-        if (!level) return;
-        const targetEntity = level.entities.find(e => e.id === targetId);
         if (targetEntity) this.onRefClicked?.(targetEntity);
       });
       row.appendChild(span);

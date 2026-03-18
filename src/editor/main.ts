@@ -620,14 +620,16 @@ function renderErrorSpan(err: import('./EditorApp').ValidationError): HTMLSpanEl
   const span = document.createElement('span');
   span.textContent = err.message;
   if (err.entity) {
+    const ent = err.entity;
     const link = document.createElement('a');
     link.className = 'error-goto';
-    link.textContent = '\u2192select';
-    link.title = `Select ${err.entity.type} at (${err.entity.col}, ${err.entity.row})`;
+    link.textContent = `${ent.type} @ (${ent.col}, ${ent.row})`;
+    if (ent.id) link.title = ent.id;
     link.addEventListener('click', (e) => {
       e.stopPropagation();
-      selectEntity(err.entity!);
+      selectEntity(ent);
     });
+    span.appendChild(document.createTextNode(' '));
     span.appendChild(link);
   }
   return span;
