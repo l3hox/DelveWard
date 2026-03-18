@@ -11,6 +11,8 @@ import { itemDatabase } from './itemDatabase';
 import type { ItemDef } from './itemDatabase';
 export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
+import { SignalManager } from './signalManager';
+import type { GateMode } from './signalManager';
 
 export type DoorState = 'open' | 'closed';
 
@@ -21,6 +23,7 @@ export interface DoorInstance {
   state: DoorState;
   keyId?: string;
   mechanical: boolean;
+  gateMode?: GateMode;
 }
 
 export interface KeyInstance {
@@ -115,6 +118,7 @@ export class GameState {
 
   // Entity registry — single source of truth for all item instances.
   entityRegistry: EntityRegistry;
+  signalManager: SignalManager;
   currentLevelId: string;
 
   hp: number;
@@ -152,6 +156,7 @@ export class GameState {
     this.entityById = new Map();
 
     this.entityRegistry = new EntityRegistry();
+    this.signalManager = new SignalManager();
     this.currentLevelId = levelId;
 
     // Base attributes default to 5
@@ -291,6 +296,40 @@ export class GameState {
         }
       }
     }
+
+    this._initSignalManager();
+  }
+
+  private _initSignalManager(): void {
+    this.signalManager.clear();
+
+    // Register levers and plates as sources
+    for (const lever of this.levers.values()) {
+      if (lever.id) {
+        this.signalManager.registerSource(lever.id, lever.targets, 'toggle');
+      }
+    }
+    for (const plate of this.plates.values()) {
+      if (plate.id) {
+        this.signalManager.registerSource(plate.id, plate.targets, 'toggle');
+      }
+    }
+
+    // Register mechanical doors as receivers
+    for (const door of this.doors.values()) {
+      if (door.id && door.mechanical) {
+        this.signalManager.registerReceiver(door.id, door.gateMode ?? 'or');
+      }
+    }
+
+    // Wire receiver-changed callback to update door state
+    this.signalManager.setReceiverChangedCallback((entityId, active) => {
+      const pos = this.resolveEntityPosition(entityId);
+      if (!pos) return;
+      const door = this.getDoor(pos.col, pos.row);
+      if (!door) return;
+      door.state = active ? 'open' : 'closed';
+    });
   }
 
   private _rebuildEntityIndex(): void {
@@ -381,6 +420,7 @@ export class GameState {
       this.entityRegistry.restore(snapshot.registrySnapshot);
     }
     this._rebuildEntityIndex();
+    this._initSignalManager();
   }
 
   loadNewLevel(entities: Entity[], grid?: string[], levelId?: string): void {
@@ -472,9 +512,15 @@ export class GameState {
     const lever = this.levers.get(doorKey(col, row));
     if (!lever) return undefined;
     lever.state = lever.state === 'up' ? 'down' : 'up';
-    for (const t of lever.targets) {
-      const pos = this.resolveEntityPosition(t);
-      if (pos) this.toggleDoor(pos.col, pos.row);
+    // Route through SignalManager if source is registered, else direct toggle
+    if (lever.id && this.signalManager.getSource(lever.id)) {
+      const isDown = lever.state === 'down';
+      this.signalManager.setSourceActive(lever.id, isDown);
+    } else {
+      for (const t of lever.targets) {
+        const pos = this.resolveEntityPosition(t);
+        if (pos) this.toggleDoor(pos.col, pos.row);
+      }
     }
     return lever.targets;
   }
@@ -483,13 +529,17 @@ export class GameState {
     const plate = this.plates.get(doorKey(col, row));
     if (!plate || plate.activated) return undefined;
     plate.activated = true;
-    for (const t of plate.targets) {
-      const pos = this.resolveEntityPosition(t);
-      if (pos) {
-        // Bypass openDoor check — mechanisms can always operate their doors
-        const door = this.getDoor(pos.col, pos.row);
-        if (door && door.state === 'closed') {
-          door.state = 'open';
+    // Route through SignalManager if source is registered, else direct open
+    if (plate.id && this.signalManager.getSource(plate.id)) {
+      this.signalManager.setSourceActive(plate.id, true);
+    } else {
+      for (const t of plate.targets) {
+        const pos = this.resolveEntityPosition(t);
+        if (pos) {
+          const door = this.getDoor(pos.col, pos.row);
+          if (door && door.state === 'closed') {
+            door.state = 'open';
+          }
         }
       }
     }

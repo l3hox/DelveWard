@@ -792,6 +792,7 @@ async function init(): Promise<void> {
     ls.doorAnimator.update(delta);
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
+    gameState.signalManager.tick(delta);
     transition.update(delta);
     damageNumbers.update(delta);
     swordSwing.update(delta);
