@@ -552,11 +552,19 @@ export class Inspector {
       row.style.gap = '4px';
 
       const span = document.createElement('span');
+      span.className = 'inspector-ref-item';
       span.style.flex = '1';
       span.style.fontSize = '0.85em';
       span.style.overflow = 'hidden';
       span.style.textOverflow = 'ellipsis';
       span.textContent = targets[i];
+      const targetId = targets[i];
+      span.addEventListener('click', () => {
+        const level = this.app.level;
+        if (!level) return;
+        const targetEntity = level.entities.find(e => e.id === targetId);
+        if (targetEntity) this.onRefClicked?.(targetEntity);
+      });
       row.appendChild(span);
 
       const removeBtn = document.createElement('button');
