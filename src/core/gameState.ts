@@ -474,10 +474,24 @@ export class GameState {
       door.state = active ? 'open' : 'closed';
       this.onDoorSignalChanged?.(pos.col, pos.row, active);
     });
+
+    // Wire source-deactivated callback to reset timed levers
+    this.signalManager.setSourceDeactivatedCallback((entityId) => {
+      const pos = this.resolveEntityPosition(entityId);
+      if (!pos) return;
+      const lever = this.getLever(pos.col, pos.row);
+      if (lever && lever.state === 'down') {
+        lever.state = 'up';
+        this.onLeverReset?.(pos.col, pos.row);
+      }
+    });
   }
 
   /** External callback for signal-driven door state changes (for mesh animation). */
   onDoorSignalChanged: ((col: number, row: number, open: boolean) => void) | null = null;
+
+  /** External callback for timed lever auto-reset (for mesh animation). */
+  onLeverReset: ((col: number, row: number) => void) | null = null;
 
   private _rebuildEntityIndex(): void {
     this.entityById.clear();

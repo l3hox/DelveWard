@@ -484,6 +484,12 @@ async function init(): Promise<void> {
     gameState.onDoorSignalChanged = (col, row, open) => {
       updateDoorMesh(ls.doorMeshes.panelMap, col, row, open, ls.doorAnimator);
     };
+
+    // Timed source deactivation → animate lever reset
+    gameState.onLeverReset = (col, row) => {
+      const leverKey = doorKey(col, row);
+      ls.leverAnimator.setState(leverKey, 'up');
+    };
   }
 
   function triggerLevelTransition(stairEntity: Entity): void {

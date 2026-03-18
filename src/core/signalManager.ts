@@ -41,15 +41,21 @@ export interface SignalGate {
 }
 
 export type ReceiverChangedCallback = (entityId: string, active: boolean) => void;
+export type SourceDeactivatedCallback = (entityId: string) => void;
 
 export class SignalManager {
   private sources = new Map<string, SignalSource>();
   private receivers = new Map<string, SignalReceiver>();
   private gates = new Map<string, SignalGate>();
   private onReceiverChanged: ReceiverChangedCallback | null = null;
+  private onSourceDeactivated: SourceDeactivatedCallback | null = null;
 
   setReceiverChangedCallback(cb: ReceiverChangedCallback): void {
     this.onReceiverChanged = cb;
+  }
+
+  setSourceDeactivatedCallback(cb: SourceDeactivatedCallback): void {
+    this.onSourceDeactivated = cb;
   }
 
   registerSource(
@@ -171,6 +177,7 @@ export class SignalManager {
           source.timer = 0;
           source.active = false;
           changed = true;
+          this.onSourceDeactivated?.(source.entityId);
         }
       }
     }

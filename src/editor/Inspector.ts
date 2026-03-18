@@ -171,13 +171,9 @@ export class Inspector {
           this.onEntityChanged?.();
         });
         this.addTargetsArrayField(entity, 'door,gate');
-        this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
-          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
-            if (val) {
-              entity.signalMode = val;
-            } else {
-              delete (entity as Record<string, unknown>).signalMode;
-            }
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
+          ['toggle', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
             this.onEntityChanged?.();
             this.refresh();
           });
