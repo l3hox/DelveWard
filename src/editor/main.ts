@@ -558,8 +558,12 @@ inspector.setPickRequestedCallback((entity, field, validChar, validEntityType) =
   if (entity.type === 'stairs' && field === 'target') {
     app.pickMode!.crossLevel = true;
     app.statusHint = 'Switch to target level and click a stairs entity to link (Esc to cancel)';
-    updateStatusHint();
+  } else if (field === 'targets' && validEntityType) {
+    app.statusHint = `Click a ${validEntityType} to add as target (Esc to cancel)`;
+  } else if (field === 'target' && validEntityType) {
+    app.statusHint = `Click a ${validEntityType} to set as target (Esc to cancel)`;
   }
+  updateStatusHint();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
 });

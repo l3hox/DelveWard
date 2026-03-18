@@ -165,7 +165,7 @@ export class Inspector {
           this.onEntityChanged?.();
         });
         this.addTargetsArrayField(entity, 'door');
-        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
           ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             if (val) {
               entity.signalMode = val;
@@ -179,13 +179,13 @@ export class Inspector {
           this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
             entity.signalDuration = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         break;
 
       case 'pressure_plate':
         this.addTargetsArrayField(entity, 'door');
-        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? '',
           ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             if (val) {
               entity.signalMode = val;
@@ -199,7 +199,7 @@ export class Inspector {
           this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
             entity.signalDuration = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         break;
 
@@ -230,7 +230,7 @@ export class Inspector {
 
       case 'trigger':
         this.addTargetsArrayField(entity, 'door');
-        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'momentary',
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
             this.onEntityChanged?.();
@@ -240,7 +240,7 @@ export class Inspector {
           this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
             entity.signalDuration = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         break;
 
@@ -250,7 +250,7 @@ export class Inspector {
           entity.orientation = val;
           this.onEntityChanged?.();
         });
-        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'one_shot',
+        this.addSignalModeField(entity, (entity.signalMode as string) ?? 'one_shot',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
             this.onEntityChanged?.();
@@ -264,7 +264,7 @@ export class Inspector {
           this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
             entity.signalDuration = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         break;
 
@@ -280,13 +280,13 @@ export class Inspector {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         if ((entity.gateType as string) === 'pulse_repeat') {
           this.addNumberField('interval', (entity.interval as number) ?? 1, (val) => {
             entity.interval = val;
             this.onEntityChanged?.();
-          });
+          }, { step: '0.1' });
         }
         break;
 
@@ -420,7 +420,8 @@ export class Inspector {
   private addNumberField(
     label: string,
     value: number,
-    onChange: (val: number) => void
+    onChange: (val: number) => void,
+    options?: { step?: string },
   ): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field';
@@ -432,9 +433,10 @@ export class Inspector {
     const input = document.createElement('input');
     input.type = 'number';
     input.value = String(value);
+    if (options?.step) input.step = options.step;
     input.addEventListener('input', () => {
       this.onBeginTextEdit?.();
-      const parsed = parseInt(input.value, 10);
+      const parsed = parseFloat(input.value);
       if (!isNaN(parsed)) onChange(parsed);
     });
     input.addEventListener('blur', () => this.onCommitTextEdit?.());
@@ -485,6 +487,47 @@ export class Inspector {
     row.appendChild(pickBtn);
 
     wrapper.appendChild(row);
+    this.container.appendChild(wrapper);
+  }
+
+  private static SIGNAL_MODE_INFO: Record<string, { label: string; tooltip: string }> = {
+    '':          { label: '(default)', tooltip: 'Uses the entity-type default signal mode' },
+    'toggle':    { label: 'toggle', tooltip: 'Each activation flips the signal on/off' },
+    'momentary': { label: 'momentary', tooltip: 'Active only while standing on it; deactivates on step-off' },
+    'one_shot':  { label: 'one_shot', tooltip: 'Fires once and cannot be re-activated' },
+    'timed':     { label: 'timed', tooltip: 'Activates for a set duration, then auto-deactivates' },
+  };
+
+  /** Signal mode dropdown with display labels and hover tooltips. */
+  private addSignalModeField(
+    entity: Entity,
+    currentValue: string,
+    options: string[],
+    onChange: (val: string) => void,
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'signalMode';
+    wrapper.appendChild(lbl);
+
+    const select = document.createElement('select');
+    for (const opt of options) {
+      const info = Inspector.SIGNAL_MODE_INFO[opt] ?? { label: opt, tooltip: '' };
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = info.label;
+      option.title = info.tooltip;
+      if (opt === currentValue) option.selected = true;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => {
+      this.onBeforeDiscreteChange?.();
+      onChange(select.value);
+    });
+    wrapper.appendChild(select);
+
     this.container.appendChild(wrapper);
   }
 
