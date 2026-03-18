@@ -7,6 +7,8 @@
       "environment": "forest",
       "fireflies": true,
       "dustMotes": false,
+      "ceiling": false,
+      "skybox": "starry-night",
       "grid": [
         "FFFFFFFFFFFF",
         "FTTTTTTTTTTF",

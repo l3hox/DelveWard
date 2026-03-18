@@ -6,6 +6,7 @@ Unplanned feature ideas and wishlist items. Not scoped or scheduled — just cap
 
 - Animated water + lava tiles with lowered floor
 - Outdoor sections — no ceiling, skybox, fullbright lighting only for outdoor tiles; indoor/outdoor boundary wall acts as strong light source; day/night cycle affects outdoor light level
+- Outdoor forest environment — solid "forest" charDef cells rendered as billboard tree sprites (1-3 per cell, randomly placed/scaled pixelart trees) in front of a green forest-wall texture. Walkable clearings use grass/dirt floor textures. Layered depth: front trees larger/darker, back trees smaller/lighter, dense fog-green wall behind. Stone walls visible through tree gaps when forest cells are adjacent to dungeon walls — ruins peeking through trees. Combine with cemetery theme: graveyard walls, iron fences (using thin walls when available), tombstone entities. Natural habitat for skeleton/zombie encounters. Procedural tree placement per cell (seeded by col/row for determinism).
 - Multiple dungeon layers visible at once (vertical openness)
 - Footstep screen bob — subtle camera vertical bounce on each step
 - Damage directional indicator — brief red arrow on HUD showing attack direction
@@ -25,3 +26,4 @@ Unplanned feature ideas and wishlist items. Not scoped or scheduled — just cap
 - Thin walls — walls between two walkable cells (edge walls, not cell walls), including thin wall doors; enables villages and walk-in houses
 - Editor: monster database editor — edit enemy stats (hp, atk, def, aggro, speed, xp), add/remove enemy types, preview sprites, live-save to enemyTypes
 - Editor: item database editor — edit items.json directly from the editor, add/remove items, edit stats/modifiers/requirements, icon picker from available sprites
+- Editor: direct file save via Vite dev server — add a `configureServer` plugin to `vite.config.ts` exposing `POST /api/write-file` and `GET /api/read-file` routes. Editor writes JSON files (items, enemies, dungeons) directly to the repo during `npm run dev`. Hot-reload picks up changes instantly. In non-dev mode (static build), save is unavailable but export (download) still works as fallback. If public access is ever needed, revisit with a proper backend.

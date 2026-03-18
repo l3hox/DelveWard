@@ -14,11 +14,16 @@
         "floorTexture": "stone_tile",
         "ceilingTexture": "dark_rock"
       },
+      "charDefs": [
+        { "char": "F", "solid": true, "wallTexture": "forest" },
+        { "char": "T", "solid": true, "seeThrough": true, "wallTexture": "forest", "floorTexture": "grass", "ceilingTexture": "canopy" },
+        { "char": "'", "solid": false, "floorTexture": "grass", "ceilingTexture": "canopy" }
+      ],
       "grid": [
-        "#################",
-        "#...............#",
-        "#.#.............#",
-        "#...............#",
+        "FFFFFFFFFFFFFFFFF",
+        "F''''T'T'TT'T'TTF",
+        "F'#''''''''''''TF",
+        "F'''''''''''''TTF",
         "######.##########",
         "#....#..........#",
         "#....#..........#",
@@ -68,15 +73,15 @@
         },
         {
           "col": 2,
-          "row": 1,
+          "row": 3,
           "type": "torch_sconce",
-          "wall": "N"
+          "wall": "S"
         },
         {
           "col": 10,
-          "row": 1,
+          "row": 3,
           "type": "torch_sconce",
-          "wall": "N"
+          "wall": "S"
         },
         {
           "col": 8,
