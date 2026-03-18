@@ -1111,7 +1111,10 @@ export class GridCanvas {
     const { ctx } = this;
     const selected = this.app.selectedEntity;
 
-    // Collect all wiring arrows from every lever/pressure_plate
+    // Compute full signal chain for highlighting
+    const signalChain = selected ? this.app.getSignalChain(selected) : new Set<string>();
+
+    // Collect all wiring arrows
     type Arrow = { fromCol: number; fromRow: number; toCol: number; toRow: number; active: boolean };
     const arrows: Arrow[] = [];
 
@@ -1121,9 +1124,10 @@ export class GridCanvas {
         for (const targetId of e.targets as string[]) {
           const targetEntity = level.entities.find(t => t.id === targetId);
           if (!targetEntity) continue;
+          // Highlight if either endpoint is in the signal chain
           const isActive = selected !== null && (
-            e === selected ||
-            (selected.id !== undefined && selected.id === targetId)
+            (e.id !== undefined && signalChain.has(e.id)) ||
+            (targetEntity.id !== undefined && signalChain.has(targetEntity.id!))
           );
           arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
         }

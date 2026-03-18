@@ -117,21 +117,18 @@ export class Inspector {
           }
           this.onEntityChanged?.();
         });
-        const refs = [
-          ...this.app.getReferencingEntities(entity),
-          ...this.app.getKeyIdPeers(entity).filter(e => e.type === 'key'),
-        ];
-        if (refs.length > 0) {
-          const refHeader = document.createElement('div');
-          refHeader.className = 'inspector-ref-header';
-          refHeader.textContent = `Referenced by (${refs.length})`;
-          this.container.appendChild(refHeader);
-          for (const ref of refs) {
-            const refItem = document.createElement('div');
-            refItem.className = 'inspector-ref-item';
-            refItem.textContent = `${ref.type} @ (${ref.col}, ${ref.row})`;
-            refItem.addEventListener('click', () => this.onRefClicked?.(ref));
-            this.container.appendChild(refItem);
+        this.addReferencedBySection(entity);
+        {
+          // Also show key peers as references
+          const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'key');
+          if (keyPeers.length > 0) {
+            for (const peer of keyPeers) {
+              const peerItem = document.createElement('div');
+              peerItem.className = 'inspector-ref-item';
+              peerItem.textContent = `key @ (${peer.col}, ${peer.row})`;
+              peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
+              this.container.appendChild(peerItem);
+            }
           }
         }
         break;
@@ -292,6 +289,7 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addReferencedBySection(entity);
         break;
 
       case 'stairs': {
@@ -492,6 +490,23 @@ export class Inspector {
 
     wrapper.appendChild(row);
     this.container.appendChild(wrapper);
+  }
+
+  /** Show "Referenced by" section listing entities that target this entity. */
+  private addReferencedBySection(entity: Entity): void {
+    const refs = this.app.getReferencingEntities(entity);
+    if (refs.length === 0) return;
+    const refHeader = document.createElement('div');
+    refHeader.className = 'inspector-ref-header';
+    refHeader.textContent = `Referenced by (${refs.length})`;
+    this.container.appendChild(refHeader);
+    for (const ref of refs) {
+      const refItem = document.createElement('div');
+      refItem.className = 'inspector-ref-item';
+      refItem.textContent = `${ref.type} @ (${ref.col}, ${ref.row})`;
+      refItem.addEventListener('click', () => this.onRefClicked?.(ref));
+      this.container.appendChild(refItem);
+    }
   }
 
   private static SIGNAL_MODE_INFO: Record<string, { label: string; tooltip: string }> = {

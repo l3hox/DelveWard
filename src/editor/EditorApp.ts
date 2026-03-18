@@ -370,6 +370,39 @@ export class EditorApp {
       }
     }
 
+    // Signal chain loop detection
+    const SIGNAL_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
+    const entityMap = new Map<string, Entity>();
+    for (const e of level.entities) {
+      if (e.id) entityMap.set(e.id, e);
+    }
+    for (const e of level.entities) {
+      if (!SIGNAL_ENTITY_TYPES.has(e.type) || !e.id) continue;
+      const visited = new Set<string>();
+      const stack = [e.id];
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        if (visited.has(cur)) {
+          errors.push({ message: `Signal loop detected: '${e.id}' reaches itself through '${cur}'`, entity: e });
+          break;
+        }
+        visited.add(cur);
+        const curEntity = entityMap.get(cur);
+        if (!curEntity) continue;
+        const rec = curEntity as Record<string, unknown>;
+        if (Array.isArray(rec.targets)) {
+          for (const t of rec.targets as string[]) {
+            if (t === e.id) {
+              errors.push({ message: `Signal loop detected: '${e.id}' reaches itself through '${cur}'`, entity: e });
+              stack.length = 0;
+              break;
+            }
+            if (!visited.has(t)) stack.push(t);
+          }
+        }
+      }
+    }
+
     // Entities with empty targets (warning — not blocking)
     const TARGETS_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
     for (const e of level.entities) {
@@ -820,6 +853,49 @@ export class EditorApp {
       (source as Record<string, unknown>)[field] = target.id;
     }
     return true;
+  }
+
+  /**
+   * Compute the full signal chain reachable from an entity (both forward through targets
+   * and backward through referencing sources). Returns a set of entity IDs in the chain.
+   */
+  getSignalChain(entity: Entity): Set<string> {
+    if (!this.level || !entity.id) return new Set();
+    const chain = new Set<string>();
+    const entityMap = new Map<string, Entity>();
+    for (const e of this.level.entities) {
+      if (e.id) entityMap.set(e.id, e);
+    }
+    // Forward: follow targets
+    const forwardStack = [entity.id];
+    while (forwardStack.length > 0) {
+      const cur = forwardStack.pop()!;
+      if (chain.has(cur)) continue;
+      chain.add(cur);
+      const curEntity = entityMap.get(cur);
+      if (!curEntity) continue;
+      const rec = curEntity as Record<string, unknown>;
+      if (Array.isArray(rec.targets)) {
+        for (const t of rec.targets as string[]) forwardStack.push(t);
+      }
+    }
+    // Backward: follow referencing entities
+    const backwardStack = [entity.id];
+    const visitedBack = new Set<string>();
+    while (backwardStack.length > 0) {
+      const cur = backwardStack.pop()!;
+      if (visitedBack.has(cur)) continue;
+      visitedBack.add(cur);
+      chain.add(cur);
+      for (const e of this.level.entities) {
+        if (!e.id || chain.has(e.id)) continue;
+        const rec = e as Record<string, unknown>;
+        if (Array.isArray(rec.targets) && (rec.targets as string[]).includes(cur)) {
+          backwardStack.push(e.id);
+        }
+      }
+    }
+    return chain;
   }
 
   /** Auto-detect which wall a wall-mounted entity should face based on adjacent solid cells. */
