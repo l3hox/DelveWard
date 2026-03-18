@@ -384,7 +384,7 @@ describe('validateLevel', () => {
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [
         { col: 2, row: 1, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 2, type: 'lever', id: 'lever_1', target: 'door_1' },
+        { col: 2, row: 2, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ],
     }), 'test');
     expect(level.entities).toHaveLength(2);
@@ -400,9 +400,10 @@ describe('validateLevel', () => {
       ],
     }), 'test');
     expect(level.entities).toHaveLength(2);
-    // After migration lever should have target (entity ID), not targetDoor
+    // After migration lever should have targets (array), not target or targetDoor
     const lever = level.entities.find((e) => e.type === 'lever');
-    expect(lever!.target).toBeDefined();
+    expect(lever!.targets).toEqual([expect.any(String)]);
+    expect(lever!.target).toBeUndefined();
     expect(lever!.targetDoor).toBeUndefined();
   });
 
@@ -411,15 +412,28 @@ describe('validateLevel', () => {
       grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever' }],
-    }), 'test')).toThrow('lever must have a non-empty string target');
+    }), 'test')).toThrow('lever must have a non-empty targets array');
   });
 
   it('rejects lever target referencing non-existent entity ID', () => {
     expect(() => validateLevel(validLevel({
       grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
-      entities: [{ col: 2, row: 2, type: 'lever', id: 'lever_1', target: 'no_such_door' }],
-    }), 'test')).toThrow('lever target must reference an existing entity id');
+      entities: [{ col: 2, row: 2, type: 'lever', id: 'lever_1', targets: ['no_such_door'] }],
+    }), 'test')).toThrow('lever target "no_such_door" must reference an existing entity id');
+  });
+
+  it('accepts lever with multiple targets', () => {
+    const level = validateLevel(validLevel({
+      grid: ['#####', '#...#', '#...#', '#####'],
+      playerStart: { col: 1, row: 1, facing: 'S' },
+      entities: [
+        { col: 1, row: 1, type: 'door', state: 'closed', id: 'door_1' },
+        { col: 2, row: 1, type: 'door', state: 'closed', id: 'door_2' },
+        { col: 1, row: 2, type: 'lever', id: 'lever_1', targets: ['door_1', 'door_2'] },
+      ],
+    }), 'test');
+    expect(level.entities).toHaveLength(3);
   });
 
   it('rejects duplicate entity IDs', () => {
@@ -436,7 +450,7 @@ describe('validateLevel', () => {
   it('accepts valid pressure_plate entity', () => {
     const level = validateLevel(doorLevel([
       { col: 2, row: 1, type: 'door', state: 'closed', id: 'door_1' },
-      { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+      { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
     ]), 'test');
     expect(level.entities).toHaveLength(2);
   });
@@ -444,13 +458,13 @@ describe('validateLevel', () => {
   it('rejects pressure_plate with no target and no targetDoor', () => {
     expect(() => validateLevel(doorLevel([
       { col: 1, row: 2, type: 'pressure_plate' },
-    ]), 'test')).toThrow('pressure_plate must have a non-empty string target');
+    ]), 'test')).toThrow('pressure_plate must have a non-empty targets array');
   });
 
   it('rejects pressure_plate target referencing non-existent entity ID', () => {
     expect(() => validateLevel(doorLevel([
-      { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', target: 'no_such_door' },
-    ]), 'test')).toThrow('pressure_plate target must reference an existing entity id');
+      { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['no_such_door'] },
+    ]), 'test')).toThrow('pressure_plate target "no_such_door" must reference an existing entity id');
   });
 
   it('rejects entity with out-of-bounds position', () => {
@@ -483,7 +497,8 @@ describe('migrateEntities', () => {
     const door = entities.find((e) => e.type === 'door');
     const lever = entities.find((e) => e.type === 'lever');
     expect(door!.id).toBeDefined();
-    expect(lever!.target).toBe(door!.id);
+    expect(lever!.targets).toEqual([door!.id]);
+    expect(lever!.target).toBeUndefined();
     expect(lever!.targetDoor).toBeUndefined();
   });
 
@@ -495,18 +510,21 @@ describe('migrateEntities', () => {
     migrateEntities(entities);
     const door = entities.find((e) => e.type === 'door');
     const plate = entities.find((e) => e.type === 'pressure_plate');
-    expect(plate!.target).toBe(door!.id);
+    expect(plate!.targets).toEqual([door!.id]);
+    expect(plate!.target).toBeUndefined();
     expect(plate!.targetDoor).toBeUndefined();
   });
 
-  it('does not overwrite an existing target field', () => {
+  it('converts existing target field to targets array', () => {
     const entities: Entity[] = [
       { col: 3, row: 1, type: 'door', state: 'closed', id: 'my_door' },
       { col: 1, row: 2, type: 'lever', id: 'my_lever', target: 'my_door', targetDoor: '3,1' },
     ];
     migrateEntities(entities);
     const lever = entities.find((e) => e.type === 'lever');
-    expect(lever!.target).toBe('my_door');
+    expect(lever!.targets).toEqual(['my_door']);
+    expect(lever!.target).toBeUndefined();
+    expect(lever!.targetDoor).toBeUndefined();
   });
 
   it('does not assign IDs to doors that already have one', () => {

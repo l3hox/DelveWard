@@ -19,8 +19,11 @@ export type EditorTool = 'select' | 'paint' | 'entity';
 const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   door:           { state: 'closed' },
   key:            { keyId: '' },
-  lever:          { target: '', wall: 'N' },
-  pressure_plate: { target: '' },
+  lever:          { targets: [], wall: 'N' },
+  pressure_plate: { targets: [] },
+  trigger:        { targets: [], signalMode: 'momentary' },
+  tripwire:       { targets: [], signalMode: 'one_shot', visibilityThreshold: 8 },
+  gate:           { gateType: 'and', targets: [] },
   torch_sconce:   { wall: 'N' },
   enemy:          { enemyType: 'rat' },
   equipment:      { itemId: '' },
@@ -65,8 +68,11 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'target', validEntityType: 'door' },
-  pressure_plate: { field: 'target', validEntityType: 'door' },
+  lever:          { field: 'targets', validEntityType: 'door' },
+  pressure_plate: { field: 'targets', validEntityType: 'door' },
+  trigger:        { field: 'targets', validEntityType: 'door' },
+  tripwire:       { field: 'targets', validEntityType: 'door' },
+  gate:           { field: 'targets', validEntityType: 'door' },
   key:            { field: 'keyId',  validEntityType: 'door' },
   door:           { field: 'keyId',  validEntityType: 'key' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
@@ -348,9 +354,19 @@ export class EditorApp {
     }
     for (const e of level.entities) {
       if (e.type === 'stairs') continue; // stairs.target points to another level — validated separately below
-      const target = (e as Record<string, unknown>).target;
+      const rec = e as Record<string, unknown>;
+      // Check scalar target field
+      const target = rec.target;
       if (typeof target === 'string' && target && !entityIds.has(target)) {
         errors.push({ message: `${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`, entity: e });
+      }
+      // Check targets array field (lever, pressure_plate)
+      if (Array.isArray(rec.targets)) {
+        for (const t of rec.targets as string[]) {
+          if (typeof t === 'string' && t && !entityIds.has(t)) {
+            errors.push({ message: `${e.type} '${e.id ?? '?'}' references non-existent target '${t}'`, entity: e });
+          }
+        }
       }
     }
 
@@ -612,32 +628,41 @@ export class EditorApp {
 
     const pm = this.pickMode;
 
-    if (pm.field === 'target' && pm.validEntityType) {
-      // ID-based pick: find target entity, ensure it has an ID, write ID into source's target field
-      let targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+    if ((pm.field === 'target' || pm.field === 'targets') && pm.validEntityType) {
+      // ID-based pick: find target entity, ensure it has an ID, write ID into source's field
+      let pickedTargets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
       // Cross-level stair pick: auto-create a stair on empty walkable cell
-      if (targets.length === 0 && pm.crossLevel && pm.validEntityType === 'stairs') {
+      if (pickedTargets.length === 0 && pm.crossLevel && pm.validEntityType === 'stairs') {
         const sourceDir = (pm.entity as Record<string, unknown>).direction as string;
         const oppositeDir = sourceDir === 'up' ? 'down' : 'up';
         const defaults = { direction: oppositeDir, facing: 'S', target: '' };
         const newStair: Entity = { col, row, type: 'stairs', id: this.generateEntityId('stairs'), ...defaults };
         this.level!.entities.push(newStair);
-        targets = [newStair];
+        pickedTargets = [newStair];
       }
-      if (targets.length === 0) { this.pickMode = null; return false; }
-      const target = targets[0];
-      if (!target.id) {
-        target.id = this.generateEntityId(target.type);
+      if (pickedTargets.length === 0) { this.pickMode = null; return false; }
+      const pickedTarget = pickedTargets[0];
+      if (!pickedTarget.id) {
+        pickedTarget.id = this.generateEntityId(pickedTarget.type);
       }
       // Ensure source has an ID too
       if (!pm.entity.id) {
         pm.entity.id = this.generateEntityId(pm.entity.type);
       }
-      (pm.entity as Record<string, unknown>)[pm.field] = target.id;
-      // Cross-level: mutually link and select the target entity
-      if (pm.crossLevel) {
-        (target as Record<string, unknown>)[pm.field] = pm.entity.id;
-        this.selectedEntity = target;
+      if (pm.field === 'targets') {
+        // Array field: push into targets array
+        const arr = ((pm.entity as Record<string, unknown>).targets as string[]) ?? [];
+        if (!arr.includes(pickedTarget.id!)) {
+          arr.push(pickedTarget.id!);
+        }
+        (pm.entity as Record<string, unknown>).targets = arr;
+      } else {
+        (pm.entity as Record<string, unknown>)[pm.field] = pickedTarget.id;
+      }
+      // Cross-level: mutually link and select the target entity (only for scalar target)
+      if (pm.crossLevel && pm.field === 'target') {
+        (pickedTarget as Record<string, unknown>)[pm.field] = pm.entity.id;
+        this.selectedEntity = pickedTarget;
       }
     } else {
       // keyId sync: sync field value between source and target entities
@@ -657,7 +682,14 @@ export class EditorApp {
 
   getReferencingEntities(entity: Entity): Entity[] {
     if (!this.level || !entity.id) return [];
-    return this.level.entities.filter(e => (e as Record<string, unknown>).target === entity.id);
+    return this.level.entities.filter(e => {
+      const rec = e as Record<string, unknown>;
+      // Check scalar target field (stairs)
+      if (rec.target === entity.id) return true;
+      // Check targets array field (lever, pressure_plate)
+      if (Array.isArray(rec.targets) && (rec.targets as string[]).includes(entity.id!)) return true;
+      return false;
+    });
   }
 
   getKeyIdPeers(entity: Entity): Entity[] {
@@ -724,8 +756,15 @@ export class EditorApp {
       const syncedVal = targetVal || sourceVal || this.generateKeyId();
       (source as Record<string, unknown>)[field] = syncedVal;
       (target as Record<string, unknown>)[field] = syncedVal;
+    } else if (field === 'targets') {
+      // Array field: push target's id into source's targets array
+      const arr = (source as Record<string, unknown>)[field] as string[] ?? [];
+      if (!arr.includes(target.id!)) {
+        arr.push(target.id!);
+      }
+      (source as Record<string, unknown>)[field] = arr;
     } else {
-      // target field: write target's id into source's field
+      // Scalar target field: write target's id into source's field
       (source as Record<string, unknown>)[field] = target.id;
     }
     return true;

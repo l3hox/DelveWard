@@ -109,6 +109,14 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
+        this.addDropdownField('gateMode', (entity.gateMode as string) ?? '', ['', 'or', 'and', 'xor'], (val) => {
+          if (val) {
+            entity.gateMode = val;
+          } else {
+            delete (entity as Record<string, unknown>).gateMode;
+          }
+          this.onEntityChanged?.();
+        });
         const refs = [
           ...this.app.getReferencingEntities(entity),
           ...this.app.getKeyIdPeers(entity).filter(e => e.type === 'key'),
@@ -156,17 +164,43 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addPickableField('target', (entity.target as string) ?? '', entity, 'target', (val) => {
-          entity.target = val;
-          this.onEntityChanged?.();
-        }, undefined, 'door');
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            if (val) {
+              entity.signalMode = val;
+            } else {
+              delete (entity as Record<string, unknown>).signalMode;
+            }
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'pressure_plate':
-        this.addPickableField('target', (entity.target as string) ?? '', entity, 'target', (val) => {
-          entity.target = val;
-          this.onEntityChanged?.();
-        }, undefined, 'door');
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? '',
+          ['', 'toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            if (val) {
+              entity.signalMode = val;
+            } else {
+              delete (entity as Record<string, unknown>).signalMode;
+            }
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'torch_sconce':
@@ -192,6 +226,64 @@ export class Inspector {
 
       case 'consumable':
         this.addItemDropdown(entity, 'consumable');
+        break;
+
+      case 'trigger':
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'momentary',
+          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+
+      case 'tripwire':
+        this.addTargetsArrayField(entity, 'door');
+        this.addDropdownField('signalMode', (entity.signalMode as string) ?? 'one_shot',
+          ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
+            entity.signalMode = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        this.addNumberField('visibilityThreshold', (entity.visibilityThreshold as number) ?? 8, (val) => {
+          entity.visibilityThreshold = val;
+          this.onEntityChanged?.();
+        });
+        if ((entity.signalMode as string) === 'timed') {
+          this.addNumberField('signalDuration', (entity.signalDuration as number) ?? 3, (val) => {
+            entity.signalDuration = val;
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+
+      case 'gate':
+        this.addDropdownField('gateType', (entity.gateType as string) ?? 'and',
+          ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'], (val) => {
+            entity.gateType = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
+        this.addTargetsArrayField(entity, 'door');
+        if ((entity.gateType as string) === 'delay') {
+          this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
+            entity.delay = val;
+            this.onEntityChanged?.();
+          });
+        }
+        if ((entity.gateType as string) === 'pulse_repeat') {
+          this.addNumberField('interval', (entity.interval as number) ?? 1, (val) => {
+            entity.interval = val;
+            this.onEntityChanged?.();
+          });
+        }
         break;
 
       case 'stairs': {
@@ -389,6 +481,64 @@ export class Inspector {
     row.appendChild(pickBtn);
 
     wrapper.appendChild(row);
+    this.container.appendChild(wrapper);
+  }
+
+  private addTargetsArrayField(entity: Entity, validEntityType: string): void {
+    const targets = (entity.targets as string[] | undefined) ?? [];
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'targets';
+    wrapper.appendChild(lbl);
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '2px';
+
+    for (let i = 0; i < targets.length; i++) {
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '4px';
+
+      const span = document.createElement('span');
+      span.style.flex = '1';
+      span.style.fontSize = '0.85em';
+      span.style.overflow = 'hidden';
+      span.style.textOverflow = 'ellipsis';
+      span.textContent = targets[i];
+      row.appendChild(span);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-pick';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.style.padding = '0 4px';
+      removeBtn.style.minWidth = 'auto';
+      const idx = i;
+      removeBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
+        targets.splice(idx, 1);
+        (entity as Record<string, unknown>).targets = targets;
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-pick';
+    addBtn.textContent = targets.length === 0 ? 'Pick Target' : '+ Add Target';
+    addBtn.addEventListener('click', () => {
+      this.onPickRequested?.(entity, 'targets', undefined, validEntityType);
+    });
+    list.appendChild(addBtn);
+
+    wrapper.appendChild(list);
     this.container.appendChild(wrapper);
   }
 

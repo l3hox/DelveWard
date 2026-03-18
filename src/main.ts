@@ -403,8 +403,19 @@ async function init(): Promise<void> {
 
   // --- Callbacks ---
 
+  let lastPlayerCol = firstLevel.playerStart.col;
+  let lastPlayerRow = firstLevel.playerStart.row;
+
   function wireCallbacks(): void {
     ls.player.setOnMove((col, row) => {
+      // Deactivate momentary sources at the cell we just left
+      if (col !== lastPlayerCol || row !== lastPlayerRow) {
+        gameState.deactivatePressurePlate(lastPlayerCol, lastPlayerRow);
+        gameState.deactivateTrigger(lastPlayerCol, lastPlayerRow);
+      }
+      lastPlayerCol = col;
+      lastPlayerRow = row;
+
       // Reveal explored cells on move
       gameState.revealAround(col, row, ls.player.getState().facing, ls.level.grid);
 
@@ -431,13 +442,19 @@ async function init(): Promise<void> {
         hideConsumableMesh(ls.consumableMeshes.meshMap, col, row);
       }
 
+      // Trigger / tripwire activation
+      gameState.activateTrigger(col, row);
+      gameState.activateTripwire(col, row);
+
       // Pressure plate activation
-      const plateTarget = gameState.activatePressurePlate(col, row);
-      if (plateTarget) {
+      const plateTargets = gameState.activatePressurePlate(col, row);
+      if (plateTargets) {
         console.log('Pressure plate activated.');
-        const targetPos = gameState.resolveEntityPosition(plateTarget);
-        if (targetPos) {
-          updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
+        for (const t of plateTargets) {
+          const targetPos = gameState.resolveEntityPosition(t);
+          if (targetPos) {
+            updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, true, ls.doorAnimator);
+          }
         }
         pressPlate(ls.plateMeshes.meshMap, col, row);
       }
@@ -642,10 +659,12 @@ async function init(): Promise<void> {
             const bk = doorKey(facing.col, facing.row);
             ls.doorAnimator.bounce(bk);
           }
-          if (result.type === 'lever_activated' && result.target) {
-            const targetPos = gameState.resolveEntityPosition(result.target);
-            if (targetPos) {
-              updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+          if (result.type === 'lever_activated' && result.targets) {
+            for (const t of result.targets) {
+              const targetPos = gameState.resolveEntityPosition(t);
+              if (targetPos) {
+                updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+              }
             }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);
@@ -788,6 +807,7 @@ async function init(): Promise<void> {
     ls.doorAnimator.update(delta);
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
+    gameState.signalManager.tick(delta);
     transition.update(delta);
     damageNumbers.update(delta);
     swordSwing.update(delta);

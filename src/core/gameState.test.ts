@@ -139,7 +139,7 @@ describe('GameState', () => {
   it('openDoor: mechanical door returns false', () => {
     const gs = new GameState([
       { col: 3, row: 2, type: 'door', state: 'closed', id: 'door_1' },
-      { col: 1, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+      { col: 1, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
     ]);
     expect(gs.openDoor(3, 2)).toBe(false);
     expect(gs.getDoor(3, 2)!.state).toBe('closed');
@@ -180,7 +180,7 @@ describe('GameState', () => {
   it('closeDoor: mechanical door returns false', () => {
     const gs = new GameState([
       { col: 3, row: 2, type: 'door', state: 'closed', id: 'door_1' },
-      { col: 1, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+      { col: 1, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
     ]);
     // Open via lever
     gs.activateLever(1, 1);
@@ -193,7 +193,7 @@ describe('GameState', () => {
   it('door targeted by lever is marked mechanical', () => {
     const gs = new GameState([
       { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-      { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+      { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
     ]);
     expect(gs.getDoor(5, 3)!.mechanical).toBe(true);
   });
@@ -201,7 +201,7 @@ describe('GameState', () => {
   it('door targeted by pressure plate is marked mechanical', () => {
     const gs = new GameState([
       { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-      { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+      { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
     ]);
     expect(gs.getDoor(5, 3)!.mechanical).toBe(true);
   });
@@ -217,7 +217,7 @@ describe('GameState', () => {
     it('is populated after construction', () => {
       const gs = new GameState([
         { col: 3, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 1, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+        { col: 1, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ]);
       expect(gs.entityById.has('door_1')).toBe(true);
       expect(gs.entityById.get('door_1')).toEqual({ col: 3, row: 3, type: 'door' });
@@ -340,20 +340,20 @@ describe('GameState', () => {
   // --- Lever activation ---
 
   describe('lever activation', () => {
-    it('activateLever toggles target door and returns entity ID', () => {
+    it('activateLever toggles target door and returns entity IDs', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ]);
       const result = gs.activateLever(2, 1);
-      expect(result).toBe('door_1');
+      expect(result).toEqual(['door_1']);
       expect(gs.getDoor(5, 3)!.state).toBe('open');
     });
 
     it('activateLever toggles lever state up -> down -> up', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ]);
       expect(gs.getLever(2, 1)!.state).toBe('up');
       gs.activateLever(2, 1);
@@ -365,7 +365,7 @@ describe('GameState', () => {
     it('activateLever is repeatable — toggles door back', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ]);
       gs.activateLever(2, 1);
       expect(gs.getDoor(5, 3)!.state).toBe('open');
@@ -379,35 +379,46 @@ describe('GameState', () => {
       expect(result).toBeUndefined();
     });
 
+    it('activateLever toggles multiple target doors', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'door', state: 'closed', id: 'door_1' },
+        { col: 3, row: 3, type: 'door', state: 'closed', id: 'door_2' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1', 'door_2'] },
+      ]);
+      gs.activateLever(2, 1);
+      expect(gs.getDoor(1, 1)!.state).toBe('open');
+      expect(gs.getDoor(3, 3)!.state).toBe('open');
+    });
+
     it('constructor extracts lever entities', () => {
       const gs = new GameState([
-        { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_1' },
-        { col: 4, row: 6, type: 'lever', id: 'lever_2', target: 'door_2' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
+        { col: 4, row: 6, type: 'lever', id: 'lever_2', targets: ['door_2'] },
       ]);
       expect(gs.levers.size).toBe(2);
       expect(gs.levers.get('2,1')).toBeDefined();
       expect(gs.levers.get('4,6')).toBeDefined();
-      expect(gs.levers.get('2,1')!.target).toBe('door_1');
+      expect(gs.levers.get('2,1')!.targets).toEqual(['door_1']);
     });
   });
 
   // --- Pressure plate activation ---
 
   describe('pressure plate activation', () => {
-    it('activatePressurePlate opens target door and returns entity ID', () => {
+    it('activatePressurePlate opens target door and returns entity IDs', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
       ]);
       const result = gs.activatePressurePlate(2, 2);
-      expect(result).toBe('door_1');
+      expect(result).toEqual(['door_1']);
       expect(gs.getDoor(5, 3)!.state).toBe('open');
     });
 
     it('activatePressurePlate returns undefined for already activated plate', () => {
       const gs = new GameState([
         { col: 5, row: 3, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
       ]);
       gs.activatePressurePlate(2, 2);
       const result = gs.activatePressurePlate(2, 2);
@@ -420,19 +431,30 @@ describe('GameState', () => {
       expect(result).toBeUndefined();
     });
 
+    it('activatePressurePlate opens multiple target doors', () => {
+      const gs = new GameState([
+        { col: 1, row: 1, type: 'door', state: 'closed', id: 'door_1' },
+        { col: 3, row: 3, type: 'door', state: 'closed', id: 'door_2' },
+        { col: 2, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['door_1', 'door_2'] },
+      ]);
+      gs.activatePressurePlate(2, 2);
+      expect(gs.getDoor(1, 1)!.state).toBe('open');
+      expect(gs.getDoor(3, 3)!.state).toBe('open');
+    });
+
     it('constructor extracts pressure_plate entities', () => {
       const gs = new GameState([
-        { col: 3, row: 3, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+        { col: 3, row: 3, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
       ]);
       expect(gs.plates.size).toBe(1);
       expect(gs.plates.get('3,3')).toBeDefined();
-      expect(gs.plates.get('3,3')!.target).toBe('door_1');
+      expect(gs.plates.get('3,3')!.targets).toEqual(['door_1']);
     });
 
     it('plate opens a closed door', () => {
       const gs = new GameState([
         { col: 4, row: 2, type: 'door', state: 'closed', id: 'door_1' },
-        { col: 1, row: 3, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+        { col: 1, row: 3, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
       ]);
       expect(gs.isDoorOpen(4, 2)).toBe(false);
       gs.activatePressurePlate(1, 3);
@@ -465,7 +487,7 @@ describe('GameState', () => {
     it('detects N wall when wall is to the north', () => {
       // Cell (2,1) has wall at row 0 to the north
       const gs = new GameState([
-        { col: 2, row: 1, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 2, row: 1, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ], grid);
       expect(gs.levers.get('2,1')!.wall).toBe('N');
     });
@@ -473,7 +495,7 @@ describe('GameState', () => {
     it('detects S wall when wall is to the south', () => {
       // Cell (2,3) has wall at row 4 to the south
       const gs = new GameState([
-        { col: 2, row: 3, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 2, row: 3, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ], grid);
       expect(gs.levers.get('2,3')!.wall).toBe('S');
     });
@@ -481,7 +503,7 @@ describe('GameState', () => {
     it('detects E wall when wall is to the east', () => {
       // Cell (3,2) has wall at col 4 to the east, no wall N or S
       const gs = new GameState([
-        { col: 3, row: 2, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 3, row: 2, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ], grid);
       expect(gs.levers.get('3,2')!.wall).toBe('E');
     });
@@ -489,7 +511,7 @@ describe('GameState', () => {
     it('detects W wall when wall is to the west', () => {
       // Cell (1,2) has wall at col 0 to the west, no wall N or S
       const gs = new GameState([
-        { col: 1, row: 2, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 1, row: 2, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ], grid);
       expect(gs.levers.get('1,2')!.wall).toBe('W');
     });
@@ -497,14 +519,14 @@ describe('GameState', () => {
     it('falls back to N when no adjacent walls', () => {
       // Cell (2,2) is surrounded by floor on all sides
       const gs = new GameState([
-        { col: 2, row: 2, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 2, row: 2, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ], grid);
       expect(gs.levers.get('2,2')!.wall).toBe('N');
     });
 
     it('falls back to N when no grid provided', () => {
       const gs = new GameState([
-        { col: 2, row: 2, type: 'lever', id: 'lever_1', target: 'door_x' },
+        { col: 2, row: 2, type: 'lever', id: 'lever_1', targets: ['door_x'] },
       ]);
       expect(gs.levers.get('2,2')!.wall).toBe('N');
     });
@@ -638,8 +660,8 @@ describe('GameState', () => {
       const gs = new GameState([
         { col: 1, row: 1, type: 'door', state: 'closed', id: 'door_1' },
         { col: 2, row: 2, type: 'key', keyId: 'gold_key' },
-        { col: 3, row: 3, type: 'lever', id: 'lever_1', target: 'door_1' },
-        { col: 4, row: 4, type: 'pressure_plate', id: 'plate_1', target: 'door_1' },
+        { col: 3, row: 3, type: 'lever', id: 'lever_1', targets: ['door_1'] },
+        { col: 4, row: 4, type: 'pressure_plate', id: 'plate_1', targets: ['door_1'] },
       ]);
       gs.exploredCells.add('0,0');
       gs.exploredCells.add('1,0');

@@ -60,13 +60,22 @@ export function migrateEntities(entities: Entity[]): void {
     }
   }
 
-  // Convert targetDoor → target on levers and plates
+  // Convert targetDoor → target → targets on levers and plates
   for (const e of entities) {
-    if ((e.type === 'lever' || e.type === 'pressure_plate') && e.targetDoor && !e.target) {
-      const doorId = doorPosToId.get(e.targetDoor as string);
-      if (doorId) {
-        e.target = doorId;
-        delete e.targetDoor;
+    if (e.type === 'lever' || e.type === 'pressure_plate') {
+      // Legacy: targetDoor → target
+      if (e.targetDoor && !e.target) {
+        const doorId = doorPosToId.get(e.targetDoor as string);
+        if (doorId) {
+          e.target = doorId;
+          delete e.targetDoor;
+        }
+      }
+      // Migrate single target → targets[]
+      if (e.target && !e.targets) {
+        e.targets = [e.target as string];
+        delete e.target;
+        delete e.targetDoor; // clean up any remaining legacy field
       }
     }
   }
@@ -230,6 +239,10 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (e.keyId !== undefined && typeof e.keyId !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] door keyId must be a string`);
       }
+      const validGateModes = ['or', 'and', 'xor'];
+      if (e.gateMode !== undefined && !validGateModes.includes(e.gateMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] door gateMode must be one of ${validGateModes.join(', ')}`);
+      }
     }
 
     if (e.type === 'key') {
@@ -242,26 +255,118 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
 
     if (e.type === 'lever') {
-      if (typeof e.target !== 'string' || e.target === '') {
-        throw new Error(`Level ${source}: entities[${i}] lever must have a non-empty string target`);
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] lever must have a non-empty targets array`);
       }
-      if (!entityIds.has(e.target as string)) {
-        throw new Error(`Level ${source}: entities[${i}] lever target must reference an existing entity id`);
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] lever targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] lever target "${t}" must reference an existing entity id`);
+        }
       }
       if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
         throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
       }
+      const validSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] lever signalMode must be one of ${validSignalModes.join(', ')}`);
+      }
+      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] lever signalDuration must be a number`);
+      }
     }
 
     if (e.type === 'pressure_plate') {
-      if (typeof e.target !== 'string' || e.target === '') {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a non-empty string target`);
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a non-empty targets array`);
       }
-      if (!entityIds.has(e.target as string)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate target must reference an existing entity id`);
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] pressure_plate targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] pressure_plate target "${t}" must reference an existing entity id`);
+        }
       }
       if (!walkableChars.has(cellAtEntity)) {
         throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
+      }
+      const validPlateSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validPlateSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalMode must be one of ${validPlateSignalModes.join(', ')}`);
+      }
+      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalDuration must be a number`);
+      }
+    }
+
+    if (e.type === 'trigger') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] trigger must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] trigger targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] trigger target "${t}" must reference an existing entity id`);
+        }
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] trigger must be on a walkable cell`);
+      }
+      const validTriggerSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
+      if (e.signalMode !== undefined && !validTriggerSignalModes.includes(e.signalMode as string)) {
+        throw new Error(`Level ${source}: entities[${i}] trigger signalMode must be one of ${validTriggerSignalModes.join(', ')}`);
+      }
+    }
+
+    if (e.type === 'tripwire') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] tripwire must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] tripwire targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] tripwire target "${t}" must reference an existing entity id`);
+        }
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] tripwire must be on a walkable cell`);
+      }
+      if (e.visibilityThreshold !== undefined && typeof e.visibilityThreshold !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] tripwire visibilityThreshold must be a number`);
+      }
+    }
+
+    if (e.type === 'gate') {
+      if (!Array.isArray(e.targets) || e.targets.length === 0) {
+        throw new Error(`Level ${source}: entities[${i}] gate must have a non-empty targets array`);
+      }
+      for (const t of e.targets as string[]) {
+        if (typeof t !== 'string' || t === '') {
+          throw new Error(`Level ${source}: entities[${i}] gate targets must contain non-empty strings`);
+        }
+        if (!entityIds.has(t)) {
+          throw new Error(`Level ${source}: entities[${i}] gate target "${t}" must reference an existing entity id`);
+        }
+      }
+      const validGateTypes = ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'];
+      if (!validGateTypes.includes(e.gateType as string)) {
+        throw new Error(`Level ${source}: entities[${i}] gate must have a valid gateType (${validGateTypes.join(', ')})`);
+      }
+      if (!walkableChars.has(cellAtEntity)) {
+        throw new Error(`Level ${source}: entities[${i}] gate must be on a walkable cell`);
+      }
+      if (e.delay !== undefined && typeof e.delay !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] gate delay must be a number`);
+      }
+      if (e.interval !== undefined && typeof e.interval !== 'number') {
+        throw new Error(`Level ${source}: entities[${i}] gate interval must be a number`);
       }
     }
 

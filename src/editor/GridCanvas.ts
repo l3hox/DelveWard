@@ -766,6 +766,56 @@ export class GridCanvas {
         break;
       }
 
+      case 'trigger': {
+        // Dashed circle
+        ctx.strokeStyle = '#ff6600';
+        ctx.lineWidth = Math.max(1, iconRadius * 0.3);
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+      }
+
+      case 'tripwire': {
+        // Dashed horizontal line
+        const pad = Math.min(tw, th) * 0.15;
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = Math.max(1, iconRadius * 0.25);
+        ctx.setLineDash([4, 2]);
+        ctx.beginPath();
+        ctx.moveTo(px + pad, cy);
+        ctx.lineTo(px + tw - pad, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+      }
+
+      case 'gate': {
+        // Logic gate symbol (diamond)
+        const gd = iconRadius * 0.9;
+        ctx.fillStyle = '#6688ff';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - gd);
+        ctx.lineTo(cx + gd, cy);
+        ctx.lineTo(cx, cy + gd);
+        ctx.lineTo(cx - gd, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#3344aa';
+        ctx.lineWidth = Math.max(1, gd * 0.2);
+        ctx.stroke();
+        // Label
+        const gateLabel = ((entity.gateType as string) ?? 'and').toUpperCase().charAt(0);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(6, gd * 0.8)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(gateLabel, cx, cy);
+        break;
+      }
+
       default:
         break;
     }
@@ -1036,15 +1086,17 @@ export class GridCanvas {
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
-      if ((e.type === 'lever' || e.type === 'pressure_plate') && e.target) {
-        const targetId = e.target as string;
-        const targetEntity = level.entities.find(t => t.id === targetId);
-        if (!targetEntity) continue;
-        const isActive = selected !== null && (
-          e === selected ||
-          (selected.id !== undefined && selected.id === targetId)
-        );
-        arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+      const hasTargetsArray = e.type === 'lever' || e.type === 'pressure_plate' || e.type === 'trigger' || e.type === 'tripwire' || e.type === 'gate';
+      if (hasTargetsArray && Array.isArray(e.targets)) {
+        for (const targetId of e.targets as string[]) {
+          const targetEntity = level.entities.find(t => t.id === targetId);
+          if (!targetEntity) continue;
+          const isActive = selected !== null && (
+            e === selected ||
+            (selected.id !== undefined && selected.id === targetId)
+          );
+          arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+        }
       }
       if (e.type === 'stairs' && e.target) {
         const targetId = e.target as string;
