@@ -130,29 +130,7 @@ toolbar.setCharSelectCallback((char) => {
 
 toolbar.setExportCallback(() => {
   if (!app.level) return;
-  if (app.errors.length > 0) {
-    alert('Cannot export \u2014 fix errors first:\n\n' + app.errors.map(e => e.message).join('\n'));
-    return;
-  }
   if (app.isDungeonMode()) {
-    // Validate ALL levels before exporting dungeon
-    const allErrors: string[] = [];
-    const savedIndex = app.activeLevelIndex;
-    for (let i = 0; i < app.dungeon!.levels.length; i++) {
-      const lvl = app.dungeon!.levels[i];
-      app.level = lvl;
-      app.rebuildDerivedState();
-      if (app.errors.length > 0) {
-        allErrors.push(...app.errors.map(e => `[${lvl.name}] ${e.message}`));
-      }
-    }
-    // Restore active level
-    app.level = app.dungeon!.levels[savedIndex];
-    app.rebuildDerivedState();
-    if (allErrors.length > 0) {
-      alert('Cannot export \u2014 fix errors first:\n\n' + allErrors.join('\n'));
-      return;
-    }
     exportDungeonFile(app.dungeon!);
     // Update all clean snapshots and clear dirty state
     app.levelCleanSnapshots = app.dungeon!.levels.map(l => JSON.stringify(l));
@@ -219,12 +197,6 @@ function validateAllLevels(): string[] | null {
 async function performSave(filename: string): Promise<void> {
   if (savingInProgress) return;
   if (!app.level) return;
-
-  const errors = validateAllLevels();
-  if (errors) {
-    alert('Cannot save \u2014 fix errors first:\n\n' + errors.join('\n'));
-    return;
-  }
 
   const content = app.isDungeonMode()
     ? JSON.stringify(serializeDungeon(app.dungeon!), null, 2)

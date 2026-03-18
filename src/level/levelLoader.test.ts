@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { validateLevel, validateDungeon, migrateEntities } from './levelLoader';
 import type { Entity } from '../core/types';
 
@@ -351,18 +351,26 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('rejects door entity with invalid state', () => {
-    expect(() => validateLevel(doorLevel([
+  it('skips door entity with invalid state', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(doorLevel([
       { col: 2, row: 1, type: 'door', state: 'broken' },
-    ]), 'test')).toThrow('door state must be open or closed');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects door entity on non-walkable cell', () => {
-    expect(() => validateLevel(validLevel({
+  it('skips door entity on non-walkable cell', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(validLevel({
       grid: ['#####', '#.#.#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'E' },
       entities: [{ col: 2, row: 1, type: 'door', state: 'closed' }],
-    }), 'test')).toThrow("door must be on a walkable cell");
+    }), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('accepts valid key entity', () => {
@@ -372,10 +380,14 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('rejects key entity without keyId', () => {
-    expect(() => validateLevel(doorLevel([
+  it('skips key entity without keyId', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(doorLevel([
       { col: 1, row: 2, type: 'key' },
-    ]), 'test')).toThrow('key must have a string keyId');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('accepts valid lever entity', () => {
@@ -407,12 +419,16 @@ describe('validateLevel', () => {
     expect(lever!.targetDoor).toBeUndefined();
   });
 
-  it('rejects lever with no target and no targetDoor', () => {
-    expect(() => validateLevel(validLevel({
+  it('skips lever with no target and no targetDoor', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(validLevel({
       grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever' }],
-    }), 'test')).toThrow('lever must have a targets array');
+    }), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('accepts lever with empty targets array', () => {
@@ -424,12 +440,16 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('rejects lever target referencing non-existent entity ID', () => {
-    expect(() => validateLevel(validLevel({
+  it('skips lever target referencing non-existent entity ID', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(validLevel({
       grid: ['#####', '#...#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [{ col: 2, row: 2, type: 'lever', id: 'lever_1', targets: ['no_such_door'] }],
-    }), 'test')).toThrow('lever target "no_such_door" must reference an existing entity id');
+    }), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('accepts lever with multiple targets', () => {
@@ -464,10 +484,14 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(2);
   });
 
-  it('rejects pressure_plate with no target and no targetDoor', () => {
-    expect(() => validateLevel(doorLevel([
+  it('skips pressure_plate with no target and no targetDoor', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(doorLevel([
       { col: 1, row: 2, type: 'pressure_plate' },
-    ]), 'test')).toThrow('pressure_plate must have a targets array');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('accepts pressure_plate with empty targets array', () => {
@@ -477,16 +501,24 @@ describe('validateLevel', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('rejects pressure_plate target referencing non-existent entity ID', () => {
-    expect(() => validateLevel(doorLevel([
+  it('skips pressure_plate target referencing non-existent entity ID', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(doorLevel([
       { col: 1, row: 2, type: 'pressure_plate', id: 'plate_1', targets: ['no_such_door'] },
-    ]), 'test')).toThrow('pressure_plate target "no_such_door" must reference an existing entity id');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects entity with out-of-bounds position', () => {
-    expect(() => validateLevel(doorLevel([
+  it('skips entity with out-of-bounds position', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(doorLevel([
       { col: 20, row: 1, type: 'door', state: 'closed' },
-    ]), 'test')).toThrow('is out of grid bounds');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('rejects entity without numeric col/row', () => {
@@ -590,42 +622,66 @@ describe('stair entity validation', () => {
     expect(level.entities).toHaveLength(1);
   });
 
-  it('rejects stairs entity on non-walkable cell', () => {
-    expect(() => validateLevel(validLevel({
+  it('skips stairs entity on non-walkable cell', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(validLevel({
       grid: ['#####', '#.#.#', '#...#', '#####'],
       playerStart: { col: 1, row: 1, facing: 'E' },
       entities: [{ col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1' }],
-    }), 'test')).toThrow('stairs must be on a walkable cell');
+    }), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects stairs without direction', () => {
-    expect(() => validateLevel(stairLevel([
+  it('skips stairs without direction', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', facing: 'S', target: 'stair_up_1' },
-    ]), 'test')).toThrow('stairs must have direction "up" or "down"');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects stairs with invalid direction', () => {
-    expect(() => validateLevel(stairLevel([
+  it('skips stairs with invalid direction', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', direction: 'left', facing: 'S', target: 'stair_up_1' },
-    ]), 'test')).toThrow('stairs must have direction "up" or "down"');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects stairs without facing', () => {
-    expect(() => validateLevel(stairLevel([
+  it('skips stairs without facing', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', direction: 'down', target: 'stair_up_1' },
-    ]), 'test')).toThrow('stairs must have facing "N", "S", "E", or "W"');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects stairs with invalid facing', () => {
-    expect(() => validateLevel(stairLevel([
+  it('skips stairs with invalid facing', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'X', target: 'stair_up_1' },
-    ]), 'test')).toThrow('stairs must have facing "N", "S", "E", or "W"');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
-  it('rejects stairs without target', () => {
-    expect(() => validateLevel(stairLevel([
+  it('skips stairs without target', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(stairLevel([
       { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S' },
-    ]), 'test')).toThrow('stairs must have a string target (paired stair entity ID)');
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 

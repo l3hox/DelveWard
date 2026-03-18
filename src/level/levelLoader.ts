@@ -81,6 +81,138 @@ export function migrateEntities(entities: Entity[]): void {
   }
 }
 
+/**
+ * Validate a single entity. Returns an error message string if invalid, or null if OK.
+ * Invalid entities are skipped in the game but preserved in the JSON for editor use.
+ */
+function validateEntity(
+  e: Record<string, unknown>,
+  i: number,
+  grid: string[],
+  rowLen: number,
+  walkableChars: Set<string>,
+  entityIds: Set<string>,
+  source: string,
+  validSignalModes: Set<string>,
+  validGateTypes: Set<string>,
+): string | null {
+  const pfx = `Level ${source}: entities[${i}]`;
+
+  if ((e.row as number) < 0 || (e.row as number) >= grid.length ||
+      (e.col as number) < 0 || (e.col as number) >= rowLen) {
+    return `${pfx} (${e.col},${e.row}) is out of grid bounds`;
+  }
+
+  const cell = grid[e.row as number][e.col as number];
+
+  // Helper: validate targets array field
+  const checkTargets = (typeName: string): string | null => {
+    if (!Array.isArray(e.targets)) return `${pfx} ${typeName} must have a targets array`;
+    for (const t of e.targets as string[]) {
+      if (typeof t !== 'string' || t === '') return `${pfx} ${typeName} targets must contain non-empty strings`;
+      if (!entityIds.has(t)) return `${pfx} ${typeName} target "${t}" must reference an existing entity id`;
+    }
+    return null;
+  };
+
+  // Helper: validate optional signal mode
+  const checkSignalMode = (typeName: string): string | null => {
+    if (e.signalMode !== undefined && !validSignalModes.has(e.signalMode as string)) {
+      return `${pfx} ${typeName} signalMode must be one of ${[...validSignalModes].join(', ')}`;
+    }
+    if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
+      return `${pfx} ${typeName} signalDuration must be a number`;
+    }
+    return null;
+  };
+
+  // Helper: check walkable cell
+  const checkWalkable = (typeName: string): string | null => {
+    if (!walkableChars.has(cell)) return `${pfx} ${typeName} must be on a walkable cell, found '${cell}'`;
+    return null;
+  };
+
+  switch (e.type as string) {
+    case 'door': {
+      const w = checkWalkable('door'); if (w) return w;
+      const VALID_DOOR_STATES = new Set(['open', 'closed']);
+      if (e.state !== undefined && !VALID_DOOR_STATES.has(e.state as string)) return `${pfx} door state must be open or closed`;
+      if (e.keyId !== undefined && typeof e.keyId !== 'string') return `${pfx} door keyId must be a string`;
+      const validGateModes = ['or', 'and', 'xor'];
+      if (e.gateMode !== undefined && !validGateModes.includes(e.gateMode as string)) return `${pfx} door gateMode must be one of ${validGateModes.join(', ')}`;
+      break;
+    }
+    case 'key': {
+      if (typeof e.keyId !== 'string') return `${pfx} key must have a string keyId`;
+      const w = checkWalkable('key'); if (w) return w;
+      break;
+    }
+    case 'lever': {
+      const t = checkTargets('lever'); if (t) return t;
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) return `${pfx} lever wall must be N, S, E, or W`;
+      const s = checkSignalMode('lever'); if (s) return s;
+      break;
+    }
+    case 'pressure_plate': {
+      const t = checkTargets('pressure_plate'); if (t) return t;
+      const w = checkWalkable('pressure_plate'); if (w) return w;
+      const s = checkSignalMode('pressure_plate'); if (s) return s;
+      break;
+    }
+    case 'trigger': {
+      const t = checkTargets('trigger'); if (t) return t;
+      const w = checkWalkable('trigger'); if (w) return w;
+      const s = checkSignalMode('trigger'); if (s) return s;
+      break;
+    }
+    case 'tripwire': {
+      const t = checkTargets('tripwire'); if (t) return t;
+      const w = checkWalkable('tripwire'); if (w) return w;
+      if (e.visibilityThreshold !== undefined && typeof e.visibilityThreshold !== 'number') return `${pfx} tripwire visibilityThreshold must be a number`;
+      if (e.orientation !== undefined && e.orientation !== 'EW' && e.orientation !== 'NS') return `${pfx} tripwire orientation must be "EW" or "NS"`;
+      break;
+    }
+    case 'gate': {
+      const t = checkTargets('gate'); if (t) return t;
+      if (!validGateTypes.has(e.gateType as string)) return `${pfx} gate must have a valid gateType (${[...validGateTypes].join(', ')})`;
+      const w = checkWalkable('gate'); if (w) return w;
+      if (e.delay !== undefined && typeof e.delay !== 'number') return `${pfx} gate delay must be a number`;
+      if (e.interval !== undefined && typeof e.interval !== 'number') return `${pfx} gate interval must be a number`;
+      break;
+    }
+    case 'enemy': {
+      if (typeof e.enemyType !== 'string') return `${pfx} enemy must have a string enemyType`;
+      if (!enemyDatabase.getEnemy(e.enemyType as string)) return `${pfx} enemy has unknown enemyType "${e.enemyType}"`;
+      const w = checkWalkable('enemy'); if (w) return w;
+      break;
+    }
+    case 'torch_sconce': {
+      const w = checkWalkable('torch_sconce'); if (w) return w;
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) return `${pfx} torch_sconce wall must be N, S, E, or W`;
+      break;
+    }
+    case 'equipment': {
+      if (typeof e.itemId !== 'string') return `${pfx} equipment must have a string itemId`;
+      const w = checkWalkable('equipment'); if (w) return w;
+      break;
+    }
+    case 'consumable': {
+      if (typeof e.itemId !== 'string') return `${pfx} consumable must have a string itemId`;
+      const w = checkWalkable('consumable'); if (w) return w;
+      break;
+    }
+    case 'stairs': {
+      if (e.direction !== 'up' && e.direction !== 'down') return `${pfx} stairs must have direction "up" or "down"`;
+      if (typeof e.facing !== 'string' || !VALID_FACINGS.includes(e.facing as Facing)) return `${pfx} stairs must have facing "N", "S", "E", or "W"`;
+      const w = checkWalkable('stairs'); if (w) return w;
+      if (typeof e.target !== 'string') return `${pfx} stairs must have a string target (paired stair entity ID)`;
+      break;
+    }
+  }
+
+  return null;
+}
+
 export function validateLevel(data: unknown, source: string): DungeonLevel {
   if (typeof data !== 'object' || data === null) {
     throw new Error(`Level data from ${source} is not an object`);
@@ -212,222 +344,36 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
   }
 
+  const validEntities: Record<string, unknown>[] = [];
+  const VALID_SIGNAL_MODES = new Set(['toggle', 'momentary', 'one_shot', 'timed']);
+  const VALID_GATE_TYPES = new Set(['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat']);
+
   for (let i = 0; i < obj.entities.length; i++) {
     const e = obj.entities[i] as Record<string, unknown>;
+
+    // Structural checks — these are fatal (entity is unsalvageable)
     if (typeof e !== 'object' || e === null || Array.isArray(e)) {
       throw new Error(`Level ${source}: entities[${i}] must be an object`);
     }
     if (typeof e.col !== 'number' || typeof e.row !== 'number') {
       throw new Error(`Level ${source}: entities[${i}] must have numeric col and row`);
     }
-    if (e.row < 0 || e.row >= grid.length || e.col < 0 || e.col >= rowLen) {
-      throw new Error(`Level ${source}: entities[${i}] (${e.col},${e.row}) is out of grid bounds`);
-    }
     if (typeof e.type !== 'string') {
       throw new Error(`Level ${source}: entities[${i}] must have a string type`);
     }
 
-    const cellAtEntity = grid[e.row as number][e.col as number];
-
-    if (e.type === 'door') {
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] door must be on a walkable cell, found '${cellAtEntity}'`);
-      }
-      if (e.state !== undefined && !VALID_DOOR_STATES.has(e.state as string)) {
-        throw new Error(`Level ${source}: entities[${i}] door state must be open or closed`);
-      }
-      if (e.keyId !== undefined && typeof e.keyId !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] door keyId must be a string`);
-      }
-      const validGateModes = ['or', 'and', 'xor'];
-      if (e.gateMode !== undefined && !validGateModes.includes(e.gateMode as string)) {
-        throw new Error(`Level ${source}: entities[${i}] door gateMode must be one of ${validGateModes.join(', ')}`);
-      }
+    // Entity-level checks — recoverable: warn and skip for game
+    const err = validateEntity(e, i, grid, rowLen, walkableChars, entityIds, source, VALID_SIGNAL_MODES, VALID_GATE_TYPES);
+    if (err) {
+      console.warn(`${err} — entity skipped`);
+      continue;
     }
 
-    if (e.type === 'key') {
-      if (typeof e.keyId !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] key must have a string keyId`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] key must be on a walkable cell`);
-      }
-    }
-
-    if (e.type === 'lever') {
-      if (!Array.isArray(e.targets)) {
-        throw new Error(`Level ${source}: entities[${i}] lever must have a targets array`);
-      }
-      for (const t of e.targets as string[]) {
-        if (typeof t !== 'string' || t === '') {
-          throw new Error(`Level ${source}: entities[${i}] lever targets must contain non-empty strings`);
-        }
-        if (!entityIds.has(t)) {
-          throw new Error(`Level ${source}: entities[${i}] lever target "${t}" must reference an existing entity id`);
-        }
-      }
-      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
-        throw new Error(`Level ${source}: entities[${i}] lever wall must be N, S, E, or W`);
-      }
-      const validSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
-      if (e.signalMode !== undefined && !validSignalModes.includes(e.signalMode as string)) {
-        throw new Error(`Level ${source}: entities[${i}] lever signalMode must be one of ${validSignalModes.join(', ')}`);
-      }
-      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] lever signalDuration must be a number`);
-      }
-    }
-
-    if (e.type === 'pressure_plate') {
-      if (!Array.isArray(e.targets)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate must have a targets array`);
-      }
-      for (const t of e.targets as string[]) {
-        if (typeof t !== 'string' || t === '') {
-          throw new Error(`Level ${source}: entities[${i}] pressure_plate targets must contain non-empty strings`);
-        }
-        if (!entityIds.has(t)) {
-          throw new Error(`Level ${source}: entities[${i}] pressure_plate target "${t}" must reference an existing entity id`);
-        }
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate must be on a walkable cell`);
-      }
-      const validPlateSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
-      if (e.signalMode !== undefined && !validPlateSignalModes.includes(e.signalMode as string)) {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalMode must be one of ${validPlateSignalModes.join(', ')}`);
-      }
-      if (e.signalDuration !== undefined && typeof e.signalDuration !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] pressure_plate signalDuration must be a number`);
-      }
-    }
-
-    if (e.type === 'trigger') {
-      if (!Array.isArray(e.targets)) {
-        throw new Error(`Level ${source}: entities[${i}] trigger must have a targets array`);
-      }
-      for (const t of e.targets as string[]) {
-        if (typeof t !== 'string' || t === '') {
-          throw new Error(`Level ${source}: entities[${i}] trigger targets must contain non-empty strings`);
-        }
-        if (!entityIds.has(t)) {
-          throw new Error(`Level ${source}: entities[${i}] trigger target "${t}" must reference an existing entity id`);
-        }
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] trigger must be on a walkable cell`);
-      }
-      const validTriggerSignalModes = ['toggle', 'momentary', 'one_shot', 'timed'];
-      if (e.signalMode !== undefined && !validTriggerSignalModes.includes(e.signalMode as string)) {
-        throw new Error(`Level ${source}: entities[${i}] trigger signalMode must be one of ${validTriggerSignalModes.join(', ')}`);
-      }
-    }
-
-    if (e.type === 'tripwire') {
-      if (!Array.isArray(e.targets)) {
-        throw new Error(`Level ${source}: entities[${i}] tripwire must have a targets array`);
-      }
-      for (const t of e.targets as string[]) {
-        if (typeof t !== 'string' || t === '') {
-          throw new Error(`Level ${source}: entities[${i}] tripwire targets must contain non-empty strings`);
-        }
-        if (!entityIds.has(t)) {
-          throw new Error(`Level ${source}: entities[${i}] tripwire target "${t}" must reference an existing entity id`);
-        }
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] tripwire must be on a walkable cell`);
-      }
-      if (e.visibilityThreshold !== undefined && typeof e.visibilityThreshold !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] tripwire visibilityThreshold must be a number`);
-      }
-      if (e.orientation !== undefined && e.orientation !== 'EW' && e.orientation !== 'NS') {
-        throw new Error(`Level ${source}: entities[${i}] tripwire orientation must be "EW" or "NS"`);
-      }
-    }
-
-    if (e.type === 'gate') {
-      if (!Array.isArray(e.targets)) {
-        throw new Error(`Level ${source}: entities[${i}] gate must have a targets array`);
-      }
-      for (const t of e.targets as string[]) {
-        if (typeof t !== 'string' || t === '') {
-          throw new Error(`Level ${source}: entities[${i}] gate targets must contain non-empty strings`);
-        }
-        if (!entityIds.has(t)) {
-          throw new Error(`Level ${source}: entities[${i}] gate target "${t}" must reference an existing entity id`);
-        }
-      }
-      const validGateTypes = ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'];
-      if (!validGateTypes.includes(e.gateType as string)) {
-        throw new Error(`Level ${source}: entities[${i}] gate must have a valid gateType (${validGateTypes.join(', ')})`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] gate must be on a walkable cell`);
-      }
-      if (e.delay !== undefined && typeof e.delay !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] gate delay must be a number`);
-      }
-      if (e.interval !== undefined && typeof e.interval !== 'number') {
-        throw new Error(`Level ${source}: entities[${i}] gate interval must be a number`);
-      }
-    }
-
-    if (e.type === 'enemy') {
-      if (typeof e.enemyType !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] enemy must have a string enemyType`);
-      }
-      if (!enemyDatabase.getEnemy(e.enemyType as string)) {
-        throw new Error(`Level ${source}: entities[${i}] enemy has unknown enemyType "${e.enemyType}"`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] enemy must be on a walkable cell`);
-      }
-    }
-
-    if (e.type === 'torch_sconce') {
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] torch_sconce must be on a walkable cell`);
-      }
-      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
-        throw new Error(`Level ${source}: entities[${i}] torch_sconce wall must be N, S, E, or W`);
-      }
-    }
-
-    if (e.type === 'equipment') {
-      if (typeof e.itemId !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] equipment must have a string itemId`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] equipment must be on a walkable cell`);
-      }
-    }
-
-    if (e.type === 'consumable') {
-      if (typeof e.itemId !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] consumable must have a string itemId`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] consumable must be on a walkable cell`);
-      }
-    }
-
-    if (e.type === 'stairs') {
-      if (e.direction !== 'up' && e.direction !== 'down') {
-        throw new Error(`Level ${source}: entities[${i}] stairs must have direction "up" or "down"`);
-      }
-      const VALID_FACINGS = ['N', 'S', 'E', 'W'];
-      if (typeof e.facing !== 'string' || !VALID_FACINGS.includes(e.facing as string)) {
-        throw new Error(`Level ${source}: entities[${i}] stairs must have facing "N", "S", "E", or "W"`);
-      }
-      if (!walkableChars.has(cellAtEntity)) {
-        throw new Error(`Level ${source}: entities[${i}] stairs must be on a walkable cell, found '${cellAtEntity}'`);
-      }
-      if (typeof e.target !== 'string') {
-        throw new Error(`Level ${source}: entities[${i}] stairs must have a string target (paired stair entity ID)`);
-      }
-    }
+    validEntities.push(e);
   }
+
+  // Replace the entities array with only valid ones
+  obj.entities = validEntities as Entity[];
 
   // environment (optional)
   if (obj.environment !== undefined) {
