@@ -1,19 +1,7 @@
 // Startup asset checker — verifies all referenced PNG files exist.
 
 import { itemDatabase } from './itemDatabase';
-
-/** All enemy sprite paths (must match SPRITE_PATHS in enemyRenderer.ts). */
-const ENEMY_SPRITE_PATHS = [
-  '/sprites/rat.png',
-  '/sprites/skeleton.png',
-  '/sprites/orc.png',
-  '/sprites/goblin.png',
-  '/sprites/giant_bat.png',
-  '/sprites/spider.png',
-  '/sprites/kobold.png',
-  '/sprites/zombie.png',
-  '/sprites/troll.png',
-];
+import { enemyDatabase } from '../enemies/enemyDatabase';
 
 /**
  * Check all referenced PNG assets exist on the server.
@@ -23,8 +11,8 @@ export async function checkAssets(): Promise<void> {
   const paths = new Set<string>();
 
   // Enemy sprites
-  for (const p of ENEMY_SPRITE_PATHS) {
-    paths.add(p);
+  for (const def of enemyDatabase.getAllEnemies()) {
+    paths.add(def.sprite.path);
   }
 
   // Item sprites (derived from item database icons)

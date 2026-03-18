@@ -4,6 +4,7 @@ import type { GameState } from '../core/gameState';
 import { doorKey } from '../core/gameState';
 import { findPath, manhattanDistance } from './pathfinding';
 import { isWalkable } from '../core/grid';
+import { enemyDatabase } from './enemyDatabase';
 
 export type EnemyActionType = 'idle' | 'move' | 'attack' | 'regen';
 
@@ -50,24 +51,25 @@ export function updateEnemies(
 
     const dist = manhattanDistance(enemy.col, enemy.row, playerCol, playerRow);
 
-    // --- Troll HP regen (independent of movement timer) ---
-    if (enemy.type === 'troll' && enemy.regenTimer !== undefined && enemy.regenPauseTimer !== undefined) {
+    // --- HP regen behavior (independent of movement timer) ---
+    const regenBehavior = enemyDatabase.getBehavior(enemy.type, 'regen');
+    if (regenBehavior && enemy.regenTimer !== undefined && enemy.regenPauseTimer !== undefined) {
       if (enemy.regenPauseTimer > 0) {
         enemy.regenPauseTimer = Math.max(0, enemy.regenPauseTimer - delta);
       } else if (enemy.hp < enemy.maxHp) {
         enemy.regenTimer += delta;
-        if (enemy.regenTimer >= 1) {
-          enemy.regenTimer -= 1;
-          enemy.hp = Math.min(enemy.hp + 7, enemy.maxHp);
+        const tickInterval = regenBehavior.params.tickInterval;
+        if (enemy.regenTimer >= tickInterval) {
+          enemy.regenTimer -= tickInterval;
+          enemy.hp = Math.min(enemy.hp + regenBehavior.params.hpPerTick, enemy.maxHp);
           actions.push({ enemyKey: key, type: 'regen', fromCol: enemy.col, fromRow: enemy.row });
         }
       }
     }
 
-    // --- Kobold flee state transitions ---
-    // Switch to flee as soon as HP drops below 30%, regardless of current state.
-    // The flee movement handler will fall back to 'attack' if actually cornered.
-    if (enemy.type === 'kobold' && enemy.hp < enemy.maxHp * 0.3 && enemy.aiState !== 'flee') {
+    // --- Flee behavior state transitions ---
+    const fleeBehavior = enemyDatabase.getBehavior(enemy.type, 'flee');
+    if (fleeBehavior && enemy.hp < enemy.maxHp * fleeBehavior.params.hpThreshold && enemy.aiState !== 'flee') {
       enemy.aiState = 'flee';
     }
 
@@ -81,13 +83,15 @@ export function updateEnemies(
     if (enemy.aiState === 'chase' && dist <= 1) {
       enemy.aiState = 'attack';
     } else if (enemy.aiState === 'attack' && dist > 1) {
-      enemy.aiState = enemy.type === 'kobold' && enemy.hp < enemy.maxHp * 0.3
+      enemy.aiState = fleeBehavior && enemy.hp < enemy.maxHp * fleeBehavior.params.hpThreshold
         ? 'flee'
         : 'chase';
     }
 
-    // Flee at double speed; all other states use normal interval
-    const effectiveInterval = enemy.aiState === 'flee' ? enemy.moveInterval / 2 : enemy.moveInterval;
+    // Flee at multiplied speed; all other states use normal interval
+    const effectiveInterval = enemy.aiState === 'flee' && fleeBehavior
+      ? enemy.moveInterval / fleeBehavior.params.speedMultiplier
+      : enemy.moveInterval;
 
     // Accumulate timer
     enemy.moveTimer += delta;
@@ -104,7 +108,7 @@ export function updateEnemies(
       continue;
     }
 
-    // --- Flee movement (kobold) ---
+    // --- Flee movement ---
     if (enemy.aiState === 'flee') {
       const isPassable = (col: number, row: number) =>
         !occupied.has(doorKey(col, row)) &&
@@ -169,9 +173,10 @@ export function updateEnemies(
       if (path && path.length > 1) {
         let step = path[0];
 
-        // Giant bat: 30% chance of erratic fluttery movement
-        if (enemy.type === 'giant_bat' && Math.random() < 0.3) {
-          const isPassableForBat = (col: number, row: number) =>
+        // Erratic movement behavior
+        const erraticBehavior = enemyDatabase.getBehavior(enemy.type, 'erratic');
+        if (erraticBehavior && Math.random() < erraticBehavior.params.chance) {
+          const isPassableForErratic = (col: number, row: number) =>
             !occupied.has(doorKey(col, row)) &&
             isWalkable(grid, col, row, walkable, isDoorOpen);
 
@@ -179,7 +184,7 @@ export function updateEnemies(
           for (const [dc, dr] of CARDINAL_DIRS) {
             const nc = enemy.col + dc;
             const nr = enemy.row + dr;
-            if (isPassableForBat(nc, nr)) {
+            if (isPassableForErratic(nc, nr)) {
               candidates.push({ col: nc, row: nr });
             }
           }

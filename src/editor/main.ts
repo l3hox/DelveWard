@@ -10,12 +10,14 @@ import {
   isDevServer, listServerFiles, loadFromServer, saveToServer,
 } from './io';
 import { itemDatabase } from '../core/itemDatabase';
+import { enemyDatabase } from '../enemies/enemyDatabase';
 import type { Dungeon } from '../core/types';
 
 const app = new EditorApp();
 
-// Load item database eagerly for item preview (default on)
+// Load databases eagerly for item preview and enemy type list
 itemDatabase.load().catch(() => { /* non-fatal */ });
+enemyDatabase.load().catch(() => { /* non-fatal */ });
 
 const canvas = document.getElementById('editor-canvas') as HTMLCanvasElement;
 const container = document.getElementById('canvas-container') as HTMLElement;

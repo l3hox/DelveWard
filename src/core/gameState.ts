@@ -2,7 +2,8 @@ import type { Entity } from './types';
 import type { Facing } from './grid';
 import type { DropsOverride } from './lootTable';
 import { FACING_DELTA } from './grid';
-import { createEnemyInstance, ENEMY_DEFS } from '../enemies/enemyTypes';
+import { createEnemyInstance } from '../enemies/enemyTypes';
+import { enemyDatabase } from '../enemies/enemyDatabase';
 import type { EnemyInstance } from '../enemies/enemyTypes';
 import { EntityRegistry } from './entities';
 import type { ItemEntity, ItemLocation } from './entities';
@@ -242,7 +243,7 @@ export class GameState {
         });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
-        if (ENEMY_DEFS[enemyType]) {
+        if (enemyDatabase.getEnemy(enemyType)) {
           const instance = createEnemyInstance(e.col, e.row, enemyType);
           if (e.drops) {
             instance.drops = e.drops as DropsOverride;
@@ -527,9 +528,9 @@ export class GameState {
     const enemy = this.getEnemy(col, row);
     if (!enemy) return false;
     enemy.hp -= amount;
-    // Pause troll regen on hit
+    // Pause regen on hit
     if (enemy.regenPauseTimer !== undefined) {
-      enemy.regenPauseTimer = 3;
+      enemy.regenPauseTimer = enemyDatabase.getBehavior(enemy.type, 'regen')?.params.pauseOnDamage ?? 3;
     }
     if (enemy.hp <= 0) {
       this.enemies.delete(doorKey(col, row));

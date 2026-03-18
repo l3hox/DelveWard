@@ -250,6 +250,16 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Centralized `validate()` on EditorApp — duplicate charDef detection, export gated on zero errors
   - Refactored `loadLevel()` to use extracted `rebuildDerivedState()`
 
+- [x] **Enemy Database** — Data-driven enemy definitions:
+  - All 9 enemy types extracted from hardcoded `ENEMY_DEFS` to `public/data/enemies.json`
+  - `EnemyDatabase` class (`src/enemies/enemyDatabase.ts`) — mirrors `ItemDatabase` pattern with `load()`, `getEnemy()`, `getAllEnemies()`, `getAllEnemyIds()`, `hasBehavior()`, `getBehavior()`
+  - Sprite data (path, size, yOffset) co-located in each enemy definition — removed `SPRITE_SIZES`, `SPRITE_PATHS`, `SPRITE_Y_OFFSETS` from `enemyRenderer.ts`
+  - AI behaviors as typed `{ type, params }` arrays: `regen` (troll), `flee` (kobold), `erratic` (giant_bat) — replaces hardcoded type-name checks in `enemyAI.ts`
+  - `EnemyDef` interface and re-export moved from `enemyTypes.ts` to `enemyDatabase.ts`
+  - 12 consumer files updated: `enemyTypes.ts`, `enemyAI.ts`, `enemyRenderer.ts`, `main.ts`, `gameState.ts`, `assetCheck.ts`, `levelLoader.ts`, `editor/main.ts`, `editor/Inspector.ts`
+  - 3 test files updated: `enemyTypes.test.ts` (rewritten), `enemyAI.test.ts` (mock), `combat.test.ts` (mock)
+  - 541 tests passing
+
 - [x] **Particle Effects** — Atmosphere & visual polish:
   - Dust motes: warm-tinted particles floating near ceiling, spawn around player, per-level toggle (`dustMotes`, default true)
   - Sconce embers: orange sparks rising from lit sconce flame meshes, additive blending

@@ -1,6 +1,6 @@
 import type { Entity } from '../core/types';
 import type { EditorApp } from './EditorApp';
-import { ENEMY_DEFS } from '../enemies/enemyTypes';
+import { enemyDatabase } from '../enemies/enemyDatabase';
 import { itemDatabase, type ItemDef } from '../core/itemDatabase';
 import { getItemImage } from '../rendering/itemSprites';
 
@@ -177,9 +177,9 @@ export class Inspector {
         break;
 
       case 'enemy': {
-        const enemyType = (entity.enemyType as string) ?? Object.keys(ENEMY_DEFS)[0] ?? '';
+        const enemyType = (entity.enemyType as string) ?? enemyDatabase.getAllEnemyIds()[0] ?? '';
         this.addEnemyTypeDropdown(entity, enemyType);
-        const def = ENEMY_DEFS[enemyType];
+        const def = enemyDatabase.getEnemy(enemyType);
         if (def) {
           this.addEnemyDetails(def);
         }
@@ -393,7 +393,7 @@ export class Inspector {
   }
 
   private addEnemyTypeDropdown(entity: Entity, currentType: string): void {
-    const types = Object.keys(ENEMY_DEFS);
+    const types = enemyDatabase.getAllEnemyIds();
 
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field';
@@ -487,11 +487,11 @@ export class Inspector {
     return canvas;
   }
 
-  private addEnemyDetails(def: import('../enemies/enemyTypes').EnemyDef): void {
+  private addEnemyDetails(def: import('../enemies/enemyDatabase').EnemyDef): void {
     const section = document.createElement('div');
     section.className = 'item-details';
 
-    this.addSpritePreview(section, `/sprites/${def.type}.png`, 1);
+    this.addSpritePreview(section, def.sprite.path, 1);
 
     this.addReadonlyField(section, 'hp', String(def.maxHp));
     this.addReadonlyField(section, 'atk / def', `${def.atk} / ${def.def}`);

@@ -2,36 +2,7 @@ import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
 import { createNeutralLitMaterial } from './billboardMaterial';
-
-export const SPRITE_SIZES: Record<string, number> = {
-  rat: 1.2,
-  skeleton: 2.0,
-  orc: 2.0,
-  giant_bat: 1.4,
-  goblin: 1.6,
-  spider: 1.8,
-  kobold: 1.6,
-  zombie: 2.0,
-  troll: 2.4,
-};
-export const DEFAULT_SPRITE_SIZE = 1.2;
-
-/** Extra vertical offset — lifts sprite above the default floor-anchored position. */
-const SPRITE_Y_OFFSETS: Record<string, number> = {
-  giant_bat: 1.0,
-};
-
-const SPRITE_PATHS: Record<string, string> = {
-  rat: '/sprites/rat.png',
-  skeleton: '/sprites/skeleton.png',
-  orc: '/sprites/orc.png',
-  goblin: '/sprites/goblin.png',
-  giant_bat: '/sprites/giant_bat.png',
-  spider: '/sprites/spider.png',
-  kobold: '/sprites/kobold.png',
-  zombie: '/sprites/zombie.png',
-  troll: '/sprites/troll.png',
-};
+import { enemyDatabase, DEFAULT_SPRITE_SIZE } from '../enemies/enemyDatabase';
 
 const loader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
@@ -39,7 +10,7 @@ const textureCache = new Map<string, THREE.Texture>();
 function getEnemyTexture(type: string): THREE.Texture {
   let tex = textureCache.get(type);
   if (!tex) {
-    const path = SPRITE_PATHS[type] ?? SPRITE_PATHS['skeleton'];
+    const path = enemyDatabase.getEnemy(type)?.sprite.path ?? '/sprites/skeleton.png';
     tex = loader.load(path);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
@@ -51,12 +22,12 @@ function getEnemyTexture(type: string): THREE.Texture {
 /** Preload all known enemy textures so sprites appear immediately on scene build. */
 export async function preloadEnemyTextures(): Promise<void> {
   await Promise.all(
-    Object.entries(SPRITE_PATHS).map(async ([type, path]) => {
-      if (textureCache.has(type)) return;
-      const tex = await loader.loadAsync(path);
+    enemyDatabase.getAllEnemies().map(async (def) => {
+      if (textureCache.has(def.id)) return;
+      const tex = await loader.loadAsync(def.sprite.path);
       tex.magFilter = THREE.NearestFilter;
       tex.minFilter = THREE.NearestFilter;
-      textureCache.set(type, tex);
+      textureCache.set(def.id, tex);
     })
   );
 }
@@ -71,7 +42,8 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
   const meshMap = new Map<string, THREE.Mesh>();
 
   for (const [mapKey, enemy] of gameState.enemies) {
-    const size = SPRITE_SIZES[enemy.type] ?? DEFAULT_SPRITE_SIZE;
+    const def = enemyDatabase.getEnemy(enemy.type);
+    const size = def?.sprite.size ?? DEFAULT_SPRITE_SIZE;
     const geo = new THREE.PlaneGeometry(size, size);
     const tex = getEnemyTexture(enemy.type);
     const mat = createNeutralLitMaterial(tex);
@@ -80,7 +52,7 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
     const cx = enemy.col * CELL_SIZE + CELL_SIZE / 2;
     const cz = enemy.row * CELL_SIZE + CELL_SIZE / 2;
     // Place sprite so bottom edge sits at floor level (PlaneGeometry is center-anchored)
-    const yOffset = SPRITE_Y_OFFSETS[enemy.type] ?? 0;
+    const yOffset = def?.sprite.yOffset ?? 0;
     mesh.position.set(cx, size * 0.5 + yOffset, cz);
 
     group.add(mesh);

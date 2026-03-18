@@ -1,8 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { updateEnemies } from './enemyAI';
 import { GameState, doorKey } from '../core/gameState';
 import { WALKABLE_CELLS } from '../core/grid';
 import type { Entity } from '../core/types';
+
+vi.mock('./enemyDatabase', () => {
+  const enemies: Record<string, object> = {
+    rat: { id: 'rat', name: 'Rat', maxHp: 8, atk: 2, def: 0, aggroRange: 3, moveInterval: 0.6, blocksMovement: true, xp: 10, sprite: { path: '/sprites/rat.png', size: 1.2 }, behaviors: [] },
+    skeleton: { id: 'skeleton', name: 'Skeleton', maxHp: 20, atk: 3, def: 1, aggroRange: 4, moveInterval: 1.0, blocksMovement: true, xp: 25, sprite: { path: '/sprites/skeleton.png', size: 2.0 }, behaviors: [] },
+    orc: { id: 'orc', name: 'Orc', maxHp: 40, atk: 5, def: 2, aggroRange: 5, moveInterval: 1.4, blocksMovement: true, xp: 50, sprite: { path: '/sprites/orc.png', size: 2.0 }, behaviors: [] },
+  };
+  return {
+    enemyDatabase: {
+      getEnemy: (id: string) => (enemies as Record<string, unknown>)[id],
+      getAllEnemies: () => Object.values(enemies),
+      getAllEnemyIds: () => Object.keys(enemies),
+      isLoaded: () => true,
+      hasBehavior: (_id: string, _type: string) => false,
+      getBehavior: () => undefined,
+    },
+    DEFAULT_SPRITE_SIZE: 1.2,
+  };
+});
 
 const grid = [
   '#######',

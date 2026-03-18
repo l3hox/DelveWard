@@ -12,14 +12,14 @@ import { buildLeverMeshes } from './rendering/leverRenderer';
 import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildForestMeshes, updateForestBillboards, type ForestMeshes } from './rendering/forestRenderer';
-import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, SPRITE_SIZES, DEFAULT_SPRITE_SIZE } from './rendering/enemyRenderer';
+import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
 import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
 import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
 import { preloadItemSprites } from './rendering/itemSprites';
 import { loadLootTables, rollLoot } from './core/lootTable';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
-import { ENEMY_DEFS } from './enemies/enemyTypes';
+import { enemyDatabase, DEFAULT_SPRITE_SIZE } from './enemies/enemyDatabase';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
 import type { CombatResult } from './core/combat';
 import { LeverAnimator } from './rendering/leverAnimator';
@@ -160,7 +160,7 @@ function buildLevelScene(
   for (const [key, enemy] of gameState.enemies) {
     const mesh = enemyMeshes.meshMap.get(key);
     if (mesh) {
-      const spriteHeight = SPRITE_SIZES[enemy.type] ?? DEFAULT_SPRITE_SIZE;
+      const spriteHeight = enemyDatabase.getEnemy(enemy.type)?.sprite.size ?? DEFAULT_SPRITE_SIZE;
       healthBarManager.create(key, mesh, enemy.maxHp, spriteHeight);
     }
   }
@@ -282,7 +282,8 @@ async function init(): Promise<void> {
   let debugFullbright = false;
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
-  // --- Item database + enemy textures (preload before scene build so sprites appear immediately) ---
+  // --- Databases + enemy textures (preload before scene build so sprites appear immediately) ---
+  await enemyDatabase.load();
   await Promise.all([itemDatabase.load(), preloadEnemyTextures(), loadLootTables()]);
   // Preload item sprites (needs item DB loaded first for icon names)
   const allIcons = itemDatabase.getAllItems().map((item) => item.icon);
@@ -683,7 +684,7 @@ async function init(): Promise<void> {
                 ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
                 // Award XP for the kill
                 if (result.enemyType) {
-                  const enemyDef = ENEMY_DEFS[result.enemyType];
+                  const enemyDef = enemyDatabase.getEnemy(result.enemyType);
                   if (enemyDef) {
                     const levelled = gameState.addXp(enemyDef.xp);
                     if (levelled) {

@@ -2,7 +2,7 @@ import type { DungeonLevel, Dungeon, Entity } from '../core/types';
 import type { Facing } from '../core/grid';
 import { WALKABLE_CELLS } from '../core/grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from '../core/textureNames';
-import { ENEMY_DEFS } from '../enemies/enemyTypes';
+import { enemyDatabase } from '../enemies/enemyDatabase';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const BUILTIN_CHARS = new Set(['.', '#', ' ']);
@@ -269,7 +269,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       if (typeof e.enemyType !== 'string') {
         throw new Error(`Level ${source}: entities[${i}] enemy must have a string enemyType`);
       }
-      if (!ENEMY_DEFS[e.enemyType as string]) {
+      if (!enemyDatabase.getEnemy(e.enemyType as string)) {
         throw new Error(`Level ${source}: entities[${i}] enemy has unknown enemyType "${e.enemyType}"`);
       }
       if (!walkableChars.has(cellAtEntity)) {

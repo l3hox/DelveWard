@@ -9,6 +9,23 @@ import { PlayerState } from './grid';
 import type { Facing } from './grid';
 import type { WeaponSubtype } from './itemDatabase';
 
+vi.mock('../enemies/enemyDatabase', () => {
+  const enemies: Record<string, object> = {
+    rat: { id: 'rat', name: 'Rat', maxHp: 8, atk: 2, def: 0, aggroRange: 3, moveInterval: 0.6, blocksMovement: true, xp: 10, sprite: { path: '/sprites/rat.png', size: 1.2 }, behaviors: [] },
+  };
+  return {
+    enemyDatabase: {
+      getEnemy: (id: string) => (enemies as Record<string, unknown>)[id],
+      getAllEnemies: () => Object.values(enemies),
+      getAllEnemyIds: () => Object.keys(enemies),
+      isLoaded: () => true,
+      hasBehavior: () => false,
+      getBehavior: () => undefined,
+    },
+    DEFAULT_SPRITE_SIZE: 1.2,
+  };
+});
+
 vi.mock('./itemDatabase', () => ({
   itemDatabase: {
     isLoaded: () => true,

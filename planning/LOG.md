@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-18 — Enemy Database (Data-Driven Enemy Definitions)
+
+**Goal**: Move all hardcoded enemy definitions to a JSON database, enabling future editor-based enemy creation/editing. Prerequisite for items/monsters editor.
+
+**Key decisions**:
+- **Follow `ItemDatabase` pattern exactly** — `EnemyDatabase` class with `load()` → fetch → Map, singleton export. Consistent API surface.
+- **Behaviors as typed params** — instead of type-name checks (`enemy.type === 'troll'`), behaviors are arrays of `{ type, params }` objects. Three behavior types: `regen` (hpPerTick, tickInterval, pauseOnDamage), `flee` (hpThreshold, speedMultiplier), `erratic` (chance). AI code uses `hasBehavior()`/`getBehavior()` lookups.
+- **Sprite data co-located with enemy** — `sprite: { path, size?, yOffset? }` in each enemy definition. Eliminates the 3 separate renderer lookup maps (`SPRITE_SIZES`, `SPRITE_PATHS`, `SPRITE_Y_OFFSETS`).
+- **Load order** — `enemyDatabase.load()` must complete before `preloadEnemyTextures()` (which iterates the database for paths). Item database and loot tables can still load in parallel after.
+- **Re-export `EnemyDef`** — `enemyTypes.ts` re-exports the type from `enemyDatabase.ts` for backward compatibility of import paths.
+- **`EnemyDef.type` → `EnemyDef.id`** — the old `EnemyDef` had a `type` field that duplicated the map key. The new interface uses `id` (matching ItemDatabase convention). `createEnemyInstance` maps `def.id` to `instance.type`.
+
+**Files**: `public/data/enemies.json` (new, 9 enemies), `src/enemies/enemyDatabase.ts` (new, EnemyDatabase class), `src/enemies/enemyTypes.ts` (removed ENEMY_DEFS/EnemyDef, uses database), `src/enemies/enemyAI.ts` (behavior-driven lookups), `src/rendering/enemyRenderer.ts` (uses database), `src/main.ts`, `src/core/gameState.ts`, `src/core/assetCheck.ts`, `src/level/levelLoader.ts`, `src/editor/main.ts`, `src/editor/Inspector.ts`, `src/enemies/enemyTypes.test.ts` (rewritten), `src/enemies/enemyAI.test.ts` (mock added), `src/core/combat.test.ts` (mock added).
+
+---
+
 ## 2026-03-18 — Editor Direct File Save
 
 **Goal**: Eliminate the browser-download friction loop when iterating on levels. Let the editor read/write JSON files directly to `public/levels/` during dev.
