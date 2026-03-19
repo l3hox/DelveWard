@@ -708,8 +708,17 @@ async function init(): Promise<void> {
   gameState.revealAround(ps.col, ps.row, ps.facing, ls.level.grid);
 
   // --- Character creation + GPU warmup (concurrent) ---
-  // Level scene is built underneath; character creation overlays the HUD canvas.
-  // GPU shader compilation runs in the background, yielding between passes.
+  // Show character creation FIRST so the browser can paint it,
+  // then start shader compilation in the background.
+  const hudCanvas = hud.getCanvas();
+  const charCreationDone = new Promise<void>((resolve) => {
+    const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
+      gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
+      resolve();
+    });
+    charCreation.show();
+  });
+
   const loadingEl = document.createElement('div');
   loadingEl.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:13px;z-index:1000;color:#666;';
   loadingEl.innerHTML = 'Loading<span style="display:inline-block;overflow:hidden;vertical-align:bottom;width:0;animation:dw-dots 1.5s steps(3,end) infinite">...</span>';
@@ -718,21 +727,15 @@ async function init(): Promise<void> {
   document.head.appendChild(dotStyle);
   document.body.appendChild(loadingEl);
 
-  const warmupPromise = warmUpGPUShaders(renderer, scene, camera).then(() => {
+  // Yield to let the browser paint the character creation screen + loading indicator
+  // before the first blocking renderer.compile() call.
+  await new Promise(r => requestAnimationFrame(r));
+
+  const warmupDone = warmUpGPUShaders(renderer, scene, camera).then(() => {
     loadingEl.textContent = 'Loaded';
   });
 
-  const hudCanvas = hud.getCanvas();
-  await Promise.all([
-    warmupPromise,
-    new Promise<void>((resolve) => {
-      const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
-        gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
-        resolve();
-      });
-      charCreation.show();
-    }),
-  ]);
+  await Promise.all([charCreationDone, warmupDone]);
 
   loadingEl.remove();
   dotStyle.remove();

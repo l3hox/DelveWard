@@ -338,7 +338,7 @@ export async function warmUpGPUShaders(
     tempGroup.add(light);
     renderer.compile(scene, camera);
     onProgress?.(i + 2, total);
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => requestAnimationFrame(r));
   }
 
   scene.remove(tempGroup);
