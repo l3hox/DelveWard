@@ -19,7 +19,7 @@ function getSprite(path: string, onLoad?: () => void): HTMLImageElement | null {
 
 const ENTITY_TYPES = [
   'enemy', 'door', 'key', 'lever', 'pressure_plate',
-  'trigger', 'tripwire', 'gate',
+  'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
 ] as const;
 
@@ -696,6 +696,30 @@ export class Toolbar {
         ctx.fillText('G', cx, cy);
         break;
       }
+      case 'trap_launcher': {
+        // Wall-mounted body against top edge, short arrow pointing down
+        const tlBodyW = r * 1.4;
+        const tlBodyH = r * 0.5;
+        const tlArrowLen = r * 0.6;
+        const tlArrowW = r * 0.5;
+        ctx.fillStyle = '#884444';
+        ctx.strokeStyle = '#442222';
+        ctx.lineWidth = 1;
+        // Body against top
+        const tlY = cy - r;
+        ctx.fillRect(cx - tlBodyW / 2, tlY, tlBodyW, tlBodyH);
+        ctx.strokeRect(cx - tlBodyW / 2, tlY, tlBodyW, tlBodyH);
+        // Arrow
+        ctx.beginPath();
+        ctx.moveTo(cx - tlArrowW, tlY + tlBodyH);
+        ctx.lineTo(cx, tlY + tlBodyH + tlArrowLen);
+        ctx.lineTo(cx + tlArrowW, tlY + tlBodyH);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
       case 'stairs': {
         // Steps going down, facing north — matches grid icon style
         const size = cx * 2;

@@ -250,6 +250,37 @@ Gates are wired between sources (levers, triggers) and receivers (doors). Use th
 { "col": 2, "row": 2, "type": "gate", "id": "gate_1", "gateType": "and", "targets": ["door_1"] }
 ```
 
+**Trap launcher** (`type: "trap_launcher"`) — placed on walkable cells. Wall-mounted projectile launcher that fires when it receives a signal. It is a signal receiver — wire it from levers, pressure plates, triggers, or tripwires.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `facing` | string | Yes | Firing direction: `"N"`, `"S"`, `"E"`, or `"W"` |
+| `projectileType` | string | Yes | `"dart"`, `"arrow"`, or `"fireball"` |
+| `reloadTime` | number | Yes | Minimum seconds between shots |
+| `maxRange` | number | No | Maximum range in cells (default from projectile type: dart=20, arrow=15, fireball=10) |
+
+Projectile stats:
+
+| Type | Speed | Damage | Range | Effect |
+|------|-------|--------|-------|--------|
+| dart | 8 cells/s | 3 | 20 | — |
+| arrow | 6 cells/s | 5 | 15 | — |
+| fireball | 4 cells/s | 8 | 10 | burning (M2 stub) |
+
+The launcher fires in the `facing` direction. The projectile spawns one cell in front of the launcher and travels until it hits a wall, closed door, player, enemy, or reaches max range.
+
+For continuous signals (e.g., lever held down), the launcher re-fires every `reloadTime` seconds. For one-shot signals, it fires once.
+
+```json
+{ "id": "launcher_1", "col": 5, "row": 2, "type": "trap_launcher", "facing": "S", "projectileType": "dart", "reloadTime": 3 }
+```
+
+Wire it from a signal source:
+```json
+{ "id": "plate_1", "col": 5, "row": 5, "type": "pressure_plate", "targets": ["launcher_1"], "signalMode": "one_shot" }
+{ "id": "launcher_1", "col": 5, "row": 2, "type": "trap_launcher", "facing": "S", "projectileType": "dart", "reloadTime": 3 }
+```
+
 **Stairs** (`type: "stairs"`) — placed on walkable cells. Triggers automatically when player steps on the cell (not via Space). Stairs come in pairs — each stair references its paired stair on another level by entity ID.
 
 | Field | Type | Required | Description |

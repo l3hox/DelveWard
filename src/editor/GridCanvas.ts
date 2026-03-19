@@ -850,6 +850,55 @@ export class GridCanvas {
         break;
       }
 
+      case 'trap_launcher': {
+        // Wall-mounted launcher: body against the wall, short arrow pointing inward
+        const tlFacing = (entity.facing as string) ?? 'S';
+        // The launcher is mounted on the wall opposite to facing
+        const tlMountWall: Record<string, string> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+        const tlWall = tlMountWall[tlFacing] ?? 'N';
+        const tlBodyW = Math.max(4, Math.min(tw, th) * 0.3);
+        const tlBodyH = Math.max(3, Math.min(tw, th) * 0.12);
+        const tlArrowLen = Math.max(3, Math.min(tw, th) * 0.15);
+        const tlArrowW = Math.max(2, Math.min(tw, th) * 0.12);
+        ctx.fillStyle = '#884444';
+        ctx.strokeStyle = '#442222';
+        ctx.lineWidth = Math.max(1, tlBodyH * 0.25);
+        if (tlWall === 'N' || tlWall === 'S') {
+          // Body bar horizontal against N or S wall
+          const wallY = tlWall === 'N' ? py : py + th - tlBodyH;
+          const bodyX = cx - tlBodyW / 2;
+          ctx.fillRect(bodyX, wallY, tlBodyW, tlBodyH);
+          ctx.strokeRect(bodyX, wallY, tlBodyW, tlBodyH);
+          // Arrow pointing away from wall (into the cell)
+          const tipDir = tlWall === 'N' ? 1 : -1;
+          const baseY = tlWall === 'N' ? wallY + tlBodyH : wallY;
+          ctx.beginPath();
+          ctx.moveTo(cx - tlArrowW, baseY);
+          ctx.lineTo(cx, baseY + tipDir * tlArrowLen);
+          ctx.lineTo(cx + tlArrowW, baseY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          // Body bar vertical against E or W wall
+          const wallX = tlWall === 'W' ? px : px + tw - tlBodyH;
+          const bodyY = cy - tlBodyW / 2;
+          ctx.fillRect(wallX, bodyY, tlBodyH, tlBodyW);
+          ctx.strokeRect(wallX, bodyY, tlBodyH, tlBodyW);
+          // Arrow pointing away from wall
+          const tipDir = tlWall === 'W' ? 1 : -1;
+          const baseX = tlWall === 'W' ? wallX + tlBodyH : wallX;
+          ctx.beginPath();
+          ctx.moveTo(baseX, cy - tlArrowW);
+          ctx.lineTo(baseX + tipDir * tlArrowLen, cy);
+          ctx.lineTo(baseX, cy + tlArrowW);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -1035,9 +1084,14 @@ export class GridCanvas {
         row: hover.row,
         type: eType,
       };
-      // Auto-detect wall orientation for lever/sconce
+      // Auto-detect wall orientation for wall-mounted entities
       if (eType === 'lever' || eType === 'torch_sconce') {
         ghostEntity.wall = this.app.autoDetectWallAt(hover.col, hover.row) ?? 'N';
+      }
+      if (eType === 'trap_launcher') {
+        const wall = this.app.autoDetectWallAt(hover.col, hover.row) ?? 'N';
+        const OPP: Record<string, string> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+        ghostEntity.facing = OPP[wall];
       }
       if (eType === 'tripwire') {
         ghostEntity.orientation = this.isTripwireNS(hover.col, hover.row) ? 'NS' : 'EW';

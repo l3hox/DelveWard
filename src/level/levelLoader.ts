@@ -183,6 +183,14 @@ function validateEntity(
       if (e.interval !== undefined && typeof e.interval !== 'number') return `${pfx} gate interval must be a number`;
       break;
     }
+    case 'trap_launcher': {
+      const w = checkWalkable('trap_launcher'); if (w) return w;
+      if (typeof e.facing !== 'string' || !['N', 'S', 'E', 'W'].includes(e.facing as string)) return `${pfx} trap_launcher must have facing "N", "S", "E", or "W"`;
+      if (typeof e.projectileType !== 'string' || !['dart', 'arrow', 'fireball'].includes(e.projectileType as string)) return `${pfx} trap_launcher must have projectileType "dart", "arrow", or "fireball"`;
+      if (typeof e.reloadTime !== 'number' || (e.reloadTime as number) <= 0) return `${pfx} trap_launcher must have a positive number reloadTime`;
+      if (e.maxRange !== undefined && typeof e.maxRange !== 'number') return `${pfx} trap_launcher maxRange must be a number`;
+      break;
+    }
     case 'enemy': {
       if (typeof e.enemyType !== 'string') return `${pfx} enemy must have a string enemyType`;
       if (!enemyDatabase.getEnemy(e.enemyType as string)) return `${pfx} enemy has unknown enemyType "${e.enemyType}"`;

@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { buildDungeon } from './rendering/dungeon';
 import { Player } from './rendering/player';
 import { loadDungeon } from './level/levelLoader';
-import { buildWalkableSet, getFacingCell } from './core/grid';
+import { buildWalkableSet, getFacingCell, FACING_DELTA } from './core/grid';
 import { GameState, doorKey } from './core/gameState';
+import { ProjectileManager } from './core/projectileManager';
+import type { TrapLauncherInstance } from './core/gameState';
 import { interact } from './level/interaction';
 import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
@@ -41,6 +43,8 @@ import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
 import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
+import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
+import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, type ProjectileMeshes } from './rendering/projectileRenderer';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -85,6 +89,8 @@ interface LevelScene {
   itemMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   consumableMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   forestMeshes: ForestMeshes;
+  trapLauncherMeshes: { group: THREE.Group };
+  projectileMeshes: ProjectileMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
 }
@@ -146,6 +152,12 @@ function buildLevelScene(
   const forestMeshes = buildForestMeshes(level.grid, level.charDefs);
   scene.add(forestMeshes.group);
 
+  const trapLauncherMeshes = buildTrapLauncherMeshes(gameState);
+  scene.add(trapLauncherMeshes.group);
+
+  const projectileMeshes = createProjectileMeshes();
+  scene.add(projectileMeshes.group);
+
   const enemyMeshes = buildEnemyMeshes(gameState);
   scene.add(enemyMeshes.group);
 
@@ -203,6 +215,8 @@ function buildLevelScene(
     sconceMeshes,
     stairMeshes,
     forestMeshes,
+    trapLauncherMeshes,
+    projectileMeshes,
     enemyMeshes,
     enemyAnimator,
     healthBarManager,
@@ -224,6 +238,8 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.sconceMeshes.group,
     ls.stairMeshes.group,
     ls.forestMeshes.group,
+    ls.trapLauncherMeshes.group,
+    ls.projectileMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
@@ -309,6 +325,8 @@ async function init(): Promise<void> {
 
   const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
 
+  const projectileManager = new ProjectileManager();
+
   // --- HUD + Transition ---
   const hud = new HudOverlay();
   hud.attach();
@@ -370,6 +388,7 @@ async function init(): Promise<void> {
       // Reset GameState for current level
       const currentLevel = dungeon.levels.find((l) => l.id === currentLevelId)!;
       gameState.loadNewLevel(currentLevel.entities, currentLevel.grid, currentLevel.id ?? currentLevel.name);
+      projectileManager.clear();
       gameState.hp = gameState.maxHp;
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
@@ -563,6 +582,27 @@ async function init(): Promise<void> {
     gameState.onPlateReset = (col, row) => {
       releasePlate(ls.plateMeshes.meshMap, col, row);
     };
+
+    // Trap launcher → spawn projectile from the launcher's own cell
+    gameState.onLauncherFire = (launcher: TrapLauncherInstance) => {
+      projectileManager.spawn({
+        col: launcher.col,
+        row: launcher.row,
+        direction: launcher.facing,
+        projectileType: launcher.projectileType,
+        source: 'trap',
+        maxRange: launcher.maxRange,
+      });
+    };
+
+    // Projectile hit → apply damage
+    projectileManager.setHitCallback((projectile, _col, _row, hitType) => {
+      if (hitType === 'player') {
+        gameState.hp -= projectile.damage;
+        playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+      }
+      // enemy hit is a stub for M4
+    });
   }
 
   function triggerLevelTransition(stairEntity: Entity): void {
@@ -570,6 +610,7 @@ async function init(): Promise<void> {
 
     // Save current level state
     blockedDoors.clear();
+    projectileManager.clear();
     levelSnapshots.set(currentLevelId, gameState.saveLevelState());
 
     transition.startTransition(() => {
@@ -893,10 +934,21 @@ async function init(): Promise<void> {
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
     gameState.signalManager.tick(delta);
+    gameState.tickTrapLaunchers(delta);
+    projectileManager.update(
+      delta,
+      (col, row) => ls.walkable.has(ls.level.grid[row]?.[col]),
+      gameState.isDoorOpen.bind(gameState),
+      lastPlayerCol, lastPlayerRow,
+      gameState.isEnemyAt.bind(gameState),
+    );
     tickBlockedDoors(delta);
     transition.update(delta);
     damageNumbers.update(delta);
     swordSwing.update(delta);
+
+    // Sync projectile meshes with active projectiles
+    updateProjectileMeshes(ls.projectileMeshes.group, ls.projectileMeshes.meshMap, projectileManager.getAll(), camera);
 
     // Billboard enemy sprites toward camera
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);

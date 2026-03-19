@@ -24,6 +24,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   trigger:        { targets: [], signalMode: 'momentary' },
   tripwire:       { targets: [], visibilityThreshold: 8, orientation: 'EW' },
   gate:           { gateType: 'and', targets: [] },
+  trap_launcher:  { facing: 'S', projectileType: 'dart', reloadTime: 3 },
   torch_sconce:   { wall: 'N' },
   enemy:          { enemyType: 'rat' },
   equipment:      { itemId: '' },
@@ -68,11 +69,11 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door,gate' },
-  pressure_plate: { field: 'targets', validEntityType: 'door,gate' },
-  trigger:        { field: 'targets', validEntityType: 'door,gate' },
-  tripwire:       { field: 'targets', validEntityType: 'door,gate' },
-  gate:           { field: 'targets', validEntityType: 'door,gate' },
+  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
   key:            { field: 'keyId',  validEntityType: 'door' },
   door:           { field: 'keyId',  validEntityType: 'key' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
@@ -618,6 +619,14 @@ export class EditorApp {
       const detected = this.autoDetectWall(col, row);
       if (detected) {
         entity.wall = detected;
+      }
+    }
+    // Trap launcher: auto-detect facing (opposite of the wall it's mounted on)
+    if (type === 'trap_launcher' && this.level) {
+      const detected = this.autoDetectWall(col, row);
+      if (detected) {
+        const OPPOSITE: Record<string, string> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+        entity.facing = OPPOSITE[detected];
       }
     }
     // Copy targets from the previously selected entity of the same type

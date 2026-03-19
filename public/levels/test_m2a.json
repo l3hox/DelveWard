@@ -29,33 +29,14 @@
       },
       "entities": [
         {
-          "col": 5,
-          "row": 3,
-          "type": "door",
-          "id": "door_1",
-          "state": "closed",
-          "gateMode": "xor"
-        },
-        {
           "col": 4,
           "row": 5,
           "type": "lever",
           "id": "lever_1",
-          "targets": [
-            "door_1",
-            "door_2"
-          ],
+          "targets": [],
           "wall": "E",
           "signalMode": "toggle",
           "signalDuration": 3
-        },
-        {
-          "col": 7,
-          "row": 3,
-          "type": "door",
-          "id": "door_2",
-          "state": "closed",
-          "gateMode": "or"
         },
         {
           "col": 3,
@@ -80,10 +61,11 @@
           "type": "lever",
           "id": "lever_2",
           "targets": [
-            "door_1",
-            "door_2"
+            "door_1"
           ],
-          "wall": "E"
+          "wall": "E",
+          "signalMode": "toggle",
+          "signalDuration": 1
         },
         {
           "col": 5,
@@ -102,18 +84,6 @@
           "type": "door",
           "id": "door_4",
           "state": "closed"
-        },
-        {
-          "col": 3,
-          "row": 10,
-          "type": "tripwire",
-          "id": "tripwire_1",
-          "targets": [
-            "door_5"
-          ],
-          "signalMode": "one_shot",
-          "visibilityThreshold": 3,
-          "orientation": "EW"
         },
         {
           "col": 3,
@@ -277,20 +247,75 @@
           "type": "torch_sconce",
           "id": "torch_sconce_17",
           "wall": "W"
+        },
+        {
+          "col": 14,
+          "row": 1,
+          "type": "stairs",
+          "id": "stairs_1",
+          "direction": "down",
+          "facing": "S",
+          "target": "stairs_2"
+        },
+        {
+          "col": 9,
+          "row": 7,
+          "type": "enemy",
+          "id": "enemy_1",
+          "enemyType": "troll"
+        },
+        {
+          "col": 5,
+          "row": 3,
+          "type": "door",
+          "id": "door_1",
+          "state": "closed",
+          "gateMode": "or"
+        },
+        {
+          "col": 4,
+          "row": 3,
+          "type": "trigger",
+          "id": "trigger_2",
+          "targets": [
+            "door_1"
+          ],
+          "signalMode": "toggle",
+          "signalDuration": 1
+        },
+        {
+          "col": 4,
+          "row": 13,
+          "type": "tripwire",
+          "id": "tripwire_2",
+          "targets": [],
+          "visibilityThreshold": 8,
+          "orientation": "NS"
+        },
+        {
+          "col": 3,
+          "row": 10,
+          "type": "tripwire",
+          "id": "tripwire_1",
+          "targets": [
+            "door_5"
+          ],
+          "visibilityThreshold": 8,
+          "orientation": "EW"
         }
       ]
     },
     {
       "id": "level_2",
-      "name": "Untitled",
+      "name": "Level 2",
       "grid": [
         "################",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
+        "#...#....#.....#",
+        "#...#....#.....#",
+        "#........#.....#",
+        "#...#....#.....#",
+        "#...#....#.....#",
+        "#...######.....#",
         "#..............#",
         "#..............#",
         "#..............#",
@@ -306,7 +331,85 @@
         "row": 1,
         "facing": "S"
       },
-      "entities": []
+      "entities": [
+        {
+          "col": 6,
+          "row": 1,
+          "type": "stairs",
+          "id": "stairs_2",
+          "direction": "up",
+          "facing": "S",
+          "target": "stairs_1"
+        },
+        {
+          "col": 5,
+          "row": 5,
+          "type": "lever",
+          "id": "lever_5",
+          "targets": [
+            "door_7"
+          ],
+          "wall": "S"
+        },
+        {
+          "col": 6,
+          "row": 5,
+          "type": "lever",
+          "id": "lever_6",
+          "targets": [
+            "door_7"
+          ],
+          "wall": "S"
+        },
+        {
+          "col": 7,
+          "row": 5,
+          "type": "lever",
+          "id": "lever_7",
+          "targets": [
+            "door_7"
+          ],
+          "wall": "S"
+        },
+        {
+          "col": 8,
+          "row": 5,
+          "type": "lever",
+          "id": "lever_8",
+          "targets": [
+            "door_7"
+          ],
+          "wall": "S"
+        },
+        {
+          "col": 5,
+          "row": 2,
+          "type": "torch_sconce",
+          "id": "torch_sconce_18",
+          "wall": "W"
+        },
+        {
+          "col": 5,
+          "row": 4,
+          "type": "torch_sconce",
+          "id": "torch_sconce_19",
+          "wall": "W"
+        },
+        {
+          "col": 8,
+          "row": 3,
+          "type": "torch_sconce",
+          "id": "torch_sconce_20",
+          "wall": "E"
+        },
+        {
+          "col": 4,
+          "row": 3,
+          "type": "door",
+          "id": "door_7",
+          "state": "closed"
+        }
+      ]
     }
   ]
 }

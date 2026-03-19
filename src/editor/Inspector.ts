@@ -170,7 +170,7 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTargetsArrayField(entity, 'door,gate');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -187,7 +187,7 @@ export class Inspector {
         break;
 
       case 'pressure_plate':
-        this.addTargetsArrayField(entity, 'door,gate');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -229,7 +229,7 @@ export class Inspector {
         break;
 
       case 'trigger':
-        this.addTargetsArrayField(entity, 'door,gate');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -246,7 +246,7 @@ export class Inspector {
         break;
 
       case 'tripwire':
-        this.addTargetsArrayField(entity, 'door,gate');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
           entity.orientation = val;
           this.onEntityChanged?.();
@@ -265,7 +265,7 @@ export class Inspector {
             this.onEntityChanged?.();
             this.refresh();
           });
-        this.addTargetsArrayField(entity, 'door,gate');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         if ((entity.gateType as string) === 'delay') {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;
@@ -278,6 +278,28 @@ export class Inspector {
             this.onEntityChanged?.();
           }, { step: '0.1' });
         }
+        this.addReferencedBySection(entity);
+        break;
+
+      case 'trap_launcher':
+        this.addDropdownField('facing', (entity.facing as string) ?? 'S',
+          ['N', 'S', 'E', 'W'], (val) => {
+            entity.facing = val;
+            this.onEntityChanged?.();
+          });
+        this.addDropdownField('projectileType', (entity.projectileType as string) ?? 'dart',
+          ['dart', 'arrow', 'fireball'], (val) => {
+            entity.projectileType = val;
+            this.onEntityChanged?.();
+          });
+        this.addNumberField('reloadTime', (entity.reloadTime as number) ?? 3, (val) => {
+          entity.reloadTime = val;
+          this.onEntityChanged?.();
+        }, { step: '0.5', min: '0.5' });
+        this.addNumberField('maxRange', (entity.maxRange as number) ?? 20, (val) => {
+          entity.maxRange = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
         this.addReferencedBySection(entity);
         break;
 
@@ -414,7 +436,7 @@ export class Inspector {
     label: string,
     value: number,
     onChange: (val: number) => void,
-    options?: { step?: string },
+    options?: { step?: string; min?: string },
   ): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'inspector-field';
@@ -427,6 +449,7 @@ export class Inspector {
     input.type = 'number';
     input.value = String(value);
     if (options?.step) input.step = options.step;
+    if (options?.min) input.min = options.min;
     input.addEventListener('input', () => {
       this.onBeginTextEdit?.();
       const parsed = parseFloat(input.value);

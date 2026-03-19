@@ -103,6 +103,17 @@ export interface StairInstance {
   facing: Facing;
 }
 
+export interface TrapLauncherInstance {
+  id?: string;
+  col: number;
+  row: number;
+  facing: Facing;              // firing direction
+  projectileType: string;      // 'dart' | 'arrow' | 'fireball'
+  reloadTime: number;          // seconds between shots (minimum interval)
+  reloadTimer: number;         // countdown to next allowed shot
+  maxRange?: number;           // optional range limit
+}
+
 export interface SconceInstance {
   id?: string;
   col: number;
@@ -152,6 +163,7 @@ export interface LevelSnapshot {
   triggers: Map<string, TriggerInstance>;
   tripwires: Map<string, TripwireInstance>;
   gates: Map<string, GateInstance>;
+  trapLaunchers: Map<string, TrapLauncherInstance>;
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
@@ -169,6 +181,7 @@ export class GameState {
   triggers: Map<string, TriggerInstance>;
   tripwires: Map<string, TripwireInstance>;
   gates: Map<string, GateInstance>;
+  trapLaunchers: Map<string, TrapLauncherInstance>;
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
@@ -213,6 +226,7 @@ export class GameState {
     this.triggers = new Map();
     this.tripwires = new Map();
     this.gates = new Map();
+    this.trapLaunchers = new Map();
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
@@ -339,6 +353,17 @@ export class GameState {
           targets,
           delay: e.delay as number | undefined,
           interval: e.interval as number | undefined,
+        });
+      } else if (e.type === 'trap_launcher') {
+        this.trapLaunchers.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          facing: (e.facing as Facing) ?? 'S',
+          projectileType: (e.projectileType as string) ?? 'dart',
+          reloadTime: (e.reloadTime as number) ?? 3,
+          reloadTimer: 0,
+          maxRange: e.maxRange as number | undefined,
         });
       } else if (e.type === 'torch_sconce') {
         const wall = (e.wall as Facing | undefined) ??
@@ -467,14 +492,29 @@ export class GameState {
       }
     }
 
-    // Wire receiver-changed callback to update door state
+    // Register trap launchers as receivers
+    for (const launcher of this.trapLaunchers.values()) {
+      if (launcher.id) {
+        this.signalManager.registerReceiver(launcher.id, 'or');
+      }
+    }
+
+    // Wire receiver-changed callback to update door state and fire trap launchers
     this.signalManager.setReceiverChangedCallback((entityId, active) => {
       const pos = this.resolveEntityPosition(entityId);
       if (!pos) return;
       const door = this.getDoor(pos.col, pos.row);
-      if (!door) return;
-      door.state = active ? 'open' : 'closed';
-      this.onDoorSignalChanged?.(pos.col, pos.row, active);
+      if (door) {
+        door.state = active ? 'open' : 'closed';
+        this.onDoorSignalChanged?.(pos.col, pos.row, active);
+        return;
+      }
+      // Check if this receiver is a trap launcher
+      const launcher = this.trapLaunchers.get(doorKey(pos.col, pos.row));
+      if (launcher && active && launcher.reloadTimer <= 0) {
+        launcher.reloadTimer = launcher.reloadTime;
+        this.onLauncherFire?.(launcher);
+      }
     });
 
     // Wire source-deactivated callback to reset timed sources
@@ -507,6 +547,9 @@ export class GameState {
   /** External callback for pressure plate reset (for mesh animation). */
   onPlateReset: ((col: number, row: number) => void) | null = null;
 
+  /** External callback for trap launcher firing (wire to ProjectileManager). */
+  onLauncherFire: ((launcher: TrapLauncherInstance) => void) | null = null;
+
   private _rebuildEntityIndex(): void {
     this.entityById.clear();
     const register = (inst: { id?: string; col: number; row: number }, type: string) => {
@@ -519,6 +562,7 @@ export class GameState {
     for (const t of this.triggers.values()) register(t, 'trigger');
     for (const tw of this.tripwires.values()) register(tw, 'tripwire');
     for (const g of this.gates.values()) register(g, 'gate');
+    for (const tl of this.trapLaunchers.values()) register(tl, 'trap_launcher');
     for (const s of this.sconces.values()) register(s, 'torch_sconce');
     for (const s of this.stairs.values()) register(s, 'stairs');
   }
@@ -556,6 +600,10 @@ export class GameState {
     for (const [k, v] of this.gates) {
       gates.set(k, { ...v });
     }
+    const trapLaunchers = new Map<string, TrapLauncherInstance>();
+    for (const [k, v] of this.trapLaunchers) {
+      trapLaunchers.set(k, { ...v });
+    }
     const sconces = new Map<string, SconceInstance>();
     for (const [k, v] of this.sconces) {
       sconces.set(k, { ...v });
@@ -572,7 +620,7 @@ export class GameState {
     const registrySnapshot = this.entityRegistry.snapshot();
     const signalState = this.signalManager.saveState();
     return {
-      doors, keys, levers, plates, triggers, tripwires, gates,
+      doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, exploredCells, registrySnapshot,
       signalState,
     };
@@ -606,6 +654,10 @@ export class GameState {
     this.gates = new Map<string, GateInstance>();
     for (const [k, v] of snapshot.gates) {
       this.gates.set(k, { ...v });
+    }
+    this.trapLaunchers = new Map<string, TrapLauncherInstance>();
+    for (const [k, v] of snapshot.trapLaunchers) {
+      this.trapLaunchers.set(k, { ...v });
     }
     this.sconces = new Map<string, SconceInstance>();
     for (const [k, v] of snapshot.sconces) {
@@ -643,6 +695,7 @@ export class GameState {
     this.triggers = new Map();
     this.tripwires = new Map();
     this.gates = new Map();
+    this.trapLaunchers = new Map();
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
@@ -856,6 +909,22 @@ export class GameState {
       this.signalManager.setSourceActive(tripwire.id, true);
     }
     return true;
+  }
+
+  /** Tick reload timers for all trap launchers. Check continuous signals. */
+  tickTrapLaunchers(delta: number): void {
+    for (const launcher of this.trapLaunchers.values()) {
+      if (launcher.reloadTimer > 0) {
+        launcher.reloadTimer = Math.max(0, launcher.reloadTimer - delta);
+      }
+      // Continuous signal: re-fire when reload ready and signal still active
+      if (launcher.id && launcher.reloadTimer <= 0) {
+        if (this.signalManager.isReceiverActive(launcher.id)) {
+          launcher.reloadTimer = launcher.reloadTime;
+          this.onLauncherFire?.(launcher);
+        }
+      }
+    }
   }
 
   getSconce(col: number, row: number): SconceInstance | undefined {
