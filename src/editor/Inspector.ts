@@ -110,7 +110,7 @@ export class Inspector {
           this.onEntityChanged?.();
           this.refresh();
         });
-        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
+        this.addPickableField('key', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
@@ -125,41 +125,23 @@ export class Inspector {
             });
           }
         }
-        {
-          // Also show key peers as references
-          const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'key');
-          if (keyPeers.length > 0) {
-            for (const peer of keyPeers) {
-              const peerItem = document.createElement('div');
-              peerItem.className = 'inspector-ref-item';
-              peerItem.textContent = `key @ (${peer.col}, ${peer.row})`;
-              peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
-              this.attachHoverHighlight(peerItem, peer);
-              this.container.appendChild(peerItem);
-            }
-          }
-        }
+        this.addKeyIdPeerSection(entity, 'key');
         break;
       }
 
       case 'key': {
-        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
+        this.addPickableField('key', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
           entity.keyId = val;
           this.onEntityChanged?.();
-        }, undefined, 'door');
-        const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'door');
+        }, undefined, 'door,chest');
+        const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === 'door' || e.type === 'chest');
         if (keyPeers.length > 0) {
           const unlockHeader = document.createElement('div');
           unlockHeader.className = 'inspector-ref-header';
           unlockHeader.textContent = `Unlocks (${keyPeers.length})`;
           this.container.appendChild(unlockHeader);
           for (const peer of keyPeers) {
-            const peerItem = document.createElement('div');
-            peerItem.className = 'inspector-ref-item';
-            peerItem.textContent = `${peer.type} @ (${peer.col}, ${peer.row})`;
-            peerItem.addEventListener('click', () => this.onRefClicked?.(peer));
-            this.attachHoverHighlight(peerItem, peer);
-            this.container.appendChild(peerItem);
+            this.addKeyIdPeerItem(entity, peer);
           }
         }
         break;
@@ -378,14 +360,19 @@ export class Inspector {
         break;
 
       case 'chest': {
+        this.addDropdownField('facing', (entity.facing as string) ?? 'S', ['N', 'S', 'E', 'W'], (val) => {
+          entity.facing = val;
+          this.onEntityChanged?.();
+        });
         this.addDropdownField('state', (entity.state as string) ?? 'closed', ['closed', 'open', 'locked'], (val) => {
           entity.state = val;
           this.onEntityChanged?.();
         });
-        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
+        this.addPickableField('key', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
         this.addReferencedBySection(entity);
         {
           const refs = this.app.getReferencingEntities(entity);
@@ -396,6 +383,7 @@ export class Inspector {
             });
           }
         }
+        this.addKeyIdPeerSection(entity, 'key');
         break;
       }
 
@@ -524,6 +512,7 @@ export class Inspector {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = value;
+    input.autocomplete = 'off';
     input.addEventListener('input', () => {
       this.onBeginTextEdit?.();
       onChange(input.value);
@@ -587,6 +576,7 @@ export class Inspector {
     input.type = 'text';
     input.style.flex = '1';
     input.value = value;
+    input.autocomplete = 'off';
     input.addEventListener('input', () => {
       this.onBeginTextEdit?.();
       onChange(input.value);
@@ -609,6 +599,46 @@ export class Inspector {
   }
 
   /** Show "Referenced by" section listing entities that target this entity. */
+  private addKeyIdPeerSection(entity: Entity, filterType: string): void {
+    const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === filterType);
+    if (keyPeers.length === 0) return;
+    for (const peer of keyPeers) {
+      this.addKeyIdPeerItem(entity, peer);
+    }
+  }
+
+  private addKeyIdPeerItem(entity: Entity, peer: Entity): void {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '4px';
+    row.style.alignItems = 'center';
+
+    const refItem = document.createElement('span');
+    refItem.className = 'inspector-ref-item';
+    refItem.style.flex = '1';
+    refItem.textContent = `${peer.type} @ (${peer.col}, ${peer.row})`;
+    refItem.addEventListener('click', () => this.onRefClicked?.(peer));
+    this.attachHoverHighlight(refItem, peer);
+    row.appendChild(refItem);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn-pick';
+    removeBtn.textContent = '\u00d7';
+    removeBtn.style.padding = '0 4px';
+    removeBtn.style.minWidth = 'auto';
+    removeBtn.addEventListener('click', () => {
+      this.onBeforeDiscreteChange?.();
+      this.onRefHovered?.(null);
+      (entity as Record<string, unknown>).keyId = '';
+      (peer as Record<string, unknown>).keyId = '';
+      this.onEntityChanged?.();
+      this.refresh();
+    });
+    row.appendChild(removeBtn);
+
+    this.container.appendChild(row);
+  }
+
   private addReferencedBySection(entity: Entity): void {
     const refs = this.app.getReferencingEntities(entity);
     if (refs.length === 0) return;
@@ -641,6 +671,7 @@ export class Inspector {
         removeBtn.style.minWidth = 'auto';
         removeBtn.addEventListener('click', () => {
           this.onBeforeDiscreteChange?.();
+          this.onRefHovered?.(null);
           const idx = targets.indexOf(entity.id!);
           if (idx >= 0) targets.splice(idx, 1);
           this.onEntityChanged?.();
@@ -918,6 +949,13 @@ export class Inspector {
     return canvas;
   }
 
+  private static readonly BEHAVIOR_TOOLTIPS: Record<string, string> = {
+    erratic: 'Moves randomly instead of chasing the player',
+    regen: 'Regenerates HP over time when not recently hit',
+    flee: 'Runs away when HP drops below a threshold',
+    onHit: 'Applies a status effect on successful attack',
+  };
+
   private addEnemyDetails(def: import('../enemies/enemyDatabase').EnemyDef): void {
     const section = document.createElement('div');
     section.className = 'item-details';
@@ -929,6 +967,28 @@ export class Inspector {
     this.addReadonlyField(section, 'aggro range', String(def.aggroRange));
     this.addReadonlyField(section, 'move interval', `${def.moveInterval}s`);
     this.addReadonlyField(section, 'xp', String(def.xp));
+
+    if (def.behaviors.length > 0) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'inspector-field readonly-field';
+      wrapper.style.flexWrap = 'wrap';
+
+      const lbl = document.createElement('label');
+      lbl.textContent = 'behaviors';
+      wrapper.appendChild(lbl);
+
+      const tags = document.createElement('div');
+      tags.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap;';
+      for (const b of def.behaviors) {
+        const tag = document.createElement('span');
+        tag.textContent = b.type;
+        tag.title = Inspector.BEHAVIOR_TOOLTIPS[b.type] ?? b.type;
+        tag.style.cssText = 'background: #2a2a3a; color: #aac; font-size: 10px; padding: 1px 5px; border-radius: 3px; cursor: help;';
+        tags.appendChild(tag);
+      }
+      wrapper.appendChild(tags);
+      section.appendChild(wrapper);
+    }
 
     this.container.appendChild(section);
   }

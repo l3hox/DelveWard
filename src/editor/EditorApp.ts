@@ -33,7 +33,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   breakable_wall: { hp: 30 },
   secret_wall:    { persistent: false },
   block:          {},
-  chest:          { state: 'closed' },
+  chest:          { state: 'closed', facing: 'S' },
   sign:           { wall: 'N', text: '' },
 };
 
@@ -79,8 +79,9 @@ const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
   trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
   tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
   gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
-  key:            { field: 'keyId',  validEntityType: 'door' },
+  key:            { field: 'keyId',  validEntityType: 'door,chest' },
   door:           { field: 'keyId',  validEntityType: 'key' },
+  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
 };
 
@@ -412,7 +413,7 @@ export class EditorApp {
     }
 
     // Signal chain loop detection — DFS with proper cycle detection
-    const SIGNAL_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
+    const SIGNAL_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate', 'chest']);
     const entityMap = new Map<string, Entity>();
     for (const e of level.entities) {
       if (e.id) entityMap.set(e.id, e);
@@ -787,6 +788,10 @@ export class EditorApp {
         if (pm.crossLevel && validTypes.includes('stairs') && this.walkableSet.has(grid[row][col])) {
           return true;
         }
+        // keyId pick from door/chest: accept walkable cells to auto-create a key
+        if (pm.field === 'keyId' && validTypes.includes('key') && this.walkableSet.has(grid[row][col])) {
+          return true;
+        }
         return false;
       }
     }
@@ -838,7 +843,20 @@ export class EditorApp {
       }
     } else {
       // keyId sync: sync field value between source and target entities
-      const targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      let targets = this.getEntitiesAt(col, row).filter(e => e.type === pm.validEntityType);
+      // Auto-create a key entity on empty walkable cell when picking keyId for door/chest
+      if (targets.length === 0 && pm.field === 'keyId' && pm.validEntityType === 'key') {
+        if (this.walkableSet.has(this.level!.grid[row]?.[col])) {
+          const newKey: Entity = {
+            col, row, type: 'key',
+            id: this.generateEntityId('key'),
+            keyId: (pm.entity as Record<string, unknown>)[pm.field] as string || this.generateKeyId(),
+          };
+          this.level!.entities.push(newKey);
+          targets = [newKey];
+          this.selectedEntity = newKey;
+        }
+      }
       if (targets.length === 0) { this.pickMode = null; return false; }
       const target = targets[0];
       const sourceVal = (pm.entity as Record<string, unknown>)[pm.field] as string || '';

@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
+import type { Facing } from '../core/grid';
+
+const FACING_ROT: Record<Facing, number> = {
+  S: 0,
+  W: Math.PI / 2,
+  N: Math.PI,
+  E: -Math.PI / 2,
+};
 
 const CHEST_WIDTH = 0.6;
 const CHEST_DEPTH = 0.4;
@@ -90,11 +98,12 @@ export function buildChestMeshes(gameState: GameState): ChestMeshes {
 
     // Set initial state
     if (chest.state === 'open') {
-      lidPivot.rotation.x = Math.PI / 4; // open
+      lidPivot.rotation.x = -Math.PI / 4; // open upward
     }
 
     chestGroup.add(lidPivot);
     chestGroup.position.set(cx, CHEST_Y, cz);
+    chestGroup.rotation.y = FACING_ROT[chest.facing ?? 'S'];
 
     group.add(chestGroup);
     meshMap.set(key, chestGroup);
@@ -118,8 +127,8 @@ export function openChestMesh(
   ) as THREE.Group | undefined;
   if (!lidPivot) return;
 
-  // Animate lid opening
-  const targetAngle = Math.PI / 4;
+  // Animate lid opening (negative = upward)
+  const targetAngle = -Math.PI / 4;
   const duration = 400; // ms
   const startAngle = lidPivot.rotation.x;
   const startTime = performance.now();

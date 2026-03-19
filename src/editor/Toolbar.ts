@@ -509,10 +509,11 @@ export class Toolbar {
     const ctx = canvas.getContext('2d')!;
     const cx = size / 2;
     const cy = size / 2;
-    const r = size * 0.25;
+    const btnR = type === 'breakable_wall' || type === 'secret_wall' || type === 'block' || type === 'chest' || type === 'sign'
+      ? size * 0.35 : size * 0.25;
     const fs = size * 0.4;
 
-    this.drawEntityIcon(ctx, type, cx, cy, r, fs);
+    this.drawEntityIcon(ctx, type, cx, cy, btnR, fs);
 
     btn.appendChild(canvas);
     btn.addEventListener('click', () => this.selectEntityBtn(btn, type));
@@ -538,7 +539,9 @@ export class Toolbar {
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const size = canvas.width;
-    this.drawEntityIcon(ctx, type, size / 2, size / 2, size * 0.25, size * 0.4);
+    const btnR = type === 'breakable_wall' || type === 'secret_wall' || type === 'block' || type === 'chest' || type === 'sign'
+      ? size * 0.35 : size * 0.25;
+    this.drawEntityIcon(ctx, type, size / 2, size / 2, btnR, size * 0.4);
   }
 
   /** Draw the same icon shapes used by GridCanvas.drawEntityIcon */
@@ -789,7 +792,7 @@ export class Toolbar {
       }
 
       case 'chest': {
-        // Box shape with a horizontal lid line
+        // Box shape with lid line and yellow lock bar (south-facing = lock at bottom)
         const chW = r * 1.6;
         const chH = r * 1.2;
         const chX = cx - chW / 2;
@@ -800,11 +803,16 @@ export class Toolbar {
         ctx.lineWidth = Math.max(1, r * 0.15);
         ctx.strokeRect(chX, chY, chW, chH);
         // Lid line across the middle
-        const lidY = chY + chH * 0.45;
+        const cLidY = chY + chH * 0.45;
         ctx.beginPath();
-        ctx.moveTo(chX, lidY);
-        ctx.lineTo(chX + chW, lidY);
+        ctx.moveTo(chX, cLidY);
+        ctx.lineTo(chX + chW, cLidY);
         ctx.stroke();
+        // Yellow lock bar at bottom center
+        const lockW = chW * 0.25;
+        const lockH = chH * 0.18;
+        ctx.fillStyle = '#ddaa22';
+        ctx.fillRect(cx - lockW / 2, chY + chH - lockH - chH * 0.08, lockW, lockH);
         break;
       }
 

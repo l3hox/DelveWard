@@ -86,6 +86,9 @@ export function interact(
   // Chest interaction
   const chest = gameState.getChest(col, row);
   if (chest) {
+    if (chest.gateMode) {
+      return { type: 'nothing', message: 'This chest is sealed by a mechanism.' };
+    }
     const result = gameState.openChest(col, row);
     if (result.locked) {
       return { type: 'chest_locked', message: 'This chest is locked.' };

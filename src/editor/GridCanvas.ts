@@ -186,9 +186,13 @@ export class GridCanvas {
           const { col, row } = this.screenToGrid(screenX, screenY);
           this.onBeforePickComplete?.();
           const cb = this.app.coordPickCallback;
-          this.app.coordPickCallback = null;
           cb(col, row);
-          this.onPickComplete?.();
+          // Only clear if the callback accepted the pick (set itself to null or kept itself)
+          if (this.app.coordPickCallback === cb) {
+            // Callback didn't clear itself — it rejected the click, stay in pick mode
+          } else {
+            this.onPickComplete?.();
+          }
           this.dirty = true;
           return;
         }
@@ -955,23 +959,32 @@ export class GridCanvas {
       }
 
       case 'chest': {
-        // Box shape with a horizontal lid line
-        const chPad = Math.min(tw, th) * 0.12;
-        const chW = tw - chPad * 2;
-        const chH = (th - chPad * 2) * 0.75;
-        const chX = px + chPad;
-        const chY = cy - chH / 2;
+        // Box shape with lid line and yellow lock bar, rotated by facing
+        const facing = (entity.facing as string) ?? 'S';
+        const rotMap: Record<string, number> = { S: 0, E: Math.PI / 2, N: Math.PI, W: -Math.PI / 2 };
+        const chRot = rotMap[facing] ?? 0;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(chRot);
+        const chW2 = Math.min(tw, th) * 0.38;
+        const chH2 = Math.min(tw, th) * 0.28;
         ctx.fillStyle = '#8B6914';
-        ctx.fillRect(chX, chY, chW, chH);
+        ctx.fillRect(-chW2, -chH2, chW2 * 2, chH2 * 2);
         ctx.strokeStyle = '#4a3500';
         ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.05);
-        ctx.strokeRect(chX, chY, chW, chH);
-        // Lid line across the upper 40%
-        const lidY = chY + chH * 0.4;
+        ctx.strokeRect(-chW2, -chH2, chW2 * 2, chH2 * 2);
+        // Lid line
+        const chLidOff = chH2 * 0.1;
         ctx.beginPath();
-        ctx.moveTo(chX, lidY);
-        ctx.lineTo(chX + chW, lidY);
+        ctx.moveTo(-chW2, chLidOff);
+        ctx.lineTo(chW2, chLidOff);
         ctx.stroke();
+        // Yellow lock bar at bottom center (south in local space)
+        const lkW = chW2 * 0.5;
+        const lkH = chH2 * 0.35;
+        ctx.fillStyle = '#ddaa22';
+        ctx.fillRect(-lkW / 2, chH2 - lkH - chH2 * 0.15, lkW, lkH);
+        ctx.restore();
         break;
       }
 
@@ -1341,7 +1354,7 @@ export class GridCanvas {
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
-      const hasTargetsArray = e.type === 'lever' || e.type === 'pressure_plate' || e.type === 'trigger' || e.type === 'tripwire' || e.type === 'gate';
+      const hasTargetsArray = e.type === 'lever' || e.type === 'pressure_plate' || e.type === 'trigger' || e.type === 'tripwire' || e.type === 'gate' || e.type === 'chest';
       if (hasTargetsArray && Array.isArray(e.targets)) {
         // Lever arrows originate from the bar center, not cell center
         let fromCol = e.col;
@@ -1388,7 +1401,7 @@ export class GridCanvas {
       if (e.type === 'key' && (e as Record<string, unknown>).keyId) {
         const keyId = (e as Record<string, unknown>).keyId as string;
         for (const other of level.entities) {
-          if (other.type === 'door' && (other as Record<string, unknown>).keyId === keyId) {
+          if ((other.type === 'door' || other.type === 'chest') && (other as Record<string, unknown>).keyId === keyId) {
             const isActive = selected !== null && (e === selected || other === selected);
             arrows.push({ fromCol: e.col, fromRow: e.row, toCol: other.col, toRow: other.row, active: isActive });
           }

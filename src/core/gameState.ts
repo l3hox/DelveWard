@@ -157,8 +157,10 @@ export interface ChestInstance {
   col: number;
   row: number;
   state: ChestState;
+  facing: Facing;
   keyId?: string;
   gateMode?: GateMode;
+  targets?: string[];
   drops?: DropsOverride;
 }
 
@@ -484,8 +486,10 @@ export class GameState {
           col: e.col,
           row: e.row,
           state: (e.state as ChestState) ?? 'closed',
+          facing: (e.facing as Facing) ?? 'S',
           keyId: e.keyId as string | undefined,
           gateMode: e.gateMode as GateMode | undefined,
+          targets: e.targets as string[] | undefined,
           drops: e.drops as DropsOverride | undefined,
         });
       } else if (e.type === 'sign') {
@@ -534,6 +538,9 @@ export class GameState {
         if (pos) {
           const door = this.getDoor(pos.col, pos.row);
           if (door) door.mechanical = true;
+          // Auto-set gateMode on chests targeted by signal sources
+          const chest = this.getChest(pos.col, pos.row);
+          if (chest && !chest.gateMode) chest.gateMode = 'or';
         }
       }
     };
@@ -543,6 +550,9 @@ export class GameState {
     for (const tripwire of this.tripwires.values()) markMechanical(tripwire.targets);
     // Gates target doors indirectly; mark their direct targets
     for (const gate of this.gates.values()) markMechanical(gate.targets);
+    for (const chest of this.chests.values()) {
+      if (chest.targets) markMechanical(chest.targets);
+    }
 
     this._initSignalManager();
   }
@@ -621,6 +631,13 @@ export class GameState {
       }
     }
 
+    // Register chests with targets as sources (booby-trapped chests)
+    for (const chest of this.chests.values()) {
+      if (chest.id && chest.targets && chest.targets.length > 0) {
+        this.signalManager.registerSource(chest.id, chest.targets, 'toggle');
+      }
+    }
+
     // Wire receiver-changed callback to update door state and fire trap launchers
     this.signalManager.setReceiverChangedCallback((entityId, active) => {
       const pos = this.resolveEntityPosition(entityId);
@@ -636,6 +653,7 @@ export class GameState {
       if (chest) {
         if (active) {
           chest.state = 'open';
+          this._activateChestSignal(chest);
           this.onChestSignalChanged?.(pos.col, pos.row, true);
         } else {
           chest.state = 'closed';
@@ -1208,12 +1226,20 @@ export class GameState {
       if (chest.keyId && this.hasKey(chest.keyId)) {
         this.inventory.delete(chest.keyId);
         chest.state = 'open';
+        this._activateChestSignal(chest);
         return { opened: true, drops: chest.drops };
       }
       return { opened: false, locked: true };
     }
     chest.state = 'open';
+    this._activateChestSignal(chest);
     return { opened: true, drops: chest.drops };
+  }
+
+  private _activateChestSignal(chest: ChestInstance): void {
+    if (chest.id && chest.targets && chest.targets.length > 0) {
+      this.signalManager.setSourceActive(chest.id, true);
+    }
   }
 
   // --- Sign helpers ---

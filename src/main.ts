@@ -929,8 +929,8 @@ async function init(): Promise<void> {
       case 'Space':
         {
           const result = interact(ls.player.getState(), ls.level.grid, gameState);
-          if (result.message) {
-            console.log(result.message);
+          if (result.type === 'nothing' && result.message) {
+            hud.showMessage(result.message);
           }
           if (result.type === 'door_opened') {
             const facing = getFacingCell(ls.player.getState());

@@ -290,10 +290,16 @@
         display: inline;
         margin-bottom: 0;
         white-space: nowrap;
+        color: #999;
+        font-size: 11px;
+      }
+
+      .readonly-field label::after {
+        content: ':';
       }
 
       .readonly-value {
-        color: #aaa;
+        color: #ccc;
         font-size: 11px;
         word-wrap: break-word;
       }

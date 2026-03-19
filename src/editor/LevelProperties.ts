@@ -88,7 +88,11 @@ export class LevelProperties {
             this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
             this.onStatusHintChanged?.();
             this.app.coordPickCallback = (col, row) => {
-              if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+              if (!this.app.walkableSet.has(level.grid[row]?.[col])) {
+                this.app.statusHint = 'Cannot place on a wall tile — click a floor tile (Esc to cancel)';
+                this.onStatusHintChanged?.();
+                return;
+              }
               dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing };
               this.app.coordPickCallback = null;
               this.app.statusHint = null;
@@ -122,7 +126,11 @@ export class LevelProperties {
           this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
           this.onStatusHintChanged?.();
           this.app.coordPickCallback = (col, row) => {
-            if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+            if (!this.app.walkableSet.has(level.grid[row]?.[col])) {
+                this.app.statusHint = 'Cannot place on a wall tile — click a floor tile (Esc to cancel)';
+                this.onStatusHintChanged?.();
+                return;
+              }
             dungeon.playerStart.col = col;
             dungeon.playerStart.row = row;
             this.app.coordPickCallback = null;
@@ -162,7 +170,11 @@ export class LevelProperties {
           this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
           this.onStatusHintChanged?.();
           this.app.coordPickCallback = (col, row) => {
-            if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+            if (!this.app.walkableSet.has(level.grid[row]?.[col])) {
+                this.app.statusHint = 'Cannot place on a wall tile — click a floor tile (Esc to cancel)';
+                this.onStatusHintChanged?.();
+                return;
+              }
             ps.col = col;
             ps.row = row;
             this.app.coordPickCallback = null;
@@ -599,6 +611,7 @@ export class LevelProperties {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = value;
+    input.autocomplete = 'off';
     if (maxLength !== undefined) input.maxLength = maxLength;
     input.addEventListener('input', () => {
       this.onBeginTextEdit?.();

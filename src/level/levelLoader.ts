@@ -237,10 +237,14 @@ function validateEntity(
         const validStates = new Set(['closed', 'open', 'locked']);
         if (!validStates.has(e.state as string)) return `${pfx} chest state must be closed, open, or locked`;
       }
+      if (e.facing !== undefined && !['N', 'S', 'E', 'W'].includes(e.facing as string)) return `${pfx} chest facing must be N, S, E, or W`;
       if (e.keyId !== undefined && typeof e.keyId !== 'string') return `${pfx} chest keyId must be a string`;
       if (e.gateMode !== undefined) {
         const validGateModes = ['or', 'and', 'xor'];
         if (!validGateModes.includes(e.gateMode as string)) return `${pfx} chest gateMode must be one of ${validGateModes.join(', ')}`;
+      }
+      if (e.targets !== undefined) {
+        const t = checkTargets('chest'); if (t) return t;
       }
       break;
     }
