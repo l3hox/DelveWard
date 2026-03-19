@@ -2,6 +2,7 @@ import { MINIMAP } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { FACING_DELTA, type Facing } from '../core/grid';
 import type { EnemyInstance } from '../enemies/enemyTypes';
+import type { SecretWallInstance } from '../core/gameState';
 
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,
@@ -13,6 +14,7 @@ export function drawMinimap(
   enemies?: Map<string, EnemyInstance>,
   doors?: Map<string, unknown>,
   stairs?: Map<string, unknown>,
+  secretWalls?: Map<string, SecretWallInstance>,
 ): void {
   const { x, y, w, h, cellSize } = MINIMAP;
 
@@ -40,7 +42,9 @@ export function drawMinimap(
       const px = x + vx * cellSize;
       const py = y + vy * cellSize;
 
-      if (cell === '#') {
+      // Persistent (illusory) secret walls still appear as walls on the minimap
+      const sw = secretWalls?.get(key);
+      if (cell === '#' || (sw && sw.persistent)) {
         ctx.fillStyle = HUD_COLORS.minimapWall;
       } else if (doors && doors.has(`${gc},${gr}`)) {
         ctx.fillStyle = HUD_COLORS.minimapDoor;

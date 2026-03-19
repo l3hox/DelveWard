@@ -365,6 +365,11 @@ async function init(): Promise<void> {
 
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
+  // Preserve original grids for restart (grids are mutated by breakable/secret wall opening)
+  const originalGrids = new Map<string, string[]>();
+  for (const level of dungeon.levels) {
+    originalGrids.set(level.id ?? level.name, [...level.grid]);
+  }
   applyEnvironment(firstLevel.environment, scene, ambient);
 
   const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
@@ -453,6 +458,10 @@ async function init(): Promise<void> {
       // Restart always goes back to the dungeon start level and position
       const startLevel = dungeon.levels.find((l) => l.id === dungeon.playerStart.levelId) ?? dungeon.levels[0];
       currentLevelId = startLevel.id ?? startLevel.name;
+      // Restore original grid (may have been mutated by breakable/secret wall openings)
+      const origGrid = originalGrids.get(currentLevelId);
+      if (origGrid) startLevel.grid = [...origGrid];
+      levelSnapshots.clear();
       gameState.loadNewLevel(startLevel.entities, startLevel.grid, startLevel.id ?? startLevel.name);
       projectileManager.clear();
       fireballExplosions.clear();
@@ -1144,6 +1153,8 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen();
+
     ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);
     if (ls.skyboxMesh) {
@@ -1152,29 +1163,19 @@ async function init(): Promise<void> {
     ls.doorAnimator.update(delta);
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
-    gameState.signalManager.tick(delta);
-    gameState.tickTrapLaunchers();
-    projectileManager.update(
-      delta,
-      (col, row) => ls.walkable.has(ls.level.grid[row]?.[col]),
-      gameState.isDoorOpen.bind(gameState),
-      lastPlayerCol, lastPlayerRow,
-      gameState.isEnemyAt.bind(gameState),
-      gameState.isBlockAt.bind(gameState),
-    );
-    tickBlockedDoors(delta);
     transition.update(delta);
     damageNumbers.update(delta);
     swordSwing.update(delta);
 
-    // Sync projectile meshes with active projectiles
-    updateProjectileMeshes(ls.projectileMeshes.group, ls.projectileMeshes.meshMap, projectileManager.getAll(), camera);
-
-    // Billboard enemy sprites toward camera
+    // Billboard enemy sprites toward camera (always — static visual)
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
     updateForestBillboards(ls.forestMeshes, camera);
 
-    // Status effect tint on enemies
+    // Sync health bar positions (enemies animate with hit shake and lunge)
+    ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
+    ls.healthBarManager.updateBillboards(camera);
+
+    // Status effect tint on enemies (always — static visual)
     for (const [key, enemy] of gameState.enemies) {
       const mesh = ls.enemyMeshes.meshMap.get(key);
       if (!mesh) continue;
@@ -1190,22 +1191,34 @@ async function init(): Promise<void> {
       }
     }
 
-    // Sync health bar positions (enemies animate with hit shake and lunge)
-    ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
-    ls.healthBarManager.updateBillboards(camera);
+    // --- Everything below pauses when an overlay is open ---
+    if (!anyOverlayOpen) {
+      gameState.signalManager.tick(delta);
+      gameState.tickTrapLaunchers();
+      projectileManager.update(
+        delta,
+        (col, row) => ls.walkable.has(ls.level.grid[row]?.[col]),
+        gameState.isDoorOpen.bind(gameState),
+        lastPlayerCol, lastPlayerRow,
+        gameState.isEnemyAt.bind(gameState),
+        gameState.isBlockAt.bind(gameState),
+      );
+      tickBlockedDoors(delta);
 
-    // Sconce torch flicker
-    updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
+      // Sync projectile meshes with active projectiles
+      updateProjectileMeshes(ls.projectileMeshes.group, ls.projectileMeshes.meshMap, projectileManager.getAll(), camera);
 
-    // Particle effects
-    const camPos2 = torchFillLight.position;
-    dustMotes.update(delta, camPos2.x, camPos2.y, camPos2.z);
-    sconceEmbers.update(delta);
-    waterDrips.update(delta, camPos2.x, camPos2.z);
-    fireflies.update(delta, camPos2.x, camPos2.z);
-    fireballExplosions.update(delta);
+      // Sconce torch flicker
+      updateSconceFlicker(ls.sconceMeshes.lightMap, delta);
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen();
+      // Particle effects
+      const camPos2 = torchFillLight.position;
+      dustMotes.update(delta, camPos2.x, camPos2.y, camPos2.z);
+      sconceEmbers.update(delta);
+      waterDrips.update(delta, camPos2.x, camPos2.z);
+      fireflies.update(delta, camPos2.x, camPos2.z);
+      fireballExplosions.update(delta);
+    }
 
     // Attack cooldown tick — paused when overlays are open
     if (gameState.attackCooldown > 0 && !anyOverlayOpen) {
@@ -1293,14 +1306,16 @@ async function init(): Promise<void> {
     torchLight.distance = 4.5 + lightScale * 7.5;
     torchFillLight.distance = 3 + lightScale * 6;
 
-    flickerTimer -= delta;
-    if (flickerTimer <= 0) {
-      const baseIntensity = 1.2 + lightScale * 4.2;
-      flickerTarget = baseIntensity + Math.random() * FLICKER_RANGE * lightScale;
-      flickerTimer = FLICKER_MIN_INTERVAL + Math.random() * FLICKER_INTERVAL_RANGE;
+    if (!anyOverlayOpen) {
+      flickerTimer -= delta;
+      if (flickerTimer <= 0) {
+        const baseIntensity = 1.2 + lightScale * 4.2;
+        flickerTarget = baseIntensity + Math.random() * FLICKER_RANGE * lightScale;
+        flickerTimer = FLICKER_MIN_INTERVAL + Math.random() * FLICKER_INTERVAL_RANGE;
+      }
+      torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
+      torchFillLight.intensity = torchLight.intensity * 0.6;
     }
-    torchLight.intensity += (flickerTarget - torchLight.intensity) * FLICKER_LERP;
-    torchFillLight.intensity = torchLight.intensity * 0.6;
 
     levelUpNotification.update(delta);
 
