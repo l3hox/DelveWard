@@ -443,6 +443,7 @@ levelList.onCommitTextEdit = () => {
 
 // Selection callback — update inspector
 gridCanvas.setSelectionCallback(() => {
+  app.errors = app.validate();
   inspector.refresh();
   updateStairHighlight();
   levelList.refresh();
