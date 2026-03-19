@@ -324,21 +324,20 @@ export async function warmUpGPUShaders(
   // Compile at current light count (base scene + 1 fireball PointLight),
   // then add extra PointLights one at a time, compiling at each count.
   // This pre-caches shader variants for every light count the game can hit.
-  // Yield between compiles so the UI thread stays responsive.
+  // compileAsync uses KHR_parallel_shader_compile when available, keeping
+  // the main thread responsive while the GPU compiles in the background.
   const EXTRA_LIGHTS = 10;
   const total = EXTRA_LIGHTS + 1;
 
-  renderer.compile(scene, camera);
+  await renderer.compileAsync(scene, camera);
   onProgress?.(1, total);
-  await new Promise(r => setTimeout(r, 0));
 
   for (let i = 0; i < EXTRA_LIGHTS; i++) {
     const light = new THREE.PointLight(0x000000, 0, 1);
     light.position.set(0, -1000, 0);
     tempGroup.add(light);
-    renderer.compile(scene, camera);
+    await renderer.compileAsync(scene, camera);
     onProgress?.(i + 2, total);
-    await new Promise(r => requestAnimationFrame(r));
   }
 
   scene.remove(tempGroup);
