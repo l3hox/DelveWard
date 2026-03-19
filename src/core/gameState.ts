@@ -127,6 +127,49 @@ export interface SconceInstance {
   lit: boolean;
 }
 
+export interface BreakableWallInstance {
+  id?: string;
+  col: number;
+  row: number;
+  hp: number;
+  maxHp: number;
+  drops?: DropsOverride;
+}
+
+export interface SecretWallInstance {
+  id?: string;
+  col: number;
+  row: number;
+  opened: boolean;
+  persistent: boolean; // illusionary wall: stays visible after opening
+}
+
+export interface BlockInstance {
+  id?: string;
+  col: number;
+  row: number;
+}
+
+export type ChestState = 'closed' | 'open' | 'locked';
+
+export interface ChestInstance {
+  id?: string;
+  col: number;
+  row: number;
+  state: ChestState;
+  keyId?: string;
+  gateMode?: GateMode;
+  drops?: DropsOverride;
+}
+
+export interface SignInstance {
+  id?: string;
+  col: number;
+  row: number;
+  wall: Facing;
+  text: string;
+}
+
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -172,6 +215,12 @@ export interface LevelSnapshot {
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
+  breakableWalls: Map<string, BreakableWallInstance>;
+  secretWalls: Map<string, SecretWallInstance>;
+  blocks: Map<string, BlockInstance>;
+  chests: Map<string, ChestInstance>;
+  signs: Map<string, SignInstance>;
+  destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
   signalState?: ReturnType<SignalManager['saveState']>;
@@ -190,6 +239,12 @@ export class GameState {
   sconces: Map<string, SconceInstance>;
   stairs: Map<string, StairInstance>;
   enemies: Map<string, EnemyInstance>;
+  breakableWalls: Map<string, BreakableWallInstance>;
+  secretWalls: Map<string, SecretWallInstance>;
+  blocks: Map<string, BlockInstance>;
+  chests: Map<string, ChestInstance>;
+  signs: Map<string, SignInstance>;
+  destroyedWalls: Set<string>;
   inventory: Set<string>;
 
   // Index: entity ID → position + type (derived state, rebuilt after parse/load)
@@ -238,6 +293,12 @@ export class GameState {
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
+    this.breakableWalls = new Map();
+    this.secretWalls = new Map();
+    this.blocks = new Map();
+    this.chests = new Map();
+    this.signs = new Map();
+    this.destroyedWalls = new Set();
     this.inventory = new Set();
     this.entityById = new Map();
 
@@ -393,6 +454,50 @@ export class GameState {
           direction: e.direction as 'up' | 'down',
           facing: e.facing as Facing,
         });
+      } else if (e.type === 'breakable_wall') {
+        const hp = (e.hp as number) ?? 30;
+        this.breakableWalls.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          hp,
+          maxHp: hp,
+          drops: e.drops as DropsOverride | undefined,
+        });
+      } else if (e.type === 'secret_wall') {
+        this.secretWalls.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          opened: false,
+          persistent: (e.persistent as boolean) ?? false,
+        });
+      } else if (e.type === 'block') {
+        this.blocks.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+        });
+      } else if (e.type === 'chest') {
+        this.chests.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          state: (e.state as ChestState) ?? 'closed',
+          keyId: e.keyId as string | undefined,
+          gateMode: e.gateMode as GateMode | undefined,
+          drops: e.drops as DropsOverride | undefined,
+        });
+      } else if (e.type === 'sign') {
+        const wall = (e.wall as Facing | undefined) ??
+          autoDetectLeverWall(e.col, e.row, grid);
+        this.signs.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          wall,
+          text: (e.text as string) ?? '',
+        });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (enemyDatabase.getEnemy(enemyType)) {
@@ -509,6 +614,13 @@ export class GameState {
       }
     }
 
+    // Register chests with gateMode as receivers
+    for (const chest of this.chests.values()) {
+      if (chest.id && chest.gateMode) {
+        this.signalManager.registerReceiver(chest.id, chest.gateMode);
+      }
+    }
+
     // Wire receiver-changed callback to update door state and fire trap launchers
     this.signalManager.setReceiverChangedCallback((entityId, active) => {
       const pos = this.resolveEntityPosition(entityId);
@@ -517,6 +629,18 @@ export class GameState {
       if (door) {
         door.state = active ? 'open' : 'closed';
         this.onDoorSignalChanged?.(pos.col, pos.row, active);
+        return;
+      }
+      // Check if this receiver is a chest
+      const chest = this.chests.get(doorKey(pos.col, pos.row));
+      if (chest) {
+        if (active) {
+          chest.state = 'open';
+          this.onChestSignalChanged?.(pos.col, pos.row, true);
+        } else {
+          chest.state = 'closed';
+          this.onChestSignalChanged?.(pos.col, pos.row, false);
+        }
         return;
       }
       // Check if this receiver is a trap launcher
@@ -565,6 +689,9 @@ export class GameState {
   /** External callback for trap launcher firing (wire to ProjectileManager). */
   onLauncherFire: ((launcher: TrapLauncherInstance) => void) | null = null;
 
+  /** External callback for signal-driven chest state changes. */
+  onChestSignalChanged: ((col: number, row: number, open: boolean) => void) | null = null;
+
   private _rebuildEntityIndex(): void {
     this.entityById.clear();
     const register = (inst: { id?: string; col: number; row: number }, type: string) => {
@@ -580,6 +707,11 @@ export class GameState {
     for (const tl of this.trapLaunchers.values()) register(tl, 'trap_launcher');
     for (const s of this.sconces.values()) register(s, 'torch_sconce');
     for (const s of this.stairs.values()) register(s, 'stairs');
+    for (const bw of this.breakableWalls.values()) register(bw, 'breakable_wall');
+    for (const sw of this.secretWalls.values()) register(sw, 'secret_wall');
+    for (const b of this.blocks.values()) register(b, 'block');
+    for (const c of this.chests.values()) register(c, 'chest');
+    for (const s of this.signs.values()) register(s, 'sign');
   }
 
   resolveEntityPosition(id: string): { col: number; row: number } | undefined {
@@ -631,12 +763,34 @@ export class GameState {
     for (const [k, v] of this.enemies) {
       enemies.set(k, { ...v, statusEffects: v.statusEffects.map(e => ({ ...e })) });
     }
+    const breakableWalls = new Map<string, BreakableWallInstance>();
+    for (const [k, v] of this.breakableWalls) {
+      breakableWalls.set(k, { ...v });
+    }
+    const secretWalls = new Map<string, SecretWallInstance>();
+    for (const [k, v] of this.secretWalls) {
+      secretWalls.set(k, { ...v });
+    }
+    const blocks = new Map<string, BlockInstance>();
+    for (const [k, v] of this.blocks) {
+      blocks.set(k, { ...v });
+    }
+    const chests = new Map<string, ChestInstance>();
+    for (const [k, v] of this.chests) {
+      chests.set(k, { ...v });
+    }
+    const signs = new Map<string, SignInstance>();
+    for (const [k, v] of this.signs) {
+      signs.set(k, { ...v });
+    }
+    const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
     const signalState = this.signalManager.saveState();
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
-      sconces, stairs, enemies, exploredCells, registrySnapshot,
+      sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
+      destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -686,6 +840,27 @@ export class GameState {
     for (const [k, v] of snapshot.enemies) {
       this.enemies.set(k, { ...v, statusEffects: v.statusEffects.map(e => ({ ...e })) });
     }
+    this.breakableWalls = new Map<string, BreakableWallInstance>();
+    for (const [k, v] of snapshot.breakableWalls) {
+      this.breakableWalls.set(k, { ...v });
+    }
+    this.secretWalls = new Map<string, SecretWallInstance>();
+    for (const [k, v] of snapshot.secretWalls) {
+      this.secretWalls.set(k, { ...v });
+    }
+    this.blocks = new Map<string, BlockInstance>();
+    for (const [k, v] of snapshot.blocks) {
+      this.blocks.set(k, { ...v });
+    }
+    this.chests = new Map<string, ChestInstance>();
+    for (const [k, v] of snapshot.chests) {
+      this.chests.set(k, { ...v });
+    }
+    this.signs = new Map<string, SignInstance>();
+    for (const [k, v] of snapshot.signs) {
+      this.signs.set(k, { ...v });
+    }
+    this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);
     if (snapshot.registrySnapshot) {
       this.entityRegistry.restore(snapshot.registrySnapshot);
@@ -714,6 +889,12 @@ export class GameState {
     this.sconces = new Map();
     this.stairs = new Map();
     this.enemies = new Map();
+    this.breakableWalls = new Map();
+    this.secretWalls = new Map();
+    this.blocks = new Map();
+    this.chests = new Map();
+    this.signs = new Map();
+    this.destroyedWalls = new Set();
     this.entityById = new Map();
     this.exploredCells = new Set();
     // Clear only ground items for the old level; equipped/backpack items survive transitions.
@@ -952,6 +1133,99 @@ export class GameState {
     sconce.lit = false;
     this.torchFuel = this.maxTorchFuel;
     return true;
+  }
+
+  // --- Breakable wall helpers ---
+
+  getBreakableWall(col: number, row: number): BreakableWallInstance | undefined {
+    return this.breakableWalls.get(doorKey(col, row));
+  }
+
+  damageBreakableWall(
+    col: number, row: number, damage: number, grid: string[],
+  ): { destroyed: boolean; drops?: DropsOverride } {
+    const wall = this.breakableWalls.get(doorKey(col, row));
+    if (!wall) return { destroyed: false };
+    wall.hp = Math.max(0, wall.hp - damage);
+    if (wall.hp <= 0) {
+      this.breakableWalls.delete(doorKey(col, row));
+      grid[row] = grid[row].substring(0, col) + '.' + grid[row].substring(col + 1);
+      this.destroyedWalls.add(doorKey(col, row));
+      return { destroyed: true, drops: wall.drops };
+    }
+    return { destroyed: false };
+  }
+
+  // --- Secret wall helpers ---
+
+  getSecretWall(col: number, row: number): SecretWallInstance | undefined {
+    return this.secretWalls.get(doorKey(col, row));
+  }
+
+  openSecretWall(col: number, row: number, grid: string[]): { opened: boolean; persistent: boolean } {
+    const wall = this.secretWalls.get(doorKey(col, row));
+    if (!wall || wall.opened) return { opened: false, persistent: false };
+    wall.opened = true;
+    grid[row] = grid[row].substring(0, col) + '.' + grid[row].substring(col + 1);
+    this.destroyedWalls.add(doorKey(col, row));
+    return { opened: true, persistent: wall.persistent };
+  }
+
+  // --- Block helpers ---
+
+  getBlock(col: number, row: number): BlockInstance | undefined {
+    return this.blocks.get(doorKey(col, row));
+  }
+
+  isBlockAt(col: number, row: number): boolean {
+    return this.blocks.has(doorKey(col, row));
+  }
+
+  pushBlock(fromCol: number, fromRow: number, toCol: number, toRow: number): boolean {
+    const key = doorKey(fromCol, fromRow);
+    const block = this.blocks.get(key);
+    if (!block) return false;
+    this.blocks.delete(key);
+    block.col = toCol;
+    block.row = toRow;
+    this.blocks.set(doorKey(toCol, toRow), block);
+    // Check and activate pressure plate at destination
+    this.activatePressurePlate(toCol, toRow);
+    return true;
+  }
+
+  // --- Chest helpers ---
+
+  getChest(col: number, row: number): ChestInstance | undefined {
+    return this.chests.get(doorKey(col, row));
+  }
+
+  openChest(col: number, row: number): { opened: boolean; locked?: boolean; drops?: DropsOverride } {
+    const chest = this.chests.get(doorKey(col, row));
+    if (!chest) return { opened: false };
+    if (chest.state === 'open') return { opened: false };
+    if (chest.state === 'locked' || chest.keyId) {
+      if (chest.keyId && this.hasKey(chest.keyId)) {
+        this.inventory.delete(chest.keyId);
+        chest.state = 'open';
+        return { opened: true, drops: chest.drops };
+      }
+      return { opened: false, locked: true };
+    }
+    chest.state = 'open';
+    return { opened: true, drops: chest.drops };
+  }
+
+  // --- Sign helpers ---
+
+  getSign(col: number, row: number): SignInstance | undefined {
+    return this.signs.get(doorKey(col, row));
+  }
+
+  getSignOnWall(col: number, row: number, wall: Facing): SignInstance | undefined {
+    const sign = this.signs.get(doorKey(col, row));
+    if (sign && sign.wall === wall) return sign;
+    return undefined;
   }
 
   // --- Enemy helpers ---

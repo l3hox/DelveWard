@@ -286,3 +286,42 @@ describe('spear 2-cell attack', () => {
     expect(WEAPON_BEHAVIOR.spear.damageMultiplier).toBe(1.1);
   });
 });
+
+// --- Phase D: Breakable wall combat ---
+
+describe('Phase D — breakable wall attacks', () => {
+  it('breakable wall hit: player faces breakable wall, returns wall_hit with damage', () => {
+    const gs = new GameState([
+      { col: 3, row: 1, type: 'breakable_wall', hp: 50 },
+    ], [
+      '#####',
+      '#...#',
+      '#...#',
+      '#####',
+    ]);
+    // Player at (2,1) facing E → attacks (3,1) where breakable wall is
+    const player = makePlayer(2, 1, 'E');
+    const results = playerAttack(player, gs);
+    expect(results[0].type).toBe('wall_hit');
+    expect(results[0].damage).toBeGreaterThan(0);
+    expect(results[0].targetCol).toBe(3);
+    expect(results[0].targetRow).toBe(1);
+  });
+
+  it('enemy takes priority over breakable wall at same cell', () => {
+    // If both enemy and breakable wall exist at the same position, enemy wins
+    const gs = new GameState([
+      { col: 3, row: 1, type: 'enemy', enemyType: 'rat' },
+      { col: 3, row: 1, type: 'breakable_wall', hp: 50 },
+    ], [
+      '#####',
+      '#...#',
+      '#...#',
+      '#####',
+    ]);
+    const player = makePlayer(2, 1, 'E');
+    const results = playerAttack(player, gs);
+    // Enemy takes priority — result is hit or kill, not wall_hit
+    expect(results[0].type === 'hit' || results[0].type === 'kill').toBe(true);
+  });
+});

@@ -851,3 +851,122 @@ describe('validateDungeon', () => {
     expect(dungeon.levels[1].entities).toHaveLength(1);
   });
 });
+
+// --- Phase D: new entity type validation ---
+
+// Helper grid: solid cells at border, walkable interior
+// '#####' row 0, '#...#' rows 1-3, '#####' row 4
+function phaseD_level(entities: unknown[]) {
+  return validLevel({
+    grid: ['#####', '#...#', '#...#', '#...#', '#####'],
+    playerStart: { col: 1, row: 1, facing: 'S' },
+    entities,
+  });
+}
+
+describe('Phase D — entity validation', () => {
+  // --- breakable_wall ---
+
+  it('breakable_wall valid: solid cell with hp > 0 passes', () => {
+    const level = validateLevel(phaseD_level([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 30 },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('breakable_wall on walkable cell: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 1, row: 1, type: 'breakable_wall', hp: 30 },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('breakable_wall missing hp: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 0, row: 0, type: 'breakable_wall' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  // --- secret_wall ---
+
+  it('secret_wall valid: solid cell passes', () => {
+    const level = validateLevel(phaseD_level([
+      { col: 0, row: 0, type: 'secret_wall' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('secret_wall on walkable cell: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 1, row: 1, type: 'secret_wall' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  // --- block ---
+
+  it('block valid: walkable cell passes', () => {
+    const level = validateLevel(phaseD_level([
+      { col: 1, row: 1, type: 'block' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('block on solid cell: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 0, row: 0, type: 'block' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  // --- chest ---
+
+  it('chest valid: walkable cell passes', () => {
+    const level = validateLevel(phaseD_level([
+      { col: 2, row: 1, type: 'chest', state: 'closed' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('chest with invalid state: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 2, row: 1, type: 'chest', state: 'broken' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  // --- sign ---
+
+  it('sign valid: walkable cell with wall and text passes', () => {
+    const level = validateLevel(phaseD_level([
+      { col: 2, row: 1, type: 'sign', wall: 'N', text: 'Read me' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(1);
+  });
+
+  it('sign empty text: skipped with warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const level = validateLevel(phaseD_level([
+      { col: 2, row: 1, type: 'sign', wall: 'N', text: '' },
+    ]), 'test');
+    expect(level.entities).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});

@@ -30,6 +30,11 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   equipment:      { itemId: '' },
   consumable:     { itemId: '' },
   stairs:         { direction: 'down', facing: 'S', target: '' },
+  breakable_wall: { hp: 30 },
+  secret_wall:    { persistent: false },
+  block:          {},
+  chest:          { state: 'closed' },
+  sign:           { wall: 'N', text: '' },
 };
 
 export interface ValidationError {
@@ -69,11 +74,11 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
-  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
-  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
-  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
-  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
+  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
   key:            { field: 'keyId',  validEntityType: 'door' },
   door:           { field: 'keyId',  validEntityType: 'key' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
@@ -327,7 +332,7 @@ export class EditorApp {
       for (let i = 0; i < level.charDefs.length; i++) {
         const ch = level.charDefs[i].char;
         if (seen.has(ch)) {
-          errors.push({ message: `Duplicate charDef '${ch}' at indices ${seen.get(ch)} and ${i}` });
+          errors.push({ message: `Duplicate tile type '${ch}' at indices ${seen.get(ch)} and ${i}` });
         } else {
           seen.set(ch, i);
         }
@@ -346,7 +351,7 @@ export class EditorApp {
       }
     }
     for (const ch of unknownChars) {
-      errors.push({ message: `Grid char '${ch}' is used but has no charDef` });
+      errors.push({ message: `Tile '${ch}' is used in the grid but has no tile type definition` });
     }
 
     // Entity references to non-existent targets
@@ -445,8 +450,15 @@ export class EditorApp {
         continue;
       }
       const ch = level.grid[e.row][e.col];
-      if (!this.walkableSet.has(ch) && e.type !== 'gate') {
+      if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
         errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
+      }
+    }
+
+    // Sign with empty text
+    for (const e of level.entities) {
+      if (e.type === 'sign' && !(e.text as string)) {
+        errors.push({ message: `sign '${e.id ?? '?'}' at (${e.col},${e.row}) has empty text`, entity: e });
       }
     }
 
@@ -621,6 +633,12 @@ export class EditorApp {
         entity.wall = detected;
       }
     }
+    if (type === 'sign' && this.level) {
+      const detected = this.autoDetectWall(col, row);
+      if (detected) {
+        entity.wall = detected;
+      }
+    }
     // Trap launcher: auto-detect facing (opposite of the wall it's mounted on)
     if (type === 'trap_launcher' && this.level) {
       const detected = this.autoDetectWall(col, row);
@@ -690,6 +708,10 @@ export class EditorApp {
     }
     // Gates are abstract logic — placeable anywhere (including walls)
     if (type === 'gate') return char !== ' ';
+    // Wall entities: must be on solid (non-walkable) cell
+    if (type === 'breakable_wall' || type === 'secret_wall') {
+      return !this.walkableSet.has(char) && char !== ' ';
+    }
     // All others require a walkable cell
     return this.walkableSet.has(char);
   }

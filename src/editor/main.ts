@@ -448,6 +448,7 @@ gridCanvas.setSelectionCallback(() => {
   levelList.refresh();
   gridCanvas.markDirty();
   updateErrorBanner();
+  updateStatusHint();
   // Auto-enter pick mode when placing a new stairs in dungeon mode
   const sel = app.selectedEntity;
   if (app.activeTool === 'entity' && sel?.type === 'stairs' && !sel.target && app.dungeon) {

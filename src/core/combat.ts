@@ -36,12 +36,12 @@ export function getWeaponCooldown(gameState: GameState): number {
 }
 
 export interface CombatResult {
-  type: 'miss' | 'hit' | 'kill' | 'no_target' | 'cooldown';
+  type: 'miss' | 'hit' | 'kill' | 'no_target' | 'cooldown' | 'wall_hit' | 'wall_destroy';
   damage?: number;
   targetCol?: number;
   targetRow?: number;
   enemyType?: string;
-  dropsOverride?: DropsOverride;  // NEW
+  dropsOverride?: DropsOverride;
 }
 
 export interface EnemyAttackResult {
@@ -153,6 +153,17 @@ export function playerAttack(
   gameState.attackCooldown = cooldown;
 
   if (!hitAnything) {
+    const bwall = gameState.getBreakableWall(frontCol, frontRow);
+    if (bwall) {
+      const { damage } = resolveWeaponEffect(subtype, stats.atk, 0, stats.critChance);
+      return [{
+        type: 'wall_hit',
+        damage,
+        targetCol: frontCol,
+        targetRow: frontRow,
+        dropsOverride: bwall.drops,
+      }];
+    }
     return [{ type: 'no_target' }];
   }
 

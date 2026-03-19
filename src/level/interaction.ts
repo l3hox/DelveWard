@@ -1,11 +1,13 @@
 import type { PlayerState } from '../core/grid';
-import { getFacingCell } from '../core/grid';
+import { getFacingCell, FACING_DELTA, isWalkable } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'block_pushed' | 'chest_opened' | 'chest_locked' | 'sign_read' | 'nothing';
   message?: string;
   targets?: string[]; // entity IDs of affected doors (for mesh updates)
+  targetCol?: number;
+  targetRow?: number;
 }
 
 export function interact(
@@ -61,6 +63,43 @@ export function interact(
     if (gameState.takeSconceTorch(playerState.col, playerState.row)) {
       return { type: 'sconce_taken', message: 'Torch taken. Fuel replenished.' };
     }
+  }
+
+  // Block push — player faces a cell containing a pushable block
+  const block = gameState.getBlock(col, row);
+  if (block) {
+    const [dc, dr] = FACING_DELTA[playerState.facing];
+    const destCol = col + dc;
+    const destRow = row + dr;
+    if (
+      isWalkable(grid, destCol, destRow, undefined, gameState.isDoorOpen.bind(gameState)) &&
+      !gameState.isBlockedByEnemy(destCol, destRow) &&
+      !gameState.isBlockAt(destCol, destRow) &&
+      !(destCol === playerState.col && destRow === playerState.row)
+    ) {
+      gameState.pushBlock(col, row, destCol, destRow);
+      return { type: 'block_pushed', targetCol: destCol, targetRow: destRow };
+    }
+    return { type: 'nothing' };
+  }
+
+  // Chest interaction
+  const chest = gameState.getChest(col, row);
+  if (chest) {
+    const result = gameState.openChest(col, row);
+    if (result.locked) {
+      return { type: 'chest_locked', message: 'This chest is locked.' };
+    }
+    if (result.opened) {
+      return { type: 'chest_opened', targetCol: col, targetRow: row, message: 'Chest opened.' };
+    }
+    return { type: 'nothing' };
+  }
+
+  // Sign interaction — player stands on sign cell and faces the sign's wall
+  const sign = gameState.getSignOnWall(playerState.col, playerState.row, playerState.facing);
+  if (sign) {
+    return { type: 'sign_read', message: sign.text };
   }
 
   return { type: 'nothing' };

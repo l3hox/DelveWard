@@ -48,6 +48,11 @@ import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
 import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpGPUShaders, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
 import { tickEffects, applyEffect, getSlowMultiplier, hasEffect } from './core/statusEffects';
 import type { StatusEffectType } from './core/statusEffects';
+import { buildWallEntityMeshes, type WallEntityMeshes } from './rendering/wallEntityRenderer';
+import { buildBlockMeshes, animateBlockPush, type BlockMeshes } from './rendering/blockRenderer';
+import { buildChestMeshes, openChestMesh, closeChestMesh, type ChestMeshes } from './rendering/chestRenderer';
+import { buildSignMeshes, type SignMeshes } from './rendering/signRenderer';
+import { SignOverlay } from './hud/signOverlay';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -94,6 +99,10 @@ interface LevelScene {
   forestMeshes: ForestMeshes;
   trapLauncherMeshes: { group: THREE.Group };
   projectileMeshes: ProjectileMeshes;
+  wallEntityMeshes: WallEntityMeshes;
+  blockMeshes: BlockMeshes;
+  chestMeshes: ChestMeshes;
+  signMeshes: SignMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
 }
@@ -110,7 +119,11 @@ function buildLevelScene(
   const walkable = buildWalkableSet(level.charDefs);
 
   const stairPositions = new Set(gameState.stairs.keys());
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions);
+  // Wall entity cells: breakable + secret walls that need dungeon builder to skip wall faces
+  const wallEntityCells = new Set<string>();
+  for (const key of gameState.breakableWalls.keys()) wallEntityCells.add(key);
+  for (const key of gameState.secretWalls.keys()) wallEntityCells.add(key);
+  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions, wallEntityCells);
   scene.add(dungeonGroup);
 
   const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
@@ -161,6 +174,24 @@ function buildLevelScene(
   const projectileMeshes = createProjectileMeshes();
   scene.add(projectileMeshes.group);
 
+  // Wall entity meshes (breakable + secret walls — combined into one renderer)
+  const allWallEntities = new Map<string, { col: number; row: number }>();
+  for (const [k, v] of gameState.breakableWalls) allWallEntities.set(k, v);
+  for (const [k, v] of gameState.secretWalls) allWallEntities.set(k, v);
+  const wallEntityMeshes = buildWallEntityMeshes(
+    allWallEntities, level.grid, level.defaults, level.areas, level.charDefs,
+  );
+  scene.add(wallEntityMeshes.group);
+
+  const blockMeshes = buildBlockMeshes(gameState);
+  scene.add(blockMeshes.group);
+
+  const chestMeshes = buildChestMeshes(gameState);
+  scene.add(chestMeshes.group);
+
+  const signMeshes = buildSignMeshes(gameState);
+  scene.add(signMeshes.group);
+
   const enemyMeshes = buildEnemyMeshes(gameState);
   scene.add(enemyMeshes.group);
 
@@ -194,7 +225,7 @@ function buildLevelScene(
     startFacing,
     walkable,
     gameState.isDoorOpen.bind(gameState),
-    gameState.isBlockedByEnemy.bind(gameState),
+    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row),
     gameState.stairs,
   );
 
@@ -220,6 +251,10 @@ function buildLevelScene(
     forestMeshes,
     trapLauncherMeshes,
     projectileMeshes,
+    wallEntityMeshes,
+    blockMeshes,
+    chestMeshes,
+    signMeshes,
     enemyMeshes,
     enemyAnimator,
     healthBarManager,
@@ -243,6 +278,10 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.forestMeshes.group,
     ls.trapLauncherMeshes.group,
     ls.projectileMeshes.group,
+    ls.wallEntityMeshes.group,
+    ls.blockMeshes.group,
+    ls.chestMeshes.group,
+    ls.signMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
@@ -319,7 +358,7 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/test_m2b.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
   const firstLevel = dungeon.levels[0];
 
@@ -337,6 +376,9 @@ async function init(): Promise<void> {
 
   const transition = new TransitionOverlay();
   transition.attach();
+
+  const signOverlay = new SignOverlay();
+  signOverlay.attach();
 
   // --- Level-up notification ---
   const levelUpNotification = new LevelUpNotification();
@@ -607,6 +649,36 @@ async function init(): Promise<void> {
       releasePlate(ls.plateMeshes.meshMap, col, row);
     };
 
+    // Secret wall detection — walking into a wall cell with a secret wall entity
+    ls.player.setOnMoveBlocked((col, row) => {
+      const sw = gameState.getSecretWall(col, row);
+      if (sw && !sw.opened) {
+        const result = gameState.openSecretWall(col, row, ls.level.grid);
+        if (result.opened) {
+          const entry = ls.wallEntityMeshes.meshMap.get(doorKey(col, row));
+          if (entry) {
+            // Persistent (illusionary): keep wall visible, just make cell walkable
+            if (!result.persistent) {
+              entry.wallGroup.visible = false;
+            }
+            entry.floorCeilGroup.visible = true;
+          }
+          hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
+          // Re-attempt the move now that the cell is walkable
+          ls.player.moveForward();
+        }
+      }
+    });
+
+    // Signal-driven chest state changes → animate chest mesh
+    gameState.onChestSignalChanged = (col, row, open) => {
+      if (open) {
+        openChestMesh(ls.chestMeshes.meshMap, col, row);
+      } else {
+        closeChestMesh(ls.chestMeshes.meshMap, col, row);
+      }
+    };
+
     // Trap launcher → spawn projectile from the launcher's own cell
     gameState.onLauncherFire = (launcher: TrapLauncherInstance) => {
       projectileManager.spawn({
@@ -803,6 +875,7 @@ async function init(): Promise<void> {
 
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
+    if (signOverlay.isOpen()) return; // sign overlay handles its own dismissal
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
@@ -885,6 +958,50 @@ async function init(): Promise<void> {
             const ps = ls.player.getState();
             extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, ps.col, ps.row);
           }
+          if (result.type === 'block_pushed' && result.targetCol !== undefined && result.targetRow !== undefined) {
+            const facing = getFacingCell(ls.player.getState());
+            animateBlockPush(ls.blockMeshes.meshMap, facing.col, facing.row, result.targetCol, result.targetRow);
+            // Pressure plate at destination already activated by gameState.pushBlock()
+            // Just animate the visual press
+            const destPlate = gameState.plates.get(doorKey(result.targetCol, result.targetRow));
+            if (destPlate?.activated) {
+              pressPlate(ls.plateMeshes.meshMap, result.targetCol, result.targetRow);
+            }
+            // Deactivate plate at origin if block was on one
+            gameState.deactivatePressurePlate(facing.col, facing.row);
+            const originPlate = gameState.plates.get(doorKey(facing.col, facing.row));
+            if (originPlate && !originPlate.activated) {
+              releasePlate(ls.plateMeshes.meshMap, facing.col, facing.row);
+            }
+          }
+          if (result.type === 'chest_opened' && result.targetCol !== undefined && result.targetRow !== undefined) {
+            openChestMesh(ls.chestMeshes.meshMap, result.targetCol, result.targetRow);
+            // Roll loot from chest drops
+            const chest = gameState.getChest(result.targetCol, result.targetRow);
+            if (chest?.drops) {
+              const lootResult = rollLoot('', chest.drops);
+              gameState.gold += lootResult.gold;
+              for (const drop of lootResult.items) {
+                const entity = gameState.entityRegistry.createItem(
+                  drop.itemId, drop.quality,
+                  { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                  drop.modifiers,
+                );
+                const itemDef = itemDatabase.getItem(drop.itemId);
+                if (itemDef && itemDef.type === 'consumable') {
+                  addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                } else if (itemDef) {
+                  addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                }
+              }
+            }
+          }
+          if (result.type === 'chest_locked') {
+            hud.showMessage('This chest is locked.');
+          }
+          if (result.type === 'sign_read' && result.message) {
+            signOverlay.show(result.message);
+          }
         }
         break;
       case 'KeyF':
@@ -932,6 +1049,37 @@ async function init(): Promise<void> {
                     addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
                   } else if (itemDef) {
                     addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                  }
+                }
+              }
+            }
+            if (result.type === 'wall_hit' && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
+              // Apply damage to breakable wall and handle destruction
+              const wallResult = gameState.damageBreakableWall(result.targetCol, result.targetRow, result.damage, ls.level.grid);
+              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+              if (wallResult.destroyed) {
+                // Hide wall faces, show floor/ceiling
+                const entry = ls.wallEntityMeshes.meshMap.get(doorKey(result.targetCol, result.targetRow));
+                if (entry) {
+                  entry.wallGroup.visible = false;
+                  entry.floorCeilGroup.visible = true;
+                }
+                // Roll loot from wall drops
+                if (wallResult.drops) {
+                  const lootResult = rollLoot('', wallResult.drops);
+                  gameState.gold += lootResult.gold;
+                  for (const drop of lootResult.items) {
+                    const entity = gameState.entityRegistry.createItem(
+                      drop.itemId, drop.quality,
+                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                      drop.modifiers,
+                    );
+                    const itemDef = itemDatabase.getItem(drop.itemId);
+                    if (itemDef && itemDef.type === 'consumable') {
+                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                    } else if (itemDef) {
+                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                    }
                   }
                 }
               }
@@ -1010,6 +1158,7 @@ async function init(): Promise<void> {
       gameState.isDoorOpen.bind(gameState),
       lastPlayerCol, lastPlayerRow,
       gameState.isEnemyAt.bind(gameState),
+      gameState.isBlockAt.bind(gameState),
     );
     tickBlockedDoors(delta);
     transition.update(delta);
@@ -1054,7 +1203,7 @@ async function init(): Promise<void> {
     fireflies.update(delta, camPos2.x, camPos2.z);
     fireballExplosions.update(delta);
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen();
 
     // Attack cooldown tick — paused when overlays are open
     if (gameState.attackCooldown > 0 && !anyOverlayOpen) {

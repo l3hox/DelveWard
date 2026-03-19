@@ -95,6 +95,7 @@ export class ProjectileManager {
     playerCol: number,
     playerRow: number,
     isEnemyAt?: (col: number, row: number) => boolean,
+    isBlockAt?: (col: number, row: number) => boolean,
   ): void {
     const toRemove: string[] = [];
 
@@ -123,6 +124,7 @@ export class ProjectileManager {
           isWalkable, isDoorOpen,
           playerCol, playerRow,
           isEnemyAt,
+          isBlockAt,
         );
         if (hitType !== null) {
           // Place the projectile at the boundary it collided with.
@@ -256,9 +258,11 @@ export class ProjectileManager {
     playerCol: number,
     playerRow: number,
     isEnemyAt?: (col: number, row: number) => boolean,
+    isBlockAt?: (col: number, row: number) => boolean,
   ): HitType | null {
     if (!isWalkable(col, row)) return 'wall';
     if (!isDoorOpen(col, row)) return 'door';
+    if (isBlockAt?.(col, row)) return 'wall'; // blocks stop projectiles like walls
     if (col === playerCol && row === playerRow) return 'player';
     if (isEnemyAt?.(col, row)) return 'enemy';
     return null;

@@ -21,6 +21,7 @@ const ENTITY_TYPES = [
   'enemy', 'door', 'key', 'lever', 'pressure_plate',
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
+  'breakable_wall', 'secret_wall', 'block', 'chest', 'sign',
 ] as const;
 
 export class Toolbar {
@@ -740,6 +741,89 @@ export class Toolbar {
           const y = i * stepH;
           ctx.fillRect((size - w) / 2, y, w, Math.ceil(stepH - stepGap));
         }
+        break;
+      }
+
+      case 'breakable_wall': {
+        // Cracked X — two diagonal lines with a gap/break in the middle
+        ctx.strokeStyle = '#cc8844';
+        ctx.lineWidth = Math.max(1.5, r * 0.3);
+        const bGap = r * 0.3;
+        // NW-to-SE diagonal, broken at center
+        ctx.beginPath();
+        ctx.moveTo(cx - r, cy - r);
+        ctx.lineTo(cx - bGap, cy - bGap);
+        ctx.moveTo(cx + bGap, cy + bGap);
+        ctx.lineTo(cx + r, cy + r);
+        ctx.stroke();
+        // NE-to-SW diagonal, broken at center
+        ctx.beginPath();
+        ctx.moveTo(cx + r, cy - r);
+        ctx.lineTo(cx + bGap, cy - bGap);
+        ctx.moveTo(cx - bGap, cy + bGap);
+        ctx.lineTo(cx - r, cy + r);
+        ctx.stroke();
+        break;
+      }
+
+      case 'secret_wall': {
+        // Dashed rectangle outline
+        const swPad = r * 0.2;
+        ctx.strokeStyle = '#aaaaee';
+        ctx.lineWidth = Math.max(1, r * 0.2);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(cx - r + swPad, cy - r + swPad, (r - swPad) * 2, (r - swPad) * 2);
+        ctx.setLineDash([]);
+        break;
+      }
+
+      case 'block': {
+        // Filled gray square, smaller than full cell
+        const bkPad = r * 0.25;
+        ctx.fillStyle = '#888888';
+        ctx.fillRect(cx - r + bkPad, cy - r + bkPad, (r - bkPad) * 2, (r - bkPad) * 2);
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.strokeRect(cx - r + bkPad, cy - r + bkPad, (r - bkPad) * 2, (r - bkPad) * 2);
+        break;
+      }
+
+      case 'chest': {
+        // Box shape with a horizontal lid line
+        const chW = r * 1.6;
+        const chH = r * 1.2;
+        const chX = cx - chW / 2;
+        const chY = cy - chH / 2;
+        ctx.fillStyle = '#8B6914';
+        ctx.fillRect(chX, chY, chW, chH);
+        ctx.strokeStyle = '#4a3500';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.strokeRect(chX, chY, chW, chH);
+        // Lid line across the middle
+        const lidY = chY + chH * 0.45;
+        ctx.beginPath();
+        ctx.moveTo(chX, lidY);
+        ctx.lineTo(chX + chW, lidY);
+        ctx.stroke();
+        break;
+      }
+
+      case 'sign': {
+        // Small scroll/tablet rectangle
+        const sgW = r * 1.4;
+        const sgH = r * 1.0;
+        const sgX = cx - sgW / 2;
+        const sgY = cy - sgH / 2;
+        ctx.fillStyle = '#d4b896';
+        ctx.fillRect(sgX, sgY, sgW, sgH);
+        ctx.strokeStyle = '#6b4226';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.strokeRect(sgX, sgY, sgW, sgH);
+        // Two text lines
+        ctx.fillStyle = '#6b4226';
+        const lineH = sgH * 0.25;
+        ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.2, sgW * 0.7, lineH * 0.6);
+        ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.55, sgW * 0.7, lineH * 0.6);
         break;
       }
     }

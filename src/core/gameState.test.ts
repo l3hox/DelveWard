@@ -1306,3 +1306,243 @@ describe('GameState', () => {
     });
   });
 });
+
+// --- Phase D: Environment Entities ---
+
+describe('Phase D — Environment Entities', () => {
+  // --- Parse ---
+
+  it('Parse breakable_wall: stored in breakableWalls with correct hp/maxHp', () => {
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 40 },
+    ]);
+    expect(gs.breakableWalls.size).toBe(1);
+    const wall = gs.getBreakableWall(0, 0);
+    expect(wall).toBeDefined();
+    expect(wall!.hp).toBe(40);
+    expect(wall!.maxHp).toBe(40);
+  });
+
+  it('Parse secret_wall: stored in secretWalls with opened=false', () => {
+    const gs = new GameState([
+      { col: 2, row: 3, type: 'secret_wall' },
+    ]);
+    expect(gs.secretWalls.size).toBe(1);
+    const sw = gs.getSecretWall(2, 3);
+    expect(sw).toBeDefined();
+    expect(sw!.opened).toBe(false);
+  });
+
+  it('Parse block: stored in blocks map', () => {
+    const gs = new GameState([
+      { col: 1, row: 2, type: 'block' },
+    ]);
+    expect(gs.blocks.size).toBe(1);
+    expect(gs.getBlock(1, 2)).toBeDefined();
+  });
+
+  it('Parse chest: stored in chests map with correct state and keyId', () => {
+    const gs = new GameState([
+      { col: 3, row: 1, type: 'chest', state: 'locked', keyId: 'gold_key' },
+    ]);
+    expect(gs.chests.size).toBe(1);
+    const chest = gs.getChest(3, 1);
+    expect(chest).toBeDefined();
+    expect(chest!.state).toBe('locked');
+    expect(chest!.keyId).toBe('gold_key');
+  });
+
+  it('Parse sign: stored in signs map with correct wall and text', () => {
+    const grid = ['#####', '#...#', '#...#', '#####'];
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'sign', wall: 'N', text: 'Beware!' },
+    ], grid);
+    expect(gs.signs.size).toBe(1);
+    const sign = gs.getSign(1, 1);
+    expect(sign).toBeDefined();
+    expect(sign!.wall).toBe('N');
+    expect(sign!.text).toBe('Beware!');
+  });
+
+  // --- damageBreakableWall ---
+
+  it('damageBreakableWall — HP decreases', () => {
+    const grid = ['###', '#.#', '###'];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 30 },
+    ], grid);
+    const result = gs.damageBreakableWall(0, 0, 10, grid);
+    expect(result.destroyed).toBe(false);
+    const wall = gs.getBreakableWall(0, 0);
+    expect(wall?.hp).toBe(20);
+  });
+
+  it('damageBreakableWall — destroys at 0 HP', () => {
+    const grid = ['###', '#.#', '###'];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 10 },
+    ], grid);
+    const result = gs.damageBreakableWall(0, 0, 50, grid);
+    expect(result.destroyed).toBe(true);
+    expect(gs.getBreakableWall(0, 0)).toBeUndefined();
+    expect(grid[0][0]).toBe('.');
+    expect(gs.destroyedWalls.has('0,0')).toBe(true);
+  });
+
+  it('damageBreakableWall — returns drops on destroy', () => {
+    const grid = ['###', '#.#', '###'];
+    const drops = [{ itemId: 'hp1', chance: 100 }];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 10, drops },
+    ], grid);
+    const result = gs.damageBreakableWall(0, 0, 50, grid);
+    expect(result.destroyed).toBe(true);
+    expect(result.drops).toBeDefined();
+  });
+
+  // --- openSecretWall ---
+
+  it('openSecretWall — grid mutates and destroyedWalls updated', () => {
+    const grid = ['###', '#.#', '###'];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'secret_wall' },
+    ], grid);
+    const result = gs.openSecretWall(0, 0, grid);
+    expect(result.opened).toBe(true);
+    expect(result.persistent).toBe(false);
+    expect(grid[0][0]).toBe('.');
+    expect(gs.destroyedWalls.has('0,0')).toBe(true);
+    const sw = gs.getSecretWall(0, 0);
+    expect(sw?.opened).toBe(true);
+  });
+
+  it('openSecretWall — already opened returns false', () => {
+    const grid = ['###', '#.#', '###'];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'secret_wall' },
+    ], grid);
+    expect(gs.openSecretWall(0, 0, grid).opened).toBe(true);
+    expect(gs.openSecretWall(0, 0, grid).opened).toBe(false);
+  });
+
+  // --- pushBlock ---
+
+  it('pushBlock — re-keys map and updates block col/row', () => {
+    const gs = new GameState([
+      { col: 3, row: 3, type: 'block' },
+    ]);
+    const moved = gs.pushBlock(3, 3, 3, 2);
+    expect(moved).toBe(true);
+    expect(gs.getBlock(3, 3)).toBeUndefined();
+    const block = gs.getBlock(3, 2);
+    expect(block).toBeDefined();
+    expect(block!.col).toBe(3);
+    expect(block!.row).toBe(2);
+  });
+
+  it('pushBlock — returns false if no block at source', () => {
+    const gs = new GameState([]);
+    expect(gs.pushBlock(5, 5, 5, 4)).toBe(false);
+  });
+
+  // --- isBlockAt ---
+
+  it('isBlockAt — returns true for block position', () => {
+    const gs = new GameState([
+      { col: 2, row: 2, type: 'block' },
+    ]);
+    expect(gs.isBlockAt(2, 2)).toBe(true);
+    expect(gs.isBlockAt(2, 3)).toBe(false);
+  });
+
+  // --- openChest ---
+
+  it('openChest — closed chest opens and returns opened=true', () => {
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'chest', state: 'closed' },
+    ]);
+    const result = gs.openChest(1, 1);
+    expect(result.opened).toBe(true);
+    expect(gs.getChest(1, 1)!.state).toBe('open');
+  });
+
+  it('openChest — locked chest with correct key: key consumed, chest opens', () => {
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'chest', state: 'locked', keyId: 'gold_key' },
+    ]);
+    gs.addKey('gold_key');
+    const result = gs.openChest(1, 1);
+    expect(result.opened).toBe(true);
+    expect(gs.getChest(1, 1)!.state).toBe('open');
+    expect(gs.hasKey('gold_key')).toBe(false);
+  });
+
+  it('openChest — locked chest without key returns locked=true', () => {
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'chest', state: 'locked', keyId: 'gold_key' },
+    ]);
+    const result = gs.openChest(1, 1);
+    expect(result.opened).toBe(false);
+    expect(result.locked).toBe(true);
+    expect(gs.getChest(1, 1)!.state).toBe('locked');
+  });
+
+  it('openChest — already open returns opened=false', () => {
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'chest', state: 'open' },
+    ]);
+    const result = gs.openChest(1, 1);
+    expect(result.opened).toBe(false);
+  });
+
+  // --- getSignOnWall ---
+
+  it('getSignOnWall — matching wall returns sign', () => {
+    const grid = ['#####', '#...#', '#####'];
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'sign', wall: 'N', text: 'Hello' },
+    ], grid);
+    const sign = gs.getSignOnWall(1, 1, 'N');
+    expect(sign).toBeDefined();
+    expect(sign!.text).toBe('Hello');
+  });
+
+  it('getSignOnWall — wrong wall returns undefined', () => {
+    const grid = ['#####', '#...#', '#####'];
+    const gs = new GameState([
+      { col: 1, row: 1, type: 'sign', wall: 'N', text: 'Hello' },
+    ], grid);
+    expect(gs.getSignOnWall(1, 1, 'S')).toBeUndefined();
+  });
+
+  // --- Snapshot save/restore ---
+
+  it('Snapshot save/restore includes all new entity types', () => {
+    const grid = ['#####', '#...#', '#...#', '#####'];
+    const gs = new GameState([
+      { col: 0, row: 0, type: 'breakable_wall', hp: 20 },
+      { col: 4, row: 0, type: 'secret_wall' },
+      { col: 1, row: 1, type: 'block' },
+      { col: 2, row: 1, type: 'chest', state: 'closed' },
+      { col: 3, row: 1, type: 'sign', wall: 'N', text: 'Clue' },
+    ], grid);
+
+    const snap = gs.saveLevelState();
+
+    // Mutate state
+    gs.breakableWalls.clear();
+    gs.secretWalls.clear();
+    gs.blocks.clear();
+    gs.chests.clear();
+    gs.signs.clear();
+
+    // Restore
+    gs.loadLevelState(snap);
+
+    expect(gs.getBreakableWall(0, 0)?.hp).toBe(20);
+    expect(gs.getSecretWall(4, 0)?.opened).toBe(false);
+    expect(gs.getBlock(1, 1)).toBeDefined();
+    expect(gs.getChest(2, 1)?.state).toBe('closed');
+    expect(gs.getSign(3, 1)?.text).toBe('Clue');
+  });
+});

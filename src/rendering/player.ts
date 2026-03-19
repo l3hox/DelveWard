@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
-import { PlayerState, Facing, FACING_ANGLE } from '../core/grid';
+import { PlayerState, Facing, FACING_ANGLE, FACING_DELTA } from '../core/grid';
 import { doorKey, type StairInstance } from '../core/gameState';
 
 const TWEEN_SPEED = 20;
@@ -26,6 +26,7 @@ export class Player {
   private targetPitch: number;
 
   private onMoveCallback?: (col: number, row: number) => void;
+  private onMoveBlocked?: (col: number, row: number) => void;
   private onTurnCallback?: () => void;
   private commandQueue: Array<() => void> = [];
 
@@ -99,6 +100,10 @@ export class Player {
     this.onMoveCallback = callback;
   }
 
+  setOnMoveBlocked(callback: (col: number, row: number) => void): void {
+    this.onMoveBlocked = callback;
+  }
+
   setOnTurn(callback: () => void): void {
     this.onTurnCallback = callback;
   }
@@ -109,6 +114,9 @@ export class Player {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
+    } else {
+      const [dc, dr] = FACING_DELTA[this.state.facing];
+      this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr);
     }
   }
 

@@ -341,7 +341,103 @@ export class Inspector {
         }
         break;
       }
+
+      case 'breakable_wall':
+        this.addNumberField('hp', (entity.hp as number) ?? 30, (val) => {
+          entity.hp = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        break;
+
+      case 'secret_wall': {
+        const persistWrapper = document.createElement('div');
+        persistWrapper.className = 'inspector-field';
+        const persistLbl = document.createElement('label');
+        persistLbl.style.display = 'flex';
+        persistLbl.style.alignItems = 'center';
+        persistLbl.style.gap = '4px';
+        const persistCb = document.createElement('input');
+        persistCb.type = 'checkbox';
+        persistCb.checked = (entity.persistent as boolean) ?? false;
+        persistCb.addEventListener('change', () => {
+          this.onBeforeDiscreteChange?.();
+          entity.persistent = persistCb.checked;
+          this.onEntityChanged?.();
+        });
+        persistLbl.appendChild(persistCb);
+        const persistText = document.createElement('span');
+        persistText.textContent = 'illusionary (stays visible)';
+        persistLbl.appendChild(persistText);
+        persistWrapper.appendChild(persistLbl);
+        this.container.appendChild(persistWrapper);
+        break;
+      }
+
+      case 'block':
+        // No extra fields beyond type and position
+        break;
+
+      case 'chest': {
+        this.addDropdownField('state', (entity.state as string) ?? 'closed', ['closed', 'open', 'locked'], (val) => {
+          entity.state = val;
+          this.onEntityChanged?.();
+        });
+        this.addPickableField('keyId', (entity.keyId as string) ?? '', entity, 'keyId', (val) => {
+          entity.keyId = val;
+          this.onEntityChanged?.();
+        }, undefined, 'key');
+        this.addReferencedBySection(entity);
+        {
+          const refs = this.app.getReferencingEntities(entity);
+          if (refs.length > 1) {
+            this.addDropdownField('gateMode', (entity.gateMode as string) ?? 'or', ['or', 'and', 'xor'], (val) => {
+              entity.gateMode = val;
+              this.onEntityChanged?.();
+            });
+          }
+        }
+        break;
+      }
+
+      case 'sign':
+        this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+          entity.wall = val;
+          this.onEntityChanged?.();
+        });
+        this.addTextareaField('text', (entity.text as string) ?? '', (val) => {
+          entity.text = val;
+          this.onEntityChanged?.();
+        });
+        break;
     }
+  }
+
+  private addTextareaField(
+    label: string,
+    value: string,
+    onChange: (val: string) => void
+  ): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    wrapper.appendChild(lbl);
+
+    const textarea = document.createElement('textarea');
+    textarea.rows = 3;
+    textarea.value = value;
+    textarea.style.width = '100%';
+    textarea.style.boxSizing = 'border-box';
+    textarea.style.resize = 'vertical';
+    textarea.addEventListener('input', () => {
+      this.onBeginTextEdit?.();
+      onChange(textarea.value);
+    });
+    textarea.addEventListener('blur', () => this.onCommitTextEdit?.());
+    wrapper.appendChild(textarea);
+
+    this.container.appendChild(wrapper);
   }
 
   private addDropdownField(

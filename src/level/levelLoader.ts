@@ -218,6 +218,38 @@ function validateEntity(
       if (typeof e.target !== 'string') return `${pfx} stairs must have a string target (paired stair entity ID)`;
       break;
     }
+    case 'breakable_wall': {
+      if (walkableChars.has(cell)) return `${pfx} breakable_wall must be on a solid cell, found '${cell}'`;
+      if (typeof e.hp !== 'number' || (e.hp as number) <= 0) return `${pfx} breakable_wall must have a positive hp`;
+      break;
+    }
+    case 'secret_wall': {
+      if (walkableChars.has(cell)) return `${pfx} secret_wall must be on a solid cell, found '${cell}'`;
+      break;
+    }
+    case 'block': {
+      const w = checkWalkable('block'); if (w) return w;
+      break;
+    }
+    case 'chest': {
+      const w = checkWalkable('chest'); if (w) return w;
+      if (e.state !== undefined) {
+        const validStates = new Set(['closed', 'open', 'locked']);
+        if (!validStates.has(e.state as string)) return `${pfx} chest state must be closed, open, or locked`;
+      }
+      if (e.keyId !== undefined && typeof e.keyId !== 'string') return `${pfx} chest keyId must be a string`;
+      if (e.gateMode !== undefined) {
+        const validGateModes = ['or', 'and', 'xor'];
+        if (!validGateModes.includes(e.gateMode as string)) return `${pfx} chest gateMode must be one of ${validGateModes.join(', ')}`;
+      }
+      break;
+    }
+    case 'sign': {
+      const w = checkWalkable('sign'); if (w) return w;
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) return `${pfx} sign wall must be N, S, E, or W`;
+      if (typeof e.text !== 'string' || (e.text as string).length === 0) return `${pfx} sign must have non-empty text`;
+      break;
+    }
   }
 
   return null;

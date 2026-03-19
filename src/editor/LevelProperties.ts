@@ -161,7 +161,7 @@ export class LevelProperties {
       }, 'ceiling');
     });
 
-    this.addCollapsibleSection('CharDefs', 'charDefs', (body) => {
+    this.addCollapsibleSection('Custom Tiles', 'charDefs', (body) => {
       if (!level.charDefs) level.charDefs = [];
       const charDefs = level.charDefs;
 
@@ -172,7 +172,7 @@ export class LevelProperties {
 
       const addBtn = document.createElement('button');
       addBtn.className = 'btn-add';
-      addBtn.textContent = 'Add CharDef';
+      addBtn.textContent = 'Add Tile Type';
       addBtn.addEventListener('click', () => {
         this.onBeforeDiscreteChange?.();
         charDefs.push({ char: '?', solid: false });

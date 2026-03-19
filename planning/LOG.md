@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-19 — Phase D: Environment Entities
+
+**Design**: 5 new entity types for dungeon environment interaction.
+
+- **Breakable walls**: Solid cells with HP. Player attacks reduce HP (wall_hit combat result). On destroy: grid mutated to '.', wall geometry hidden, floor/ceiling revealed, optional loot drops. Uses shared wallEntityRenderer for geometry (wallGroup visible initially, floorCeilGroup hidden until destroy).
+- **Secret walls**: Solid cells opened by walking into them. Player's `onMoveBlocked` callback detects walk-into, opens wall (grid mutation + geometry swap), re-invokes moveForward. `persistent` flag for illusionary walls that stay visible but become walkable ("An illusionary wall!" vs "A secret passage!").
+- **Pushable blocks**: Walkable cells with blocking entities. Interact (Space) pushes one cell in facing direction. Validates destination (walkable, no enemy/block/player, door open). Activates pressure plates. Blocks projectiles (added to projectileManager collision).
+- **Treasure chests**: Three states (closed/open/locked). Key-locked variant consumes key on open. Signal-controlled variant (gateMode) registered as signal receiver. Lid pivot animation on open/close.
+- **Message signs**: Wall-mounted on walkable cells. Interact (Space facing sign's wall) shows parchment overlay. DOM-based overlay with capture-phase keydown for modal input blocking.
+
+**Architecture**: `wallEntityCells` Set passed to `buildDungeon()` to skip wall faces that entity renderers own. Combined `isBlocked` callback on Player (`isBlockedByEnemy || isBlockAt`). `destroyedWalls` Set in GameState for walkability tracking across save/restore.
+
+---
+
 ## 2026-03-19 — Phase C: Status Effects
 
 **Design**: Array-based status effects on both player and enemies. Same-type refresh (max of remaining vs new duration), no damage stacking. Ticked in existing game loops (animate for player, updateEnemies for enemies). ADR-M2-04.

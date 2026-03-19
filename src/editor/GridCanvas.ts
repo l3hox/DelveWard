@@ -243,7 +243,17 @@ export class GridCanvas {
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
           this.onBeforeEntityAdd?.();
-          this.app.addEntity(col, row, this.app.selectedEntityType);
+          const added = this.app.addEntity(col, row, this.app.selectedEntityType);
+          if (!added) {
+            const t = this.app.selectedEntityType;
+            if (t === 'breakable_wall' || t === 'secret_wall') {
+              this.app.statusHint = 'Must be placed on a solid wall tile';
+            } else if (t !== 'gate') {
+              this.app.statusHint = 'Must be placed on a floor tile';
+            }
+          } else {
+            this.app.statusHint = null;
+          }
           this.onSelectionChange?.();
           this.dirty = true;
         }
@@ -896,6 +906,92 @@ export class GridCanvas {
           ctx.fill();
           ctx.stroke();
         }
+        break;
+      }
+
+      case 'breakable_wall': {
+        // Cracked X — two diagonal lines with a gap/break in the middle
+        const bGap = Math.max(2, Math.min(tw, th) * 0.12);
+        const bReach = Math.min(tw, th) * 0.4;
+        ctx.strokeStyle = '#cc8844';
+        ctx.lineWidth = Math.max(1.5, Math.min(tw, th) * 0.06);
+        // NW-to-SE diagonal, broken at center
+        ctx.beginPath();
+        ctx.moveTo(cx - bReach, cy - bReach);
+        ctx.lineTo(cx - bGap, cy - bGap);
+        ctx.moveTo(cx + bGap, cy + bGap);
+        ctx.lineTo(cx + bReach, cy + bReach);
+        ctx.stroke();
+        // NE-to-SW diagonal, broken at center
+        ctx.beginPath();
+        ctx.moveTo(cx + bReach, cy - bReach);
+        ctx.lineTo(cx + bGap, cy - bGap);
+        ctx.moveTo(cx - bGap, cy + bGap);
+        ctx.lineTo(cx - bReach, cy + bReach);
+        ctx.stroke();
+        break;
+      }
+
+      case 'secret_wall': {
+        // Dashed rectangle outline
+        const swPad = Math.min(tw, th) * 0.12;
+        ctx.strokeStyle = '#aaaaee';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.06);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(px + swPad, py + swPad, tw - swPad * 2, th - swPad * 2);
+        ctx.setLineDash([]);
+        break;
+      }
+
+      case 'block': {
+        // Filled gray square, inset from the tile edges
+        const bkPad = Math.min(tw, th) * 0.15;
+        ctx.fillStyle = '#888888';
+        ctx.fillRect(px + bkPad, py + bkPad, tw - bkPad * 2, th - bkPad * 2);
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.05);
+        ctx.strokeRect(px + bkPad, py + bkPad, tw - bkPad * 2, th - bkPad * 2);
+        break;
+      }
+
+      case 'chest': {
+        // Box shape with a horizontal lid line
+        const chPad = Math.min(tw, th) * 0.12;
+        const chW = tw - chPad * 2;
+        const chH = (th - chPad * 2) * 0.75;
+        const chX = px + chPad;
+        const chY = cy - chH / 2;
+        ctx.fillStyle = '#8B6914';
+        ctx.fillRect(chX, chY, chW, chH);
+        ctx.strokeStyle = '#4a3500';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.05);
+        ctx.strokeRect(chX, chY, chW, chH);
+        // Lid line across the upper 40%
+        const lidY = chY + chH * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(chX, lidY);
+        ctx.lineTo(chX + chW, lidY);
+        ctx.stroke();
+        break;
+      }
+
+      case 'sign': {
+        // Small scroll/tablet rectangle with two simulated text lines
+        const sgPad = Math.min(tw, th) * 0.15;
+        const sgW = tw - sgPad * 2;
+        const sgH = (th - sgPad * 2) * 0.7;
+        const sgX = px + sgPad;
+        const sgY = cy - sgH / 2;
+        ctx.fillStyle = '#d4b896';
+        ctx.fillRect(sgX, sgY, sgW, sgH);
+        ctx.strokeStyle = '#6b4226';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.05);
+        ctx.strokeRect(sgX, sgY, sgW, sgH);
+        // Two text lines
+        ctx.fillStyle = '#6b4226';
+        const lineH = Math.max(1, sgH * 0.15);
+        ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.2, sgW * 0.7, lineH);
+        ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.55, sgW * 0.7, lineH);
         break;
       }
 
