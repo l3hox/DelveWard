@@ -103,13 +103,16 @@ export interface StairInstance {
   facing: Facing;
 }
 
+export type LauncherFireMode = 'single' | 'repeat';
+
 export interface TrapLauncherInstance {
   id?: string;
   col: number;
   row: number;
   facing: Facing;              // firing direction
   projectileType: string;      // 'dart' | 'arrow' | 'fireball'
-  reloadTime: number;          // seconds between shots (minimum interval)
+  fireMode: LauncherFireMode;  // 'single' = one shot per signal edge, 'repeat' = continuous while active
+  reloadTime: number;          // seconds between shots (repeat mode interval)
   nextFireAt: number;          // absolute time for next allowed shot (0 = ready)
   maxRange?: number;           // optional range limit
 }
@@ -361,6 +364,7 @@ export class GameState {
           row: e.row,
           facing: (e.facing as Facing) ?? 'S',
           projectileType: (e.projectileType as string) ?? 'dart',
+          fireMode: (e.fireMode as LauncherFireMode) ?? 'repeat',
           reloadTime: (e.reloadTime as number) ?? 3,
           nextFireAt: 0,
           maxRange: e.maxRange as number | undefined,
@@ -512,8 +516,10 @@ export class GameState {
       // Check if this receiver is a trap launcher
       const launcher = this.trapLaunchers.get(doorKey(pos.col, pos.row));
       if (launcher && active && launcher.nextFireAt === 0) {
-        launcher.nextFireAt = this.signalManager.now + launcher.reloadTime;
         this.onLauncherFire?.(launcher);
+        if (launcher.fireMode === 'repeat') {
+          launcher.nextFireAt = this.signalManager.now + launcher.reloadTime;
+        }
       }
       if (launcher && !active) {
         launcher.nextFireAt = 0;  // cancel reload schedule
@@ -914,10 +920,11 @@ export class GameState {
     return true;
   }
 
-  /** Tick trap launchers using absolute-time scheduling. */
+  /** Tick trap launchers using absolute-time scheduling (repeat mode only). */
   tickTrapLaunchers(): void {
     const now = this.signalManager.now;
     for (const launcher of this.trapLaunchers.values()) {
+      if (launcher.fireMode !== 'repeat') continue;
       if (launcher.nextFireAt > 0 && now >= launcher.nextFireAt && launcher.id) {
         if (this.signalManager.isReceiverActive(launcher.id)) {
           launcher.nextFireAt = launcher.nextFireAt + launcher.reloadTime;  // drift-free

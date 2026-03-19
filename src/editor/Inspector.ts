@@ -292,6 +292,12 @@ export class Inspector {
             entity.projectileType = val;
             this.onEntityChanged?.();
           });
+        this.addDropdownField('fireMode', (entity.fireMode as string) ?? 'repeat',
+          ['single', 'repeat'], (val) => {
+            entity.fireMode = val;
+            this.onEntityChanged?.();
+            this.refresh();
+          });
         this.addNumberField('reloadTime', (entity.reloadTime as number) ?? 3, (val) => {
           entity.reloadTime = val;
           this.onEntityChanged?.();

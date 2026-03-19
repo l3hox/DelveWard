@@ -35,10 +35,15 @@ describe('ProjectileManager', () => {
       expect(p.maxRange).toBe(PROJECTILE_STATS.dart.maxRange);
     });
 
-    it('sets spawn position to center of the given cell', () => {
-      const p = pm.spawn({ col: 2, row: 3, direction: 'E', projectileType: 'arrow' });
-      expect(p.col).toBe(2.5);
-      expect(p.row).toBe(3.5);
+    it('spawns at wall edge offset toward launcher (opposite of firing direction)', () => {
+      const e = pm.spawn({ col: 2, row: 3, direction: 'E', projectileType: 'arrow' });
+      expect(e.col).toBeCloseTo(2.05, 5); // offset toward west wall (launcher side)
+      expect(e.row).toBeCloseTo(3.5, 5);
+
+      const pm2 = new ProjectileManager();
+      const n = pm2.spawn({ col: 5, row: 5, direction: 'N', projectileType: 'dart' });
+      expect(n.col).toBeCloseTo(5.5, 5);
+      expect(n.row).toBeCloseTo(5.95, 5); // offset toward south wall
     });
 
     it('assigns a unique id per projectile', () => {

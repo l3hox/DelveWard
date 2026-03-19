@@ -316,7 +316,7 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/test_m2a.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/test_m2b.json');
   const firstLevel = dungeon.levels[0];
 
   let currentLevelId = firstLevel.id!;

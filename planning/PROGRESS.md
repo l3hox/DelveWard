@@ -24,7 +24,7 @@ Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning
 
 ### M2 Implementation
 - [x] Phase A: Signal system foundation (targets[] migration, signal state, gate modes, behaviors, trigger/tripwire, standalone gates, editor support)
-- [ ] Phase B: Projectile system (ProjectileManager, collision, trap launchers, 3 projectile types, rendering, editor support)
+- [x] Phase B: Projectile system (ProjectileManager, collision, trap launchers, 3 projectile types, rendering, editor support, single/repeat fire modes, wall-edge spawn)
 - [ ] Phase C: Status effects (data model, tick logic, poison/slow/burning, HUD icons + visual overlays)
 - [ ] Phase D: Environment entities (breakable walls, secret walls, pushable blocks, chests, signs, renderers, editor support)
 - [ ] Phase E: Save/load (serialization, localStorage slots, auto-save, UI, export/import, death → load)

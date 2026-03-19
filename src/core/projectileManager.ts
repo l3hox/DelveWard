@@ -62,10 +62,17 @@ export class ProjectileManager {
     }
 
     const id = `proj_${this.nextId++}`;
+    // Offset spawn toward the wall the launcher is mounted on (wall edge)
+    const WALL_OFFSET = 0.45;
+    const dirOffsets: Record<string, [number, number]> = {
+      N: [0, WALL_OFFSET], S: [0, -WALL_OFFSET], E: [-WALL_OFFSET, 0], W: [WALL_OFFSET, 0],
+    };
+    const [dCol, dRow] = dirOffsets[opts.direction] ?? [0, 0];
+
     const projectile: Projectile = {
       id,
-      col: opts.col + 0.5,
-      row: opts.row + 0.5,
+      col: opts.col + 0.5 + dCol,
+      row: opts.row + 0.5 + dRow,
       direction: opts.direction,
       speed: stats.speed,
       damage: stats.damage,
