@@ -98,11 +98,7 @@ export function rollGold(min: number, max: number): number {
  */
 export function rollLoot(enemyType: string, dropsOverride?: DropsOverride): LootRollResult {
   const entry = lootTableMap.get(enemyType);
-  if (!entry) {
-    return { gold: 0, items: [] };
-  }
-
-  const gold = rollGold(entry.gold[0], entry.gold[1]);
+  const gold = entry ? rollGold(entry.gold[0], entry.gold[1]) : 0;
   const items: LootRollResult['items'] = [];
 
   // 1. Guaranteed items from override — always added.
@@ -114,8 +110,8 @@ export function rollLoot(enemyType: string, dropsOverride?: DropsOverride): Loot
     }
   }
 
-  // 2. Base table drops — skipped when suppressTable is set.
-  if (!dropsOverride?.suppressTable) {
+  // 2. Base table drops — skipped when suppressTable is set or no table exists.
+  if (entry && !dropsOverride?.suppressTable) {
     for (const drop of entry.drops) {
       if (Math.random() < drop.chance) {
         const quality = drop.quality ?? rollQuality();
