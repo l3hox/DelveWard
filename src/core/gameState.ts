@@ -110,7 +110,7 @@ export interface TrapLauncherInstance {
   facing: Facing;              // firing direction
   projectileType: string;      // 'dart' | 'arrow' | 'fireball'
   reloadTime: number;          // seconds between shots (minimum interval)
-  reloadTimer: number;         // countdown to next allowed shot
+  nextFireAt: number;          // absolute time for next allowed shot (0 = ready)
   maxRange?: number;           // optional range limit
 }
 
@@ -362,7 +362,7 @@ export class GameState {
           facing: (e.facing as Facing) ?? 'S',
           projectileType: (e.projectileType as string) ?? 'dart',
           reloadTime: (e.reloadTime as number) ?? 3,
-          reloadTimer: 0,
+          nextFireAt: 0,
           maxRange: e.maxRange as number | undefined,
         });
       } else if (e.type === 'torch_sconce') {
@@ -511,9 +511,12 @@ export class GameState {
       }
       // Check if this receiver is a trap launcher
       const launcher = this.trapLaunchers.get(doorKey(pos.col, pos.row));
-      if (launcher && active && launcher.reloadTimer <= 0) {
-        launcher.reloadTimer = launcher.reloadTime;
+      if (launcher && active && launcher.nextFireAt === 0) {
+        launcher.nextFireAt = this.signalManager.now + launcher.reloadTime;
         this.onLauncherFire?.(launcher);
+      }
+      if (launcher && !active) {
+        launcher.nextFireAt = 0;  // cancel reload schedule
       }
     });
 
@@ -814,7 +817,7 @@ export class GameState {
       // Timed plates: clear the timer — countdown starts on step-off, not step-on
       if (mode === 'timed') {
         const source = this.signalManager.getSource(plate.id);
-        if (source) source.timer = 0;
+        if (source) source.deactivateAt = 0;
       }
     } else {
       for (const t of plate.targets) {
@@ -846,7 +849,7 @@ export class GameState {
       // Start the timed countdown — signal stays active until timer expires
       const source = plate.id ? this.signalManager.getSource(plate.id) : undefined;
       if (source && source.active && source.duration) {
-        source.timer = source.duration;
+        source.deactivateAt = this.signalManager.now + source.duration;
       }
     }
   }
@@ -874,7 +877,7 @@ export class GameState {
       // Timed triggers: clear timer — countdown starts on step-off
       if (mode === 'timed') {
         const source = this.signalManager.getSource(trigger.id);
-        if (source) source.timer = 0;
+        if (source) source.deactivateAt = 0;
       }
     }
     return true;
@@ -895,7 +898,7 @@ export class GameState {
       // Start the timed countdown — signal stays active until timer expires
       const source = trigger.id ? this.signalManager.getSource(trigger.id) : undefined;
       if (source && source.active && source.duration) {
-        source.timer = source.duration;
+        source.deactivateAt = this.signalManager.now + source.duration;
       }
     }
   }
@@ -911,17 +914,16 @@ export class GameState {
     return true;
   }
 
-  /** Tick reload timers for all trap launchers. Check continuous signals. */
-  tickTrapLaunchers(delta: number): void {
+  /** Tick trap launchers using absolute-time scheduling. */
+  tickTrapLaunchers(): void {
+    const now = this.signalManager.now;
     for (const launcher of this.trapLaunchers.values()) {
-      if (launcher.reloadTimer > 0) {
-        launcher.reloadTimer = Math.max(0, launcher.reloadTimer - delta);
-      }
-      // Continuous signal: re-fire when reload ready and signal still active
-      if (launcher.id && launcher.reloadTimer <= 0) {
+      if (launcher.nextFireAt > 0 && now >= launcher.nextFireAt && launcher.id) {
         if (this.signalManager.isReceiverActive(launcher.id)) {
-          launcher.reloadTimer = launcher.reloadTime;
+          launcher.nextFireAt = launcher.nextFireAt + launcher.reloadTime;  // drift-free
           this.onLauncherFire?.(launcher);
+        } else {
+          launcher.nextFireAt = 0;
         }
       }
     }

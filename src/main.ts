@@ -980,7 +980,7 @@ async function init(): Promise<void> {
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
     gameState.signalManager.tick(delta);
-    gameState.tickTrapLaunchers(delta);
+    gameState.tickTrapLaunchers();
     projectileManager.update(
       delta,
       (col, row) => ls.walkable.has(ls.level.grid[row]?.[col]),

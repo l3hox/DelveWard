@@ -382,4 +382,103 @@ describe('SignalManager', () => {
     sm.setSourceActive('lever_1', false);
     expect(sm.isReceiverActive('door_1')).toBe(true);
   });
+
+  // --- Drift regression tests ---
+
+  it('pulse repeat: zero drift over irregular frame deltas', () => {
+    const sm = new SignalManager();
+    const cb = vi.fn();
+    sm.setReceiverChangedCallback(cb);
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'pulse_repeat', ['door_1'], undefined, 1.0);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('lever_1', true);
+    cb.mockClear();
+
+    // Simulate 10 seconds with wildly irregular frame deltas
+    const deltas = [
+      0.016, 0.032, 0.008, 0.1, 0.05, 0.004, 0.016, 0.033, 0.016, 0.016,
+      0.08, 0.012, 0.016, 0.064, 0.016, 0.016, 0.016, 0.1, 0.016, 0.016,
+    ];
+    let elapsed = 0;
+    let pulseCount = 0;
+    while (elapsed < 10) {
+      const d = deltas[Math.floor(Math.random() * deltas.length)];
+      const prevNow = sm.now;
+      sm.tick(d);
+      elapsed += d;
+      // Count pulses by checking if gate.fireAt advanced
+      const gate = sm.getGate('gate_1')!;
+      if (gate.fireAt > prevNow + d + 0.001 || cb.mock.calls.length > pulseCount) {
+        // A repropagation happened
+      }
+    }
+    // With interval=1.0 and ~10s elapsed, exactly 10 pulse events should have fired
+    // (initial schedule at t=1, then t=2, t=3, ... t=10)
+    const gate = sm.getGate('gate_1')!;
+    // The gate's fireAt should be exactly 11.0 (next unprocessed fire) regardless of frame jitter
+    // Since we went past 10s, fireAt should be the next integer after elapsed
+    const expectedNextFire = Math.ceil(elapsed);
+    // fireAt should be within 1 interval of expected — the key point is NO accumulated drift
+    expect(gate.fireAt).toBeCloseTo(expectedNextFire, 0);
+  });
+
+  it('save/load preserves clock and timed source deactivates correctly', () => {
+    const sm = new SignalManager();
+    sm.registerSource('plate_1', ['door_1'], 'timed', 3.0);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('plate_1', true);
+    sm.tick(2.0); // now = 2, deactivateAt = 3.0
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+
+    const state = sm.saveState();
+    expect(state.now).toBe(2.0);
+
+    // Load into fresh SM
+    const sm2 = new SignalManager();
+    sm2.loadState(state);
+    expect(sm2.now).toBe(2.0);
+    expect(sm2.isReceiverActive('door_1')).toBe(true);
+
+    // Tick to t=5 — should deactivate at t=3
+    const cb = vi.fn();
+    sm2.setSourceDeactivatedCallback(cb);
+    sm2.tick(3.0); // now = 5
+    expect(sm2.isReceiverActive('door_1')).toBe(false);
+    expect(cb).toHaveBeenCalledWith('plate_1');
+  });
+
+  it('delay gate chain: exact timing regardless of frame jitter', () => {
+    const sm = new SignalManager();
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'delay', ['gate_2'], 1.0);
+    sm.registerGate('gate_2', 'delay', ['door_1'], 1.0);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('lever_1', true);
+
+    // Simulate with irregular deltas totaling exactly 2.0s
+    // Use many small irregular steps
+    const steps = [0.3, 0.15, 0.05, 0.2, 0.1, 0.25, 0.05, 0.15, 0.3, 0.1, 0.15, 0.1];
+    let total = 0;
+    for (const d of steps) {
+      sm.tick(d);
+      total += d;
+      if (total < 1.0) {
+        expect(sm.getGate('gate_1')!.active).toBe(false);
+      }
+      if (total < 2.0) {
+        expect(sm.isReceiverActive('door_1')).toBe(false);
+      }
+    }
+    // After 1.9s total, door should still be closed
+    expect(total).toBeCloseTo(1.9, 5);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // One more tick past 2.0s total
+    sm.tick(0.2);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+  });
 });

@@ -115,6 +115,50 @@ Save data includes full GameState (player stats, inventory, position), all level
 
 ---
 
+## ADR-M2-05 — Global Clock: Absolute-Time Scheduling
+
+**Status:** Accepted
+**Date:** 2026-03-19
+
+### Context
+
+Multiple timed systems (signal delays, timed levers/plates, delay gates, pulse gates, trap launcher reload) used independent countdown timers (`timer -= delta`). Two problems:
+
+1. **Frame drift**: when framerates fluctuate, countdown-based timers drift from their intended fire times because `delta` is never exactly the remaining time.
+2. **Compounding drift on repeating events**: pulse_repeat gates and trap launchers reschedule from `now` instead of their intended fire time, compounding drift over many cycles.
+
+### Decision
+
+**Single monotonic clock on SignalManager (`now`). All timed events store absolute timestamps.**
+
+- `SignalManager.now` is a public monotonic clock, advanced by `tick(delta)`.
+- Source timers renamed: `timer` → `deactivateAt`, `delayTimer` → `delayFireAt` (absolute timestamps, 0 = not scheduled).
+- Gate timers renamed: `timer` → `fireAt` (absolute timestamp, 0 = not scheduled).
+- Trap launcher: `reloadTimer` → `nextFireAt` (absolute, 0 = ready).
+- `tick()` checks `this.now >= timestamp` instead of decrementing counters.
+- Repeating events (pulse_repeat, trap reload) reschedule from their *intended* fire time (`fireAt + interval`), not `this.now + interval` — zero accumulated drift.
+- Delayed→timed chaining anchors deactivation to intended activation time (`delayFireAt + duration`), not actual frame time.
+- Clock is serialized in `saveState`/`loadState` and reset in `clear()`.
+
+**Scope:** Game-logic timers only. Visual/animation timers (animators, particles, damage numbers, flicker, overlays) remain delta-based — drift in visuals is imperceptible.
+
+### Alternatives Rejected
+
+**Compensating delta approach:** Adjust each countdown's final tick to account for overshoot. Fixes single events but still drifts on repeating schedules because each new countdown starts from the frame-adjusted value, not the intended time. Also requires changes at every timer site.
+
+### Consequences
+
+**Positive:**
+- Zero drift over any time horizon — pulse gates and trap launchers stay perfectly in sync
+- Tab-away/background doesn't desync timed systems (MAX_FRAME_DELTA cap still applies, but no accumulation)
+- Cleaner semantics — "when does this fire?" vs "how much time is left?"
+- Backward-safe: `loadState` defaults `now` to 0 for old saves
+
+**Negative / Risks:**
+- All code touching source/gate timer fields must use the new names — breaking change across signalManager.ts and gameState.ts (contained, both updated simultaneously)
+
+---
+
 ## ADR-M2-04 — Status Effects System
 
 **Status:** Accepted

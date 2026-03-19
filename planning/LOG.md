@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-19 — Global Clock: Absolute-Time Scheduling
+
+**Problem**: Independent countdown timers (`timer -= delta`) across signal delays, timed sources, delay/pulse gates, and trap launchers drift under variable framerates. Repeating events compound drift by rescheduling from `this.now` instead of intended fire time.
+
+**Solution**: Single monotonic clock (`SignalManager.now`) advanced by `tick()`. All timed events store absolute timestamps (`deactivateAt`, `delayFireAt`, `fireAt`, `nextFireAt`). Repeating events reschedule from their *intended* fire time, not actual frame time. Zero drift over any time horizon.
+
+**Scope**: Game-logic timers only. Visual/animation timers (particles, damage numbers, flicker) remain delta-based.
+
+**Changes**:
+- `signalManager.ts`: `now` field, renamed `timer`→`deactivateAt`/`delayFireAt`/`fireAt`, tick uses `>=` comparison instead of countdown, save/load/clear includes clock
+- `gameState.ts`: `reloadTimer`→`nextFireAt`, `tickTrapLaunchers()` drops delta param, 4 source field mutation sites updated
+- `main.ts`: removed delta arg from `tickTrapLaunchers()` call
+- `signalManager.test.ts`: 3 new drift regression tests (pulse zero-drift, save/load clock preservation, delay chain timing)
+
+**ADR**: ADR-M2-05
+
+---
+
 ## 2026-03-18 — Post-Phase-A Round 2: Trigger/Tripwire Fixes, Tripwire Rendering, Editor UX
 
 **Trigger modes fixed**: Toggle triggers flip on/off each step-on (was always activating). Timed triggers start countdown on step-off, not step-on. Fired state resets on timer expiry via `onSourceDeactivated`.

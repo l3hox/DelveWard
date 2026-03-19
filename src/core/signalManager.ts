@@ -17,9 +17,9 @@ export interface SignalSource {
   active: boolean;
   fired: boolean;          // for one_shot: already triggered
   duration?: number;       // for timed: total duration in seconds
-  timer: number;           // for timed: remaining time
+  deactivateAt: number;    // for timed: absolute time to deactivate (0 = not scheduled)
   delay?: number;          // optional activation delay in seconds
-  delayTimer: number;      // countdown for pending delayed activation
+  delayFireAt: number;     // absolute time for delayed activation (0 = not scheduled)
   delayPending: boolean;   // true while waiting for delay to elapse
 }
 
@@ -36,7 +36,7 @@ export interface SignalGate {
   active: boolean;         // computed output
   delay?: number;          // for delay gate
   interval?: number;       // for pulse_repeat gate
-  timer: number;           // internal timer for delay/pulse
+  fireAt: number;          // absolute time for next gate event (0 = not scheduled)
   pendingActivation: boolean; // for delay: waiting to activate
 }
 
@@ -49,6 +49,7 @@ export class SignalManager {
   private gates = new Map<string, SignalGate>();
   private onReceiverChanged: ReceiverChangedCallback | null = null;
   private onSourceDeactivated: SourceDeactivatedCallback | null = null;
+  now = 0;
 
   setReceiverChangedCallback(cb: ReceiverChangedCallback): void {
     this.onReceiverChanged = cb;
@@ -72,9 +73,9 @@ export class SignalManager {
       active: false,
       fired: false,
       duration,
-      timer: 0,
+      deactivateAt: 0,
       delay,
-      delayTimer: 0,
+      delayFireAt: 0,
       delayPending: false,
     });
   }
@@ -101,7 +102,7 @@ export class SignalManager {
       active: false,
       delay,
       interval,
-      timer: 0,
+      fireAt: 0,
       pendingActivation: false,
     });
   }
@@ -116,7 +117,7 @@ export class SignalManager {
     // Delayed activation: start countdown instead of activating immediately
     if (active && source.delay && source.delay > 0 && !source.delayPending && !source.active) {
       source.delayPending = true;
-      source.delayTimer = source.delay;
+      source.delayFireAt = this.now + source.delay;
       if (source.signalMode === 'one_shot') source.fired = true;
       return; // don't propagate yet — tick() will handle it
     }
@@ -124,7 +125,7 @@ export class SignalManager {
     // Cancel pending delay on deactivation
     if (!active) {
       source.delayPending = false;
-      source.delayTimer = 0;
+      source.delayFireAt = 0;
     }
 
     source.active = active;
@@ -134,7 +135,7 @@ export class SignalManager {
     }
 
     if (active && source.signalMode === 'timed' && source.duration) {
-      source.timer = source.duration;
+      source.deactivateAt = this.now + source.duration;
     }
 
     this.propagate();
@@ -145,61 +146,51 @@ export class SignalManager {
     if (!source) return;
     source.active = false;
     source.delayPending = false;
-    source.delayTimer = 0;
+    source.delayFireAt = 0;
+    source.deactivateAt = 0;
     this.propagate();
   }
 
   /** Advance timed sources and delay/pulse gates. */
   tick(delta: number): void {
+    this.now += delta;
     let changed = false;
 
-    // Delayed source activation: countdown and activate
+    // Delayed source activation
     for (const source of this.sources.values()) {
-      if (source.delayPending) {
-        source.delayTimer -= delta;
-        if (source.delayTimer <= 0) {
-          source.delayTimer = 0;
-          source.delayPending = false;
-          source.active = true;
-          if (source.signalMode === 'timed' && source.duration) {
-            source.timer = source.duration;
-          }
-          changed = true;
+      if (source.delayPending && source.delayFireAt > 0 && this.now >= source.delayFireAt) {
+        source.delayPending = false;
+        source.active = true;
+        if (source.signalMode === 'timed' && source.duration) {
+          // Schedule deactivation from INTENDED activation time (not this.now)
+          source.deactivateAt = source.delayFireAt + source.duration;
         }
+        source.delayFireAt = 0;
+        changed = true;
       }
     }
 
-    // Timed sources: countdown and deactivate
+    // Timed sources: deactivate at scheduled time
     for (const source of this.sources.values()) {
-      if (source.signalMode === 'timed' && source.active && source.timer > 0) {
-        source.timer -= delta;
-        if (source.timer <= 0) {
-          source.timer = 0;
-          source.active = false;
-          changed = true;
-          this.onSourceDeactivated?.(source.entityId);
-        }
+      if (source.signalMode === 'timed' && source.active && source.deactivateAt > 0 && this.now >= source.deactivateAt) {
+        source.deactivateAt = 0;
+        source.active = false;
+        changed = true;
+        this.onSourceDeactivated?.(source.entityId);
       }
     }
 
-    // Delay gates: countdown and activate output
+    // Delay gates and pulse repeat gates
     for (const gate of this.gates.values()) {
-      if (gate.gateType === 'delay' && gate.pendingActivation) {
-        gate.timer -= delta;
-        if (gate.timer <= 0) {
-          gate.timer = 0;
-          gate.pendingActivation = false;
-          gate.active = true;
-          changed = true;
-        }
+      if (gate.gateType === 'delay' && gate.pendingActivation && gate.fireAt > 0 && this.now >= gate.fireAt) {
+        gate.fireAt = 0;
+        gate.pendingActivation = false;
+        gate.active = true;
+        changed = true;
       }
-      if (gate.gateType === 'pulse_repeat' && gate.active) {
-        gate.timer -= delta;
-        if (gate.timer <= 0) {
-          gate.timer = gate.interval ?? 1;
-          // Re-propagate to pulse the output
-          changed = true;
-        }
+      if (gate.gateType === 'pulse_repeat' && gate.active && gate.fireAt > 0 && this.now >= gate.fireAt) {
+        gate.fireAt = gate.fireAt + (gate.interval ?? 1);  // NOT this.now + interval — drift-free
+        changed = true;
       }
     }
 
@@ -235,19 +226,22 @@ export class SignalManager {
     this.sources.clear();
     this.receivers.clear();
     this.gates.clear();
+    this.now = 0;
   }
 
   /** Save signal state for level snapshot. */
-  saveState(): { sources: [string, SignalSource][]; receivers: [string, SignalReceiver][]; gates: [string, SignalGate][] } {
+  saveState(): { sources: [string, SignalSource][]; receivers: [string, SignalReceiver][]; gates: [string, SignalGate][]; now: number } {
     return {
       sources: Array.from(this.sources.entries()).map(([k, v]) => [k, { ...v }]),
       receivers: Array.from(this.receivers.entries()).map(([k, v]) => [k, { ...v }]),
       gates: Array.from(this.gates.entries()).map(([k, v]) => [k, { ...v }]),
+      now: this.now,
     };
   }
 
   /** Restore signal state from level snapshot. */
-  loadState(state: { sources: [string, SignalSource][]; receivers: [string, SignalReceiver][]; gates: [string, SignalGate][] }): void {
+  loadState(state: { sources: [string, SignalSource][]; receivers: [string, SignalReceiver][]; gates: [string, SignalGate][]; now?: number }): void {
+    this.now = state.now ?? 0;
     this.sources.clear();
     for (const [k, v] of state.sources) this.sources.set(k, { ...v });
     this.receivers.clear();
@@ -299,7 +293,7 @@ export class SignalManager {
         case 'delay':
           if (inputActive && !gate.pendingActivation && !gate.active) {
             gate.pendingActivation = true;
-            gate.timer = gate.delay ?? 0;
+            gate.fireAt = this.now + (gate.delay ?? 0);
           }
           if (!inputActive) {
             gate.pendingActivation = false;
@@ -312,7 +306,7 @@ export class SignalManager {
         case 'pulse_repeat':
           if (inputActive && !gate.active) {
             gate.active = true;
-            gate.timer = gate.interval ?? 1;
+            gate.fireAt = this.now + (gate.interval ?? 1);
           }
           if (!inputActive) {
             gate.active = false;
