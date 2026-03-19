@@ -368,11 +368,11 @@ toolbar.setNewDungeonCallback(() => {
 
   const dungeon: Dungeon = {
     name,
+    playerStart: { levelId: 'level_1', col: 1, row: 1, facing: 'S' },
     levels: [{
       id: 'level_1',
       name: 'Level 1',
       grid,
-      playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [],
     }],
   };

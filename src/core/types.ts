@@ -26,7 +26,7 @@ export interface DungeonLevel {
   id?: string;               // optional stable identifier for save/load keying
   name: string;
   grid: string[];            // each string = one row of chars
-  playerStart: { col: number; row: number; facing: Facing };
+  playerStart?: { col: number; row: number; facing: Facing };  // optional — single-level mode only
   entities: Entity[];
   environment?: Environment;     // visual environment preset (default: 'dungeon')
   ceiling?: boolean;             // render ceiling geometry (default: true)
@@ -42,6 +42,7 @@ export interface DungeonLevel {
 export interface Dungeon {
   name: string;
   levels: DungeonLevel[];
+  playerStart: { levelId: string; col: number; row: number; facing: Facing };
 }
 
 // Grid char legend:

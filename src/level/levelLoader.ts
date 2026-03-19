@@ -343,26 +343,28 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
   }
 
-  // playerStart
-  const ps = obj.playerStart;
-  if (typeof ps !== 'object' || ps === null) {
-    throw new Error(`Level ${source}: "playerStart" must be an object`);
-  }
-  const start = ps as Record<string, unknown>;
-  if (typeof start.col !== 'number' || typeof start.row !== 'number') {
-    throw new Error(`Level ${source}: "playerStart" must have numeric col and row`);
-  }
-  if (!VALID_FACINGS.includes(start.facing as Facing)) {
-    throw new Error(`Level ${source}: "playerStart.facing" must be one of ${VALID_FACINGS.join(', ')}`);
-  }
+  // playerStart (optional — single-level mode only; dungeon mode validates at dungeon level)
+  if (obj.playerStart !== undefined) {
+    const ps = obj.playerStart;
+    if (typeof ps !== 'object' || ps === null) {
+      throw new Error(`Level ${source}: "playerStart" must be an object`);
+    }
+    const start = ps as Record<string, unknown>;
+    if (typeof start.col !== 'number' || typeof start.row !== 'number') {
+      throw new Error(`Level ${source}: "playerStart" must have numeric col and row`);
+    }
+    if (!VALID_FACINGS.includes(start.facing as Facing)) {
+      throw new Error(`Level ${source}: "playerStart.facing" must be one of ${VALID_FACINGS.join(', ')}`);
+    }
 
-  const startCol = start.col as number;
-  const startRow = start.row as number;
-  if (startRow < 0 || startRow >= grid.length || startCol < 0 || startCol >= rowLen) {
-    throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is out of grid bounds`);
-  }
-  if (!walkableChars.has(grid[startRow][startCol])) {
-    throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is not a walkable cell`);
+    const startCol = start.col as number;
+    const startRow = start.row as number;
+    if (startRow < 0 || startRow >= grid.length || startCol < 0 || startCol >= rowLen) {
+      throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is out of grid bounds`);
+    }
+    if (!walkableChars.has(grid[startRow][startCol])) {
+      throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is not a walkable tile`);
+    }
   }
 
   // entities
@@ -527,6 +529,66 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
     levels.push(level);
   }
 
+  // Validate or migrate dungeon-level playerStart
+  let dungeonPlayerStart: { levelId: string; col: number; row: number; facing: Facing };
+
+  if (obj.playerStart !== undefined) {
+    const dps = obj.playerStart as Record<string, unknown>;
+    if (typeof dps !== 'object' || dps === null) {
+      throw new Error(`Dungeon ${source}: "playerStart" must be an object`);
+    }
+    if (typeof dps.levelId !== 'string' || dps.levelId === '') {
+      throw new Error(`Dungeon ${source}: "playerStart.levelId" must be a non-empty string`);
+    }
+    if (!levelIds.has(dps.levelId as string)) {
+      throw new Error(`Dungeon ${source}: "playerStart.levelId" "${dps.levelId}" does not match any level id`);
+    }
+    if (typeof dps.col !== 'number' || typeof dps.row !== 'number') {
+      throw new Error(`Dungeon ${source}: "playerStart" must have numeric col and row`);
+    }
+    if (!VALID_FACINGS.includes(dps.facing as Facing)) {
+      throw new Error(`Dungeon ${source}: "playerStart.facing" must be one of ${VALID_FACINGS.join(', ')}`);
+    }
+
+    const startLevel = levels.find(l => l.id === dps.levelId)!;
+    const startCol = dps.col as number;
+    const startRow = dps.row as number;
+    const startRowLen = startLevel.grid[0].length;
+
+    if (startRow < 0 || startRow >= startLevel.grid.length || startCol < 0 || startCol >= startRowLen) {
+      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is out of grid bounds on level "${dps.levelId}"`);
+    }
+
+    const startWalkable = new Set(WALKABLE_CELLS);
+    if (startLevel.charDefs) {
+      for (const def of startLevel.charDefs) {
+        if (!def.solid) startWalkable.add(def.char);
+      }
+    }
+    if (!startWalkable.has(startLevel.grid[startRow][startCol])) {
+      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is on a non-walkable tile on level "${dps.levelId}"`);
+    }
+
+    dungeonPlayerStart = {
+      levelId: dps.levelId as string,
+      col: startCol,
+      row: startRow,
+      facing: dps.facing as Facing,
+    };
+  } else {
+    // Migration: promote first level's playerStart to dungeon level
+    const migrateLevel = levels.find(l => l.playerStart !== undefined);
+    if (!migrateLevel || !migrateLevel.playerStart) {
+      throw new Error(`Dungeon ${source}: "playerStart" is required on the dungeon object`);
+    }
+    dungeonPlayerStart = {
+      levelId: migrateLevel.id!,
+      col: migrateLevel.playerStart.col,
+      row: migrateLevel.playerStart.row,
+      facing: migrateLevel.playerStart.facing,
+    };
+  }
+
   // Cross-level validation: stairs must reference valid stair entities on other levels
   // and the spawn cell (one step in facing direction from target) must be walkable
   for (let i = 0; i < levels.length; i++) {
@@ -580,7 +642,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
     }
   }
 
-  return { name: obj.name as string, levels };
+  return { name: obj.name as string, levels, playerStart: dungeonPlayerStart };
 }
 
 export async function loadDungeon(url: string): Promise<Dungeon> {

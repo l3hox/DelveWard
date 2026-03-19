@@ -158,6 +158,26 @@ export class EditorApp {
         level.id = `level_${i}`;
       }
     }
+    // Migration: if dungeon has no playerStart, promote the first level's playerStart
+    if (!dungeon.playerStart) {
+      const migrateLevel = dungeon.levels.find(l => l.playerStart !== undefined);
+      if (migrateLevel && migrateLevel.playerStart) {
+        (dungeon as Dungeon).playerStart = {
+          levelId: migrateLevel.id!,
+          col: migrateLevel.playerStart.col,
+          row: migrateLevel.playerStart.row,
+          facing: migrateLevel.playerStart.facing,
+        };
+      } else {
+        // Fallback: place at (1,1) on first level
+        (dungeon as Dungeon).playerStart = {
+          levelId: dungeon.levels[0].id!,
+          col: 1,
+          row: 1,
+          facing: 'S',
+        };
+      }
+    }
     // Populate clean snapshots
     this.levelCleanSnapshots = dungeon.levels.map(level => JSON.stringify(level));
     this.dirtyLevelIndices = new Set();
@@ -223,7 +243,6 @@ export class EditorApp {
       id,
       name: 'Untitled',
       grid,
-      playerStart: { col: 1, row: 1, facing: 'S' },
       entities: [],
     };
 
@@ -307,6 +326,21 @@ export class EditorApp {
 
   isDungeonMode(): boolean {
     return this.dungeon !== null;
+  }
+
+  getPlayerStart(): { levelId?: string; col: number; row: number; facing: import('../core/grid').Facing } | null {
+    if (this.dungeon) {
+      return this.dungeon.playerStart;
+    }
+    return this.level?.playerStart ?? null;
+  }
+
+  setPlayerStart(col: number, row: number, facing: import('../core/grid').Facing, levelId?: string): void {
+    if (this.dungeon) {
+      this.dungeon.playerStart = { levelId: levelId ?? this.dungeon.playerStart.levelId, col, row, facing };
+    } else if (this.level) {
+      this.level.playerStart = { col, row, facing };
+    }
   }
 
   rebuildDerivedState(): void {
@@ -430,15 +464,28 @@ export class EditorApp {
       }
     }
 
-    // Player start out of bounds
-    const ps = level.playerStart;
-    if (ps.row < 0 || ps.row >= level.grid.length ||
-        ps.col < 0 || ps.col >= (level.grid[ps.row]?.length ?? 0)) {
-      errors.push({ message: `Player start (${ps.col},${ps.row}) is out of bounds` });
+    // Player start validation
+    if (this.dungeon) {
+      // Dungeon mode: validate dungeon.playerStart only on the level it refers to
+      const dp = this.dungeon.playerStart;
+      if (dp.levelId === level.id) {
+        if (dp.row < 0 || dp.row >= level.grid.length ||
+            dp.col < 0 || dp.col >= (level.grid[dp.row]?.length ?? 0)) {
+          errors.push({ message: `Player start (${dp.col},${dp.row}) is out of bounds` });
+        } else if (!this.walkableSet.has(level.grid[dp.row][dp.col])) {
+          errors.push({ message: `Player start (${dp.col},${dp.row}) is on a non-walkable tile` });
+        }
+      }
     } else {
-      const psChar = level.grid[ps.row][ps.col];
-      if (!this.walkableSet.has(psChar)) {
-        errors.push({ message: `Player start (${ps.col},${ps.row}) is on non-walkable cell '${psChar}'` });
+      // Single-level mode: validate level.playerStart
+      const ps = level.playerStart;
+      if (ps) {
+        if (ps.row < 0 || ps.row >= level.grid.length ||
+            ps.col < 0 || ps.col >= (level.grid[ps.row]?.length ?? 0)) {
+          errors.push({ message: `Player start (${ps.col},${ps.row}) is out of bounds` });
+        } else if (!this.walkableSet.has(level.grid[ps.row][ps.col])) {
+          errors.push({ message: `Player start (${ps.col},${ps.row}) is on a non-walkable tile` });
+        }
       }
     }
 

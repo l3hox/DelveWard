@@ -21,7 +21,7 @@ export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
   if (level.id !== undefined) out.id = level.id;
   out.name = level.name;
   out.grid = level.grid;
-  out.playerStart = level.playerStart;
+  if (level.playerStart) out.playerStart = level.playerStart;
   out.entities = level.entities;
   if (level.environment !== undefined) out.environment = level.environment;
   if (level.ceiling !== undefined) out.ceiling = level.ceiling;
@@ -38,6 +38,7 @@ export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
 export function serializeDungeon(dungeon: Dungeon): Record<string, unknown> {
   return {
     name: dungeon.name,
+    playerStart: dungeon.playerStart,
     levels: dungeon.levels.map(serializeLevel),
   };
 }

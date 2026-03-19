@@ -1076,7 +1076,19 @@ export class GridCanvas {
   private drawPlayerStart(offsetX: number, offsetY: number, tileSize: number): void {
     const level = this.app.level!;
     const { ctx } = this;
-    const { col, row, facing } = level.playerStart;
+
+    let ps: { col: number; row: number; facing: Facing } | undefined;
+    if (this.app.dungeon) {
+      const dp = this.app.dungeon.playerStart;
+      if (dp.levelId === level.id) {
+        ps = dp;
+      }
+    } else {
+      ps = level.playerStart;
+    }
+    if (!ps) return;
+
+    const { col, row, facing } = ps;
 
     const px = Math.floor(offsetX + col * tileSize);
     const py = Math.floor(offsetY + row * tileSize);

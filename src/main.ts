@@ -360,7 +360,8 @@ async function init(): Promise<void> {
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
-  const firstLevel = dungeon.levels[0];
+  const startLevelId = dungeon.playerStart.levelId;
+  const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
   let currentLevelId = firstLevel.id!;
   const levelSnapshots = new Map<string, LevelSnapshot>();
@@ -449,9 +450,10 @@ async function init(): Promise<void> {
     transition.startTransition(() => {
       teardownLevelScene(ls, scene);
 
-      // Reset GameState for current level
-      const currentLevel = dungeon.levels.find((l) => l.id === currentLevelId)!;
-      gameState.loadNewLevel(currentLevel.entities, currentLevel.grid, currentLevel.id ?? currentLevel.name);
+      // Restart always goes back to the dungeon start level and position
+      const startLevel = dungeon.levels.find((l) => l.id === dungeon.playerStart.levelId) ?? dungeon.levels[0];
+      currentLevelId = startLevel.id ?? startLevel.name;
+      gameState.loadNewLevel(startLevel.entities, startLevel.grid, startLevel.id ?? startLevel.name);
       projectileManager.clear();
       fireballExplosions.clear();
       gameState.hp = gameState.maxHp;
@@ -459,25 +461,25 @@ async function init(): Promise<void> {
       gameState.attackCooldown = 0;
       gameState.gold = 0;
       gameState.playerStatusEffects = [];
-      applyEnvironment(currentLevel.environment, scene, ambient);
+      applyEnvironment(startLevel.environment, scene, ambient);
 
       ls = buildLevelScene(
-        currentLevel, gameState, camera, scene,
-        currentLevel.playerStart.col,
-        currentLevel.playerStart.row,
-        currentLevel.playerStart.facing,
+        startLevel, gameState, camera, scene,
+        dungeon.playerStart.col,
+        dungeon.playerStart.row,
+        dungeon.playerStart.facing,
       );
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
-      dustMotes.setVisible(currentLevel.dustMotes !== false);
-      waterDrips.setLevel(currentLevel.grid, currentLevel.charDefs);
-      waterDrips.setVisible(currentLevel.waterDrips === true);
-      fireflies.setVisible(currentLevel.fireflies === true);
+      dustMotes.setVisible(startLevel.dustMotes !== false);
+      waterDrips.setLevel(startLevel.grid, startLevel.charDefs);
+      waterDrips.setVisible(startLevel.waterDrips === true);
+      fireflies.setVisible(startLevel.fireflies === true);
       gameState.revealAround(
-        currentLevel.playerStart.col,
-        currentLevel.playerStart.row,
-        currentLevel.playerStart.facing,
-        currentLevel.grid,
+        dungeon.playerStart.col,
+        dungeon.playerStart.row,
+        dungeon.playerStart.facing,
+        startLevel.grid,
       );
     });
   }
@@ -488,15 +490,15 @@ async function init(): Promise<void> {
     gameState,
     camera,
     scene,
-    firstLevel.playerStart.col,
-    firstLevel.playerStart.row,
-    firstLevel.playerStart.facing,
+    dungeon.playerStart.col,
+    dungeon.playerStart.row,
+    dungeon.playerStart.facing,
   );
 
   // --- Callbacks ---
 
-  let lastPlayerCol = firstLevel.playerStart.col;
-  let lastPlayerRow = firstLevel.playerStart.row;
+  let lastPlayerCol = dungeon.playerStart.col;
+  let lastPlayerRow = dungeon.playerStart.row;
 
   // Blocked doors: doors that tried to close while occupied. Retry every 2s.
   const DOOR_RETRY_INTERVAL = 1.5;

@@ -3,6 +3,7 @@ import type { EditorApp } from './EditorApp';
 import { WALL_TEXTURES, FLOOR_TEXTURES, CEILING_TEXTURES } from '../core/textureNames';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
+import type { Facing } from '../core/grid';
 
 export class LevelProperties {
   private container: HTMLElement;
@@ -13,7 +14,7 @@ export class LevelProperties {
   private onCommitTextEdit: (() => void) | null = null;
   private onStatusHintChanged: (() => void) | null = null;
 
-  private expandedSections = new Set<string>(['level', 'environment', 'defaults']);
+  private expandedSections = new Set<string>(['level', 'playerStart', 'environment', 'defaults']);
   private expandedCharDefs = new Set<number>();
   private expandedAreas = new Set<number>();
 
@@ -63,6 +64,116 @@ export class LevelProperties {
         level.id = val || undefined;
         this.onChanged?.();
       });
+    });
+
+    this.addCollapsibleSection('Player Start', 'playerStart', (body) => {
+      const isDungeon = !!this.app.dungeon;
+
+      if (isDungeon) {
+        const dungeon = this.app.dungeon!;
+        const isStartLevel = dungeon.playerStart.levelId === level.id;
+
+        if (!isStartLevel) {
+          const startLevel = dungeon.levels.find(l => l.id === dungeon.playerStart.levelId);
+          const info = document.createElement('div');
+          info.style.cssText = 'color: #888; font-size: 11px; margin-bottom: 8px;';
+          info.textContent = `Player starts on "${startLevel?.name ?? dungeon.playerStart.levelId}"`;
+          body.appendChild(info);
+
+          const moveBtn = document.createElement('button');
+          moveBtn.className = 'btn-add';
+          moveBtn.textContent = 'Move start here';
+          moveBtn.addEventListener('click', () => {
+            this.onBeforeDiscreteChange?.();
+            this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
+            this.onStatusHintChanged?.();
+            this.app.coordPickCallback = (col, row) => {
+              if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+              dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing };
+              this.app.coordPickCallback = null;
+              this.app.statusHint = null;
+              this.onStatusHintChanged?.();
+              this.onChanged?.();
+              this.refresh();
+            };
+          });
+          body.appendChild(moveBtn);
+          return;
+        }
+
+        // This IS the start level — show position + facing + pick
+        const ps = dungeon.playerStart;
+
+        const posLabel = document.createElement('div');
+        posLabel.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 6px;';
+        posLabel.textContent = `Position: (${ps.col}, ${ps.row})`;
+        body.appendChild(posLabel);
+
+        this.addDropdownField(body, 'facing', ps.facing, ['N', 'S', 'E', 'W'], (val) => {
+          ps.facing = val as Facing;
+          this.onChanged?.();
+        });
+
+        const pickBtn = document.createElement('button');
+        pickBtn.className = 'btn-add';
+        pickBtn.textContent = 'Pick position';
+        pickBtn.addEventListener('click', () => {
+          this.onBeforeDiscreteChange?.();
+          this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
+          this.onStatusHintChanged?.();
+          this.app.coordPickCallback = (col, row) => {
+            if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+            dungeon.playerStart.col = col;
+            dungeon.playerStart.row = row;
+            this.app.coordPickCallback = null;
+            this.app.statusHint = null;
+            this.onStatusHintChanged?.();
+            this.onChanged?.();
+            this.refresh();
+          };
+        });
+        body.appendChild(pickBtn);
+      } else {
+        // Single level mode
+        const ps = level.playerStart;
+        if (!ps) {
+          const info = document.createElement('div');
+          info.style.cssText = 'color: #888; font-size: 11px; margin-bottom: 8px;';
+          info.textContent = 'No player start set.';
+          body.appendChild(info);
+          return;
+        }
+
+        const posLabel = document.createElement('div');
+        posLabel.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 6px;';
+        posLabel.textContent = `Position: (${ps.col}, ${ps.row})`;
+        body.appendChild(posLabel);
+
+        this.addDropdownField(body, 'facing', ps.facing, ['N', 'S', 'E', 'W'], (val) => {
+          ps.facing = val as Facing;
+          this.onChanged?.();
+        });
+
+        const pickBtn = document.createElement('button');
+        pickBtn.className = 'btn-add';
+        pickBtn.textContent = 'Pick position';
+        pickBtn.addEventListener('click', () => {
+          this.onBeforeDiscreteChange?.();
+          this.app.statusHint = 'Click a floor tile to set player start (Esc to cancel)';
+          this.onStatusHintChanged?.();
+          this.app.coordPickCallback = (col, row) => {
+            if (!this.app.walkableSet.has(level.grid[row]?.[col])) return;
+            ps.col = col;
+            ps.row = row;
+            this.app.coordPickCallback = null;
+            this.app.statusHint = null;
+            this.onStatusHintChanged?.();
+            this.onChanged?.();
+            this.refresh();
+          };
+        });
+        body.appendChild(pickBtn);
+      }
     });
 
     this.addCollapsibleSection('Environment', 'environment', (body) => {

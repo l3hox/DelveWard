@@ -17,7 +17,7 @@ describe('validateLevel', () => {
     const level = validateLevel(validLevel(), 'test');
     expect(level.name).toBe('Test');
     expect(level.grid).toHaveLength(3);
-    expect(level.playerStart.facing).toBe('N');
+    expect(level.playerStart?.facing).toBe('N');
     expect(level.entities).toEqual([]);
   });
 
@@ -74,7 +74,7 @@ describe('validateLevel', () => {
   it('rejects playerStart on a wall cell', () => {
     expect(() => validateLevel(validLevel({
       playerStart: { col: 0, row: 0, facing: 'N' },
-    }), 'test')).toThrow('is not a walkable cell');
+    }), 'test')).toThrow('is not a walkable tile');
   });
 
   it('rejects missing entities', () => {
@@ -316,7 +316,7 @@ describe('validateLevel', () => {
       grid: ['###', '#b#', '###'],
       playerStart: { col: 1, row: 1, facing: 'N' },
     }), 'test');
-    expect(level.playerStart.col).toBe(1);
+    expect(level.playerStart?.col).toBe(1);
   });
 
   it('rejects playerStart on solid charDef cell', () => {
@@ -324,7 +324,7 @@ describe('validateLevel', () => {
       charDefs: [{ char: '@', solid: true, wallTexture: 'wood' }],
       grid: ['###', '#@#', '###'],
       playerStart: { col: 1, row: 1, facing: 'N' },
-    }), 'test')).toThrow('is not a walkable cell');
+    }), 'test')).toThrow('is not a walkable tile');
   });
 
   // --- entity validation ---
@@ -702,6 +702,7 @@ describe('validateDungeon', () => {
   function validDungeon(overrides: Record<string, unknown> = {}) {
     return {
       name: 'Test Dungeon',
+      playerStart: { levelId: 'level1', col: 1, row: 1, facing: 'S' },
       levels: [
         validDungeonLevel('level1'),
         validDungeonLevel('level2'),
@@ -789,12 +790,12 @@ describe('validateDungeon', () => {
     // Grid: ['#.#', '#.#', '###'] — stair at col:1, row:0, but row:0 is '.' here
     expect(() => validateDungeon({
       name: 'Test Dungeon',
+      playerStart: { levelId: 'level1', col: 1, row: 1, facing: 'S' },
       levels: [
         {
           id: 'level1',
           name: 'Level level1',
           grid: ['#####', '#...#', '#...#', '#...#', '#####'],
-          playerStart: { col: 1, row: 1, facing: 'S' },
           entities: [
             { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
           ],
@@ -804,7 +805,6 @@ describe('validateDungeon', () => {
           name: 'Level level2',
           // stair at col:1, row:0 (walkable), facing N → spawn col:1, row:-1 (out of bounds)
           grid: ['.....', '#####'],
-          playerStart: { col: 2, row: 0, facing: 'S' },
           entities: [
             { col: 1, row: 0, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
           ],
