@@ -280,6 +280,48 @@ export function updateProjectileMeshes(
 }
 
 /**
+ * Pre-compile projectile and explosion shader programs so the GPU doesn't
+ * stall on the first fireball spawn.  Call once during init after the scene
+ * has lighting and fog set up (shader variants depend on those).
+ */
+export function warmUpProjectileMaterials(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+): void {
+  ensureSharedAssets();
+
+  const tempGroup = new THREE.Group();
+  tempGroup.position.set(0, -1000, 0);
+
+  // Projectile meshes — fireball's MeshStandardMaterial is the expensive one
+  for (const type of ['dart', 'arrow', 'fireball']) {
+    tempGroup.add(createProjectileMesh(type));
+  }
+
+  // Explosion particles (PointsMaterial + AdditiveBlending + CanvasTexture)
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
+  const mat = new THREE.PointsMaterial({
+    size: EXPLOSION_SIZE,
+    map: getExplosionTexture(),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    color: EXPLOSION_COLOR,
+    fog: true,
+  });
+  tempGroup.add(new THREE.Points(geo, mat));
+
+  scene.add(tempGroup);
+  renderer.compile(scene, camera);
+  scene.remove(tempGroup);
+
+  geo.dispose();
+  mat.dispose();
+}
+
+/**
  * Removes all projectile meshes from the group and clears the map.
  * Call this when changing levels or resetting the scene.
  */

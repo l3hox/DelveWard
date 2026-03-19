@@ -44,7 +44,7 @@ import { checkAssets } from './core/assetCheck';
 import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
-import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
+import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpProjectileMaterials, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -713,6 +713,9 @@ async function init(): Promise<void> {
   waterDrips.setLevel(ls.level.grid, ls.level.charDefs);
   waterDrips.setVisible(ls.level.waterDrips === true);
   fireflies.setVisible(ls.level.fireflies === true);
+
+  // Pre-compile projectile/explosion shaders (prevents first-fireball stutter)
+  warmUpProjectileMaterials(renderer, scene, camera);
 
   // Reveal initial position
   const ps = ls.player.getState();
