@@ -326,11 +326,15 @@ export async function warmUpGPUShaders(
   // This pre-caches shader variants for every light count the game can hit.
   // compileAsync uses KHR_parallel_shader_compile when available, keeping
   // the main thread responsive while the GPU compiles in the background.
+  // On browsers without the extension (Firefox), compileAsync completes
+  // synchronously — the explicit RAF yield after each pass forces a paint
+  // so the UI stays visible between blocking compiles.
   const EXTRA_LIGHTS = 10;
   const total = EXTRA_LIGHTS + 1;
 
   await renderer.compileAsync(scene, camera);
   onProgress?.(1, total);
+  await new Promise(r => requestAnimationFrame(r));
 
   for (let i = 0; i < EXTRA_LIGHTS; i++) {
     const light = new THREE.PointLight(0x000000, 0, 1);
@@ -338,6 +342,7 @@ export async function warmUpGPUShaders(
     tempGroup.add(light);
     await renderer.compileAsync(scene, camera);
     onProgress?.(i + 2, total);
+    await new Promise(r => requestAnimationFrame(r));
   }
 
   scene.remove(tempGroup);

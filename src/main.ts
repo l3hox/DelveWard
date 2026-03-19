@@ -727,9 +727,11 @@ async function init(): Promise<void> {
   document.head.appendChild(dotStyle);
   document.body.appendChild(loadingEl);
 
-  // Yield to let the browser paint the character creation screen + loading indicator
-  // before the first blocking renderer.compile() call.
-  await new Promise(r => requestAnimationFrame(r));
+  // Double-RAF: the outer fires before paint, the inner fires after paint.
+  // This guarantees the character creation screen is actually drawn to the
+  // display before shader compilation starts (important for Firefox where
+  // compileAsync falls back to synchronous compilation).
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const warmupDone = warmUpGPUShaders(renderer, scene, camera).then(() => {
     loadingEl.textContent = 'Loaded';
