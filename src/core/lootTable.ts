@@ -147,6 +147,11 @@ export function getLootTableXp(enemyType: string): number {
   return lootTableMap.get(enemyType)?.xp ?? 0;
 }
 
+/** Returns the loot table entry for a given enemy type, or undefined. */
+export function getLootTable(enemyType: string): LootTableEntry | undefined {
+  return lootTableMap.get(enemyType);
+}
+
 // --- Private helpers ---
 
 function pickEnchantedModifier(): string {

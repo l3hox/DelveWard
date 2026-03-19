@@ -1,8 +1,9 @@
 import type { Entity } from '../core/types';
 import type { EditorApp } from './EditorApp';
 import { enemyDatabase } from '../enemies/enemyDatabase';
-import { itemDatabase, type ItemDef } from '../core/itemDatabase';
+import { itemDatabase, type ItemDef, type ItemQuality } from '../core/itemDatabase';
 import { getItemImage } from '../rendering/itemSprites';
+import { getLootTable } from '../core/lootTable';
 
 const enemySpriteCache = new Map<string, HTMLImageElement>();
 function getEnemySpriteImage(type: string): HTMLImageElement | null {
@@ -199,6 +200,7 @@ export class Inspector {
         if (def) {
           this.addEnemyDetails(def);
         }
+        this.addDropsEditor(entity);
         break;
       }
 
@@ -329,6 +331,7 @@ export class Inspector {
           entity.hp = val;
           this.onEntityChanged?.();
         }, { step: '1', min: '1' });
+        this.addDropsEditor(entity);
         break;
 
       case 'secret_wall': {
@@ -384,6 +387,7 @@ export class Inspector {
           }
         }
         this.addKeyIdPeerSection(entity, 'key');
+        this.addDropsEditor(entity);
         break;
       }
 
@@ -599,6 +603,281 @@ export class Inspector {
   }
 
   /** Show "Referenced by" section listing entities that target this entity. */
+  private addDropsEditor(entity: Entity): void {
+    const rec = entity as Record<string, unknown>;
+    const drops = (rec.drops ?? {}) as Record<string, unknown>;
+    const guaranteed = (drops.guaranteed ?? []) as Array<{ itemId: string; quality?: ItemQuality }>;
+    const extra = (drops.extra ?? []) as Array<{ itemId: string; chance: number; quality?: ItemQuality }>;
+
+    const QUALITIES: ItemQuality[] = ['poor', 'common', 'fine', 'masterwork', 'enchanted'];
+    const allItems = itemDatabase.isLoaded() ? itemDatabase.getAllItems() : [];
+    const itemIds = allItems.map(i => i.id);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const header = document.createElement('label');
+    header.textContent = 'drops';
+    wrapper.appendChild(header);
+
+    // --- Guaranteed drops ---
+    const gLabel = document.createElement('div');
+    gLabel.style.cssText = 'color:#8a8; font-size:10px; margin-top:4px; margin-bottom:2px;';
+    gLabel.textContent = 'guaranteed';
+    wrapper.appendChild(gLabel);
+
+    for (let i = 0; i < guaranteed.length; i++) {
+      const drop = guaranteed[i];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:3px; align-items:center; margin-bottom:2px;';
+
+      const sel = this.createItemSelect(drop.itemId, itemIds, allItems, (val) => {
+        this.onBeforeDiscreteChange?.();
+        drop.itemId = val;
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+      });
+      sel.style.flex = '1';
+      sel.style.fontSize = '10px';
+      row.appendChild(sel);
+
+      const qSel = document.createElement('select');
+      qSel.style.cssText = 'width:70px; font-size:10px; background:#222; color:#ccc; border:1px solid #444;';
+      for (const q of QUALITIES) {
+        const opt = document.createElement('option');
+        opt.value = q;
+        opt.textContent = q;
+        if ((drop.quality ?? 'common') === q) opt.selected = true;
+        qSel.appendChild(opt);
+      }
+      qSel.addEventListener('change', () => {
+        this.onBeforeDiscreteChange?.();
+        drop.quality = qSel.value as ItemQuality;
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+      });
+      row.appendChild(qSel);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-pick';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.style.cssText = 'padding:0 4px; min-width:auto;';
+      removeBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
+        guaranteed.splice(i, 1);
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+      row.appendChild(removeBtn);
+      wrapper.appendChild(row);
+    }
+
+    const addGBtn = document.createElement('button');
+    addGBtn.className = 'btn-add';
+    addGBtn.textContent = '+ guaranteed';
+    addGBtn.style.cssText = 'font-size:10px; padding:1px 6px; margin-bottom:6px;';
+    addGBtn.addEventListener('click', () => {
+      this.onBeforeDiscreteChange?.();
+      guaranteed.push({ itemId: itemIds[0] ?? '', quality: 'common' });
+      this.syncDrops(entity, guaranteed, extra);
+      this.onEntityChanged?.();
+      this.refresh();
+    });
+    wrapper.appendChild(addGBtn);
+
+    // --- Extra (chance-based) drops ---
+    const eLabel = document.createElement('div');
+    eLabel.style.cssText = 'color:#88a; font-size:10px; margin-top:4px; margin-bottom:2px;';
+    eLabel.textContent = 'extra (chance-based)';
+    wrapper.appendChild(eLabel);
+
+    for (let i = 0; i < extra.length; i++) {
+      const drop = extra[i];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:3px; align-items:center; margin-bottom:2px;';
+
+      const sel = this.createItemSelect(drop.itemId, itemIds, allItems, (val) => {
+        this.onBeforeDiscreteChange?.();
+        drop.itemId = val;
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+      });
+      sel.style.flex = '1';
+      sel.style.fontSize = '10px';
+      row.appendChild(sel);
+
+      const chanceInput = document.createElement('input');
+      chanceInput.type = 'number';
+      chanceInput.value = String(drop.chance);
+      chanceInput.step = '0.05';
+      chanceInput.min = '0';
+      chanceInput.max = '1';
+      chanceInput.style.cssText = 'width:45px; font-size:10px; background:#222; color:#ccc; border:1px solid #444;';
+      chanceInput.title = 'Drop chance (0-1)';
+      chanceInput.addEventListener('input', () => {
+        this.onBeginTextEdit?.();
+        drop.chance = Math.max(0, Math.min(1, parseFloat(chanceInput.value) || 0));
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+      });
+      chanceInput.addEventListener('blur', () => this.onCommitTextEdit?.());
+      row.appendChild(chanceInput);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-pick';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.style.cssText = 'padding:0 4px; min-width:auto;';
+      removeBtn.addEventListener('click', () => {
+        this.onBeforeDiscreteChange?.();
+        extra.splice(i, 1);
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+      row.appendChild(removeBtn);
+      wrapper.appendChild(row);
+    }
+
+    const addEBtn = document.createElement('button');
+    addEBtn.className = 'btn-add';
+    addEBtn.textContent = '+ extra';
+    addEBtn.style.cssText = 'font-size:10px; padding:1px 6px; margin-bottom:4px;';
+    addEBtn.addEventListener('click', () => {
+      this.onBeforeDiscreteChange?.();
+      extra.push({ itemId: itemIds[0] ?? '', chance: 0.5 });
+      this.syncDrops(entity, guaranteed, extra);
+      this.onEntityChanged?.();
+      this.refresh();
+    });
+    wrapper.appendChild(addEBtn);
+
+    // --- suppressTable checkbox (enemies only) ---
+    if (entity.type === 'enemy') {
+      const stRow = document.createElement('div');
+      stRow.style.cssText = 'display:flex; align-items:center; gap:4px; margin-top:2px;';
+      const stCb = document.createElement('input');
+      stCb.type = 'checkbox';
+      stCb.checked = (drops.suppressTable as boolean) ?? false;
+      stCb.addEventListener('change', () => {
+        this.onBeforeDiscreteChange?.();
+        if (stCb.checked) {
+          drops.suppressTable = true;
+        } else {
+          delete drops.suppressTable;
+        }
+        this.syncDrops(entity, guaranteed, extra);
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+      stRow.appendChild(stCb);
+      const stLabel = document.createElement('span');
+      stLabel.style.cssText = 'font-size:10px; color:#888;';
+      stLabel.textContent = 'suppress default loot table';
+      stRow.appendChild(stLabel);
+      wrapper.appendChild(stRow);
+
+      // Show read-only base loot table if not suppressed
+      const suppressed = (drops.suppressTable as boolean) ?? false;
+      const enemyType = (entity.enemyType as string) ?? '';
+      const table = !suppressed ? getLootTable(enemyType) : undefined;
+      if (table) {
+        const tableSection = document.createElement('div');
+        tableSection.style.cssText = 'margin-top:6px; padding:4px 6px; background:#1a1a22; border:1px solid #333; border-radius:3px;';
+
+        const tableHeader = document.createElement('div');
+        tableHeader.style.cssText = 'color:#777; font-size:10px; margin-bottom:3px;';
+        tableHeader.textContent = 'base loot table';
+        tableSection.appendChild(tableHeader);
+
+        const goldLine = document.createElement('div');
+        goldLine.style.cssText = 'color:#ccaa44; font-size:10px; margin-bottom:2px;';
+        goldLine.textContent = `gold: ${table.gold[0]}–${table.gold[1]}`;
+        tableSection.appendChild(goldLine);
+
+        for (const drop of table.drops) {
+          const dropLine = document.createElement('div');
+          dropLine.style.cssText = 'color:#aaa; font-size:10px;';
+          const itemName = itemDatabase.isLoaded() ? (itemDatabase.getItem(drop.itemId)?.name ?? drop.itemId) : drop.itemId;
+          const pct = Math.round(drop.chance * 100);
+          dropLine.textContent = `${itemName} — ${pct}%${drop.quality ? ` (${drop.quality})` : ''}`;
+          tableSection.appendChild(dropLine);
+        }
+
+        if (table.drops.length === 0) {
+          const noDrops = document.createElement('div');
+          noDrops.style.cssText = 'color:#666; font-size:10px; font-style:italic;';
+          noDrops.textContent = 'no base drops';
+          tableSection.appendChild(noDrops);
+        }
+
+        wrapper.appendChild(tableSection);
+      }
+    }
+
+    this.container.appendChild(wrapper);
+  }
+
+  /** Write guaranteed/extra arrays back to entity.drops, cleaning up empty state. */
+  private syncDrops(
+    entity: Entity,
+    guaranteed: Array<{ itemId: string; quality?: ItemQuality }>,
+    extra: Array<{ itemId: string; chance: number; quality?: ItemQuality }>,
+  ): void {
+    const rec = entity as Record<string, unknown>;
+    const drops = (rec.drops ?? {}) as Record<string, unknown>;
+    if (guaranteed.length > 0) {
+      drops.guaranteed = guaranteed;
+    } else {
+      delete drops.guaranteed;
+    }
+    if (extra.length > 0) {
+      drops.extra = extra;
+    } else {
+      delete drops.extra;
+    }
+    if (Object.keys(drops).length > 0) {
+      rec.drops = drops;
+    } else {
+      delete rec.drops;
+    }
+  }
+
+  /** Create a grouped item select dropdown. */
+  private createItemSelect(
+    currentId: string,
+    itemIds: string[],
+    allItems: ItemDef[],
+    onChange: (val: string) => void,
+  ): HTMLSelectElement {
+    const sel = document.createElement('select');
+    sel.style.cssText = 'background:#222; color:#ccc; border:1px solid #444;';
+
+    // Group by type
+    const groups: Record<string, ItemDef[]> = {};
+    for (const item of allItems) {
+      const key = `${item.type}/${item.subtype}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    }
+
+    for (const [groupName, items] of Object.entries(groups)) {
+      const optGroup = document.createElement('optgroup');
+      optGroup.label = groupName;
+      for (const item of items) {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (item.id === currentId) opt.selected = true;
+        optGroup.appendChild(opt);
+      }
+      sel.appendChild(optGroup);
+    }
+
+    sel.addEventListener('change', () => onChange(sel.value));
+    return sel;
+  }
+
   private addKeyIdPeerSection(entity: Entity, filterType: string): void {
     const keyPeers = this.app.getKeyIdPeers(entity).filter(e => e.type === filterType);
     if (keyPeers.length === 0) return;

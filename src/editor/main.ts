@@ -15,9 +15,11 @@ import type { Dungeon } from '../core/types';
 
 const app = new EditorApp();
 
-// Load databases eagerly for item preview and enemy type list
+// Load databases eagerly for item preview, enemy type list, and loot table display
+import { loadLootTables } from '../core/lootTable';
 itemDatabase.load().catch(() => { /* non-fatal */ });
 enemyDatabase.load().catch(() => { /* non-fatal */ });
+loadLootTables().catch(() => { /* non-fatal */ });
 
 const canvas = document.getElementById('editor-canvas') as HTMLCanvasElement;
 const container = document.getElementById('canvas-container') as HTMLElement;
