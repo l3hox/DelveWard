@@ -334,17 +334,6 @@ async function init(): Promise<void> {
   const transition = new TransitionOverlay();
   transition.attach();
 
-  // --- Character creation screen ---
-  // Shown before the game loop starts. The 3D scene is already loaded beneath it.
-  const hudCanvas = hud.getCanvas();
-  await new Promise<void>((resolve) => {
-    const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
-      gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
-      resolve();
-    });
-    charCreation.show();
-  });
-
   // --- Level-up notification ---
   const levelUpNotification = new LevelUpNotification();
 
@@ -714,12 +703,39 @@ async function init(): Promise<void> {
   waterDrips.setVisible(ls.level.waterDrips === true);
   fireflies.setVisible(ls.level.fireflies === true);
 
-  // Pre-compile all GPU shader variants (prevents mid-gameplay stutter)
-  warmUpGPUShaders(renderer, scene, camera);
-
   // Reveal initial position
   const ps = ls.player.getState();
   gameState.revealAround(ps.col, ps.row, ps.facing, ls.level.grid);
+
+  // --- Character creation + GPU warmup (concurrent) ---
+  // Level scene is built underneath; character creation overlays the HUD canvas.
+  // GPU shader compilation runs in the background, yielding between passes.
+  const loadingEl = document.createElement('div');
+  loadingEl.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:13px;z-index:1000;color:#666;';
+  loadingEl.innerHTML = 'Loading<span style="display:inline-block;overflow:hidden;vertical-align:bottom;width:0;animation:dw-dots 1.5s steps(3,end) infinite">...</span>';
+  const dotStyle = document.createElement('style');
+  dotStyle.textContent = '@keyframes dw-dots{to{width:1.2em}}';
+  document.head.appendChild(dotStyle);
+  document.body.appendChild(loadingEl);
+
+  const warmupPromise = warmUpGPUShaders(renderer, scene, camera).then(() => {
+    loadingEl.textContent = 'Loaded';
+  });
+
+  const hudCanvas = hud.getCanvas();
+  await Promise.all([
+    warmupPromise,
+    new Promise<void>((resolve) => {
+      const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
+        gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
+        resolve();
+      });
+      charCreation.show();
+    }),
+  ]);
+
+  loadingEl.remove();
+  dotStyle.remove();
 
   // --- Input ---
   const pressedKeys = new Set<string>();
