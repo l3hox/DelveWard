@@ -280,11 +280,16 @@ export function updateProjectileMeshes(
 }
 
 /**
- * Pre-compile projectile and explosion shader programs so the GPU doesn't
- * stall on the first fireball spawn.  Call once during init after the scene
- * has lighting and fog set up (shader variants depend on those).
+ * Pre-compile ALL shader programs in the scene so the GPU doesn't stall
+ * mid-gameplay.  Call once during init after the level scene is built
+ * (lighting, fog, and all dungeon/entity materials must be in the scene).
+ *
+ * Three.js bakes NUM_POINT_LIGHTS into shader defines — adding a PointLight
+ * at runtime forces recompilation of every lit material.  We incrementally
+ * add temp PointLights and compile at each count to pre-cache variants for
+ * up to 10 extra lights (covers simultaneous fireballs + explosions).
  */
-export function warmUpProjectileMaterials(
+export function warmUpGPUShaders(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.Camera,
@@ -294,7 +299,7 @@ export function warmUpProjectileMaterials(
   const tempGroup = new THREE.Group();
   tempGroup.position.set(0, -1000, 0);
 
-  // Projectile meshes — fireball's MeshStandardMaterial is the expensive one
+  // Projectile meshes (fireball has child PointLight + MeshStandardMaterial)
   for (const type of ['dart', 'arrow', 'fireball']) {
     tempGroup.add(createProjectileMesh(type));
   }
@@ -314,9 +319,20 @@ export function warmUpProjectileMaterials(
   tempGroup.add(new THREE.Points(geo, mat));
 
   scene.add(tempGroup);
-  renderer.compile(scene, camera);
-  scene.remove(tempGroup);
 
+  // Compile at current light count (base scene + 1 fireball PointLight),
+  // then add extra PointLights one at a time, compiling at each count.
+  // This pre-caches shader variants for every light count the game can hit.
+  const EXTRA_LIGHTS = 10;
+  renderer.compile(scene, camera);
+  for (let i = 0; i < EXTRA_LIGHTS; i++) {
+    const light = new THREE.PointLight(0x000000, 0, 1);
+    light.position.set(0, -1000, 0);
+    tempGroup.add(light);
+    renderer.compile(scene, camera);
+  }
+
+  scene.remove(tempGroup);
   geo.dispose();
   mat.dispose();
 }
