@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-19 — GPU Shader Warmup
+
+**Problem**: First fireball spawn caused heavy frame drop. Root causes: (1) lazy shader compilation of fireball `MeshStandardMaterial` and explosion `PointsMaterial` on first use, (2) each new `PointLight` (fireball/explosion) changes `NUM_POINT_LIGHTS` shader define, forcing recompilation of all lit materials.
+
+**Solution**: `warmUpGPUShaders()` pre-compiles all shader programs + light-count variants during init. Uses `renderer.compileAsync()` (`KHR_parallel_shader_compile` extension) for non-blocking compilation. Runs concurrently with character creation screen — level scene built before character creation so all materials are in the scene during warmup. Animated "Loading..." indicator.
+
+**Browser variance**: Chrome has the extension (1-2s, fully smooth). Firefox lacks it (~8s, synchronous fallback with RAF yields between blocking passes). Double-RAF before warmup guarantees the character creation screen is painted on Firefox.
+
+**Scaling**: Compile time depends on unique shader program count × light-count variants, not mesh count. 10x content with same material types ≈ same compile time.
+
+**Changes**:
+- `projectileRenderer.ts`: `warmUpGPUShaders()` — async, creates temp projectile/explosion meshes + incremental PointLights, compileAsync at each count, RAF yields for Firefox fallback
+- `main.ts`: level scene built before character creation, `Promise.all` for concurrent warmup + character creation, loading indicator with CSS-animated dots
+
+**ADR**: ADR-M2-06
+
+---
+
 ## 2026-03-19 — Global Clock: Absolute-Time Scheduling
 
 **Problem**: Independent countdown timers (`timer -= delta`) across signal delays, timed sources, delay/pulse gates, and trap launchers drift under variable framerates. Repeating events compound drift by rescheduling from `this.now` instead of intended fire time.

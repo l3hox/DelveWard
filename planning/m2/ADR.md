@@ -159,6 +159,60 @@ Multiple timed systems (signal delays, timed levers/plates, delay gates, pulse g
 
 ---
 
+## ADR-M2-06 — GPU Shader Warmup
+
+**Status:** Accepted
+**Date:** 2026-03-19
+
+### Context
+
+First-ever fireball spawn caused a heavy frame rate drop (~200ms+). Root cause: WebGL lazily compiles GPU shader programs on first render of each material. The fireball path introduces `MeshStandardMaterial` (emissive PBR), `PointsMaterial` (additive blending + CanvasTexture), and dynamic `PointLight` additions — all unseen by the GPU until mid-gameplay.
+
+Subsequent analysis revealed a second stutter source: Three.js bakes `NUM_POINT_LIGHTS` into shader defines. Each new PointLight (fireball projectile, explosion) changes the light count and forces recompilation of *every* lit material's shader variant.
+
+### Decision
+
+**Pre-compile all shader programs and light-count variants during init, concurrently with the character creation screen.**
+
+- `warmUpGPUShaders()` in `projectileRenderer.ts`: creates temp meshes for all projectile types + explosion particles, adds them to the scene, then incrementally adds PointLights and compiles at each count (up to +10 extra lights).
+- Uses `renderer.compileAsync()` (Three.js r152+) which leverages `KHR_parallel_shader_compile` when available — GPU compiles in a background thread, main thread stays free.
+- Level scene is built before character creation so all dungeon/entity materials are in the scene during warmup. Character creation overlays the HUD canvas — 3D scene is invisible underneath.
+- `Promise.all([charCreationDone, warmupDone])` — game loop starts only when both complete.
+- Explicit `requestAnimationFrame` yields between compile passes for browsers without `KHR_parallel_shader_compile` (Firefox) where `compileAsync` falls back to synchronous compilation.
+- Double-RAF before warmup start guarantees the character creation screen is painted before the first compile call.
+- "Loading..." with CSS-animated dots, switching to "Loaded" when warmup finishes.
+
+### Browser behavior
+
+| Browser | Extension | Warmup time | UI responsiveness |
+|---------|-----------|-------------|-------------------|
+| Chrome | `KHR_parallel_shader_compile` supported | ~1-2s | Fully smooth |
+| Firefox | Not supported, synchronous fallback | ~8s | Visible between ~700ms compile blocks |
+
+Compile time scales with **unique shader program count × light count variants**, not with mesh/entity count. 10x more dungeon content with the same material types ≈ same compile time.
+
+### Alternatives Rejected
+
+**No warmup (lazy compilation):** The original behavior. Unacceptable — 200ms+ stutter on first fireball, plus per-launcher stutters as light count changes.
+
+**Synchronous warmup before game start:** First implementation. Blocked init for 8 seconds with no UI feedback. Moved to concurrent approach.
+
+**PointLight pooling (fixed light count):** Pre-allocate a pool of PointLights always in the scene, toggle intensity instead of adding/removing. Eliminates light-count recompilation entirely, but adds complexity managing the pool and caps simultaneous lights. The warmup approach is simpler and handles all reasonable light counts.
+
+### Consequences
+
+**Positive:**
+- Zero mid-gameplay shader stutter on any browser
+- Warmup hidden behind character creation — no perceived loading time on Chrome
+- Firefox users see the character creation screen during warmup (laggy but functional)
+- Scales well — adding content doesn't increase compile time unless new material types are introduced
+
+**Negative / Risks:**
+- Firefox warmup blocks UI for ~700ms per compile pass (hard floor without driver support)
+- Electron migration would inherit Chrome's behavior (positive — `KHR_parallel_shader_compile` supported)
+
+---
+
 ## ADR-M2-04 — Status Effects System
 
 **Status:** Accepted
