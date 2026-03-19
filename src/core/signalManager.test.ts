@@ -316,4 +316,70 @@ describe('SignalManager', () => {
     sm.deactivateSource('nonexistent');
     // Should not throw
   });
+
+  // --- Gate chaining ---
+
+  it('OR gate chains through another OR gate to receiver', () => {
+    const sm = new SignalManager();
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'or', ['gate_2']);
+    sm.registerGate('gate_2', 'or', ['door_1']);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('lever_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+
+    sm.setSourceActive('lever_1', false);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+  });
+
+  it('delay gate chains into another delay gate', () => {
+    const sm = new SignalManager();
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'delay', ['gate_2'], 1.0);
+    sm.registerGate('gate_2', 'delay', ['door_1'], 1.0);
+    sm.registerReceiver('door_1');
+
+    sm.setSourceActive('lever_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // First delay gate fires after 1s
+    sm.tick(1.1);
+    expect(sm.getGate('gate_1')!.active).toBe(true);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // Second delay gate fires after another 1s
+    sm.tick(1.1);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+  });
+
+  it('gate targets both another gate and a receiver', () => {
+    const sm = new SignalManager();
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'or', ['door_1', 'gate_2']);
+    sm.registerGate('gate_2', 'or', ['door_2']);
+    sm.registerReceiver('door_1');
+    sm.registerReceiver('door_2');
+
+    sm.setSourceActive('lever_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+    expect(sm.isReceiverActive('door_2')).toBe(true);
+  });
+
+  it('three-deep gate chain propagates correctly', () => {
+    const sm = new SignalManager();
+    sm.registerSource('lever_1', ['gate_1']);
+    sm.registerGate('gate_1', 'or', ['gate_2']);
+    sm.registerGate('gate_2', 'not', ['gate_3']);
+    sm.registerGate('gate_3', 'or', ['door_1']);
+    sm.registerReceiver('door_1');
+
+    // lever on → gate_1=true → gate_2(NOT)=false → gate_3=false → door closed
+    sm.setSourceActive('lever_1', true);
+    expect(sm.isReceiverActive('door_1')).toBe(false);
+
+    // lever off → gate_1=false → gate_2(NOT)=true → gate_3=true → door open
+    sm.setSourceActive('lever_1', false);
+    expect(sm.isReceiverActive('door_1')).toBe(true);
+  });
 });

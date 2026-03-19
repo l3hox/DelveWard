@@ -262,24 +262,28 @@ export class SignalManager {
     this.propagateInternal(visited);
   }
 
-  private propagateInternal(visited: Set<string>): void {
-    // 1. Collect source-only inputs for gates (sources → gates)
-    const gateInputs = new Map<string, boolean[]>();
-    for (const source of this.sources.values()) {
-      for (const targetId of source.targets) {
-        if (this.gates.has(targetId)) {
-          if (!gateInputs.has(targetId)) gateInputs.set(targetId, []);
-          gateInputs.get(targetId)!.push(source.active);
+  private propagateInternal(_visited: Set<string>): void {
+    // 1. Topologically sort gates so upstream gates evaluate before downstream.
+    //    Gates in cycles are skipped (cycle guard).
+    const sortedGates = this.topologicalSortGates();
+
+    // 2. Evaluate gates in order. Each gate collects inputs from sources + upstream gates.
+    for (const gate of sortedGates) {
+      const inputs: boolean[] = [];
+      // Inputs from sources
+      for (const source of this.sources.values()) {
+        if (source.targets.includes(gate.entityId)) {
+          inputs.push(source.active);
         }
       }
-    }
+      // Inputs from upstream gates (already evaluated)
+      for (const other of this.gates.values()) {
+        if (other === gate) continue;
+        if (other.targets.includes(gate.entityId)) {
+          inputs.push(other.active);
+        }
+      }
 
-    // 2. Evaluate gates (as receivers of source signals)
-    for (const gate of this.gates.values()) {
-      if (visited.has(gate.entityId)) continue; // cycle detection
-      visited.add(gate.entityId);
-
-      const inputs = gateInputs.get(gate.entityId) ?? [];
       const inputActive = inputs.some(v => v);
 
       switch (gate.gateType) {
@@ -348,6 +352,44 @@ export class SignalManager {
         this.onReceiverChanged?.(receiver.entityId, receiver.active);
       }
     }
+  }
+
+  /** Kahn's algorithm: returns gates in topological order. Gates in cycles are excluded. */
+  private topologicalSortGates(): SignalGate[] {
+    // Build in-degree counts (only gate→gate edges matter for ordering)
+    const inDegree = new Map<string, number>();
+    for (const gate of this.gates.values()) {
+      if (!inDegree.has(gate.entityId)) inDegree.set(gate.entityId, 0);
+    }
+    for (const gate of this.gates.values()) {
+      for (const targetId of gate.targets) {
+        if (this.gates.has(targetId)) {
+          inDegree.set(targetId, (inDegree.get(targetId) ?? 0) + 1);
+        }
+      }
+    }
+
+    // Start with gates that have no gate inputs (roots)
+    const queue: string[] = [];
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const sorted: SignalGate[] = [];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      sorted.push(this.gates.get(id)!);
+      const gate = this.gates.get(id)!;
+      for (const targetId of gate.targets) {
+        if (this.gates.has(targetId)) {
+          const newDeg = (inDegree.get(targetId) ?? 1) - 1;
+          inDegree.set(targetId, newDeg);
+          if (newDeg === 0) queue.push(targetId);
+        }
+      }
+    }
+
+    return sorted;
   }
 
   private evaluateGateMode(mode: GateMode | 'and' | 'or', inputs: boolean[]): boolean {
