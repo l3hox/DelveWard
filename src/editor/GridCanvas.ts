@@ -1254,7 +1254,19 @@ export class GridCanvas {
             (e.id !== undefined && signalChain.has(e.id)) ||
             (targetEntity.id !== undefined && signalChain.has(targetEntity.id!))
           );
-          arrows.push({ fromCol, fromRow, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+          // Trap launcher arrows end at the wall-mounted position
+          let toCol = targetEntity.col;
+          let toRow = targetEntity.row;
+          if (targetEntity.type === 'trap_launcher') {
+            const facing = (targetEntity.facing as string) || 'S';
+            const wallOffset = 0.35;
+            // Mount wall is opposite of facing
+            if (facing === 'S') toRow = targetEntity.row + wallOffset - 0.5;
+            else if (facing === 'N') toRow = targetEntity.row + 0.5 - wallOffset;
+            else if (facing === 'E') toCol = targetEntity.col + wallOffset - 0.5;
+            else if (facing === 'W') toCol = targetEntity.col + 0.5 - wallOffset;
+          }
+          arrows.push({ fromCol, fromRow, toCol, toRow, active: isActive });
         }
       }
       if (e.type === 'stairs' && e.target) {

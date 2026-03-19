@@ -178,7 +178,6 @@ function validateEntity(
     case 'gate': {
       const t = checkTargets('gate'); if (t) return t;
       if (!validGateTypes.has(e.gateType as string)) return `${pfx} gate must have a valid gateType (${[...validGateTypes].join(', ')})`;
-      const w = checkWalkable('gate'); if (w) return w;
       if (e.delay !== undefined && typeof e.delay !== 'number') return `${pfx} gate delay must be a number`;
       if (e.interval !== undefined && typeof e.interval !== 'number') return `${pfx} gate interval must be a number`;
       break;

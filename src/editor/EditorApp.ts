@@ -688,6 +688,8 @@ export class EditorApp {
       if (!this.walkableSet.has(char)) return false;
       return !this.getEntitiesAt(col, row).some(e => e.type === 'stairs');
     }
+    // Gates are abstract logic — placeable anywhere (including walls)
+    if (type === 'gate') return char !== ' ';
     // All others require a walkable cell
     return this.walkableSet.has(char);
   }
