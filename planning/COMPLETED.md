@@ -84,6 +84,29 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Effects cleared on death/restart
   - Editor: gate entities exempt from non-walkable cell validation
   - 617 tests (15 new statusEffects tests)
+- [x] **Phase D: Environment Entities**:
+  - 5 new entity types: breakable_wall, secret_wall, block, chest, sign
+  - Wall entity renderer (shared geometry for breakable+secret walls)
+  - Chest: open/locked/signal-controlled, facing, key-locked, signal source (booby traps), loot drops
+  - Sign: wall-mounted, parchment overlay popup (SignOverlay with capture-phase keydown)
+  - Block: pushable, activates pressure plates, blocks projectiles
+  - Editor: all 5 in palette, facing-aware icons, inspector fields, auto-create key, chest-key wiring
+  - 658 tests
+- [x] **Phase E: Save/Load System**:
+  - New `saveSystem.ts`: `SaveData` interface, `SerializedLevelSnapshot` (Map→Record, Set→array), conversion helpers
+  - `buildSaveData` / `applySaveData`: full game state assembly — player, inventory, entity registry, level snapshots, mutated grids
+  - localStorage slot management: 5 manual slots + 1 autosave, `saveToSlot`/`loadFromSlot`/`deleteSlot`/`getSlotMetadata`/`getAllSlotMetadata`
+  - JSON export (`exportSaveFile` — blob download) and import (`importSaveFile` — file picker + parse + version check)
+  - `GameState` helpers: `getPlayerState()`/`restorePlayerState()`, `getPickedUpKeys()`/`restorePickedUpKeys()`
+  - New `saveLoadOverlay.ts`: DOM overlay (SignOverlay pattern), dark dungeon theme, two modes (save/load), death variant with Restart
+  - Slot rows: label, timestamp, player name, level, character level, Save/Load/Delete buttons
+  - Export/Import buttons in bottom action bar
+  - `main.ts` integration: `saveGame()`/`loadGame()`, Escape opens overlay, auto-save on stair transitions, death → load overlay
+  - Same-dungeon restriction on load (matched by name)
+  - Grids restored to original before applying saved grids (prevents mutation accumulation)
+  - Entity registry restored after `loadLevelState` for backpack/equipped items
+  - Overlay added to `anyOverlayOpen` pause check
+  - 695 tests (37 new saveSystem tests)
 
 ---
 

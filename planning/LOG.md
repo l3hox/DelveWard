@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-19 — Phase E: Save/Load System
+
+**Design**: localStorage-based persistence with 5 manual save slots + 1 autosave slot. ~50-100KB per save, well within localStorage limits. Same-dungeon restriction (saves only load for matching dungeon name). Death shows load overlay if saves exist, else restarts.
+
+**Serialization**: `SaveData` interface captures full game state: player stats/position/facing, key inventory, entity registry (all items across all levels + backpack + equipped), level snapshots (all visited levels' entity Maps→Records, Sets→arrays), and mutated grids. `serializeLevelSnapshot`/`deserializeLevelSnapshot` handle Map↔Record and Set↔array conversions. Signal state is already JSON-safe (tuple arrays from `Array.from(map.entries())`).
+
+**Architecture**: New `saveSystem.ts` owns all serialization logic and slot management. `GameState` exposes 4 accessor methods (`getPlayerState`, `restorePlayerState`, `getPickedUpKeys`, `restorePickedUpKeys`) — keeps serialization concerns out of the game state class. `applySaveData` restores grids → loads active level snapshot → overwrites entity registry with full save (backpack/equipped survive the level-scoped restore). `buildSaveData` flushes active level state before capturing the full registry.
+
+**UI**: `SaveLoadOverlay` follows `SignOverlay` DOM pattern (fullscreen backdrop, capture-phase keydown, `attach`/`show`/`hide`/`isOpen`). Dark dungeon theme with monospace font. Two modes: save (shows Save buttons on manual slots) and load (death variant with "You have died" header and Restart button). Export/Import buttons in bottom action bar.
+
+**Integration**: Escape key opens overlay in save mode. Auto-save fires on every stair transition (after level snapshot, before scene swap). Death handler checks `hasSaves()` and shows load overlay or falls back to restart. Overlay added to `anyOverlayOpen` to pause game loop.
+
+---
+
 ## 2026-03-19 — Phase D: Environment Entities
 
 **Design**: 5 new entity types for dungeon environment interaction.

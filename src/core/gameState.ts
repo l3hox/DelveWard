@@ -1688,6 +1688,68 @@ export class GameState {
       r += dr;
     }
   }
+
+  /** Return all player character state for serialization. */
+  getPlayerState(): {
+    hp: number; maxHp: number;
+    str: number; dex: number; vit: number; wis: number;
+    xp: number; level: number; attributePoints: number;
+    playerName: string; gold: number;
+    torchFuel: number; maxTorchFuel: number;
+    statusEffects: StatusEffect[];
+  } {
+    return {
+      hp: this.hp,
+      maxHp: this.maxHp,
+      str: this.str,
+      dex: this.dex,
+      vit: this.vit,
+      wis: this.wis,
+      xp: this.xp,
+      level: this.level,
+      attributePoints: this.attributePoints,
+      playerName: this.playerName,
+      gold: this.gold,
+      torchFuel: this.torchFuel,
+      maxTorchFuel: this.maxTorchFuel,
+      statusEffects: this.playerStatusEffects.map(e => ({ ...e })),
+    };
+  }
+
+  /** Restore player character state from deserialized save data. */
+  restorePlayerState(state: {
+    hp: number; maxHp: number;
+    str: number; dex: number; vit: number; wis: number;
+    xp: number; level: number; attributePoints: number;
+    playerName: string; gold: number;
+    torchFuel: number; maxTorchFuel: number;
+    statusEffects: StatusEffect[];
+  }): void {
+    this.hp = state.hp;
+    this.maxHp = state.maxHp;
+    this.str = state.str;
+    this.dex = state.dex;
+    this.vit = state.vit;
+    this.wis = state.wis;
+    this.xp = state.xp;
+    this.level = state.level;
+    this.attributePoints = state.attributePoints;
+    this.playerName = state.playerName;
+    this.gold = state.gold;
+    this.torchFuel = state.torchFuel;
+    this.maxTorchFuel = state.maxTorchFuel;
+    this.playerStatusEffects = state.statusEffects.map(e => ({ ...e }));
+  }
+
+  /** Return picked up keys for serialization. */
+  getPickedUpKeys(): string[] {
+    return Array.from(this.inventory);
+  }
+
+  /** Restore picked up keys from save data. */
+  restorePickedUpKeys(keys: string[]): void {
+    this.inventory = new Set(keys);
+  }
 }
 
 // Module-level helper used by equipFromBackpack.

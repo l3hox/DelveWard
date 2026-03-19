@@ -53,6 +53,13 @@ import { buildBlockMeshes, animateBlockPush, type BlockMeshes } from './renderin
 import { buildChestMeshes, openChestMesh, closeChestMesh, type ChestMeshes } from './rendering/chestRenderer';
 import { buildSignMeshes, type SignMeshes } from './rendering/signRenderer';
 import { SignOverlay } from './hud/signOverlay';
+import { SaveLoadOverlay } from './hud/saveLoadOverlay';
+import {
+  buildSaveData, applySaveData, saveToSlot, loadFromSlot, deleteSlot,
+  exportSaveFile, importSaveFile, getAllSlotMetadata,
+  SAVE_SLOT_KEYS, AUTOSAVE_KEY,
+} from './core/saveSystem';
+import type { SaveData } from './core/saveSystem';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -358,8 +365,8 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
-//  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
+//  const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
@@ -492,6 +499,133 @@ async function init(): Promise<void> {
       );
     });
   }
+
+  // --- Save / Load ---
+
+  function saveGame(slotKey: string): void {
+    const ps = ls.player.getState();
+    const data = buildSaveData({
+      gameState,
+      playerCol: ps.col,
+      playerRow: ps.row,
+      playerFacing: ps.facing,
+      currentLevelId,
+      levelSnapshots,
+      dungeon,
+    });
+    const ok = saveToSlot(slotKey, data);
+    if (!ok) {
+      hud.showMessage('Save failed — storage full!');
+    }
+  }
+
+  function loadGame(data: SaveData): void {
+    transition.startTransition(() => {
+      teardownLevelScene(ls, scene);
+
+      // Restore all grids to original before applying saved grids
+      for (const level of dungeon.levels) {
+        const id = level.id ?? level.name;
+        const orig = originalGrids.get(id);
+        if (orig) level.grid = [...orig];
+      }
+
+      const result = applySaveData(data, gameState, dungeon);
+
+      // Replace level snapshots with the ones from the save
+      levelSnapshots.clear();
+      for (const [id, snapshot] of result.levelSnapshots) {
+        levelSnapshots.set(id, snapshot);
+      }
+
+      currentLevelId = result.targetLevelId;
+
+      // Find the target level and rebuild the scene
+      const targetLevel = dungeon.levels.find(l => (l.id ?? l.name) === currentLevelId) ?? dungeon.levels[0];
+      applyEnvironment(targetLevel.environment, scene, ambient);
+
+      projectileManager.clear();
+      fireballExplosions.clear();
+      blockedDoors.clear();
+      gameState.attackCooldown = 0;
+
+      ls = buildLevelScene(
+        targetLevel, gameState, camera, scene,
+        result.playerCol, result.playerRow, result.playerFacing,
+      );
+      wireCallbacks();
+      sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
+      dustMotes.setVisible(targetLevel.dustMotes !== false);
+      waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
+      waterDrips.setVisible(targetLevel.waterDrips === true);
+      fireflies.setVisible(targetLevel.fireflies === true);
+
+      gameState.revealAround(result.playerCol, result.playerRow, result.playerFacing, targetLevel.grid);
+    });
+  }
+
+  function hasSaves(): boolean {
+    const meta = getAllSlotMetadata();
+    return Object.values(meta).some(m => m !== null);
+  }
+
+  const saveLoadOverlay = new SaveLoadOverlay({
+    onSave(slotKey) {
+      saveGame(slotKey);
+      saveLoadOverlay.hide();
+      hud.showMessage('Game saved.');
+    },
+    onLoad(slotKey) {
+      const data = loadFromSlot(slotKey);
+      if (!data) {
+        saveLoadOverlay.hide();
+        hud.showMessage('Failed to load save.');
+        return;
+      }
+      if (data.dungeonName !== dungeon.name) {
+        saveLoadOverlay.hide();
+        hud.showMessage('Save is from a different dungeon.');
+        return;
+      }
+      saveLoadOverlay.hide();
+      loadGame(data);
+    },
+    onDelete(slotKey) {
+      deleteSlot(slotKey);
+      saveLoadOverlay.refreshSlots();
+    },
+    onExport() {
+      const ps = ls.player.getState();
+      const data = buildSaveData({
+        gameState,
+        playerCol: ps.col,
+        playerRow: ps.row,
+        playerFacing: ps.facing,
+        currentLevelId,
+        levelSnapshots,
+        dungeon,
+      });
+      exportSaveFile(data);
+    },
+    onImport() {
+      importSaveFile().then((data) => {
+        if (data.dungeonName !== dungeon.name) {
+          saveLoadOverlay.hide();
+          hud.showMessage('Save is from a different dungeon.');
+          return;
+        }
+        saveLoadOverlay.hide();
+        loadGame(data);
+      }).catch(() => {
+        // User cancelled or invalid file — do nothing
+      });
+    },
+    onRestart() {
+      saveLoadOverlay.hide();
+      restartLevel();
+    },
+  });
+  saveLoadOverlay.attach();
 
   // --- First level scene ---
   let ls = buildLevelScene(
@@ -746,6 +880,9 @@ async function init(): Promise<void> {
     projectileManager.clear();
     levelSnapshots.set(currentLevelId, gameState.saveLevelState());
 
+    // Auto-save on every stair transition
+    saveGame(AUTOSAVE_KEY);
+
     transition.startTransition(() => {
       // --- Midpoint: swap level ---
       teardownLevelScene(ls, scene);
@@ -887,6 +1024,7 @@ async function init(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
     if (signOverlay.isOpen()) return; // sign overlay handles its own dismissal
+    if (saveLoadOverlay.isOpen()) return; // save/load overlay handles its own keys
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
@@ -1121,6 +1259,10 @@ async function init(): Promise<void> {
         if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
         hud.getAttributePanel().open(gameState);
         break;
+      case 'Escape':
+        // Open save/load overlay when no other overlay is active
+        saveLoadOverlay.show('save');
+        break;
       case 'Backquote':
         debugFullbright = !debugFullbright;
         if (debugFullbright) {
@@ -1153,7 +1295,7 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || saveLoadOverlay.isOpen();
 
     ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);
@@ -1284,9 +1426,13 @@ async function init(): Promise<void> {
         }
       }
 
-      // Death — restart current level
+      // Death — show save/load overlay if saves exist, else restart
       if (gameState.hp <= 0) {
-        restartLevel();
+        if (hasSaves()) {
+          saveLoadOverlay.show('load', true);
+        } else {
+          restartLevel();
+        }
       }
     }
 
