@@ -544,6 +544,7 @@ export class Inspector {
           this.onEntityChanged?.();
           this.refresh();
         });
+        this.attachHoverHighlight(removeBtn, ref);
         row.appendChild(removeBtn);
       }
 
@@ -702,6 +703,7 @@ export class Inspector {
         this.onEntityChanged?.();
         this.refresh();
       });
+      if (targetEntity) this.attachHoverHighlight(removeBtn, targetEntity);
       row.appendChild(removeBtn);
 
       list.appendChild(row);
