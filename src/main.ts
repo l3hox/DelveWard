@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildDungeon } from './rendering/dungeon';
+import { buildDungeon, CELL_SIZE } from './rendering/dungeon';
 import { Player } from './rendering/player';
 import { loadDungeon } from './level/levelLoader';
 import { buildWalkableSet, getFacingCell, FACING_DELTA } from './core/grid';
@@ -44,7 +44,7 @@ import { checkAssets } from './core/assetCheck';
 import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
-import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, type ProjectileMeshes } from './rendering/projectileRenderer';
+import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -363,6 +363,8 @@ async function init(): Promise<void> {
   scene.add(waterDrips.getObject());
   const fireflies = new Fireflies();
   scene.add(fireflies.getObject());
+  const fireballExplosions = new FireballExplosions();
+  scene.add(fireballExplosions.getObject());
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
@@ -389,6 +391,7 @@ async function init(): Promise<void> {
       const currentLevel = dungeon.levels.find((l) => l.id === currentLevelId)!;
       gameState.loadNewLevel(currentLevel.entities, currentLevel.grid, currentLevel.id ?? currentLevel.name);
       projectileManager.clear();
+      fireballExplosions.clear();
       gameState.hp = gameState.maxHp;
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
@@ -595,13 +598,56 @@ async function init(): Promise<void> {
       });
     };
 
-    // Projectile hit → apply damage
-    projectileManager.setHitCallback((projectile, _col, _row, hitType) => {
+    // Projectile hit → apply damage and visual effects
+    projectileManager.setHitCallback((projectile, col, row, hitType) => {
       if (hitType === 'player') {
         gameState.hp -= projectile.damage;
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
       }
-      // enemy hit is a stub for M4
+      if (hitType === 'enemy') {
+        const key = doorKey(col, row);
+        const enemy = gameState.getEnemy(col, row);
+        if (enemy) {
+          enemy.hp -= projectile.damage;
+          enemyDamageFlash(ls.enemyMeshes.meshMap, col, row);
+          ls.enemyAnimator.triggerHit(key);
+          damageNumbers.spawn(col, row, projectile.damage);
+          if (enemy.hp <= 0) {
+            ls.healthBarManager.remove(key);
+            hideEnemyMesh(ls.enemyMeshes.meshMap, col, row);
+            ls.enemyAnimator.remove(key);
+            gameState.enemies.delete(key);
+            const enemyDef = enemyDatabase.getEnemy(enemy.type);
+            if (enemyDef) {
+              const levelled = gameState.addXp(enemyDef.xp);
+              if (levelled) levelUpNotification.trigger(gameState.level);
+            }
+            const lootResult = rollLoot(enemy.type, enemy.drops);
+            gameState.gold += lootResult.gold;
+            for (const drop of lootResult.items) {
+              const entity = gameState.entityRegistry.createItem(
+                drop.itemId, drop.quality,
+                { kind: 'world', levelId: gameState.currentLevelId, col, row },
+                drop.modifiers,
+              );
+              const itemDef = itemDatabase.getItem(drop.itemId);
+              if (itemDef && itemDef.type === 'consumable') {
+                addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+              } else if (itemDef) {
+                addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+              }
+            }
+          } else {
+            ls.healthBarManager.update(key, enemy.hp, enemy.maxHp);
+          }
+        }
+      }
+      if (projectile.projectileType === 'fireball') {
+        fireballExplosions.spawn(
+          projectile.col * CELL_SIZE,
+          projectile.row * CELL_SIZE,
+        );
+      }
     });
   }
 
@@ -967,6 +1013,7 @@ async function init(): Promise<void> {
     sconceEmbers.update(delta);
     waterDrips.update(delta, camPos2.x, camPos2.z);
     fireflies.update(delta, camPos2.x, camPos2.z);
+    fireballExplosions.update(delta);
 
     const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen();
 
