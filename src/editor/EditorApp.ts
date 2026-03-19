@@ -445,7 +445,7 @@ export class EditorApp {
         continue;
       }
       const ch = level.grid[e.row][e.col];
-      if (!this.walkableSet.has(ch)) {
+      if (!this.walkableSet.has(ch) && e.type !== 'gate') {
         errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
       }
     }

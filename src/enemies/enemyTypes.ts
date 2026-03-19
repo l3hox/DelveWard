@@ -2,6 +2,7 @@
 
 import type { DropsOverride } from '../core/lootTable';
 import { enemyDatabase } from './enemyDatabase';
+import type { StatusEffect } from '../core/statusEffects';
 
 export type { EnemyDef } from './enemyDatabase';
 
@@ -23,6 +24,7 @@ export interface EnemyInstance {
   regenTimer?: number;       // accumulates time for HP regen
   regenPauseTimer?: number;  // remaining seconds of regen pause after taking damage
   drops?: DropsOverride;  // per-entity override from dungeon JSON
+  statusEffects: StatusEffect[];
 }
 
 export function createEnemyInstance(
@@ -45,6 +47,7 @@ export function createEnemyInstance(
     blocksMovement: def.blocksMovement,
     aiState: 'idle',
     moveTimer: 0,
+    statusEffects: [],
   };
   if (enemyDatabase.hasBehavior(enemyType, 'regen')) {
     instance.regenTimer = 0;

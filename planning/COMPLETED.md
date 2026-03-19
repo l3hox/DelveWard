@@ -56,6 +56,34 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Drag-to-wire falls back to any wirable entity at cell if selected entity is not a wire source
   - Lever wiring arrows originate from bar center instead of cell center
   - 572 tests
+- [x] **Phase B: Projectile System**:
+  - `ProjectileManager` class: spawn, update, collision detection (player/enemy/wall), hit callbacks
+  - 3 projectile types: dart (physical), arrow (physical), fireball (fire + burning status stub)
+  - `PROJECTILE_STATS` config: speed, damage, damageType, maxRange, statusEffect
+  - Trap launcher entity: facing, projectileType, fireMode (single/repeat), maxRange, signal-triggered
+  - Wall-edge projectile spawn (launcher on wall cell, projectile starts in adjacent walkable cell)
+  - Projectile rendering: dart/arrow as elongated quads, fireball as emissive sphere with point light
+  - `FireballExplosions` particle effect on fireball impact
+  - Editor: trap launcher entity type, inspector fields, toolbar icon
+  - 602 tests
+- [x] **Phase C: Status Effects**:
+  - New `statusEffects.ts` module: `StatusEffect` interface, `applyEffect` (same-type refresh, no stacking), `tickEffects` (periodic damage), `removeEffectsByType`, `hasEffect`, `getSlowMultiplier`
+  - 3 effect types: poison (2 dmg/s), slow (2× movement penalty), burning (3 dmg/s)
+  - `statusEffects: StatusEffect[]` on `EnemyInstance`, `playerStatusEffects: StatusEffect[]` on `GameState`
+  - Enemy status tick in `enemyAI.ts`: status_damage/status_kill actions, slow multiplier on effectiveInterval
+  - Player status tick in animate loop: periodic damage, flash, effect expiry, paused during overlays
+  - Fireball → burning (6s) on player and enemy hit
+  - Spider → poison (10s, 30% chance) via `onHit` behavior in `enemies.json`
+  - Antidote integration: `curePoison` clears poison in both `useConsumable` and `useConsumableFromRegistry`
+  - Player slow: `slowMultiplier` field on `Player`, halves tween speed
+  - Screen tint overlays: burning (orange flicker), poison (green pulse), slow (blue static)
+  - Pixel-art status icons above health bar: flame, droplet, snowflake
+  - Enemy tint: burning=orange, poison=green per-frame override on billboard shader
+  - `handleEnemyKill` helper extracted (combat, projectile, status_kill paths)
+  - Deep-copy enemy statusEffects in save/load level state
+  - Effects cleared on death/restart
+  - Editor: gate entities exempt from non-walkable cell validation
+  - 617 tests (15 new statusEffects tests)
 
 ---
 

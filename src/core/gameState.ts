@@ -13,6 +13,8 @@ export type { EquipSlot } from './entities';
 import type { EquipSlot } from './entities';
 import { SignalManager } from './signalManager';
 import type { GateMode, GateType, SignalMode } from './signalManager';
+import type { StatusEffect } from './statusEffects';
+import { removeEffectsByType } from './statusEffects';
 
 export type DoorState = 'open' | 'closed';
 
@@ -221,6 +223,9 @@ export class GameState {
   playerName: string;
   gold: number;
 
+  // Active status effects on the player (global, not per-level)
+  playerStatusEffects: StatusEffect[];
+
   constructor(entities: Entity[], grid?: string[], levelId: string = 'default') {
     this.doors = new Map();
     this.keys = new Map();
@@ -251,6 +256,7 @@ export class GameState {
     this.attributePoints = 0;
     this.playerName = 'Adventurer';
     this.gold = 0;
+    this.playerStatusEffects = [];
 
     this.atk = 3;
     this.def = 1;
@@ -623,7 +629,7 @@ export class GameState {
     }
     const enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of this.enemies) {
-      enemies.set(k, { ...v });
+      enemies.set(k, { ...v, statusEffects: v.statusEffects.map(e => ({ ...e })) });
     }
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
@@ -678,7 +684,7 @@ export class GameState {
     }
     this.enemies = new Map<string, EnemyInstance>();
     for (const [k, v] of snapshot.enemies) {
-      this.enemies.set(k, { ...v });
+      this.enemies.set(k, { ...v, statusEffects: v.statusEffects.map(e => ({ ...e })) });
     }
     this.exploredCells = new Set<string>(snapshot.exploredCells);
     if (snapshot.registrySnapshot) {
@@ -980,7 +986,7 @@ export class GameState {
     enemy.hp -= amount;
     // Pause regen on hit
     if (enemy.regenPauseTimer !== undefined) {
-      enemy.regenPauseTimer = enemyDatabase.getBehavior(enemy.type, 'regen')?.params.pauseOnDamage ?? 3;
+      enemy.regenPauseTimer = (enemyDatabase.getBehavior(enemy.type, 'regen')?.params.pauseOnDamage as number | undefined) ?? 3;
     }
     if (enemy.hp <= 0) {
       this.enemies.delete(doorKey(col, row));
@@ -1264,6 +1270,9 @@ export class GameState {
     } else if (itemDef.subtype === 'torch_oil') {
       this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
     }
+    if (itemDef.effect?.curePoison) {
+      this.playerStatusEffects = removeEffectsByType(this.playerStatusEffects, 'poison');
+    }
 
     this.entityRegistry.removeItem(instanceId);
     return true;
@@ -1340,6 +1349,9 @@ export class GameState {
         this.hp = Math.min(this.maxHp, this.hp + (itemDef.stats.hp ?? 0));
       } else if (itemDef.subtype === 'torch_oil') {
         this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
+      }
+      if (itemDef.effect?.curePoison) {
+        this.playerStatusEffects = removeEffectsByType(this.playerStatusEffects, 'poison');
       }
     }
 

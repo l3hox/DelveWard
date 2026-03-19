@@ -23,6 +23,7 @@ import { loadLootTables, rollLoot } from './core/lootTable';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
 import { enemyDatabase, DEFAULT_SPRITE_SIZE } from './enemies/enemyDatabase';
+import type { EnemyInstance } from './enemies/enemyTypes';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
 import type { CombatResult } from './core/combat';
 import { LeverAnimator } from './rendering/leverAnimator';
@@ -45,6 +46,8 @@ import { applyEnvironment, getEnvironmentConfig } from './rendering/environment'
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
 import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpGPUShaders, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
+import { tickEffects, applyEffect, getSlowMultiplier, hasEffect } from './core/statusEffects';
+import type { StatusEffectType } from './core/statusEffects';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -317,6 +320,7 @@ async function init(): Promise<void> {
 
   // --- Dungeon ---
   const dungeon: Dungeon = await loadDungeon('/levels/test_m2b.json');
+//  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
   const firstLevel = dungeon.levels[0];
 
   let currentLevelId = firstLevel.id!;
@@ -372,6 +376,33 @@ async function init(): Promise<void> {
     }, ENEMY_DAMAGE_FLASH_DURATION * 1000);
   }
 
+  function handleEnemyKill(key: string, col: number, row: number, enemy: EnemyInstance): void {
+    ls.healthBarManager.remove(key);
+    hideEnemyMesh(ls.enemyMeshes.meshMap, col, row);
+    ls.enemyAnimator.remove(key);
+    gameState.enemies.delete(key);
+    const enemyDef = enemyDatabase.getEnemy(enemy.type);
+    if (enemyDef) {
+      const levelled = gameState.addXp(enemyDef.xp);
+      if (levelled) levelUpNotification.trigger(gameState.level);
+    }
+    const lootResult = rollLoot(enemy.type, enemy.drops);
+    gameState.gold += lootResult.gold;
+    for (const drop of lootResult.items) {
+      const entity = gameState.entityRegistry.createItem(
+        drop.itemId, drop.quality,
+        { kind: 'world', levelId: gameState.currentLevelId, col, row },
+        drop.modifiers,
+      );
+      const itemDef = itemDatabase.getItem(drop.itemId);
+      if (itemDef && itemDef.type === 'consumable') {
+        addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+      } else if (itemDef) {
+        addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+      }
+    }
+  }
+
   function restartLevel(): void {
     transition.startTransition(() => {
       teardownLevelScene(ls, scene);
@@ -385,6 +416,7 @@ async function init(): Promise<void> {
       gameState.torchFuel = gameState.maxTorchFuel;
       gameState.attackCooldown = 0;
       gameState.gold = 0;
+      gameState.playerStatusEffects = [];
       applyEnvironment(currentLevel.environment, scene, ambient);
 
       ls = buildLevelScene(
@@ -592,40 +624,23 @@ async function init(): Promise<void> {
       if (hitType === 'player') {
         gameState.hp -= projectile.damage;
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+        if (projectile.statusEffect) {
+          applyEffect(gameState.playerStatusEffects, projectile.statusEffect as StatusEffectType, 6);
+        }
       }
       if (hitType === 'enemy') {
         const key = doorKey(col, row);
         const enemy = gameState.getEnemy(col, row);
         if (enemy) {
           enemy.hp -= projectile.damage;
+          if (projectile.statusEffect) {
+            applyEffect(enemy.statusEffects, projectile.statusEffect as StatusEffectType, 6);
+          }
           enemyDamageFlash(ls.enemyMeshes.meshMap, col, row);
           ls.enemyAnimator.triggerHit(key);
           damageNumbers.spawn(col, row, projectile.damage);
           if (enemy.hp <= 0) {
-            ls.healthBarManager.remove(key);
-            hideEnemyMesh(ls.enemyMeshes.meshMap, col, row);
-            ls.enemyAnimator.remove(key);
-            gameState.enemies.delete(key);
-            const enemyDef = enemyDatabase.getEnemy(enemy.type);
-            if (enemyDef) {
-              const levelled = gameState.addXp(enemyDef.xp);
-              if (levelled) levelUpNotification.trigger(gameState.level);
-            }
-            const lootResult = rollLoot(enemy.type, enemy.drops);
-            gameState.gold += lootResult.gold;
-            for (const drop of lootResult.items) {
-              const entity = gameState.entityRegistry.createItem(
-                drop.itemId, drop.quality,
-                { kind: 'world', levelId: gameState.currentLevelId, col, row },
-                drop.modifiers,
-              );
-              const itemDef = itemDatabase.getItem(drop.itemId);
-              if (itemDef && itemDef.type === 'consumable') {
-                addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
-              } else if (itemDef) {
-                addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
-              }
-            }
+            handleEnemyKill(key, col, row, enemy);
           } else {
             ls.healthBarManager.update(key, enemy.hp, enemy.maxHp);
           }
@@ -893,47 +908,30 @@ async function init(): Promise<void> {
                   ls.healthBarManager.update(doorKey(result.targetCol, result.targetRow), hitEnemy.hp, hitEnemy.maxHp);
                 }
               }
-              if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined) {
-                ls.healthBarManager.remove(doorKey(result.targetCol, result.targetRow));
+              if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined && result.enemyType) {
+                // Enemy already removed from map by damageEnemy(); use result data for XP/loot
+                const killKey = doorKey(result.targetCol, result.targetRow);
+                ls.healthBarManager.remove(killKey);
                 hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
-                ls.enemyAnimator.remove(doorKey(result.targetCol, result.targetRow));
-                // Award XP for the kill
-                if (result.enemyType) {
-                  const enemyDef = enemyDatabase.getEnemy(result.enemyType);
-                  if (enemyDef) {
-                    const levelled = gameState.addXp(enemyDef.xp);
-                    if (levelled) {
-                      levelUpNotification.trigger(gameState.level);
-                    }
-                  }
+                ls.enemyAnimator.remove(killKey);
+                const enemyDef = enemyDatabase.getEnemy(result.enemyType);
+                if (enemyDef) {
+                  const levelled = gameState.addXp(enemyDef.xp);
+                  if (levelled) levelUpNotification.trigger(gameState.level);
                 }
-                // Loot roll
-                if (result.enemyType) {
-                  const lootResult = rollLoot(result.enemyType, result.dropsOverride);
-
-                  // Add gold
-                  gameState.gold += lootResult.gold;
-
-                  // Spawn dropped items on the ground
-                  for (const drop of lootResult.items) {
-                    const entity = gameState.entityRegistry.createItem(
-                      drop.itemId,
-                      drop.quality,
-                      {
-                        kind: 'world',
-                        levelId: gameState.currentLevelId,
-                        col: result.targetCol!,
-                        row: result.targetRow!,
-                      },
-                      drop.modifiers,
-                    );
-
-                    const itemDef = itemDatabase.getItem(drop.itemId);
-                    if (itemDef && itemDef.type === 'consumable') {
-                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
-                    } else if (itemDef) {
-                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
-                    }
+                const lootResult = rollLoot(result.enemyType, result.dropsOverride);
+                gameState.gold += lootResult.gold;
+                for (const drop of lootResult.items) {
+                  const entity = gameState.entityRegistry.createItem(
+                    drop.itemId, drop.quality,
+                    { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                    drop.modifiers,
+                  );
+                  const itemDef = itemDatabase.getItem(drop.itemId);
+                  if (itemDef && itemDef.type === 'consumable') {
+                    addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                  } else if (itemDef) {
+                    addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
                   }
                 }
               }
@@ -996,6 +994,7 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
+    ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);
     if (ls.skyboxMesh) {
       ls.skyboxMesh.position.copy(camera.position);
@@ -1024,6 +1023,22 @@ async function init(): Promise<void> {
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
     updateForestBillboards(ls.forestMeshes, camera);
 
+    // Status effect tint on enemies
+    for (const [key, enemy] of gameState.enemies) {
+      const mesh = ls.enemyMeshes.meshMap.get(key);
+      if (!mesh) continue;
+      const mat = mesh.material as THREE.ShaderMaterial;
+      const tint = mat.uniforms.tint;
+      if (!tint) continue;
+      if (hasEffect(enemy.statusEffects, 'burning')) {
+        tint.value.set(0xFF8844);
+      } else if (hasEffect(enemy.statusEffects, 'poison')) {
+        tint.value.set(0x66FF66);
+      } else {
+        tint.value.set(0xFFFFFF);
+      }
+    }
+
     // Sync health bar positions (enemies animate with hit shake and lunge)
     ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
     ls.healthBarManager.updateBillboards(camera);
@@ -1044,6 +1059,16 @@ async function init(): Promise<void> {
     // Attack cooldown tick — paused when overlays are open
     if (gameState.attackCooldown > 0 && !anyOverlayOpen) {
       gameState.attackCooldown = Math.max(0, gameState.attackCooldown - delta);
+    }
+
+    // Player status effect tick — paused when overlays are open
+    if (!anyOverlayOpen) {
+      const effectResult = tickEffects(gameState.playerStatusEffects, delta);
+      if (effectResult.damage > 0) {
+        gameState.hp = Math.max(0, gameState.hp - effectResult.damage);
+        playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+      }
+      gameState.playerStatusEffects = gameState.playerStatusEffects.filter(e => e.remaining > 0);
     }
 
     // Player damage flash tick
@@ -1070,11 +1095,27 @@ async function init(): Promise<void> {
             enemyAttackPlayer(gameState, enemy.atk);
             playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
             ls.enemyAnimator.triggerLunge(action.enemyKey, ps.col, ps.row);
+            const onHitBehavior = enemyDatabase.getBehavior(enemy.type, 'onHit');
+            if (onHitBehavior && Math.random() < (onHitBehavior.params.chance as number)) {
+              applyEffect(gameState.playerStatusEffects, onHitBehavior.params.statusEffect as StatusEffectType, onHitBehavior.params.duration as number);
+            }
           }
         } else if (action.type === 'regen') {
           const enemy = gameState.enemies.get(action.enemyKey);
           if (enemy) {
             ls.healthBarManager.update(action.enemyKey, enemy.hp, enemy.maxHp);
+          }
+        } else if (action.type === 'status_damage') {
+          const enemy = gameState.enemies.get(action.enemyKey);
+          if (enemy) {
+            enemyDamageFlash(ls.enemyMeshes.meshMap, action.fromCol, action.fromRow);
+            ls.healthBarManager.update(action.enemyKey, enemy.hp, enemy.maxHp);
+          }
+        } else if (action.type === 'status_kill') {
+          const enemy = gameState.enemies.get(action.enemyKey);
+          if (enemy) {
+            enemyDamageFlash(ls.enemyMeshes.meshMap, action.fromCol, action.fromRow);
+            handleEnemyKill(action.enemyKey, action.fromCol, action.fromRow, enemy);
           }
         }
       }

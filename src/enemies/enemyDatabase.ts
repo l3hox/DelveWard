@@ -9,7 +9,7 @@ export interface EnemySpriteData {
 
 export interface EnemyBehavior {
   type: string;
-  params: Record<string, number>;
+  params: Record<string, unknown>;
 }
 
 export interface EnemyDef {

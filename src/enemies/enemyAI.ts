@@ -5,8 +5,9 @@ import { doorKey } from '../core/gameState';
 import { findPath, manhattanDistance } from './pathfinding';
 import { isWalkable } from '../core/grid';
 import { enemyDatabase } from './enemyDatabase';
+import { tickEffects, getSlowMultiplier } from '../core/statusEffects';
 
-export type EnemyActionType = 'idle' | 'move' | 'attack' | 'regen';
+export type EnemyActionType = 'idle' | 'move' | 'attack' | 'regen' | 'status_damage' | 'status_kill';
 
 export interface EnemyAction {
   enemyKey: string;
@@ -58,18 +59,33 @@ export function updateEnemies(
         enemy.regenPauseTimer = Math.max(0, enemy.regenPauseTimer - delta);
       } else if (enemy.hp < enemy.maxHp) {
         enemy.regenTimer += delta;
-        const tickInterval = regenBehavior.params.tickInterval;
+        const tickInterval = regenBehavior.params.tickInterval as number;
         if (enemy.regenTimer >= tickInterval) {
           enemy.regenTimer -= tickInterval;
-          enemy.hp = Math.min(enemy.hp + regenBehavior.params.hpPerTick, enemy.maxHp);
+          enemy.hp = Math.min(enemy.hp + (regenBehavior.params.hpPerTick as number), enemy.maxHp);
           actions.push({ enemyKey: key, type: 'regen', fromCol: enemy.col, fromRow: enemy.row });
         }
       }
     }
 
+    // --- Status effect tick (independent of movement timer) ---
+    if (enemy.statusEffects.length > 0) {
+      const result = tickEffects(enemy.statusEffects, delta);
+      if (result.damage > 0) {
+        enemy.hp -= result.damage;
+        actions.push({ enemyKey: key, type: 'status_damage', fromCol: enemy.col, fromRow: enemy.row });
+      }
+      enemy.statusEffects = enemy.statusEffects.filter(e => e.remaining > 0);
+      if (enemy.hp <= 0) {
+        actions.push({ enemyKey: key, type: 'status_kill', fromCol: enemy.col, fromRow: enemy.row });
+        continue;
+      }
+    }
+
     // --- Flee behavior state transitions ---
     const fleeBehavior = enemyDatabase.getBehavior(enemy.type, 'flee');
-    if (fleeBehavior && enemy.hp < enemy.maxHp * fleeBehavior.params.hpThreshold && enemy.aiState !== 'flee') {
+    const fleeHpThreshold = fleeBehavior ? (fleeBehavior.params.hpThreshold as number) : 0;
+    if (fleeBehavior && enemy.hp < enemy.maxHp * fleeHpThreshold && enemy.aiState !== 'flee') {
       enemy.aiState = 'flee';
     }
 
@@ -83,15 +99,16 @@ export function updateEnemies(
     if (enemy.aiState === 'chase' && dist <= 1) {
       enemy.aiState = 'attack';
     } else if (enemy.aiState === 'attack' && dist > 1) {
-      enemy.aiState = fleeBehavior && enemy.hp < enemy.maxHp * fleeBehavior.params.hpThreshold
+      enemy.aiState = fleeBehavior && enemy.hp < enemy.maxHp * fleeHpThreshold
         ? 'flee'
         : 'chase';
     }
 
-    // Flee at multiplied speed; all other states use normal interval
-    const effectiveInterval = enemy.aiState === 'flee' && fleeBehavior
-      ? enemy.moveInterval / fleeBehavior.params.speedMultiplier
+    // Flee at multiplied speed; slow effect slows enemy movement
+    let effectiveInterval = enemy.aiState === 'flee' && fleeBehavior
+      ? enemy.moveInterval / (fleeBehavior.params.speedMultiplier as number)
       : enemy.moveInterval;
+    effectiveInterval *= getSlowMultiplier(enemy.statusEffects);
 
     // Accumulate timer
     enemy.moveTimer += delta;
@@ -175,7 +192,7 @@ export function updateEnemies(
 
         // Erratic movement behavior
         const erraticBehavior = enemyDatabase.getBehavior(enemy.type, 'erratic');
-        if (erraticBehavior && Math.random() < erraticBehavior.params.chance) {
+        if (erraticBehavior && Math.random() < (erraticBehavior.params.chance as number)) {
           const isPassableForErratic = (col: number, row: number) =>
             !occupied.has(doorKey(col, row)) &&
             isWalkable(grid, col, row, walkable, isDoorOpen);

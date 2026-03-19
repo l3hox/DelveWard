@@ -29,6 +29,8 @@ export class Player {
   private onTurnCallback?: () => void;
   private commandQueue: Array<() => void> = [];
 
+  public slowMultiplier = 1;
+
   private stairs?: Map<string, StairInstance>;
 
   constructor(
@@ -158,7 +160,7 @@ export class Player {
   }
 
   update(delta: number): void {
-    const alpha = Math.min(1, TWEEN_SPEED * delta);
+    const alpha = Math.min(1, (TWEEN_SPEED / this.slowMultiplier) * delta);
 
     this.currentPos.lerp(this.targetPos, alpha);
     if (this.currentPos.distanceTo(this.targetPos) < 0.005) {

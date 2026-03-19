@@ -1,24 +1,9 @@
 {
-  "name": "DelveWard \u2014 Milestone 1 Dungeon",
+  "name": "DelveWard — Milestone 1 Dungeon",
   "levels": [
     {
       "id": "level_1",
       "name": "The Upper Crypts",
-      "dustMotes": true,
-      "waterDrips": false,
-      "environment": "dungeon",
-      "ceiling": false,
-      "skybox": "starry-night",
-      "defaults": {
-        "wallTexture": "stone",
-        "floorTexture": "stone_tile",
-        "ceilingTexture": "dark_rock"
-      },
-      "charDefs": [
-        { "char": "F", "solid": true, "wallTexture": "forest" },
-        { "char": "T", "solid": true, "seeThrough": true, "wallTexture": "forest", "floorTexture": "grass", "ceilingTexture": "canopy" },
-        { "char": "'", "solid": false, "floorTexture": "grass", "ceilingTexture": "canopy" }
-      ],
       "grid": [
         "FFFFFFFFFFFFFFFFF",
         "F''''T'T'TT'T'TTF",
@@ -191,32 +176,42 @@
           "type": "enemy",
           "enemyType": "goblin"
         }
+      ],
+      "environment": "dungeon",
+      "ceiling": false,
+      "skybox": "starry-night",
+      "dustMotes": true,
+      "waterDrips": false,
+      "defaults": {
+        "wallTexture": "stone",
+        "floorTexture": "stone_tile",
+        "ceilingTexture": "dark_rock"
+      },
+      "charDefs": [
+        {
+          "char": "F",
+          "solid": true,
+          "wallTexture": "forest"
+        },
+        {
+          "char": "T",
+          "solid": true,
+          "seeThrough": true,
+          "wallTexture": "forest",
+          "floorTexture": "grass",
+          "ceilingTexture": "canopy"
+        },
+        {
+          "char": "'",
+          "solid": false,
+          "floorTexture": "grass",
+          "ceilingTexture": "canopy"
+        }
       ]
     },
     {
       "id": "level_2",
       "name": "The Dark Warrens",
-      "dustMotes": false,
-      "waterDrips": true,
-      "defaults": {
-        "wallTexture": "mossy",
-        "floorTexture": "dirt",
-        "ceilingTexture": "dark_rock"
-      },
-      "charDefs": [
-        {
-          "char": "s",
-          "solid": false,
-          "wallTexture": "stone",
-          "floorTexture": "dirt"
-        },
-        {
-          "char": "c",
-          "solid": false,
-          "wallTexture": "brick",
-          "floorTexture": "cobblestone"
-        }
-      ],
       "grid": [
         "###################",
         "#ssssssss#........#",
@@ -231,7 +226,8 @@
         "####.##############",
         "#cccccccc.....#####",
         "#cccccccc#........#",
-        "#cccccccc#...#....#","#cccccccc#...#....#",
+        "#cccccccc#...#....#",
+        "#cccccccc#...#....#",
         "#cccccccc#...#....#",
         "#cccccccc#...#....#",
         "#cccccccc#...#....#",
@@ -299,7 +295,9 @@
           "col": 13,
           "row": 11,
           "type": "lever",
-          "targets": ["door_4"],
+          "targets": [
+            "door_4"
+          ],
           "wall": "E"
         },
         {
@@ -463,27 +461,40 @@
           "row": 15,
           "type": "enemy",
           "enemyType": "kobold"
+        },
+        {
+          "col": 8,
+          "row": 9,
+          "type": "consumable",
+          "id": "consumable_1",
+          "itemId": "antidote"
+        }
+      ],
+      "dustMotes": false,
+      "waterDrips": true,
+      "defaults": {
+        "wallTexture": "mossy",
+        "floorTexture": "dirt",
+        "ceilingTexture": "dark_rock"
+      },
+      "charDefs": [
+        {
+          "char": "s",
+          "solid": false,
+          "wallTexture": "stone",
+          "floorTexture": "dirt"
+        },
+        {
+          "char": "c",
+          "solid": false,
+          "wallTexture": "brick",
+          "floorTexture": "cobblestone"
         }
       ]
     },
     {
       "id": "level_3",
       "name": "The Troll's Domain",
-      "dustMotes": false,
-      "waterDrips": false,
-      "defaults": {
-        "wallTexture": "brick",
-        "floorTexture": "cobblestone",
-        "ceilingTexture": "dark_rock"
-      },
-      "charDefs": [
-        {
-          "char": "m",
-          "solid": false,
-          "wallTexture": "mossy",
-          "floorTexture": "dirt"
-        }
-      ],
       "grid": [
         "#####################",
         "#####################",
@@ -741,6 +752,21 @@
           "row": 10,
           "type": "enemy",
           "enemyType": "orc"
+        }
+      ],
+      "dustMotes": false,
+      "waterDrips": false,
+      "defaults": {
+        "wallTexture": "brick",
+        "floorTexture": "cobblestone",
+        "ceilingTexture": "dark_rock"
+      },
+      "charDefs": [
+        {
+          "char": "m",
+          "solid": false,
+          "wallTexture": "mossy",
+          "floorTexture": "dirt"
         }
       ]
     }

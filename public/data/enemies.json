@@ -79,7 +79,9 @@
       "blocksMovement": true,
       "xp": 18,
       "sprite": { "path": "/sprites/spider.png", "size": 1.8 },
-      "behaviors": []
+      "behaviors": [
+        { "type": "onHit", "params": { "statusEffect": "poison", "chance": 0.3, "duration": 10 } }
+      ]
     },
     {
       "id": "kobold",

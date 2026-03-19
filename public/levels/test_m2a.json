@@ -9,7 +9,7 @@
         "#....#.#.......#",
         "#....#.#.......#",
         "#..............#",
-        "#....#.#.......#",
+        "#....#.#..##...#",
         "#....#.#.......#",
         "#....###.......#",
         "#..............#",
@@ -28,16 +28,6 @@
         "facing": "S"
       },
       "entities": [
-        {
-          "col": 4,
-          "row": 5,
-          "type": "lever",
-          "id": "lever_1",
-          "targets": [],
-          "wall": "E",
-          "signalMode": "toggle",
-          "signalDuration": 3
-        },
         {
           "col": 3,
           "row": 7,
@@ -130,32 +120,11 @@
           ]
         },
         {
-          "col": 4,
-          "row": 1,
-          "type": "torch_sconce",
-          "id": "torch_sconce_1",
-          "wall": "N"
-        },
-        {
           "col": 2,
           "row": 1,
           "type": "torch_sconce",
           "id": "torch_sconce_2",
           "wall": "N"
-        },
-        {
-          "col": 1,
-          "row": 3,
-          "type": "torch_sconce",
-          "id": "torch_sconce_3",
-          "wall": "W"
-        },
-        {
-          "col": 1,
-          "row": 5,
-          "type": "torch_sconce",
-          "id": "torch_sconce_4",
-          "wall": "W"
         },
         {
           "col": 2,
@@ -284,15 +253,6 @@
           "signalDuration": 1
         },
         {
-          "col": 4,
-          "row": 13,
-          "type": "tripwire",
-          "id": "tripwire_2",
-          "targets": [],
-          "visibilityThreshold": 8,
-          "orientation": "NS"
-        },
-        {
           "col": 3,
           "row": 10,
           "type": "tripwire",
@@ -302,6 +262,20 @@
           ],
           "visibilityThreshold": 8,
           "orientation": "EW"
+        },
+        {
+          "col": 1,
+          "row": 3,
+          "type": "torch_sconce",
+          "id": "torch_sconce_1",
+          "wall": "W"
+        },
+        {
+          "col": 1,
+          "row": 5,
+          "type": "torch_sconce",
+          "id": "torch_sconce_3",
+          "wall": "W"
         }
       ]
     },

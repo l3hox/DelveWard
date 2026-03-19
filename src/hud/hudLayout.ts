@@ -53,6 +53,14 @@ export const INVENTORY = {
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
 
+// Status effect icons — above health bar
+export const STATUS_ICONS = {
+  get x() { return HEALTH_BAR.x; },
+  get y() { return HEALTH_BAR.y - 20; },
+  iconSize: 14,
+  gap: 4,
+} as const;
+
 // Inventory overlay — fullscreen panel centered on HUD
 export const INVENTORY_OVERLAY = {
   w: 460,

@@ -4,6 +4,29 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-19 — Phase C: Status Effects
+
+**Design**: Array-based status effects on both player and enemies. Same-type refresh (max of remaining vs new duration), no damage stacking. Ticked in existing game loops (animate for player, updateEnemies for enemies). ADR-M2-04.
+
+**Effect types**: poison (2 dmg/s, 1s tick), slow (2× movement penalty, no damage), burning (3 dmg/s, 1s tick).
+
+**Application**: Fireball projectile applies burning (6s) — was stubbed in Phase B with `statusEffect: 'burning'`. Spider applies poison (10s, 30% chance) via new `onHit` behavior in enemies.json. Antidote consumable cures poison via existing `curePoison` item effect.
+
+**Architecture**:
+- `statusEffects.ts`: pure-logic module, no Three.js dependency. applyEffect/tickEffects/removeEffectsByType/hasEffect/getSlowMultiplier.
+- `statusEffects: StatusEffect[]` on EnemyInstance (non-optional, always []), `playerStatusEffects: StatusEffect[]` on GameState.
+- `status_damage` / `status_kill` action types in enemyAI. Slow multiplier applied to effectiveInterval.
+- Player effects ticked in animate(), paused during overlays. Cleared on death/restart, persisted across level transitions.
+- `handleEnemyKill()` helper extracted from 3 duplicated kill paths (combat, projectile, status_kill).
+- `EnemyBehavior.params` widened from `Record<string, number>` to `Record<string, unknown>` to support onHit's string-typed statusEffect param.
+- Deep-copy enemy statusEffects in saveLevelState/loadLevelState.
+
+**Visuals**: Screen tint overlays (burning=fast orange flicker, poison=slow green pulse, slow=static blue). Pixel-art status icons above health bar (flame, droplet, snowflake). Per-frame enemy billboard tint (burning=0xFF8844, poison=0x66FF66). Player slow via `slowMultiplier` field on Player class.
+
+**Editor fix**: Gates exempted from non-walkable cell validation (valid position for all gates).
+
+---
+
 ## 2026-03-19 — GPU Shader Warmup
 
 **Problem**: First fireball spawn caused heavy frame drop. Root causes: (1) lazy shader compilation of fireball `MeshStandardMaterial` and explosion `PointsMaterial` on first use, (2) each new `PointLight` (fireball/explosion) changes `NUM_POINT_LIGHTS` shader define, forcing recompilation of all lit materials.

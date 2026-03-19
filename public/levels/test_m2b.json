@@ -190,7 +190,8 @@
           "targets": [
             "trap_launcher_7",
             "trap_launcher_6",
-            "trap_launcher_8"
+            "trap_launcher_8",
+            "trap_launcher_5"
           ],
           "signalMode": "momentary"
         },
@@ -200,9 +201,23 @@
           "type": "trap_launcher",
           "id": "trap_launcher_5",
           "facing": "S",
-          "projectileType": "arrow",
+          "projectileType": "dart",
           "fireMode": "single",
           "reloadTime": 3
+        },
+        {
+          "col": 3,
+          "row": 8,
+          "type": "enemy",
+          "id": "enemy_1",
+          "enemyType": "orc"
+        },
+        {
+          "col": 5,
+          "row": 1,
+          "type": "enemy",
+          "id": "enemy_2",
+          "enemyType": "spider"
         }
       ]
     },

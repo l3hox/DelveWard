@@ -2,6 +2,8 @@ import { HUD_WIDTH, HUD_HEIGHT, XP_BAR } from './hudLayout';
 import { drawCompass } from './compassRose';
 import { drawHealthBar } from './healthBar';
 import { drawTorchIndicator } from './torchIndicator';
+import { drawStatusIcons } from './statusEffectIcons';
+import { hasEffect } from '../core/statusEffects';
 import { drawMinimap } from './minimapRenderer';
 import { drawInventoryPanel } from './inventoryPanel';
 import { drawXpBar } from './xpBar';
@@ -89,6 +91,25 @@ export class HudOverlay {
       this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
     }
 
+    // Status effect screen tints
+    if (gameState.playerStatusEffects.length > 0) {
+      const time = this.time;
+      if (hasEffect(gameState.playerStatusEffects, 'burning')) {
+        const a = 0.08 + 0.04 * Math.sin(time * 12);
+        this.ctx.fillStyle = `rgba(255, 100, 0, ${a})`;
+        this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+      }
+      if (hasEffect(gameState.playerStatusEffects, 'poison')) {
+        const a = 0.06 + 0.02 * Math.sin(time * 4);
+        this.ctx.fillStyle = `rgba(0, 180, 0, ${a})`;
+        this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+      }
+      if (hasEffect(gameState.playerStatusEffects, 'slow')) {
+        this.ctx.fillStyle = 'rgba(80, 120, 255, 0.06)';
+        this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+      }
+    }
+
     // Sword swing overlay
     if (swordSwing?.isActive) {
       swordSwing.draw(this.ctx, HUD_WIDTH, HUD_HEIGHT);
@@ -96,6 +117,7 @@ export class HudOverlay {
 
     drawCompass(this.ctx, playerState.facing);
     drawHealthBar(this.ctx, gameState.hp, gameState.maxHp, this.time);
+    drawStatusIcons(this.ctx, gameState.playerStatusEffects, this.time);
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
     drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies, gameState.doors, gameState.stairs);
     drawInventoryPanel(this.ctx, gameState);
