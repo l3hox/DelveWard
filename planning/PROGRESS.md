@@ -28,12 +28,13 @@ Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning
 - [x] Phase C: Status effects (data model, tick logic, poison/slow/burning, HUD icons + visual overlays, antidote cure, enemy tint, kill helper extraction)
 - [x] Phase D: Environment entities (breakable walls, secret walls, pushable blocks, chests, signs, renderers, editor support)
 - [x] Phase E: Save/load (serialization, localStorage slots, auto-save, UI, export/import, death → load)
-- [ ] Phase F: Content & polish (new textures, sprites, M2 test dungeon "The Architect's Tomb", balance pass)
+- [x] Phase F: Content & polish ("The Architect's Tomb" 3-level dungeon, balance pass)
 
 ### Completed milestones
 - [x] M0: Proof of concept (v0.0.9)
 - [x] M1: The Loot Game (v0.1)
 - [x] M6: Dungeon Editor (v0.1.5, pulled forward)
+- [x] M2: The Dangerous Dungeon (v0.2)
 
 ---
 
@@ -54,6 +55,7 @@ Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning
 
 ## Recent Changes
 
+- **Phase F: The Architect's Tomb**: 3-level dungeon (`public/levels/architects_tomb.json`) showcasing all M2 features. Level 1 "The Antechamber" (brick, tutorial — signs, tripwire→dart trap, trigger, locked door + key, lever + mechanical door, secret wall, rats + goblin). Level 2 "The Puzzle Halls" (stone/mossy/cobblestone charDefs — AND gate puzzle with 2 levers, block on momentary pressure plate, timed lever, spider + skeletons + kobold, chest). Level 3 "The Architect's Tomb" (mossy + waterDrips — fireball corridor with repeat launchers, tripwire→delay gate→dart/arrow gauntlet, breakable wall, locked chest with boss key, optional troll room, zombies + orc, lore signs, secret wall). Default dungeon changed from `test_m2d.json` to `architects_tomb.json`. 695 tests.
 - **Phase E: Save/Load System**: Full game persistence via localStorage. `saveSystem.ts`: `SaveData` model (version, player state, entity registry, level snapshots as Records, mutated grids), `serializeLevelSnapshot`/`deserializeLevelSnapshot` (Map↔Record, Set↔array), 5 manual save slots + 1 autosave, JSON export/import. `saveLoadOverlay.ts`: DOM overlay (dark dungeon theme, capture-phase keydown), slot rows with timestamp/name/level, Save/Load/Delete/Export/Import buttons, death mode variant with Restart fallback. `gameState.ts`: `getPlayerState()`/`restorePlayerState()`, `getPickedUpKeys()`/`restorePickedUpKeys()`. `main.ts`: `saveGame()`/`loadGame()` functions, Escape key opens save/load overlay, auto-save on stair transitions, death → load overlay if saves exist else restart, overlay pauses game loop. Same-dungeon restriction on load (matched by name). Grids restored to original before applying saved grids. Full entity registry restored after `loadLevelState` for backpack/equipped items. 695 tests (37 new saveSystem tests).
 - **Phase D: Environment Entities**: 5 new entity types — breakable_wall (HP-based, attackable, drops loot), secret_wall (walk-into opens passage, `persistent` flag for illusionary walls), block (pushable, activates pressure plates, blocks projectiles), chest (open/locked/signal-controlled with facing + signal source targets, loot drops, key-locked), sign (wall-mounted, parchment overlay popup). Wall entity renderer (shared geometry for breakable+secret walls). Dungeon builder `wallEntityCells` skip. Combat: wall_hit. Player `onMoveBlocked` for secret walls. Chest as signal source (booby traps). Signal-controlled chests blocked from manual opening. Interaction: block_pushed, chest_opened, chest_locked, sign_read. Editor: all 5 in palette with facing-aware chest icon, inspector fields (hp, persistent, facing, state, key, targets, gateMode, wall, text), auto-create key on pick, chest-key bidirectional wiring + visualization, placement hints, enemy behavior tags with tooltips, inline readonly stats, immediate validation, "Custom Tiles" rename, playerStart moved to dungeon-level with Pick UI. 658 tests.
 - **Phase C: Status Effects**: 3 status effect types (poison, slow, burning) on both player and enemies. Array-based effects, same-type refresh (no stacking), ticked in existing game loops. Fireball applies burning (6s), spider applies poison (10s, 30% chance via onHit behavior). Antidote cures poison. Slow halves movement speed. Visual feedback: screen tint overlays (orange/green/blue), pixel-art status icons above health bar, enemy billboard tint. Kill helper extracted for combat/projectile/status kill paths. Editor: gates exempt from non-walkable validation. 617 tests.
@@ -84,7 +86,7 @@ Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning
 
 ## Known Issues
 
-- Existing enemy stats rebalanced for M1 (rat HP 4→8, skeleton HP 8→20, orc HP 15→40) — may need tuning during F5
+- Balance pass pending — enemy stats and item placement may need tuning after playtesting The Architect's Tomb
 
 ---
 

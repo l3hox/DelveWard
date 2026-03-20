@@ -13,7 +13,7 @@
       "grid": [
         "################",
         "#..#...........#",
-        "#..#...........#",
+        "#..#.....#.....#",
         "####...#.......#",
         "#..............#",
         "#..............#",
@@ -39,7 +39,15 @@
           "row": 1,
           "type": "breakable_wall",
           "id": "breakable_wall_1",
-          "hp": 10
+          "hp": 10,
+          "drops": {
+            "guaranteed": [
+              {
+                "itemId": "bone",
+                "quality": "common"
+              }
+            ]
+          }
         },
         {
           "col": 1,
@@ -49,26 +57,26 @@
           "persistent": true
         },
         {
-          "col": 5,
-          "row": 1,
-          "type": "block",
-          "id": "block_1"
-        },
-        {
           "col": 4,
           "row": 3,
           "type": "chest",
           "id": "chest_1",
           "state": "closed",
-          "facing": "N"
-        },
-        {
-          "col": 7,
-          "row": 1,
-          "type": "sign",
-          "id": "sign_1",
-          "wall": "N",
-          "text": "Abandon all hopes, travellers."
+          "facing": "N",
+          "drops": {
+            "guaranteed": [
+              {
+                "itemId": "sword_rusty",
+                "quality": "masterwork"
+              }
+            ],
+            "extra": [
+              {
+                "itemId": "sword_iron",
+                "chance": 1
+              }
+            ]
+          }
         },
         {
           "col": 8,
@@ -97,7 +105,15 @@
           "id": "chest_2",
           "state": "closed",
           "keyId": "key_1",
-          "facing": "N"
+          "facing": "N",
+          "drops": {
+            "guaranteed": [
+              {
+                "itemId": "sword_flamebrand",
+                "quality": "common"
+              }
+            ]
+          }
         },
         {
           "col": 5,
@@ -148,28 +164,96 @@
           "reloadTime": 1
         },
         {
-          "col": 11,
+          "col": 13,
           "row": 1,
-          "type": "sign",
-          "id": "sign_2",
-          "wall": "N",
-          "text": ""
+          "type": "enemy",
+          "id": "enemy_1",
+          "enemyType": "goblin",
+          "drops": {
+            "extra": [
+              {
+                "itemId": "bone",
+                "chance": 0.5
+              }
+            ],
+            "guaranteed": [
+              {
+                "itemId": "sword_iron",
+                "quality": "masterwork"
+              }
+            ]
+          }
         },
         {
-          "col": 10,
-          "row": 3,
-          "type": "chest",
-          "id": "chest_4",
-          "state": "closed",
-          "facing": "W"
+          "col": 11,
+          "row": 1,
+          "type": "enemy",
+          "id": "enemy_2",
+          "enemyType": "goblin",
+          "drops": {
+            "guaranteed": [
+              {
+                "itemId": "sword_rusty",
+                "quality": "common"
+              }
+            ]
+          }
         },
         {
           "col": 9,
-          "row": 3,
-          "type": "chest",
-          "id": "chest_5",
-          "state": "closed",
-          "facing": "S"
+          "row": 1,
+          "type": "sign",
+          "id": "sign_1",
+          "wall": "N",
+          "text": "Abandon all hopes, travelers."
+        },
+        {
+          "col": 6,
+          "row": 2,
+          "type": "block",
+          "id": "block_3"
+        },
+        {
+          "col": 1,
+          "row": 6,
+          "type": "stairs",
+          "id": "stairs_1",
+          "direction": "down",
+          "facing": "S",
+          "target": "stairs_2"
+        }
+      ]
+    },
+    {
+      "id": "level_2",
+      "name": "Untitled",
+      "grid": [
+        "################",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "#..............#",
+        "################"
+      ],
+      "entities": [
+        {
+          "col": 1,
+          "row": 5,
+          "type": "stairs",
+          "id": "stairs_2",
+          "direction": "up",
+          "facing": "S",
+          "target": "stairs_1"
         }
       ]
     }
