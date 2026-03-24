@@ -359,6 +359,19 @@ Item properties (name, stats, slot, requirements) are defined in the item databa
 { "col": 7, "row": 7, "type": "consumable", "itemId": "health_potion_small" }
 ```
 
+**NPC** (`type: "npc"`) — placed on walkable cells. Non-hostile characters that the player can interact with (Space key when facing). Renders as a billboard sprite. Blocks player movement.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `npcId` | string | Yes | Must match an NPC `id` in `public/data/npcs.json` |
+| `facing` | string | No | Direction the NPC faces: `"N"`, `"S"` (default), `"E"`, or `"W"` |
+
+```json
+{ "col": 5, "row": 5, "type": "npc", "npcId": "merchant_gregor", "facing": "S" }
+```
+
+NPC properties (name, sprite, dialog file, merchant stock) are defined in the NPC database (`public/data/npcs.json`), not in the level JSON. Dialog trees are per-NPC files in `public/data/dialogs/{npcId}.json`.
+
 #### Door behavior summary
 
 | Door type | Open with Space | Close with Space | Visual cue |
