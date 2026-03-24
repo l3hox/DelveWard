@@ -1,4 +1,5 @@
 import type { DialogTree } from '../core/dialogManager';
+import type { QuestDef } from '../core/questManager';
 
 function editorHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -29,6 +30,36 @@ export async function loadQuestIds(): Promise<string[]> {
 
 export function getQuestIds(): string[] {
   return cachedQuestIds ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Quest file API
+// ---------------------------------------------------------------------------
+
+export async function loadQuestFromServer(questId: string): Promise<QuestDef> {
+  const res = await fetch(`/api/editor/quests/load?file=${encodeURIComponent(`${questId}.json`)}`, {
+    headers: editorHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Load failed: ${res.status}`);
+  }
+  return res.json() as Promise<QuestDef>;
+}
+
+export async function saveQuestToServer(questId: string, quest: QuestDef): Promise<void> {
+  const res = await fetch('/api/editor/quests/save', {
+    method: 'POST',
+    headers: editorHeaders(),
+    body: JSON.stringify({ file: `${questId}.json`, content: JSON.stringify(quest, null, 2) }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Save failed: ${res.status}`);
+  }
+  // Invalidate cached quest IDs so new quests appear in dropdowns
+  cachedQuestIds = null;
+  await loadQuestIds();
 }
 
 // ---------------------------------------------------------------------------

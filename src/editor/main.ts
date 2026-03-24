@@ -19,8 +19,10 @@ import { DialogInspector } from './DialogInspector';
 import {
   loadDialogFromServer, saveDialogToServer,
   loadDialogLayout, saveDialogLayout,
-  loadQuestIds,
+  loadQuestIds, loadQuestFromServer, saveQuestToServer,
 } from './dialogIO';
+import { QuestEditorPanel } from './QuestEditorPanel';
+import type { QuestDef } from '../core/questManager';
 
 const app = new EditorApp();
 
@@ -960,6 +962,70 @@ dialogInspector.onNewNode = (callback) => {
   const newId = dialogState.addNode();
   callback(newId);
   refreshDialogUI();
+};
+
+// --- Quest editor panel ---
+const questEditorPanel = new QuestEditorPanel();
+questEditorPanel.attach();
+
+questEditorPanel.setOnSave(async (quest: QuestDef, isNew: boolean) => {
+  try {
+    await saveQuestToServer(quest.id, quest);
+    questEditorPanel.close();
+    // Refresh inspector to update quest dropdowns
+    if (isNew) {
+      dialogState.pushUndo();
+    }
+    dialogInspector.refresh();
+  } catch (err) {
+    alert(`Save quest failed: ${(err as Error).message}`);
+  }
+});
+
+questEditorPanel.setOnCancel(() => {});
+
+dialogInspector.onEditQuest = async (questId) => {
+  try {
+    const quest = await loadQuestFromServer(questId);
+    questEditorPanel.open(quest, false);
+  } catch (err) {
+    alert(`Failed to load quest: ${(err as Error).message}`);
+  }
+};
+
+dialogInspector.onNewQuest = (callback) => {
+  const defaultQuest: QuestDef = {
+    id: '',
+    name: '',
+    description: '',
+    stages: [{ description: '' }],
+  };
+  questEditorPanel.open(defaultQuest, true);
+  // Temporarily override save/cancel to wire the callback
+  const restore = () => {
+    questEditorPanel.setOnSave(async (quest: QuestDef) => {
+      try {
+        await saveQuestToServer(quest.id, quest);
+        questEditorPanel.close();
+        dialogInspector.refresh();
+      } catch (err) {
+        alert(`Save quest failed: ${(err as Error).message}`);
+      }
+    });
+    questEditorPanel.setOnCancel(() => {});
+  };
+  questEditorPanel.setOnSave(async (quest: QuestDef) => {
+    try {
+      await saveQuestToServer(quest.id, quest);
+      questEditorPanel.close();
+      callback(quest.id);
+      dialogInspector.refresh();
+    } catch (err) {
+      alert(`Save quest failed: ${(err as Error).message}`);
+    }
+    restore();
+  });
+  questEditorPanel.setOnCancel(() => { restore(); });
 };
 
 // Keyboard listeners

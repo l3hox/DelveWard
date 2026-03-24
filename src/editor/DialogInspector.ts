@@ -17,6 +17,8 @@ export class DialogInspector {
   onNodeChanged: (() => void) | null = null;
   onNodeDeleted: (() => void) | null = null;
   onNewNode: ((callback: (newId: string) => void) => void) | null = null;
+  onEditQuest: ((questId: string) => void) | null = null;
+  onNewQuest: ((callback: (questId: string) => void) => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -488,19 +490,10 @@ export class DialogInspector {
           });
         }
       } else if (condition.type === 'questStage') {
-        const questIds = getQuestIds();
-        if (questIds.length > 0) {
-          this.addDropdown(row, 'questId', condition.questId ?? '', questIds.map(id => ({ value: id, label: id })), (val) => {
-            this.onBeforeDiscreteChange?.();
-            condition.questId = val;
-            onUpdate();
-          });
-        } else {
-          this.addTextField(row, 'questId', condition.questId ?? '', (val) => {
-            condition.questId = val;
-            onUpdate();
-          });
-        }
+        this.addQuestIdField(row, condition.questId ?? '', (val) => {
+          condition.questId = val;
+          onUpdate();
+        });
         const stageOptions: Array<{ value: string; label: string }> = [
           { value: 'undiscovered', label: 'undiscovered' },
           { value: 'active', label: 'active' },
@@ -623,19 +616,10 @@ export class DialogInspector {
           });
         }
       } else if (effect.type === 'startQuest' || effect.type === 'advanceQuest') {
-        const questIds = getQuestIds();
-        if (questIds.length > 0) {
-          this.addDropdown(row, 'questId', effect.questId ?? '', questIds.map(id => ({ value: id, label: id })), (val) => {
-            this.onBeforeDiscreteChange?.();
-            effect.questId = val;
-            onUpdate();
-          });
-        } else {
-          this.addTextField(row, 'questId', effect.questId ?? '', (val) => {
-            effect.questId = val;
-            onUpdate();
-          });
-        }
+        this.addQuestIdField(row, effect.questId ?? '', (val) => {
+          effect.questId = val;
+          onUpdate();
+        });
       }
       // openShop: no additional fields
 
@@ -829,5 +813,69 @@ export class DialogInspector {
     wrapper.appendChild(input);
 
     parent.appendChild(wrapper);
+  }
+
+  private addQuestIdField(parent: HTMLElement, value: string, onChange: (val: string) => void): void {
+    const questIds = getQuestIds();
+
+    if (questIds.length > 0) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'inspector-field';
+
+      const lbl = document.createElement('label');
+      lbl.textContent = 'questId';
+      wrapper.appendChild(lbl);
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; gap: 4px;';
+
+      const select = document.createElement('select');
+      select.style.flex = '1';
+      for (const id of questIds) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = id;
+        if (id === value) opt.selected = true;
+        select.appendChild(opt);
+      }
+      const newOpt = document.createElement('option');
+      newOpt.value = '__new__';
+      newOpt.textContent = '+ new quest';
+      select.appendChild(newOpt);
+
+      select.addEventListener('change', () => {
+        if (select.value === '__new__') {
+          this.onNewQuest?.((questId) => {
+            onChange(questId);
+            this.refresh();
+          });
+          // Reset dropdown to previous value while modal is open
+          select.value = value;
+          return;
+        }
+        this.onBeforeDiscreteChange?.();
+        onChange(select.value);
+      });
+      row.appendChild(select);
+
+      // Edit button
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-pick';
+      editBtn.textContent = '\u270E';
+      editBtn.title = 'Edit quest';
+      editBtn.style.padding = '4px 6px';
+      editBtn.addEventListener('click', () => {
+        const currentId = select.value;
+        if (currentId && currentId !== '__new__') {
+          this.onEditQuest?.(currentId);
+        }
+      });
+      row.appendChild(editBtn);
+
+      wrapper.appendChild(row);
+      parent.appendChild(wrapper);
+    } else {
+      this.addTextField(parent, 'questId', value, onChange);
+    }
   }
 }
