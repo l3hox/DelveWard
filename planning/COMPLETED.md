@@ -34,6 +34,18 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - editor/main.ts: npcDatabase.load() at init
   - Red hover highlight on invalid entity placement cells (all entity types)
   - NPC facing field removed (unused by game code; enemies also lack facing)
+- [x] **Phase C: Quest System**:
+  - `questManager.ts`: QuestManager class (singleton) — loadQuest, startQuest, advanceQuest, getStatus, getStageIndex, getActiveQuests, getCompletedQuests, getSerializableState/restoreState, installConditionEvaluator
+  - QuestDef JSON schema: id, name, description, stages[{ description, rewards? }]
+  - Runtime state machine: undiscovered → active → complete (dialog-driven, single advanceQuest per quest)
+  - Reward application: xp (addXp), gold, items (createItem to backpack), flags (setFlag)
+  - `dialogManager.ts`: setConditionEvaluator() export — custom evaluators shadow defaults
+  - `questLogOverlay.ts`: DOM overlay (J key), dark dungeon panel, active/completed sections
+  - `saveSystem.ts`: optional `quests` field in SaveData, threaded through build/apply params
+  - `main.ts`: quest loading at init, condition evaluator, real dialog hooks, J key binding, overlay guards, save/load wiring
+  - 3 quest data files: fetch_amulet, kill_spider_queen, collect_lore (single-stage design)
+  - `amulet_gregor` quest item added to items.json
+  - 30 new tests (725 total)
 
 ---
 

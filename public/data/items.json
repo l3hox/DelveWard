@@ -610,6 +610,18 @@
     },
 
     {
+      "id": "amulet_gregor",
+      "name": "Gregor's Family Amulet",
+      "type": "accessory", "subtype": "amulet", "quality": "common",
+      "icon": "amulet-gold",
+      "weight": 0, "value": 0,
+      "description": "A tarnished silver amulet engraved with a merchant's crest. Gregor would want this back.",
+      "stats": {},
+      "modifiers": [],
+      "requirements": {}
+    },
+
+    {
       "id": "health_potion_small",
       "name": "Health Potion",
       "type": "consumable", "subtype": "health_potion", "quality": "common",

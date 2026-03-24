@@ -62,6 +62,8 @@ import {
 import type { DialogSession } from './core/dialogManager';
 import { buildNpcMeshes, updateNpcBillboards, preloadNpcTextures, type NpcMeshes } from './rendering/npcRenderer';
 import { SaveLoadOverlay } from './hud/saveLoadOverlay';
+import { questManager } from './core/questManager';
+import { QuestLogOverlay } from './hud/questLogOverlay';
 import {
   buildSaveData, applySaveData, saveToSlot, loadFromSlot, deleteSlot,
   exportSaveFile, importSaveFile, getAllSlotMetadata,
@@ -375,11 +377,19 @@ async function init(): Promise<void> {
   const allIcons = itemDatabase.getAllItems().map((item) => item.icon);
   await preloadItemSprites(allIcons);
 
+  // Load quest definitions + wire condition evaluator
+  await Promise.all([
+    questManager.loadQuest('fetch_amulet'),
+    questManager.loadQuest('kill_spider_queen'),
+    questManager.loadQuest('collect_lore'),
+  ]);
+  questManager.installConditionEvaluator();
+
   // Verify all referenced PNG assets exist (non-blocking, logs errors)
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/architects_tomb.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
@@ -411,6 +421,10 @@ async function init(): Promise<void> {
   const dialogOverlay = new DialogOverlay();
   dialogOverlay.attach();
   let activeDialogSession: DialogSession | null = null;
+
+  // --- Quest log overlay ---
+  const questLogOverlay = new QuestLogOverlay();
+  questLogOverlay.attach();
 
   function showDialogNode(): void {
     if (!activeDialogSession) return;
@@ -446,10 +460,24 @@ async function init(): Promise<void> {
     }
   });
 
-  // Wire dialog effect hooks (quest/shop will be wired in later phases)
+  // Wire dialog effect hooks
   setDialogHooks({
-    onStartQuest: (questId) => { hud.showMessage(`Quest started: ${questId}`); },
-    onAdvanceQuest: (questId) => { hud.showMessage(`Quest advanced: ${questId}`); },
+    onStartQuest: (questId) => {
+      questManager.startQuest(questId);
+      const def = questManager.getQuestDef(questId);
+      hud.showMessage(`Quest started: ${def?.name ?? questId}`);
+    },
+    onAdvanceQuest: (questId) => {
+      questManager.advanceQuest(questId, gameState);
+      const status = questManager.getStatus(questId);
+      const def = questManager.getQuestDef(questId);
+      const name = def?.name ?? questId;
+      if (status === 'complete') {
+        hud.showMessage(`Quest complete: ${name}`);
+      } else {
+        hud.showMessage(`Quest updated: ${name}`);
+      }
+    },
     onOpenShop: (npcId) => { hud.showMessage(`Shop: ${npcId} (coming soon)`); },
   });
 
@@ -572,6 +600,7 @@ async function init(): Promise<void> {
       currentLevelId,
       levelSnapshots,
       dungeon,
+      questState: questManager.getSerializableState(),
     });
     const ok = saveToSlot(slotKey, data);
     if (!ok) {
@@ -591,6 +620,7 @@ async function init(): Promise<void> {
       }
 
       const result = applySaveData(data, gameState, dungeon);
+      questManager.restoreState(result.questState);
 
       // Replace level snapshots with the ones from the save
       levelSnapshots.clear();
@@ -664,6 +694,7 @@ async function init(): Promise<void> {
         currentLevelId,
         levelSnapshots,
         dungeon,
+        questState: questManager.getSerializableState(),
       });
       exportSaveFile(data);
     },
@@ -1086,6 +1117,7 @@ async function init(): Promise<void> {
     if (signOverlay.isOpen()) return; // sign overlay handles its own dismissal
     if (dialogOverlay.isOpen()) return; // dialog overlay handles its own keys
     if (saveLoadOverlay.isOpen()) return; // save/load overlay handles its own keys
+    if (questLogOverlay.isOpen()) return; // quest log overlay handles its own keys
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
@@ -1333,6 +1365,9 @@ async function init(): Promise<void> {
         if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
         hud.getInventoryOverlay().toggle();
         break;
+      case 'KeyJ':
+        questLogOverlay.show(questManager);
+        break;
       case 'KeyL':
         if (hud.getStatsPanel().isOpen()) hud.getStatsPanel().toggle();
         if (hud.getInventoryOverlay().isOpen()) hud.getInventoryOverlay().toggle();
@@ -1374,7 +1409,7 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || dialogOverlay.isOpen() || saveLoadOverlay.isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || dialogOverlay.isOpen() || saveLoadOverlay.isOpen() || questLogOverlay.isOpen();
 
     ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);

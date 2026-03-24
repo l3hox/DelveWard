@@ -66,8 +66,14 @@ const defaultEvaluators: Record<string, ConditionEvaluator> = {
   },
 };
 
+const customEvaluators: Record<string, ConditionEvaluator> = {};
+
+export function setConditionEvaluator(type: string, evaluator: ConditionEvaluator): void {
+  customEvaluators[type] = evaluator;
+}
+
 export function evaluateCondition(condition: DialogCondition, gameState: GameState): boolean {
-  const evaluator = defaultEvaluators[condition.type];
+  const evaluator = customEvaluators[condition.type] ?? defaultEvaluators[condition.type];
   if (!evaluator) return false;
   return evaluator(condition, gameState);
 }

@@ -82,6 +82,7 @@ export interface SaveData {
   flags: string[];
   levelSnapshots: Record<string, SerializedLevelSnapshot>;
   levelGrids: Record<string, string[]>;
+  quests?: Record<string, { status: string; stageIndex: number }>;
 }
 
 export interface SlotMetadata {
@@ -176,6 +177,7 @@ interface BuildSaveDataParams {
   currentLevelId: string;
   levelSnapshots: Map<string, LevelSnapshot>;
   dungeon: Dungeon;
+  questState?: Record<string, { status: string; stageIndex: number }>;
 }
 
 export function buildSaveData(params: BuildSaveDataParams): SaveData {
@@ -237,6 +239,7 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
     flags: Array.from(gameState.flags),
     levelSnapshots: serializedSnapshots,
     levelGrids,
+    quests: params.questState,
   };
 }
 
@@ -246,6 +249,7 @@ interface ApplySaveDataResult {
   playerCol: number;
   playerRow: number;
   playerFacing: Facing;
+  questState: Record<string, { status: string; stageIndex: number }>;
 }
 
 export function applySaveData(
@@ -322,6 +326,7 @@ export function applySaveData(
     playerCol: p.col,
     playerRow: p.row,
     playerFacing: p.facing,
+    questState: data.quests ?? {},
   };
 }
 

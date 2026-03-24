@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-24 — M3 Phase C: Quest System
+
+**Design**: Data-driven JSON quests (`public/data/quests/{questId}.json`) with dialog-driven progression. Objectives are not auto-evaluated — dialog trees gate completion via conditions (`hasItem`, `hasFlag`), and `advanceQuest` dialog effects trigger stage progression. Quest stage descriptions are purely for quest log display.
+
+**Architecture**: `QuestManager` class (singleton) owns quest defs (fetched + cached) and runtime state (`Map<string, { status, stageIndex }>`). Reward application delegates to GameState APIs (`addXp`, `gold +=`, `entityRegistry.createItem`, `setFlag`). `installConditionEvaluator()` replaces the `questStage` stub in `dialogManager` via `setConditionEvaluator()` — a new hook that shadows default evaluators with custom ones, keeping the evaluator lookup extensible.
+
+**Save/load threading**: Quest state added as optional `quests` field on `SaveData` (backward-compatible — old saves load with empty quest state). `saveSystem.ts` stays free of questManager dependency; `main.ts` bridges them.
+
+**Single-stage quest design**: Each quest has 1 stage since dialog flow calls `advanceQuest` exactly once per quest (on turn-in). Rewards are on the single stage, applied before incrementing past it (which triggers completion). Multi-stage quests would require additional `advanceQuest` triggers (e.g. auto-advance on item pickup), which can be added later if needed.
+
+**Quest log overlay**: DOM overlay following SaveLoadOverlay pattern. J key opens, J/Escape closes. Brown dungeon theme (#2a1a0a) with gold border. Active quests show name + current stage description + dimmed quest description. Completed quests show checkmark + dimmed name. Content rebuilt on each `show()` call.
+
+---
+
 ## 2026-03-24 — M3 Phase A/B Editor: NPC Editor Support
 
 **Editor integration**: NPC entity type added to dungeon editor. Toolbar palette with teal "NPC" icon. GridCanvas draws teal circle icon on grid, resolves NPC sprite from `npcDatabase` for Item Preview mode. Inspector shows `npcId` dropdown (sprite-swatch custom dropdown mirroring enemy type selector), readonly details panel (name, dialog file reference, merchant stock list), sprite preview.
