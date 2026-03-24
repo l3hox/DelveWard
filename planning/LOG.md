@@ -4,6 +4,18 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-24 — M3 Phase A/B Editor: NPC Editor Support
+
+**Editor integration**: NPC entity type added to dungeon editor. Toolbar palette with teal "NPC" icon. GridCanvas draws teal circle icon on grid, resolves NPC sprite from `npcDatabase` for Item Preview mode. Inspector shows `npcId` dropdown (sprite-swatch custom dropdown mirroring enemy type selector), readonly details panel (name, dialog file reference, merchant stock list), sprite preview.
+
+**Red hover on invalid placement**: Entity mode hover highlight now checks `canPlaceEntityType()` and turns red on cells where the selected entity type cannot be placed (walls for most entities, non-wall cells for breakable_wall/secret_wall). Applies to all entity types, not just NPC.
+
+**NPC facing removed**: `facing` field removed from NPC entity defaults, NPCInstance interface, entity parsing, level loader validation, and DUNGEON-DESIGNER.md. NPC facing was stored but never consumed by game code (billboard rendering always faces camera). Enemies also lack a facing field. May revisit if a front/back/side sprite system is added in a future milestone.
+
+**Dialog Editor planned**: New Phase C/D Editor added to M3 plan — visual dialog tree editor with node graph, condition/effect authoring (quest stages, world flags, items, stats), validation, preview mode, and NPC inspector integration. Depends on Phase C (quest system) for quest ID validation.
+
+---
+
 ## 2026-03-24 — M3 Phase B: Dialog System
 
 **Design**: Per-NPC JSON dialog trees in `public/data/dialogs/{npcId}.json`. Named nodes with `speaker`, `text`, optional `choices` (branching) or `next` (linear). Condition/effect engine: conditions gate choice visibility (`hasFlag`, `hasItem`, `questStage`, `statCheck`, all AND'd), effects execute on choice selection (`setFlag`, `giveItem`, `takeItem`, `startQuest`, `advanceQuest`, `openShop`). ADR-M3-02.
@@ -20,13 +32,13 @@ Each entry records what was decided or changed — design decisions, architectur
 
 **Design**: Separate NPC database (`public/data/npcs.json`) with `NpcDatabase` singleton class mirroring `EnemyDatabase`. `NpcDef`: id, name, sprite (path/size/yOffset), dialog reference, optional stock + markup for merchants. ADR-M3-01.
 
-**Architecture**: New `npc` entity type in dungeon JSON: `{ type: "npc", npcId: "...", facing: "S" }`. `NPCInstance` in GameState (`npcs: Map<string, NPCInstance>`), parsed in `_parseEntities`, included in `LevelSnapshot`, `saveLevelState`, `loadLevelState`, `loadNewLevel`, `_rebuildEntityIndex`. Billboard rendering via `npcRenderer.ts` (mirrors `enemyRenderer.ts` — texture cache, `PlaneGeometry`, `createNeutralLitMaterial`, `camera.rotation.y` billboard). NPCs block player movement.
+**Architecture**: New `npc` entity type in dungeon JSON: `{ type: "npc", npcId: "..." }`. `NPCInstance` in GameState (`npcs: Map<string, NPCInstance>`), parsed in `_parseEntities`, included in `LevelSnapshot`, `saveLevelState`, `loadLevelState`, `loadNewLevel`, `_rebuildEntityIndex`. Billboard rendering via `npcRenderer.ts` (mirrors `enemyRenderer.ts` — texture cache, `PlaneGeometry`, `createNeutralLitMaterial`, `camera.rotation.y` billboard). NPCs block player movement.
 
 **Global flags**: `flags: Set<string>` on GameState with `hasFlag`/`setFlag`/`removeFlag`. Persisted in SaveData as `string[]`. ADR-M3-03.
 
 **Save/load**: NPC state in `SerializedLevelSnapshot` (npcs Record). Flags in SaveData top-level. Backward-compatible deserialization (`npcs ?? {}`, `flags ?? []`).
 
-**Level loader**: `npc` entity validation — npcId must exist in NpcDatabase, walkable cell required, optional facing (N/S/E/W).
+**Level loader**: `npc` entity validation — npcId must exist in NpcDatabase, walkable cell required.
 
 ---
 

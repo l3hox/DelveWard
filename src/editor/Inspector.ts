@@ -1,6 +1,7 @@
 import type { Entity } from '../core/types';
 import type { EditorApp } from './EditorApp';
 import { enemyDatabase } from '../enemies/enemyDatabase';
+import { npcDatabase, type NpcDef } from '../npcs/npcDatabase';
 import { itemDatabase, type ItemDef, type ItemQuality } from '../core/itemDatabase';
 import { getItemImage } from '../rendering/itemSprites';
 import { getLootTable } from '../core/lootTable';
@@ -12,6 +13,18 @@ function getEnemySpriteImage(type: string): HTMLImageElement | null {
   const img = new Image();
   img.src = `/sprites/${type}.png`;
   enemySpriteCache.set(type, img);
+  return null;
+}
+
+const npcSpriteCache = new Map<string, HTMLImageElement>();
+function getNpcSpriteImage(npcId: string): HTMLImageElement | null {
+  const cached = npcSpriteCache.get(npcId);
+  if (cached) return cached.complete ? cached : null;
+  const def = npcDatabase.getNpc(npcId);
+  if (!def) return null;
+  const img = new Image();
+  img.src = def.sprite.path;
+  npcSpriteCache.set(npcId, img);
   return null;
 }
 
@@ -401,6 +414,16 @@ export class Inspector {
           this.onEntityChanged?.();
         });
         break;
+
+      case 'npc': {
+        const npcId = (entity.npcId as string) ?? npcDatabase.getAllNpcIds()[0] ?? '';
+        this.addNpcIdDropdown(entity, npcId);
+        const def = npcDatabase.getNpc(npcId);
+        if (def) {
+          this.addNpcDetails(def);
+        }
+        break;
+      }
     }
   }
 
@@ -1226,6 +1249,118 @@ export class Inspector {
       ctx.fillRect(0, 0, 20, 20);
     }
     return canvas;
+  }
+
+  private addNpcIdDropdown(entity: Entity, currentId: string): void {
+    const ids = npcDatabase.getAllNpcIds();
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspector-field';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'npcId';
+    wrapper.appendChild(lbl);
+
+    const container = document.createElement('div');
+    container.className = 'tex-dropdown';
+
+    // Trigger
+    const trigger = document.createElement('div');
+    trigger.className = 'tex-dropdown-trigger';
+    const triggerSwatch = this.createNpcSwatch(currentId);
+    const triggerText = document.createElement('span');
+    triggerText.textContent = currentId;
+    trigger.appendChild(triggerSwatch);
+    trigger.appendChild(triggerText);
+    container.appendChild(trigger);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'tex-dropdown-panel';
+
+    for (const id of ids) {
+      const row = document.createElement('div');
+      row.className = 'tex-dropdown-option';
+      if (id === currentId) row.classList.add('selected');
+
+      const swatch = this.createNpcSwatch(id);
+      const name = document.createElement('span');
+      name.textContent = id;
+      row.appendChild(swatch);
+      row.appendChild(name);
+
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onBeforeDiscreteChange?.();
+        entity.npcId = id;
+        panel.classList.remove('open');
+        this.onEntityChanged?.();
+        this.refresh();
+      });
+
+      panel.appendChild(row);
+    }
+
+    container.appendChild(panel);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.tex-dropdown-panel.open').forEach((p) => {
+        if (p !== panel) p.classList.remove('open');
+      });
+      panel.classList.toggle('open');
+    });
+
+    const closeHandler = (e: MouseEvent) => {
+      if (!container.contains(e.target as Node)) {
+        panel.classList.remove('open');
+      }
+    };
+    document.addEventListener('click', closeHandler);
+    const observer = new MutationObserver(() => {
+      if (!container.isConnected) {
+        document.removeEventListener('click', closeHandler);
+        observer.disconnect();
+      }
+    });
+    observer.observe(this.container, { childList: true, subtree: true });
+
+    wrapper.appendChild(container);
+    this.container.appendChild(wrapper);
+  }
+
+  private createNpcSwatch(npcId: string): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'tex-swatch';
+    canvas.width = 20;
+    canvas.height = 20;
+    const ctx = canvas.getContext('2d')!;
+    const img = getNpcSpriteImage(npcId);
+    if (img) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, 20, 20);
+    } else {
+      ctx.fillStyle = '#22aacc';
+      ctx.beginPath();
+      ctx.arc(10, 10, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
+  }
+
+  private addNpcDetails(def: NpcDef): void {
+    const section = document.createElement('div');
+    section.className = 'item-details';
+
+    this.addSpritePreview(section, def.sprite.path, 1);
+
+    this.addReadonlyField(section, 'name', def.name);
+    this.addReadonlyField(section, 'dialog', def.dialog);
+    if (def.stock) {
+      this.addReadonlyField(section, 'stock', def.stock.join(', '));
+    }
+
+    this.container.appendChild(section);
   }
 
   private static readonly BEHAVIOR_TOOLTIPS: Record<string, string> = {

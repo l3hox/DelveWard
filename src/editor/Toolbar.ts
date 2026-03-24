@@ -21,7 +21,7 @@ const ENTITY_TYPES = [
   'enemy', 'door', 'key', 'lever', 'pressure_plate',
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
-  'breakable_wall', 'secret_wall', 'block', 'chest', 'sign',
+  'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
 ] as const;
 
 export class Toolbar {
@@ -832,6 +832,20 @@ export class Toolbar {
         const lineH = sgH * 0.25;
         ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.2, sgW * 0.7, lineH * 0.6);
         ctx.fillRect(sgX + sgW * 0.15, sgY + sgH * 0.55, sgW * 0.7, lineH * 0.6);
+        break;
+      }
+
+      case 'npc': {
+        // Teal/cyan circle with "NPC" label
+        ctx.fillStyle = '#22aacc';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(6, fontSize * 0.5)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('NPC', cx, cy);
         break;
       }
     }

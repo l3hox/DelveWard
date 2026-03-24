@@ -4,6 +4,39 @@ Detailed checklist of everything that's been built. For session-by-session notes
 
 ---
 
+## M3 — The Living World
+
+- [x] **Phase A: NPC Foundation**:
+  - `public/data/npcs.json` + `NpcDatabase` singleton (load/getNpc/getAllNpcIds/getAllNpcs)
+  - `NpcDef` interface: id, name, sprite (path/size/yOffset), dialog, optional stock + markup
+  - `npc` entity type in dungeon JSON: `{ type: "npc", npcId: "..." }`
+  - `NPCInstance` in GameState (`npcs: Map`), parsed in `_parseEntities`
+  - NPC billboard rendering (`npcRenderer.ts` — mirrors enemyRenderer pattern)
+  - NPC interaction: Space on facing cell returns `npc_interacted`
+  - NPCs block player movement
+  - Global flags: `flags: Set<string>` on GameState with hasFlag/setFlag/removeFlag
+  - Level loader: npc entity validation (npcId exists, walkable cell)
+  - Save/load: NPC state in LevelSnapshot, flags in SaveData
+  - 3 NPC definitions: merchant_gregor, questgiver_hilda, lorekeeper_owen
+- [x] **Phase B: Dialog System**:
+  - Per-NPC JSON dialog trees in `public/data/dialogs/{npcId}.json`
+  - `DialogManager`: loadDialog, evaluateConditions, executeEffects, dialog session state
+  - Condition types: hasFlag, hasItem, questStage (stubbed), statCheck
+  - Effect types: setFlag, giveItem, takeItem, startQuest, advanceQuest, openShop
+  - `DialogOverlay`: dark dungeon-themed panel, speaker name, numbered choice buttons (1-9 keys or click)
+  - `setDialogHooks()` for quest/shop integration decoupling
+  - 3 dialog files with branching conditions and effects
+- [x] **Phase A/B Editor: NPC Editor Support**:
+  - Toolbar: teal circle "NPC" icon in entity palette
+  - GridCanvas: teal circle icon, sprite preview from npcDatabase
+  - EditorApp: `npc` entity defaults (`npcId: ''`)
+  - Inspector: npcId dropdown with sprite swatches, readonly details (name, dialog, stock), sprite preview
+  - editor/main.ts: npcDatabase.load() at init
+  - Red hover highlight on invalid entity placement cells (all entity types)
+  - NPC facing field removed (unused by game code; enemies also lack facing)
+
+---
+
 ## M2 — The Dangerous Dungeon
 
 - [x] **Phase A: Signal System Foundation**:

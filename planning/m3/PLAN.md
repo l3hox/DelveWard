@@ -1,7 +1,7 @@
 # Milestone 3: The Living World — Implementation Plan
 
 **Target version:** v0.3
-**Status:** Phase A+B game code complete, Phase A/B Editor next
+**Status:** Phase A/B Editor complete, Phase C next
 **See:** [ADR.md](ADR.md) for architecture decisions.
 
 ---
@@ -12,8 +12,9 @@
 |---|---|---|---|
 | A | NPC Foundation | — | **Complete** (game) |
 | B | Dialog System | A | **Complete** (game) |
-| A/B Editor | Editor: NPC support | A, B | Next |
-| C | Quest System + Editor | B | Pending |
+| A/B Editor | Editor: NPC support | A, B | **Complete** |
+| C | Quest System + Editor | B | Next |
+| C/D Editor | Editor: Dialog Editor | B, C | Pending |
 | D | Trading System | B | Pending |
 | E | Hunger System + Editor | — | Pending |
 | F | Dungeon Objects + Editor | — | Pending |
@@ -60,13 +61,12 @@ No editor work needed — dialog trees are standalone JSON files, not part of du
 Editor catch-up for the NPC entity type added in Phases A+B.
 
 19. **Toolbar.ts**: Add `'npc'` to `ENTITY_TYPES` array
-20. **Toolbar.ts**: `drawEntityIcon` case for `npc` — distinct icon (person silhouette or "NPC" text badge)
-21. **GridCanvas.ts**: `drawEntityIcon` case for `npc` — matching icon on grid with facing indicator
+20. **Toolbar.ts**: `drawEntityIcon` case for `npc` — distinct teal circle with "NPC" text badge
+21. **GridCanvas.ts**: `drawEntityIcon` case for `npc` — teal circle on grid
 22. **GridCanvas.ts**: `drawEntitySprite` support — show NPC sprite from npcDatabase if sprite preview enabled
-23. **EditorApp.ts**: `ENTITY_DEFAULTS` entry: `npc: { npcId: '', facing: 'S' }`
+23. **EditorApp.ts**: `ENTITY_DEFAULTS` entry: `npc: { npcId: '' }`
 24. **Inspector.ts**: `case 'npc'` field block:
     - `npcId` dropdown (populated from `npcDatabase.getAllNpcIds()`)
-    - `facing` dropdown (N/S/E/W)
     - Readonly NPC name + dialog file reference display
 25. **editor/main.ts**: Load `npcDatabase` at editor init (needed for dropdown + sprite preview)
 
@@ -88,6 +88,43 @@ Data-driven quest definitions with stage tracking and objective evaluation.
 35. Tests: quest state transitions, objective evaluation, reward application
 
 No editor work — quests are data-driven JSON, not level entities.
+
+---
+
+## Phase C/D Editor — Dialog Editor
+
+Integrated dialog tree editor inside the dungeon editor. Currently dialog JSON files are hand-edited, which is error-prone and disconnects dialog authoring from level design. This phase adds a visual editor for creating and editing dialog trees with full support for conditions gated on quest status and world flags.
+
+**Depends on:** Phase B (dialog system), Phase C (quest system — needed for quest ID validation and `questStage` condition authoring).
+
+### Dialog Editor Core
+71. **Dialog file management**: List/create/delete dialog JSON files from `public/data/dialogs/`. Load via dev server API (extend `editorApiPlugin` or use a dedicated dialogs endpoint).
+72. **Node graph view**: Visual node-and-edge graph for dialog trees. Each node shows speaker + text preview. Edges show choice transitions (labeled with choice text). Drag to reposition nodes. Pan/zoom (reuse GridCanvas patterns).
+73. **Node editor panel**: Select a node to edit in a side panel — speaker name, text (textarea), linear `next` pointer (dropdown of node IDs or "end dialog").
+74. **Choice editor**: Add/remove/reorder choices within a node. Each choice: text, `next` target (dropdown or "end"), expandable conditions/effects sections.
+
+### Condition Authoring (quest status + world flags)
+75. **Condition builder UI**: Add/remove conditions on choices and nodes. Dropdown for condition type (`hasFlag`, `hasItem`, `questStage`, `statCheck`). Type-specific fields:
+    - `hasFlag`: text input for flag name (autocomplete from known flags in all dialog files)
+    - `hasItem`: item ID dropdown (from `itemDatabase`)
+    - `questStage`: quest ID dropdown (from quest JSON files) + stage dropdown (`undiscovered`, `active`, `complete`, `failed`)
+    - `statCheck`: stat name dropdown + min value number input
+76. **Flag discovery**: Scan all dialog files for `setFlag` effects and `hasFlag` conditions to build a known-flags list for autocomplete. Warn on orphaned flags (set but never checked, or checked but never set).
+
+### Effect Authoring
+77. **Effect builder UI**: Add/remove effects on choices and nodes. Dropdown for effect type (`setFlag`, `giveItem`, `takeItem`, `startQuest`, `advanceQuest`, `openShop`). Type-specific fields:
+    - `setFlag`: text input for flag name (with autocomplete)
+    - `giveItem` / `takeItem`: item ID dropdown (from `itemDatabase`)
+    - `startQuest` / `advanceQuest`: quest ID dropdown (from quest JSON files)
+    - `openShop`: no additional fields
+
+### Validation & Preview
+78. **Validation**: Warn on unreachable nodes, dead-end nodes (no `next` and no choices), broken `next` references, unknown quest/item IDs in conditions/effects.
+79. **Dialog preview mode**: Step through dialog in the editor with simulated flag/quest state. Toggle flags and quest stages to test different conversation branches without running the game.
+
+### Integration
+80. **NPC inspector link**: When selecting an NPC entity in the dungeon editor, show a "Edit Dialog" button that opens the dialog editor for that NPC's dialog file (from `npcDatabase` → `def.dialog`).
+81. **Save**: Write modified dialog JSON back to server via dev server API.
 
 ---
 

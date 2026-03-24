@@ -259,7 +259,6 @@ function validateEntity(
       if (typeof e.npcId !== 'string') return `${pfx} npc must have a string npcId`;
       if (npcDatabase.isLoaded() && !npcDatabase.getNpc(e.npcId as string)) return `${pfx} npc has unknown npcId "${e.npcId}"`;
       const w = checkWalkable('npc'); if (w) return w;
-      if (e.facing !== undefined && !['N', 'S', 'E', 'W'].includes(e.facing as string)) return `${pfx} npc facing must be N, S, E, or W`;
       break;
     }
   }

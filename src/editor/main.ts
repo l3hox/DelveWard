@@ -11,6 +11,7 @@ import {
 } from './io';
 import { itemDatabase } from '../core/itemDatabase';
 import { enemyDatabase } from '../enemies/enemyDatabase';
+import { npcDatabase } from '../npcs/npcDatabase';
 import type { Dungeon } from '../core/types';
 
 const app = new EditorApp();
@@ -19,6 +20,7 @@ const app = new EditorApp();
 import { loadLootTables } from '../core/lootTable';
 itemDatabase.load().catch(() => { /* non-fatal */ });
 enemyDatabase.load().catch(() => { /* non-fatal */ });
+npcDatabase.load().catch(() => { /* non-fatal */ });
 loadLootTables().catch(() => { /* non-fatal */ });
 
 const canvas = document.getElementById('editor-canvas') as HTMLCanvasElement;

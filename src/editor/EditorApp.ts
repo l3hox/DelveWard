@@ -35,6 +35,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   block:          {},
   chest:          { state: 'closed', facing: 'S' },
   sign:           { wall: 'N', text: '' },
+  npc:            { npcId: '' },
 };
 
 export interface ValidationError {

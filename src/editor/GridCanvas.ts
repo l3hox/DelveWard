@@ -6,6 +6,7 @@ import type { Entity, CharDef } from '../core/types';
 import { getTreeOverlayCanvas } from './treeOverlay';
 import type { Facing } from '../core/grid';
 import { itemDatabase } from '../core/itemDatabase';
+import { npcDatabase } from '../npcs/npcDatabase';
 
 const TILE_SIZE = 32;
 const MIN_ZOOM = 0.25;
@@ -1008,6 +1009,15 @@ export class GridCanvas {
         break;
       }
 
+      case 'npc': {
+        // Teal circle
+        ctx.fillStyle = '#22aacc';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
       default:
         break;
     }
@@ -1040,6 +1050,12 @@ export class GridCanvas {
             spritePath = `/sprites/items/${def.icon}.png`;
           }
         }
+        break;
+      }
+      case 'npc': {
+        const npcId = (entity.npcId as string) || '';
+        const def = npcDatabase.getNpc(npcId);
+        if (def) spritePath = def.sprite.path;
         break;
       }
       default:
@@ -1176,10 +1192,12 @@ export class GridCanvas {
           strokeColor = 'rgba(68, 136, 255, 0.7)';
           fillColor = 'rgba(68, 136, 255, 0.1)';
           break;
-        case 'entity':
-          strokeColor = 'rgba(68, 255, 68, 0.7)';
-          fillColor = 'rgba(68, 255, 68, 0.1)';
+        case 'entity': {
+          const canPlace = this.app.canPlaceEntityType(hover.col, hover.row, this.app.selectedEntityType);
+          strokeColor = canPlace ? 'rgba(68, 255, 68, 0.7)' : 'rgba(255, 68, 68, 0.5)';
+          fillColor = canPlace ? 'rgba(68, 255, 68, 0.1)' : 'rgba(255, 68, 68, 0.05)';
           break;
+        }
         default:
           strokeColor = 'rgba(255, 255, 255, 0.6)';
           fillColor = 'rgba(255, 255, 255, 0.05)';

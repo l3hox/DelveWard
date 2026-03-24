@@ -178,7 +178,6 @@ export interface NPCInstance {
   col: number;
   row: number;
   npcId: string;
-  facing: Facing;
 }
 
 export function doorKey(col: number, row: number): string {
@@ -527,7 +526,6 @@ export class GameState {
             col: e.col,
             row: e.row,
             npcId,
-            facing: (e.facing as Facing) ?? 'S',
           });
         }
       } else if (e.type === 'enemy') {

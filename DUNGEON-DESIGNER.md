@@ -364,10 +364,9 @@ Item properties (name, stats, slot, requirements) are defined in the item databa
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `npcId` | string | Yes | Must match an NPC `id` in `public/data/npcs.json` |
-| `facing` | string | No | Direction the NPC faces: `"N"`, `"S"` (default), `"E"`, or `"W"` |
 
 ```json
-{ "col": 5, "row": 5, "type": "npc", "npcId": "merchant_gregor", "facing": "S" }
+{ "col": 5, "row": 5, "type": "npc", "npcId": "merchant_gregor" }
 ```
 
 NPC properties (name, sprite, dialog file, merchant stock) are defined in the NPC database (`public/data/npcs.json`), not in the level JSON. Dialog trees are per-NPC files in `public/data/dialogs/{npcId}.json`.
