@@ -6,7 +6,7 @@
       "name": "Gregor the Merchant",
       "sprite": { "path": "/sprites/merchant.png", "size": 2.0 },
       "dialog": "merchant_gregor",
-      "stock": ["health_potion", "antidote", "torch_oil", "rations"],
+      "stock": ["health_potion_small", "antidote", "torch_oil"],
       "markup": 1.5,
       "facing": "S"
     },

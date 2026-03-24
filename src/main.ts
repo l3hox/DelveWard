@@ -64,6 +64,7 @@ import { buildNpcMeshes, updateNpcBillboards, preloadNpcTextures, type NpcMeshes
 import { SaveLoadOverlay } from './hud/saveLoadOverlay';
 import { questManager } from './core/questManager';
 import { QuestLogOverlay } from './hud/questLogOverlay';
+import { TradingOverlay } from './hud/tradingOverlay';
 import {
   buildSaveData, applySaveData, saveToSlot, loadFromSlot, deleteSlot,
   exportSaveFile, importSaveFile, getAllSlotMetadata,
@@ -426,6 +427,11 @@ async function init(): Promise<void> {
   const questLogOverlay = new QuestLogOverlay();
   questLogOverlay.attach();
 
+  // --- Trading overlay ---
+  const tradingOverlay = new TradingOverlay();
+  tradingOverlay.attach();
+  tradingOverlay.setOnClose(() => {});
+
   function showDialogNode(): void {
     if (!activeDialogSession) return;
     const node = getCurrentNode(activeDialogSession);
@@ -483,7 +489,13 @@ async function init(): Promise<void> {
         hud.showMessage(`Quest updated: ${name}`);
       }
     },
-    onOpenShop: (npcId) => { hud.showMessage(`Shop: ${npcId} (coming soon)`); },
+    onOpenShop: (npcId) => {
+      const def = npcDatabase.getNpc(npcId);
+      if (!def || !def.stock) return;
+      dialogOverlay.hide();
+      activeDialogSession = null;
+      tradingOverlay.show(npcId, def, gameState, hud);
+    },
   });
 
   // --- Level-up notification ---
@@ -1123,6 +1135,7 @@ async function init(): Promise<void> {
     if (dialogOverlay.isOpen()) return; // dialog overlay handles its own keys
     if (saveLoadOverlay.isOpen()) return; // save/load overlay handles its own keys
     if (questLogOverlay.isOpen()) return; // quest log overlay handles its own keys
+    if (tradingOverlay.isOpen()) return; // trading overlay handles its own keys
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
 
@@ -1414,7 +1427,7 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || dialogOverlay.isOpen() || saveLoadOverlay.isOpen() || questLogOverlay.isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || dialogOverlay.isOpen() || saveLoadOverlay.isOpen() || questLogOverlay.isOpen() || tradingOverlay.isOpen();
 
     ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);

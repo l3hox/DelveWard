@@ -4,6 +4,16 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-24 — M3 Phase D: Trading System
+
+**Design**: Buy/sell trading overlay triggered by `openShop` dialog effect. NPCs with `stock` arrays in `npcs.json` are merchants. Buy price = `ceil(value × markup)`, sell price = `floor(value × 0.5)`. Items with `value: 0` are not sellable. Merchant stock is a fixed list (items are not consumed on purchase — infinite supply).
+
+**Architecture**: `TradingOverlay` follows existing overlay patterns (fixed position, z-index 500, capture-phase keydown, Escape to close). Two-column layout: shop stock (left) and player backpack (right). `_rebuildContent()` rebuilds both columns from live state after every buy/sell. The `onOpenShop` dialog hook closes the dialog overlay and opens the trading overlay — clean handoff with no overlapping overlays.
+
+**Data fix**: Gregor's stock corrected — `health_potion` → `health_potion_small` (matching actual item ID), `rations` removed (hunger system is Phase E).
+
+---
+
 ## 2026-03-24 — M3 Phase C/D Editor: Dialog Editor
 
 **Architecture**: Dialog editor runs as a separate `editorMode` ('level' | 'dialog') on EditorApp, with its own state model (`DialogEditorState`), canvas (`DialogGraphCanvas`), and inspector (`DialogInspector`). Dialog state is fully decoupled from level state — no cross-contamination of undo stacks or dirty tracking.
