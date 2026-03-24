@@ -2,6 +2,7 @@
 
 **Target version:** v0.3
 **Status:** Phase A+B game code complete, Phase A/B Editor next
+**See:** [ADR.md](ADR.md) for architecture decisions.
 
 ---
 

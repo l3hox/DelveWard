@@ -4,6 +4,45 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-24 — M3 Phase B: Dialog System
+
+**Design**: Per-NPC JSON dialog trees in `public/data/dialogs/{npcId}.json`. Named nodes with `speaker`, `text`, optional `choices` (branching) or `next` (linear). Condition/effect engine: conditions gate choice visibility (`hasFlag`, `hasItem`, `questStage`, `statCheck`, all AND'd), effects execute on choice selection (`setFlag`, `giveItem`, `takeItem`, `startQuest`, `advanceQuest`, `openShop`). ADR-M3-02.
+
+**Architecture**: `DialogManager` module (not a class — functional API with module-level cache and hooks). `loadDialog()` fetches and caches per-NPC JSON. `DialogSession` plain data object tracks tree + current node. `setDialogHooks()` decouples dialog from quest/shop systems — main.ts wires the hooks. Condition evaluators and effect executors are extensible lookup tables. `questStage` evaluator stubbed until Phase C (returns true for `undiscovered`).
+
+**UI**: `DialogOverlay` follows SignOverlay pattern. Dark dungeon-themed panel at screen bottom with gold border. Speaker name in uppercase, dialog text, numbered choice buttons (1-9 keys or click). Non-choice nodes advance on any key. Capture-phase keydown blocks game input while dialog is open.
+
+**Integration**: NPC interaction (Space on facing cell) → async `loadDialog()` → `startDialog()` → `showDialogNode()`. Dialog overlay added to both keydown guard chain and `anyOverlayOpen` pause check.
+
+---
+
+## 2026-03-24 — M3 Phase A: NPC Foundation
+
+**Design**: Separate NPC database (`public/data/npcs.json`) with `NpcDatabase` singleton class mirroring `EnemyDatabase`. `NpcDef`: id, name, sprite (path/size/yOffset), dialog reference, optional stock + markup for merchants. ADR-M3-01.
+
+**Architecture**: New `npc` entity type in dungeon JSON: `{ type: "npc", npcId: "...", facing: "S" }`. `NPCInstance` in GameState (`npcs: Map<string, NPCInstance>`), parsed in `_parseEntities`, included in `LevelSnapshot`, `saveLevelState`, `loadLevelState`, `loadNewLevel`, `_rebuildEntityIndex`. Billboard rendering via `npcRenderer.ts` (mirrors `enemyRenderer.ts` — texture cache, `PlaneGeometry`, `createNeutralLitMaterial`, `camera.rotation.y` billboard). NPCs block player movement.
+
+**Global flags**: `flags: Set<string>` on GameState with `hasFlag`/`setFlag`/`removeFlag`. Persisted in SaveData as `string[]`. ADR-M3-03.
+
+**Save/load**: NPC state in `SerializedLevelSnapshot` (npcs Record). Flags in SaveData top-level. Backward-compatible deserialization (`npcs ?? {}`, `flags ?? []`).
+
+**Level loader**: `npc` entity validation — npcId must exist in NpcDatabase, walkable cell required, optional facing (N/S/E/W).
+
+---
+
+## 2026-03-24 — M3 Design Decisions
+
+Architectural decisions for Milestone 3: The Living World. See `planning/m3/ADR.md` for full records.
+
+- **ADR-M3-01**: Separate NPC database + entity type (not reusing enemy system)
+- **ADR-M3-02**: Per-NPC JSON dialog trees with condition/effect engine (not Ink markup or embedded scripts)
+- **ADR-M3-03**: Global flags as `Set<string>` for cross-system state (not key-value store)
+- **ADR-M3-04**: Data-driven JSON quests with generic stage machine (not code-per-quest)
+- **ADR-M3-05**: Dialog-triggered trading overlay with NPC stock from npcs.json
+- **ADR-M3-06**: 3D geometry for dungeon objects (not billboard sprites)
+
+---
+
 ## 2026-03-19 — Phase E: Save/Load System
 
 **Design**: localStorage-based persistence with 5 manual save slots + 1 autosave slot. ~50-100KB per save, well within localStorage limits. Same-dungeon restriction (saves only load for matching dungeon name). Death shows load overlay if saves exist, else restarts.
