@@ -53,7 +53,13 @@ import { buildBlockMeshes, animateBlockPush, type BlockMeshes } from './renderin
 import { buildChestMeshes, openChestMesh, closeChestMesh, type ChestMeshes } from './rendering/chestRenderer';
 import { buildSignMeshes, type SignMeshes } from './rendering/signRenderer';
 import { SignOverlay } from './hud/signOverlay';
+import { DialogOverlay } from './hud/dialogOverlay';
 import { npcDatabase } from './npcs/npcDatabase';
+import {
+  loadDialog, startDialog, getCurrentNode, getAvailableChoices,
+  selectChoice, advanceDialog, setDialogHooks, executeEffects,
+} from './core/dialogManager';
+import type { DialogSession } from './core/dialogManager';
 import { buildNpcMeshes, updateNpcBillboards, preloadNpcTextures, type NpcMeshes } from './rendering/npcRenderer';
 import { SaveLoadOverlay } from './hud/saveLoadOverlay';
 import {
@@ -400,6 +406,52 @@ async function init(): Promise<void> {
 
   const signOverlay = new SignOverlay();
   signOverlay.attach();
+
+  // --- Dialog overlay ---
+  const dialogOverlay = new DialogOverlay();
+  dialogOverlay.attach();
+  let activeDialogSession: DialogSession | null = null;
+
+  function showDialogNode(): void {
+    if (!activeDialogSession) return;
+    const node = getCurrentNode(activeDialogSession);
+    if (!node) {
+      dialogOverlay.hide();
+      activeDialogSession = null;
+      return;
+    }
+    const choices = getAvailableChoices(activeDialogSession, gameState);
+    dialogOverlay.show(node, choices);
+  }
+
+  dialogOverlay.setOnChoiceSelected((index) => {
+    if (!activeDialogSession) return;
+    const nextId = selectChoice(activeDialogSession, index, gameState);
+    if (nextId === null) {
+      dialogOverlay.hide();
+      activeDialogSession = null;
+    } else {
+      showDialogNode();
+    }
+  });
+
+  dialogOverlay.setOnAdvance(() => {
+    if (!activeDialogSession) return;
+    const nextId = advanceDialog(activeDialogSession, gameState);
+    if (nextId === null) {
+      dialogOverlay.hide();
+      activeDialogSession = null;
+    } else {
+      showDialogNode();
+    }
+  });
+
+  // Wire dialog effect hooks (quest/shop will be wired in later phases)
+  setDialogHooks({
+    onStartQuest: (questId) => { hud.showMessage(`Quest started: ${questId}`); },
+    onAdvanceQuest: (questId) => { hud.showMessage(`Quest advanced: ${questId}`); },
+    onOpenShop: (npcId) => { hud.showMessage(`Shop: ${npcId} (coming soon)`); },
+  });
 
   // --- Level-up notification ---
   const levelUpNotification = new LevelUpNotification();
@@ -1032,6 +1084,7 @@ async function init(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
     if (signOverlay.isOpen()) return; // sign overlay handles its own dismissal
+    if (dialogOverlay.isOpen()) return; // dialog overlay handles its own keys
     if (saveLoadOverlay.isOpen()) return; // save/load overlay handles its own keys
     if (pressedKeys.has(e.code)) return;
     pressedKeys.add(e.code);
@@ -1160,10 +1213,21 @@ async function init(): Promise<void> {
             signOverlay.show(result.message);
           }
           if (result.type === 'npc_interacted' && result.message) {
-            // result.message contains npcId — dialog system will use this in Phase B
-            const npcDef = npcDatabase.getNpc(result.message);
+            const npcId = result.message;
+            const npcDef = npcDatabase.getNpc(npcId);
             if (npcDef) {
-              hud.showMessage(`${npcDef.name}: "..."`)
+              loadDialog(npcDef.dialog).then((tree) => {
+                activeDialogSession = startDialog(npcId, tree);
+                // Execute entry effects for the start node
+                const startNode = getCurrentNode(activeDialogSession);
+                if (startNode?.effects) {
+                  executeEffects(startNode.effects, gameState);
+                }
+                showDialogNode();
+              }).catch((err) => {
+                console.warn('Failed to load dialog:', err);
+                hud.showMessage(`${npcDef.name}: "..."`);
+              });
             }
           }
         }
@@ -1310,7 +1374,7 @@ async function init(): Promise<void> {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
     lastTime = time;
 
-    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || saveLoadOverlay.isOpen();
+    const anyOverlayOpen = hud.getInventoryOverlay().isOpen() || hud.getStatsPanel().isOpen() || hud.getAttributePanel().isOpen() || signOverlay.isOpen() || dialogOverlay.isOpen() || saveLoadOverlay.isOpen();
 
     ls.player.slowMultiplier = getSlowMultiplier(gameState.playerStatusEffects);
     ls.player.update(delta);
