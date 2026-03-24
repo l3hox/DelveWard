@@ -14,21 +14,26 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Current Milestone
 
-**Milestone 2: The Dangerous Dungeon** (v0.2)
+**Milestone 3: The Living World** (v0.3)
 
-Design complete — see `planning/m2/DESIGN.md`, `planning/m2/ADR.md`, `planning/m2/PLAN.md`.
+Plan — see `planning/m3/PLAN.md`.
 
 ---
 
 ## Next Steps
 
-### M2 Implementation
-- [x] Phase A: Signal system foundation (targets[] migration, signal state, gate modes, behaviors, trigger/tripwire, standalone gates, editor support)
-- [x] Phase B: Projectile system (ProjectileManager, collision, trap launchers, 3 projectile types, rendering, editor support, single/repeat fire modes, wall-edge spawn)
-- [x] Phase C: Status effects (data model, tick logic, poison/slow/burning, HUD icons + visual overlays, antidote cure, enemy tint, kill helper extraction)
-- [x] Phase D: Environment entities (breakable walls, secret walls, pushable blocks, chests, signs, renderers, editor support)
-- [x] Phase E: Save/load (serialization, localStorage slots, auto-save, UI, export/import, death → load)
-- [x] Phase F: Content & polish ("The Architect's Tomb" 3-level dungeon, balance pass)
+### M3 Implementation
+- [x] Phase A: NPC foundation (NpcDatabase, NPC entity, billboard rendering, flags, interaction, save/load)
+- [x] Phase B: Dialog system (DialogManager, DialogOverlay, per-NPC dialog trees, conditions, effects)
+- [ ] Phase B.5: Editor NPC support (palette entry, npcId dropdown, facing, sprite preview)
+- [ ] Phase C: Quest system (QuestManager, quest JSON, QuestLogOverlay, objectives, rewards)
+- [ ] Phase C.5: Editor quest entities (minimal — quest references display)
+- [ ] Phase D: Trading system (TradingOverlay, buy/sell, stock from npcs.json)
+- [ ] Phase E: Hunger system (hunger stat, food items, HUD bar, starvation)
+- [ ] Phase E.5: Editor hunger/food (minimal — restoreHunger display)
+- [ ] Phase F: Dungeon objects (fountain, bookshelf, altar, barrel — 3D geometry, interactions)
+- [ ] Phase F.5: Editor dungeon objects (palette entries, inspector fields for all 4)
+- [ ] Phase G: Content — M3 test dungeon (hub + dungeon levels, 3 quests)
 
 ### Completed milestones
 - [x] M0: Proof of concept (v0.0.9)
