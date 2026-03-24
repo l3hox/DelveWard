@@ -110,6 +110,8 @@ export class EditorApp {
   areaDragState: AreaDragState | null = null;
   wireDragState: WireDragState | null = null;
   statusHint: string | null = null;
+  editorMode: 'level' | 'dialog' = 'level';
+  dialogNpcId: string | null = null;
   sourcePath: string | null = null;
   showCeiling = false;
   showItemPreview = true;

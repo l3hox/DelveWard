@@ -1,5 +1,11 @@
 {
   "name": "DelveWard — Milestone 1 Dungeon",
+  "playerStart": {
+    "levelId": "level_1",
+    "col": 1,
+    "row": 1,
+    "facing": "S"
+  },
   "levels": [
     {
       "id": "level_1",
@@ -29,6 +35,13 @@
         "facing": "S"
       },
       "entities": [
+        {
+          "type": "npc",
+          "npcId": "merchant_gregor",
+          "col": 3,
+          "row": 3,
+          "facing": "N"
+        },
         {
           "id": "door_1",
           "col": 6,
@@ -175,6 +188,43 @@
           "row": 14,
           "type": "enemy",
           "enemyType": "goblin"
+        },
+        {
+          "col": 6,
+          "row": 2,
+          "type": "npc",
+          "id": "npc_1",
+          "npcId": "questgiver_hilda",
+          "facing": "W"
+        },
+        {
+          "col": 8,
+          "row": 2,
+          "type": "npc",
+          "id": "npc_2",
+          "npcId": "lorekeeper_owen",
+          "facing": "S"
+        },
+        {
+          "col": 8,
+          "row": 6,
+          "type": "equipment",
+          "id": "equipment_1",
+          "itemId": "amulet_gregor"
+        },
+        {
+          "col": 11,
+          "row": 2,
+          "type": "npc",
+          "id": "npc_3",
+          "npcId": "nameless_girl"
+        },
+        {
+          "col": 12,
+          "row": 3,
+          "type": "npc",
+          "id": "npc_4",
+          "npcId": ""
         }
       ],
       "environment": "dungeon",

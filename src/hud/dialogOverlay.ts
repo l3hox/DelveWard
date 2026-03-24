@@ -9,7 +9,11 @@ export class DialogOverlay {
   private visible = false;
   private onChoiceSelected: ((index: number) => void) | null = null;
   private onAdvance: (() => void) | null = null;
+  private onDismiss: (() => void) | null = null;
   private hasChoices = false;
+  private choiceCount = 0;
+  private highlightedIndex = -1;
+  private choiceBtns: HTMLDivElement[] = [];
 
   constructor() {
     this.container = document.createElement('div');
@@ -79,12 +83,56 @@ export class DialogOverlay {
     this._keyHandler = this._keyHandler.bind(this);
   }
 
+  private styleChoiceBtn(btn: HTMLDivElement, highlighted: boolean): void {
+    if (highlighted) {
+      btn.style.background = 'rgba(139, 105, 20, 0.35)';
+      btn.style.borderColor = '#8b6914';
+    } else {
+      btn.style.background = 'rgba(139, 105, 20, 0.15)';
+      btn.style.borderColor = '#5a4510';
+    }
+  }
+
+  private setHighlight(index: number): void {
+    if (this.highlightedIndex >= 0 && this.highlightedIndex < this.choiceBtns.length) {
+      this.styleChoiceBtn(this.choiceBtns[this.highlightedIndex], false);
+    }
+    this.highlightedIndex = index;
+    if (index >= 0 && index < this.choiceBtns.length) {
+      this.styleChoiceBtn(this.choiceBtns[index], true);
+    }
+  }
+
   private _keyHandler(e: KeyboardEvent): void {
     if (!this.visible) return;
     e.preventDefault();
     e.stopPropagation();
 
+    // Escape always dismisses the dialog
+    if (e.key === 'Escape') {
+      this.onDismiss?.();
+      return;
+    }
+
     if (this.hasChoices) {
+      // Arrow navigation
+      if (e.key === 'ArrowDown') {
+        this.setHighlight(
+          this.highlightedIndex < this.choiceCount - 1 ? this.highlightedIndex + 1 : 0
+        );
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        this.setHighlight(
+          this.highlightedIndex > 0 ? this.highlightedIndex - 1 : this.choiceCount - 1
+        );
+        return;
+      }
+      // Enter confirms highlighted choice
+      if (e.key === 'Enter' && this.highlightedIndex >= 0) {
+        this.onChoiceSelected?.(this.highlightedIndex);
+        return;
+      }
       // Number keys 1-9 select choices
       const num = parseInt(e.key);
       if (num >= 1 && num <= 9) {
@@ -107,7 +155,10 @@ export class DialogOverlay {
 
     // Clear old choices
     this.choicesEl.innerHTML = '';
+    this.choiceBtns = [];
     this.hasChoices = choices.length > 0;
+    this.choiceCount = choices.length;
+    this.highlightedIndex = -1;
 
     if (this.hasChoices) {
       choices.forEach((choice, i) => {
@@ -125,19 +176,18 @@ export class DialogOverlay {
         `;
         btn.textContent = `${i + 1}. ${choice.text}`;
         btn.addEventListener('mouseenter', () => {
-          btn.style.background = 'rgba(139, 105, 20, 0.35)';
-          btn.style.borderColor = '#8b6914';
+          this.setHighlight(i);
         });
         btn.addEventListener('mouseleave', () => {
-          btn.style.background = 'rgba(139, 105, 20, 0.15)';
-          btn.style.borderColor = '#5a4510';
+          this.setHighlight(-1);
         });
         btn.addEventListener('click', () => {
           this.onChoiceSelected?.(i);
         });
         this.choicesEl.appendChild(btn);
+        this.choiceBtns.push(btn);
       });
-      this.hintEl.textContent = 'Press 1-9 or click to choose';
+      this.hintEl.textContent = 'Press 1-9, use arrows + Enter, or click';
     } else {
       this.hintEl.textContent = 'Press any key to continue';
     }
@@ -150,6 +200,8 @@ export class DialogOverlay {
   hide(): void {
     this.container.style.display = 'none';
     this.visible = false;
+    this.highlightedIndex = -1;
+    this.choiceBtns = [];
     window.removeEventListener('keydown', this._keyHandler, true);
   }
 
@@ -163,5 +215,9 @@ export class DialogOverlay {
 
   setOnAdvance(cb: () => void): void {
     this.onAdvance = cb;
+  }
+
+  setOnDismiss(cb: () => void): void {
+    this.onDismiss = cb;
   }
 }

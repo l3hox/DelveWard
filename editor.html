@@ -95,6 +95,11 @@
         color: #fff;
       }
 
+      .tool-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
       #char-palette {
         background: #1a1a1a;
         display: flex;
@@ -386,6 +391,19 @@
       }
 
       #inspector {
+        width: 260px;
+        min-width: 260px;
+        background: #1a1a1a;
+        border-left: 1px solid #333;
+        overflow-y: auto;
+        padding: 12px;
+      }
+
+      #dialog-canvas {
+        image-rendering: pixelated;
+      }
+
+      #dialog-inspector {
         width: 260px;
         min-width: 260px;
         background: #1a1a1a;
@@ -898,8 +916,10 @@
       </div>
       <div id="canvas-container">
         <canvas id="editor-canvas"></canvas>
+        <canvas id="dialog-canvas" style="display:none"></canvas>
       </div>
       <div id="inspector"></div>
+      <div id="dialog-inspector" style="display:none"></div>
     </div>
     <div id="error-banner"></div>
     <div id="status-hint"></div>

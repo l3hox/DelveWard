@@ -40,6 +40,7 @@ export class Inspector {
   private onCommitTextEdit: (() => void) | null = null;
   private onStairGoTo: ((targetId: string) => void) | null = null;
   private onRefHovered: ((entity: Entity | null) => void) | null = null;
+  private onEditDialog: ((npcId: string) => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -80,6 +81,10 @@ export class Inspector {
 
   setRefHoveredCallback(cb: (entity: Entity | null) => void): void {
     this.onRefHovered = cb;
+  }
+
+  setEditDialogCallback(cb: (npcId: string) => void): void {
+    this.onEditDialog = cb;
   }
 
   refresh(): void {
@@ -421,6 +426,15 @@ export class Inspector {
         const def = npcDatabase.getNpc(npcId);
         if (def) {
           this.addNpcDetails(def);
+        }
+        if (npcId) {
+          const btn = document.createElement('button');
+          btn.className = 'btn-pick';
+          btn.textContent = 'Edit Dialog';
+          btn.style.width = '100%';
+          btn.style.marginTop = '8px';
+          btn.addEventListener('click', () => this.onEditDialog?.(npcId));
+          this.container.appendChild(btn);
         }
         break;
       }

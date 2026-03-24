@@ -46,6 +46,23 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - 3 quest data files: fetch_amulet, kill_spider_queen, collect_lore (single-stage design)
   - `amulet_gregor` quest item added to items.json
   - 30 new tests (725 total)
+- [x] **Phase C/D Editor: Dialog Editor**:
+  - `DialogEditorState.ts`: state model — tree/node CRUD, rename with reference sweep, BFS validation (broken refs, unreachable, empty text, missing startNode), JSON snapshot undo/redo (100-entry stacks), dirty tracking
+  - `DialogGraphCanvas.ts`: canvas node graph — pan/zoom, node drag, bezier connections with arrowheads, color-coded headers (green=start, blue=normal), selected node highlight, broken ref red connections, double-click to add node, right-click context menu (Set as Start / Delete)
+  - `DialogInspector.ts`: right-panel node editor — NPC sprite + name at top, node ID (rename), start node checkbox, speaker, text (textarea), choices/linear type toggle, collapsible choice entries with numbered preview text, next dropdown with `+ new node` option, condition sub-editor (hasFlag/hasItem/questStage/statCheck with type-specific fields), effect sub-editor (setFlag/giveItem/takeItem/startQuest/advanceQuest/openShop), default values on type switch, expandable section state preserved across refreshes
+  - `DialogNodeLayout.ts`: BFS auto-layout algorithm for node positions when no sidecar layout exists
+  - `dialogIO.ts`: API client — listDialogFiles, loadDialogFromServer, saveDialogToServer, loadDialogLayout, saveDialogLayout
+  - `vite.config.ts`: 3 dialog API routes (list/load/save) with `.layout.json` filename support, `validateDialogFilename()`, `DIALOGS_DIR`
+  - `editor.html`: `#dialog-canvas` + `#dialog-inspector` containers, `.tool-btn:disabled` CSS
+  - `EditorApp.ts`: `editorMode` ('level'|'dialog') + `dialogNpcId` fields
+  - `Inspector.ts`: "Edit Dialog" button on NPC entities, `onEditDialog` callback
+  - `main.ts`: enter/exit dialog mode (toolbar hide/show with state preservation), Add Node + Save Dialog toolbar buttons, dialog undo/redo/save keyboard shortcuts (Ctrl+S/Z/Y, Delete, Escape), context menu, `updateDialogStatus()` light refresh, `onNewNode` callback for dropdown node creation
+- [x] **Dialog Overlay Keyboard Navigation**:
+  - Arrow Up/Down to navigate choices with visual highlight (wraps around)
+  - Enter confirms highlighted choice
+  - Escape always ends conversation (new `onDismiss` callback)
+  - Mouse hover syncs with keyboard highlight
+  - Hint text: "Press 1-9, use arrows + Enter, or click"
 
 ---
 

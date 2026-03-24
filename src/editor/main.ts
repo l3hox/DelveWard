@@ -13,6 +13,13 @@ import { itemDatabase } from '../core/itemDatabase';
 import { enemyDatabase } from '../enemies/enemyDatabase';
 import { npcDatabase } from '../npcs/npcDatabase';
 import type { Dungeon } from '../core/types';
+import { DialogEditorState } from './DialogEditorState';
+import { DialogGraphCanvas } from './DialogGraphCanvas';
+import { DialogInspector } from './DialogInspector';
+import {
+  loadDialogFromServer, saveDialogToServer,
+  loadDialogLayout, saveDialogLayout,
+} from './dialogIO';
 
 const app = new EditorApp();
 
@@ -37,6 +44,70 @@ toolbar.setActiveTool('select');
 const inspector = new Inspector(document.getElementById('inspector')!, app);
 const levelProps = new LevelProperties(document.getElementById('level-props-content')!, app);
 const levelList = new LevelList(document.getElementById('level-list')!, app);
+
+// --- Dialog editor components ---
+const dialogCanvasEl = document.getElementById('dialog-canvas') as HTMLCanvasElement;
+const dialogInspectorEl = document.getElementById('dialog-inspector') as HTMLElement;
+const dialogCanvas = new DialogGraphCanvas(dialogCanvasEl, container);
+const dialogInspector = new DialogInspector(dialogInspectorEl);
+const dialogState = new DialogEditorState();
+
+// Level-mode elements to hide/show on mode switch
+const levelModeEls = [
+  document.getElementById('editor-canvas')!,
+  document.getElementById('char-palette')!,
+  document.getElementById('entity-palette')!,
+  document.getElementById('level-properties')!,
+  document.getElementById('inspector')!,
+];
+const dialogModeEls = [dialogCanvasEl, dialogInspectorEl];
+
+// --- Dialog toolbar buttons (created once, shown/hidden) ---
+const toolbarEl = document.getElementById('toolbar')!;
+
+const dialogBackBtn = document.createElement('button');
+dialogBackBtn.id = 'btn-dialog-back';
+dialogBackBtn.className = 'tool-btn';
+dialogBackBtn.textContent = '\u2190 Back';
+dialogBackBtn.style.display = 'none';
+dialogBackBtn.addEventListener('click', () => exitDialogMode());
+toolbarEl.insertBefore(dialogBackBtn, levelNameEl);
+
+const dialogAddNodeBtn = document.createElement('button');
+dialogAddNodeBtn.id = 'btn-dialog-add-node';
+dialogAddNodeBtn.className = 'tool-btn';
+dialogAddNodeBtn.textContent = 'Add Node';
+dialogAddNodeBtn.style.display = 'none';
+dialogAddNodeBtn.addEventListener('click', () => {
+  dialogState.pushUndo();
+  dialogState.addNode();
+  refreshDialogUI();
+});
+toolbarEl.insertBefore(dialogAddNodeBtn, coordEl);
+
+const dialogSaveBtn = document.createElement('button');
+dialogSaveBtn.id = 'btn-dialog-save';
+dialogSaveBtn.className = 'tool-btn';
+dialogSaveBtn.textContent = 'Save Dialog';
+dialogSaveBtn.style.display = 'none';
+dialogSaveBtn.disabled = true;
+dialogSaveBtn.addEventListener('click', () => saveDialog());
+toolbarEl.insertBefore(dialogSaveBtn, coordEl);
+
+// Level-specific toolbar buttons to hide in dialog mode
+const levelToolbarBtns = [
+  document.getElementById('btn-open'),
+  document.getElementById('btn-new'),
+  document.getElementById('btn-new-dungeon'),
+  document.getElementById('btn-export'),
+  document.getElementById('btn-save'),
+  document.getElementById('btn-save-as'),
+  document.getElementById('btn-open-server'),
+].filter((el): el is HTMLElement => el !== null);
+// Also hide the tool group and view toggles
+const toolGroupEls = toolbarEl.querySelectorAll('.tool-group, .toolbar-sep');
+// Save original display state so we restore correctly (some start hidden)
+const savedToolbarDisplay = new Map<HTMLElement, string>();
 
 function markDirty(): void {
   app.dirty = true;
@@ -675,8 +746,278 @@ function updateErrorBanner(): void {
   }
 }
 
+// --- Dialog editor mode ---
+
+async function enterDialogMode(npcId: string): Promise<void> {
+  try {
+    const tree = await loadDialogFromServer(npcId);
+    const layout = await loadDialogLayout(npcId);
+    dialogState.loadTree(npcId, tree, layout ?? undefined);
+  } catch {
+    // No dialog file exists — create a new empty tree
+    const defaultTree = {
+      startNode: 'greeting',
+      nodes: {
+        greeting: { speaker: '', text: '' },
+      },
+    };
+    dialogState.loadTree(npcId, defaultTree);
+  }
+
+  app.editorMode = 'dialog';
+  app.dialogNpcId = npcId;
+
+  // Hide level-mode elements, show dialog-mode elements
+  for (const el of levelModeEls) el.style.display = 'none';
+  for (const el of dialogModeEls) el.style.display = '';
+
+  // Hide level toolbar buttons, show dialog toolbar buttons
+  savedToolbarDisplay.clear();
+  for (const el of levelToolbarBtns) {
+    savedToolbarDisplay.set(el, el.style.display);
+    el.style.display = 'none';
+  }
+  for (const el of toolGroupEls) {
+    const htmlEl = el as HTMLElement;
+    savedToolbarDisplay.set(htmlEl, htmlEl.style.display);
+    htmlEl.style.display = 'none';
+  }
+  dialogBackBtn.style.display = '';
+  dialogAddNodeBtn.style.display = '';
+  dialogSaveBtn.style.display = '';
+  dialogSaveBtn.disabled = true;
+  levelNameEl.textContent = `Dialog: ${npcId}`;
+  coordEl.textContent = '';
+
+  // Wire dialog canvas + inspector to state
+  dialogCanvas.setState(dialogState);
+  dialogCanvas.resetViewport();
+  dialogCanvas.markDirty();
+  dialogInspector.state = dialogState;
+  dialogInspector.refresh();
+}
+
+async function exitDialogMode(): Promise<void> {
+  if (dialogState.isDirty()) {
+    if (confirm('Save dialog changes before exiting?')) {
+      await saveDialog();
+    }
+  }
+
+  app.editorMode = 'level';
+  app.dialogNpcId = null;
+
+  // Show level-mode elements, hide dialog-mode elements
+  for (const el of levelModeEls) el.style.display = '';
+  for (const el of dialogModeEls) el.style.display = 'none';
+
+  // Restore level toolbar buttons, hide dialog toolbar buttons
+  for (const [el, display] of savedToolbarDisplay) el.style.display = display;
+  savedToolbarDisplay.clear();
+  dialogBackBtn.style.display = 'none';
+  dialogAddNodeBtn.style.display = 'none';
+  dialogSaveBtn.style.display = 'none';
+  updateDirtyDisplay();
+  coordEl.textContent = '\u2014';
+
+  // Restore inspector to level mode
+  inspector.refresh();
+  gridCanvas.markDirty();
+}
+
+let dialogSaving = false;
+
+async function saveDialog(): Promise<void> {
+  if (dialogSaving || !dialogState.tree || !dialogState.npcId) return;
+  dialogSaving = true;
+  try {
+    await saveDialogToServer(dialogState.npcId, dialogState.tree);
+    await saveDialogLayout(
+      dialogState.npcId,
+      Object.fromEntries(dialogState.nodePositions),
+    );
+    dialogState.markClean();
+    levelNameEl.textContent = `Dialog: ${dialogState.npcId}`;
+    dialogSaveBtn.disabled = true;
+  } catch (err) {
+    alert(`Save failed: ${(err as Error).message}`);
+  } finally {
+    dialogSaving = false;
+  }
+}
+
+/** Update dirty display, canvas, and error banner — does NOT rebuild the inspector. */
+function updateDialogStatus(): void {
+  dialogCanvas.markDirty();
+  dialogState.updateDirty();
+  const prefix = dialogState.dirty ? '* ' : '';
+  levelNameEl.textContent = `${prefix}Dialog: ${dialogState.npcId ?? ''}`;
+  dialogSaveBtn.disabled = !dialogState.dirty;
+
+  // Show validation errors in the error banner
+  const validationErrors = dialogState.validate();
+  errorBannerEl.innerHTML = '';
+  if (validationErrors.length === 0) {
+    errorBannerEl.classList.remove('visible');
+  } else {
+    errorBannerEl.classList.add('visible');
+    const prefix2 = document.createTextNode(
+      validationErrors.length === 1 ? '\u26a0 ' : `\u26a0 ${validationErrors.length} errors: `
+    );
+    errorBannerEl.appendChild(prefix2);
+    for (let i = 0; i < validationErrors.length; i++) {
+      if (i > 0) errorBannerEl.appendChild(document.createTextNode(' | '));
+      const span = document.createElement('span');
+      span.textContent = validationErrors[i].message;
+      errorBannerEl.appendChild(span);
+    }
+  }
+}
+
+/** Full refresh: rebuilds inspector + updates status. Use after structural changes. */
+function refreshDialogUI(): void {
+  dialogInspector.refresh();
+  updateDialogStatus();
+}
+
+// Inspector "Edit Dialog" button callback
+inspector.setEditDialogCallback((npcId) => enterDialogMode(npcId));
+
+// Dialog canvas callbacks
+dialogCanvas.setSelectionCallback(() => {
+  dialogInspector.refresh();
+  dialogCanvas.markDirty();
+});
+
+dialogCanvas.setNodeMovedCallback(() => {
+  dialogState.updateDirty();
+  refreshDialogUI();
+});
+
+dialogCanvas.setAddNodeCallback((x, y) => {
+  dialogState.pushUndo();
+  const id = dialogState.addNode();
+  dialogState.nodePositions.set(id, { x, y });
+  refreshDialogUI();
+});
+
+dialogCanvas.setContextMenuCallback((nodeId, screenX, screenY) => {
+  // Remove existing context menu if any
+  document.querySelectorAll('.dialog-context-menu').forEach(el => el.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'dialog-context-menu';
+  menu.style.cssText = `position:fixed; left:${screenX}px; top:${screenY}px; background:#222; border:1px solid #555; z-index:200; font-family:monospace; font-size:12px; min-width:140px;`;
+
+  const setStart = document.createElement('div');
+  setStart.textContent = 'Set as Start Node';
+  setStart.style.cssText = 'padding:6px 12px; cursor:pointer; color:#ccc;';
+  setStart.addEventListener('mouseover', () => { setStart.style.background = '#333'; });
+  setStart.addEventListener('mouseout', () => { setStart.style.background = ''; });
+  setStart.addEventListener('click', () => {
+    dialogState.pushUndo();
+    dialogState.setStartNode(nodeId);
+    refreshDialogUI();
+    menu.remove();
+  });
+  menu.appendChild(setStart);
+
+  const deleteNode = document.createElement('div');
+  deleteNode.textContent = 'Delete Node';
+  deleteNode.style.cssText = 'padding:6px 12px; cursor:pointer; color:#ff6666;';
+  deleteNode.addEventListener('mouseover', () => { deleteNode.style.background = '#333'; });
+  deleteNode.addEventListener('mouseout', () => { deleteNode.style.background = ''; });
+  deleteNode.addEventListener('click', () => {
+    dialogState.pushUndo();
+    dialogState.removeNode(nodeId);
+    refreshDialogUI();
+    menu.remove();
+  });
+  menu.appendChild(deleteNode);
+
+  document.body.appendChild(menu);
+
+  // Close on click elsewhere
+  const closeMenu = (ev: MouseEvent) => {
+    if (!menu.contains(ev.target as Node)) {
+      menu.remove();
+      document.removeEventListener('mousedown', closeMenu);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', closeMenu), 0);
+});
+
+// Dialog inspector callbacks
+dialogInspector.onBeforeDiscreteChange = () => dialogState.pushUndo();
+dialogInspector.onBeginTextEdit = () => dialogState.pushUndo();
+dialogInspector.onCommitTextEdit = () => {}; // undo already pushed on begin
+dialogInspector.onNodeChanged = () => updateDialogStatus();
+dialogInspector.onNodeDeleted = () => refreshDialogUI();
+dialogInspector.onNewNode = (callback) => {
+  dialogState.pushUndo();
+  const newId = dialogState.addNode();
+  callback(newId);
+  refreshDialogUI();
+};
+
 // Keyboard listeners
 document.addEventListener('keydown', (e) => {
+  // --- Dialog mode keyboard shortcuts ---
+  if (app.editorMode === 'dialog') {
+    // Close context menus on Escape
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.dialog-context-menu').forEach(el => el.remove());
+      if (dialogState.selectedNodeId) {
+        dialogState.deselectNode();
+        dialogInspector.refresh();
+        dialogCanvas.markDirty();
+      } else {
+        exitDialogMode();
+      }
+      return;
+    }
+
+    // Delete selected node
+    if (e.key === 'Delete' && dialogState.selectedNodeId) {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      dialogState.pushUndo();
+      dialogState.removeNode(dialogState.selectedNodeId);
+      refreshDialogUI();
+      return;
+    }
+
+    // Ctrl+S: save dialog
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveDialog();
+      return;
+    }
+
+    // Ctrl+Z: undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      dialogState.undo();
+      refreshDialogUI();
+      return;
+    }
+
+    // Ctrl+Shift+Z or Ctrl+Y: redo
+    if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || (e.key === 'y' && !e.shiftKey))) {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      dialogState.redo();
+      refreshDialogUI();
+      return;
+    }
+
+    return; // Don't fall through to level-mode shortcuts
+  }
+
+  // --- Level mode keyboard shortcuts (existing) ---
   if (e.key === 'Escape' && app.wireDragState) {
     app.wireDragState = null;
     gridCanvas.updateCursor();
@@ -809,7 +1150,7 @@ btnOpen.addEventListener('click', async () => {
 });
 
 window.addEventListener('beforeunload', (e) => {
-  if (app.dirty) {
+  if (app.dirty || dialogState.isDirty()) {
     e.preventDefault();
   }
 });

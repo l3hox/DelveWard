@@ -4,6 +4,24 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-24 — M3 Phase C/D Editor: Dialog Editor
+
+**Architecture**: Dialog editor runs as a separate `editorMode` ('level' | 'dialog') on EditorApp, with its own state model (`DialogEditorState`), canvas (`DialogGraphCanvas`), and inspector (`DialogInspector`). Dialog state is fully decoupled from level state — no cross-contamination of undo stacks or dirty tracking.
+
+**Sidecar layout files**: Node positions stored in `{npcId}.layout.json` alongside dialog JSON in `public/data/dialogs/`. Keeps runtime dialog files clean. Auto-layout via BFS when no sidecar exists (`DialogNodeLayout.ts`).
+
+**API design**: Reuses the existing Vite editor API plugin pattern — 3 new routes (`/api/editor/dialogs/list`, `/load`, `/save`) with same CSRF validation. `validateDialogFilename()` allows `.layout.json` suffix. Route ordering avoids `/api/editor/load` intercepting dialog URLs.
+
+**Inspector refresh strategy**: `onNodeChanged` calls `updateDialogStatus()` (canvas + dirty + error banner) without rebuilding the inspector DOM, preventing input focus loss during text editing. Full `refresh()` only on structural changes (add/remove node, undo/redo, type switch). Expandable sections track open/closed state in a `Set<string>` keyed by section identity, preserved across rebuilds.
+
+**Toolbar mode switching**: Level-specific toolbar buttons are hidden in dialog mode (original display state saved and restored on exit to handle initially-hidden buttons like Save/Save As). Dialog mode shows Back, Add Node, and Save Dialog buttons.
+
+**Dialog overlay keyboard navigation**: Added arrow key choice navigation with visual highlight, Enter to confirm, Escape always dismisses. `onDismiss` callback added for forced close without requiring a "Farewell" choice.
+
+**Condition/effect default values**: When switching condition or effect type, default field values are set immediately (e.g. `questStage` → `stage: 'undiscovered'`, `hasItem` → first item from database). Prevents invisible mismatch between displayed dropdown value and serialized data.
+
+---
+
 ## 2026-03-24 — M3 Phase C: Quest System
 
 **Design**: Data-driven JSON quests (`public/data/quests/{questId}.json`) with dialog-driven progression. Objectives are not auto-evaluated — dialog trees gate completion via conditions (`hasItem`, `hasFlag`), and `advanceQuest` dialog effects trigger stage progression. Quest stage descriptions are purely for quest log display.

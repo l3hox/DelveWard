@@ -460,6 +460,11 @@ async function init(): Promise<void> {
     }
   });
 
+  dialogOverlay.setOnDismiss(() => {
+    dialogOverlay.hide();
+    activeDialogSession = null;
+  });
+
   // Wire dialog effect hooks
   setDialogHooks({
     onStartQuest: (questId) => {

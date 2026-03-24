@@ -23,6 +23,13 @@
       "sprite": { "path": "/sprites/lorekeeper.png", "size": 2.0 },
       "dialog": "lorekeeper_owen",
       "facing": "S"
+    },
+    {
+      "id": "nameless_girl",
+      "name": "Nameless",
+      "sprite": { "path": "/sprites/questgiver.png", "size": 2.0 },
+      "dialog": "nameless_girl",
+      "facing": "S"
     }
   ]
 }
