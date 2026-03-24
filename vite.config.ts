@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 
 const LEVELS_DIR = resolve(__dirname, 'public/levels');
 const DIALOGS_DIR = resolve(__dirname, 'public/data/dialogs');
+const QUESTS_DIR = resolve(__dirname, 'public/data/quests');
 const MAX_BODY = 1_048_576; // 1 MB
 
 function validateFilename(name: unknown): string | null {
@@ -248,6 +249,23 @@ function editorApiPlugin(): Plugin {
               res.end(JSON.stringify({ error: String(err) }));
             }
           });
+          return;
+        }
+
+        // GET /api/editor/quests/list
+        if (url === '/api/editor/quests/list') {
+          if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
+          try {
+            const files = fs.readdirSync(QUESTS_DIR)
+              .filter(f => f.endsWith('.json'))
+              .map(f => f.replace(/\.json$/, ''))
+              .sort();
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ids: files }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err) }));
+          }
           return;
         }
 

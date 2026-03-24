@@ -19,6 +19,7 @@ import { DialogInspector } from './DialogInspector';
 import {
   loadDialogFromServer, saveDialogToServer,
   loadDialogLayout, saveDialogLayout,
+  loadQuestIds,
 } from './dialogIO';
 
 const app = new EditorApp();
@@ -29,6 +30,7 @@ itemDatabase.load().catch(() => { /* non-fatal */ });
 enemyDatabase.load().catch(() => { /* non-fatal */ });
 npcDatabase.load().catch(() => { /* non-fatal */ });
 loadLootTables().catch(() => { /* non-fatal */ });
+loadQuestIds().catch(() => { /* non-fatal */ });
 
 const canvas = document.getElementById('editor-canvas') as HTMLCanvasElement;
 const container = document.getElementById('canvas-container') as HTMLElement;

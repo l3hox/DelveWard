@@ -9,6 +9,29 @@ function editorHeaders(): Record<string, string> {
 }
 
 // ---------------------------------------------------------------------------
+// Quest ID list
+// ---------------------------------------------------------------------------
+
+let cachedQuestIds: string[] | null = null;
+
+export async function loadQuestIds(): Promise<string[]> {
+  if (cachedQuestIds) return cachedQuestIds;
+  try {
+    const res = await fetch('/api/editor/quests/list', { headers: editorHeaders() });
+    if (!res.ok) return [];
+    const data = await res.json();
+    cachedQuestIds = data.ids as string[];
+    return cachedQuestIds;
+  } catch {
+    return [];
+  }
+}
+
+export function getQuestIds(): string[] {
+  return cachedQuestIds ?? [];
+}
+
+// ---------------------------------------------------------------------------
 // Dialog file API
 // ---------------------------------------------------------------------------
 

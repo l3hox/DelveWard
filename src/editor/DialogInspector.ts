@@ -2,6 +2,7 @@ import type { DialogEditorState } from './DialogEditorState';
 import type { DialogNode, DialogCondition, DialogEffect } from '../core/dialogManager';
 import { itemDatabase } from '../core/itemDatabase';
 import { npcDatabase } from '../npcs/npcDatabase';
+import { getQuestIds } from './dialogIO';
 
 export class DialogInspector {
   private container: HTMLElement;
@@ -455,7 +456,7 @@ export class DialogInspector {
         delete condition.min;
         if (condition.type === 'hasFlag') condition.flag = '';
         else if (condition.type === 'hasItem') { const items = itemDatabase.getAllItems(); condition.itemId = items.length > 0 ? items[0].id : ''; }
-        else if (condition.type === 'questStage') { condition.questId = ''; condition.stage = 'undiscovered'; }
+        else if (condition.type === 'questStage') { const qids = getQuestIds(); condition.questId = qids.length > 0 ? qids[0] : ''; condition.stage = 'undiscovered'; }
         else if (condition.type === 'statCheck') { condition.stat = ''; condition.min = 0; }
         this.expandedSections.add(sectionKey);
         onUpdate();
@@ -487,10 +488,19 @@ export class DialogInspector {
           });
         }
       } else if (condition.type === 'questStage') {
-        this.addTextField(row, 'questId', condition.questId ?? '', (val) => {
-          condition.questId = val;
-          onUpdate();
-        });
+        const questIds = getQuestIds();
+        if (questIds.length > 0) {
+          this.addDropdown(row, 'questId', condition.questId ?? '', questIds.map(id => ({ value: id, label: id })), (val) => {
+            this.onBeforeDiscreteChange?.();
+            condition.questId = val;
+            onUpdate();
+          });
+        } else {
+          this.addTextField(row, 'questId', condition.questId ?? '', (val) => {
+            condition.questId = val;
+            onUpdate();
+          });
+        }
         const stageOptions: Array<{ value: string; label: string }> = [
           { value: 'undiscovered', label: 'undiscovered' },
           { value: 'active', label: 'active' },
@@ -582,7 +592,7 @@ export class DialogInspector {
         delete effect.questId;
         if (effect.type === 'setFlag') effect.flag = '';
         else if (effect.type === 'giveItem' || effect.type === 'takeItem') { const items = itemDatabase.getAllItems(); effect.itemId = items.length > 0 ? items[0].id : ''; }
-        else if (effect.type === 'startQuest' || effect.type === 'advanceQuest') effect.questId = '';
+        else if (effect.type === 'startQuest' || effect.type === 'advanceQuest') { const qids = getQuestIds(); effect.questId = qids.length > 0 ? qids[0] : ''; }
         this.expandedSections.add(sectionKey);
         onUpdate();
         this.refresh();
@@ -613,10 +623,19 @@ export class DialogInspector {
           });
         }
       } else if (effect.type === 'startQuest' || effect.type === 'advanceQuest') {
-        this.addTextField(row, 'questId', effect.questId ?? '', (val) => {
-          effect.questId = val;
-          onUpdate();
-        });
+        const questIds = getQuestIds();
+        if (questIds.length > 0) {
+          this.addDropdown(row, 'questId', effect.questId ?? '', questIds.map(id => ({ value: id, label: id })), (val) => {
+            this.onBeforeDiscreteChange?.();
+            effect.questId = val;
+            onUpdate();
+          });
+        } else {
+          this.addTextField(row, 'questId', effect.questId ?? '', (val) => {
+            effect.questId = val;
+            onUpdate();
+          });
+        }
       }
       // openShop: no additional fields
 
