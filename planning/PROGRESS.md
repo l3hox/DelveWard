@@ -25,14 +25,11 @@ Plan — see `planning/m3/PLAN.md`.
 ### M3 Implementation
 - [x] Phase A: NPC foundation (NpcDatabase, NPC entity, billboard rendering, flags, interaction, save/load)
 - [x] Phase B: Dialog system (DialogManager, DialogOverlay, per-NPC dialog trees, conditions, effects)
-- [ ] Phase B.5: Editor NPC support (palette entry, npcId dropdown, facing, sprite preview)
+- [ ] Phase A/B Editor: NPC editor support (palette entry, npcId dropdown, facing, sprite preview)
 - [ ] Phase C: Quest system (QuestManager, quest JSON, QuestLogOverlay, objectives, rewards)
-- [ ] Phase C.5: Editor quest entities (minimal — quest references display)
 - [ ] Phase D: Trading system (TradingOverlay, buy/sell, stock from npcs.json)
-- [ ] Phase E: Hunger system (hunger stat, food items, HUD bar, starvation)
-- [ ] Phase E.5: Editor hunger/food (minimal — restoreHunger display)
-- [ ] Phase F: Dungeon objects (fountain, bookshelf, altar, barrel — 3D geometry, interactions)
-- [ ] Phase F.5: Editor dungeon objects (palette entries, inspector fields for all 4)
+- [ ] Phase E: Hunger system (hunger stat, food items, HUD bar, starvation, editor display)
+- [ ] Phase F: Dungeon objects + editor (fountain, bookshelf, altar, barrel — 3D geometry, interactions, palette, inspector)
 - [ ] Phase G: Content — M3 test dungeon (hub + dungeon levels, 3 quests)
 
 ### Completed milestones
