@@ -4,6 +4,7 @@ import type { DropsOverride } from './lootTable';
 import { FACING_DELTA } from './grid';
 import { createEnemyInstance } from '../enemies/enemyTypes';
 import { enemyDatabase } from '../enemies/enemyDatabase';
+import { npcDatabase } from '../npcs/npcDatabase';
 import type { EnemyInstance } from '../enemies/enemyTypes';
 import { EntityRegistry } from './entities';
 import type { ItemEntity, ItemLocation } from './entities';
@@ -172,6 +173,14 @@ export interface SignInstance {
   text: string;
 }
 
+export interface NPCInstance {
+  id?: string;
+  col: number;
+  row: number;
+  npcId: string;
+  facing: Facing;
+}
+
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -222,6 +231,7 @@ export interface LevelSnapshot {
   blocks: Map<string, BlockInstance>;
   chests: Map<string, ChestInstance>;
   signs: Map<string, SignInstance>;
+  npcs: Map<string, NPCInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -246,8 +256,13 @@ export class GameState {
   blocks: Map<string, BlockInstance>;
   chests: Map<string, ChestInstance>;
   signs: Map<string, SignInstance>;
+  npcs: Map<string, NPCInstance>;
   destroyedWalls: Set<string>;
   inventory: Set<string>;
+
+  // Global flags — quest/dialog conditions and world state.
+  // Persisted across levels and in save data.
+  flags: Set<string>;
 
   // Index: entity ID → position + type (derived state, rebuilt after parse/load)
   entityById: Map<string, { col: number; row: number; type: string }>;
@@ -300,8 +315,10 @@ export class GameState {
     this.blocks = new Map();
     this.chests = new Map();
     this.signs = new Map();
+    this.npcs = new Map();
     this.destroyedWalls = new Set();
     this.inventory = new Set();
+    this.flags = new Set();
     this.entityById = new Map();
 
     this.entityRegistry = new EntityRegistry();
@@ -502,6 +519,17 @@ export class GameState {
           wall,
           text: (e.text as string) ?? '',
         });
+      } else if (e.type === 'npc') {
+        const npcId = e.npcId as string;
+        if (npcDatabase.getNpc(npcId)) {
+          this.npcs.set(doorKey(e.col, e.row), {
+            id: e.id as string | undefined,
+            col: e.col,
+            row: e.row,
+            npcId,
+            facing: (e.facing as Facing) ?? 'S',
+          });
+        }
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (enemyDatabase.getEnemy(enemyType)) {
@@ -730,6 +758,7 @@ export class GameState {
     for (const b of this.blocks.values()) register(b, 'block');
     for (const c of this.chests.values()) register(c, 'chest');
     for (const s of this.signs.values()) register(s, 'sign');
+    for (const n of this.npcs.values()) register(n, 'npc');
   }
 
   resolveEntityPosition(id: string): { col: number; row: number } | undefined {
@@ -801,6 +830,10 @@ export class GameState {
     for (const [k, v] of this.signs) {
       signs.set(k, { ...v });
     }
+    const npcs = new Map<string, NPCInstance>();
+    for (const [k, v] of this.npcs) {
+      npcs.set(k, { ...v });
+    }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
@@ -808,7 +841,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      destroyedWalls, exploredCells, registrySnapshot,
+      npcs, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -878,6 +911,12 @@ export class GameState {
     for (const [k, v] of snapshot.signs) {
       this.signs.set(k, { ...v });
     }
+    this.npcs = new Map<string, NPCInstance>();
+    if (snapshot.npcs) {
+      for (const [k, v] of snapshot.npcs) {
+        this.npcs.set(k, { ...v });
+      }
+    }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);
     if (snapshot.registrySnapshot) {
@@ -912,6 +951,7 @@ export class GameState {
     this.blocks = new Map();
     this.chests = new Map();
     this.signs = new Map();
+    this.npcs = new Map();
     this.destroyedWalls = new Set();
     this.entityById = new Map();
     this.exploredCells = new Set();
@@ -1252,6 +1292,30 @@ export class GameState {
     const sign = this.signs.get(doorKey(col, row));
     if (sign && sign.wall === wall) return sign;
     return undefined;
+  }
+
+  // --- NPC helpers ---
+
+  getNpc(col: number, row: number): NPCInstance | undefined {
+    return this.npcs.get(doorKey(col, row));
+  }
+
+  isNpcAt(col: number, row: number): boolean {
+    return this.npcs.has(doorKey(col, row));
+  }
+
+  // --- Flag helpers ---
+
+  hasFlag(flag: string): boolean {
+    return this.flags.has(flag);
+  }
+
+  setFlag(flag: string): void {
+    this.flags.add(flag);
+  }
+
+  removeFlag(flag: string): void {
+    this.flags.delete(flag);
   }
 
   // --- Enemy helpers ---

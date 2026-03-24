@@ -15,6 +15,7 @@ import type {
   BlockInstance,
   ChestInstance,
   SignInstance,
+  NPCInstance,
 } from './gameState';
 import type { ItemEntity } from './entities';
 import type { Facing } from './grid';
@@ -44,6 +45,7 @@ interface SerializedLevelSnapshot {
   blocks: Record<string, BlockInstance>;
   chests: Record<string, ChestInstance>;
   signs: Record<string, SignInstance>;
+  npcs: Record<string, NPCInstance>;
   destroyedWalls: string[];
   exploredCells: string[];
   registrySnapshot: ItemEntity[];
@@ -77,6 +79,7 @@ export interface SaveData {
   };
   keys: string[];
   entityRegistry: ItemEntity[];
+  flags: string[];
   levelSnapshots: Record<string, SerializedLevelSnapshot>;
   levelGrids: Record<string, string[]>;
 }
@@ -127,6 +130,7 @@ export function serializeLevelSnapshot(snapshot: LevelSnapshot): SerializedLevel
     blocks: mapToRecord(snapshot.blocks),
     chests: mapToRecord(snapshot.chests),
     signs: mapToRecord(snapshot.signs),
+    npcs: mapToRecord(snapshot.npcs),
     destroyedWalls: setToArray(snapshot.destroyedWalls),
     exploredCells: setToArray(snapshot.exploredCells),
     registrySnapshot: snapshot.registrySnapshot,
@@ -152,6 +156,7 @@ export function deserializeLevelSnapshot(data: SerializedLevelSnapshot): LevelSn
     blocks: recordToMap(data.blocks),
     chests: recordToMap(data.chests),
     signs: recordToMap(data.signs),
+    npcs: recordToMap(data.npcs ?? {}),
     destroyedWalls: arrayToSet(data.destroyedWalls),
     exploredCells: arrayToSet(data.exploredCells),
     registrySnapshot: data.registrySnapshot,
@@ -229,6 +234,7 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
     },
     keys: Array.from(gameState.inventory),
     entityRegistry: fullRegistry,
+    flags: Array.from(gameState.flags),
     levelSnapshots: serializedSnapshots,
     levelGrids,
   };
@@ -300,6 +306,14 @@ export function applySaveData(
   gameState.inventory.clear();
   for (const keyId of data.keys) {
     gameState.inventory.add(keyId);
+  }
+
+  // Restore global flags.
+  gameState.flags.clear();
+  if (data.flags) {
+    for (const flag of data.flags) {
+      gameState.flags.add(flag);
+    }
   }
 
   return {

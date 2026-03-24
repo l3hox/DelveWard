@@ -3,7 +3,7 @@ import { getFacingCell, FACING_DELTA, isWalkable } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'block_pushed' | 'chest_opened' | 'chest_locked' | 'sign_read' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'block_pushed' | 'chest_opened' | 'chest_locked' | 'sign_read' | 'npc_interacted' | 'nothing';
   message?: string;
   targets?: string[]; // entity IDs of affected doors (for mesh updates)
   targetCol?: number;
@@ -97,6 +97,12 @@ export function interact(
       return { type: 'chest_opened', targetCol: col, targetRow: row, message: 'Chest opened.' };
     }
     return { type: 'nothing' };
+  }
+
+  // NPC interaction — player faces an NPC on the adjacent cell
+  const npc = gameState.getNpc(col, row);
+  if (npc) {
+    return { type: 'npc_interacted', message: npc.npcId, targetCol: col, targetRow: row };
   }
 
   // Sign interaction — player stands on sign cell and faces the sign's wall

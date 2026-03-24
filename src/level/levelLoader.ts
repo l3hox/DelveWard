@@ -3,6 +3,7 @@ import type { Facing } from '../core/grid';
 import { WALKABLE_CELLS } from '../core/grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from '../core/textureNames';
 import { enemyDatabase } from '../enemies/enemyDatabase';
+import { npcDatabase } from '../npcs/npcDatabase';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 const BUILTIN_CHARS = new Set(['.', '#', ' ']);
@@ -252,6 +253,13 @@ function validateEntity(
       const w = checkWalkable('sign'); if (w) return w;
       if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) return `${pfx} sign wall must be N, S, E, or W`;
       if (typeof e.text !== 'string' || (e.text as string).length === 0) return `${pfx} sign must have non-empty text`;
+      break;
+    }
+    case 'npc': {
+      if (typeof e.npcId !== 'string') return `${pfx} npc must have a string npcId`;
+      if (npcDatabase.isLoaded() && !npcDatabase.getNpc(e.npcId as string)) return `${pfx} npc has unknown npcId "${e.npcId}"`;
+      const w = checkWalkable('npc'); if (w) return w;
+      if (e.facing !== undefined && !['N', 'S', 'E', 'W'].includes(e.facing as string)) return `${pfx} npc facing must be N, S, E, or W`;
       break;
     }
   }

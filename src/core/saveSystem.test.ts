@@ -30,6 +30,7 @@ function makeEmptySnapshot(): LevelSnapshot {
     blocks:        new Map(),
     chests:        new Map(),
     signs:         new Map(),
+    npcs:          new Map(),
     destroyedWalls: new Set(),
     exploredCells:  new Set(),
     registrySnapshot: [],
@@ -68,6 +69,7 @@ function makeMinimalSnapshot(): LevelSnapshot {
     blocks:        new Map(),
     chests:        new Map(),
     signs:         new Map(),
+    npcs:          new Map(),
     destroyedWalls: new Set(['5_6', '7_8']),
     exploredCells:  new Set(['0_0', '1_0', '0_1']),
     registrySnapshot: [
@@ -115,6 +117,7 @@ function makeComplexSnapshot(): LevelSnapshot {
     blocks:         new Map(),
     chests:         new Map(),
     signs:          new Map(),
+    npcs:           new Map(),
     destroyedWalls: new Set(),
     exploredCells:  new Set(['0_0']),
     registrySnapshot: [],
@@ -147,6 +150,7 @@ function createMinimalSaveData(): SaveData {
     entityRegistry: [
       { instanceId: 'item_1', itemId: 'sword_iron', quality: 'common', modifiers: [], location: { kind: 'backpack', slot: 0 } },
     ],
+    flags: [],
     levelSnapshots: {},
     levelGrids: {},
   };

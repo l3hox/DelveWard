@@ -53,6 +53,8 @@ import { buildBlockMeshes, animateBlockPush, type BlockMeshes } from './renderin
 import { buildChestMeshes, openChestMesh, closeChestMesh, type ChestMeshes } from './rendering/chestRenderer';
 import { buildSignMeshes, type SignMeshes } from './rendering/signRenderer';
 import { SignOverlay } from './hud/signOverlay';
+import { npcDatabase } from './npcs/npcDatabase';
+import { buildNpcMeshes, updateNpcBillboards, preloadNpcTextures, type NpcMeshes } from './rendering/npcRenderer';
 import { SaveLoadOverlay } from './hud/saveLoadOverlay';
 import {
   buildSaveData, applySaveData, saveToSlot, loadFromSlot, deleteSlot,
@@ -110,6 +112,7 @@ interface LevelScene {
   blockMeshes: BlockMeshes;
   chestMeshes: ChestMeshes;
   signMeshes: SignMeshes;
+  npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
 }
@@ -199,6 +202,9 @@ function buildLevelScene(
   const signMeshes = buildSignMeshes(gameState);
   scene.add(signMeshes.group);
 
+  const npcMeshes = buildNpcMeshes(gameState.npcs);
+  scene.add(npcMeshes.group);
+
   const enemyMeshes = buildEnemyMeshes(gameState);
   scene.add(enemyMeshes.group);
 
@@ -232,7 +238,7 @@ function buildLevelScene(
     startFacing,
     walkable,
     gameState.isDoorOpen.bind(gameState),
-    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row),
+    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row),
     gameState.stairs,
   );
 
@@ -262,6 +268,7 @@ function buildLevelScene(
     blockMeshes,
     chestMeshes,
     signMeshes,
+    npcMeshes,
     enemyMeshes,
     enemyAnimator,
     healthBarManager,
@@ -289,6 +296,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.blockMeshes.group,
     ls.chestMeshes.group,
     ls.signMeshes.group,
+    ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
     ls.itemMeshes.group,
@@ -354,9 +362,9 @@ async function init(): Promise<void> {
   let debugFullbright = false;
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
 
-  // --- Databases + enemy textures (preload before scene build so sprites appear immediately) ---
-  await enemyDatabase.load();
-  await Promise.all([itemDatabase.load(), preloadEnemyTextures(), loadLootTables()]);
+  // --- Databases + textures (preload before scene build so sprites appear immediately) ---
+  await Promise.all([enemyDatabase.load(), npcDatabase.load()]);
+  await Promise.all([itemDatabase.load(), preloadEnemyTextures(), preloadNpcTextures(), loadLootTables()]);
   // Preload item sprites (needs item DB loaded first for icon names)
   const allIcons = itemDatabase.getAllItems().map((item) => item.icon);
   await preloadItemSprites(allIcons);
@@ -1151,6 +1159,13 @@ async function init(): Promise<void> {
           if (result.type === 'sign_read' && result.message) {
             signOverlay.show(result.message);
           }
+          if (result.type === 'npc_interacted' && result.message) {
+            // result.message contains npcId — dialog system will use this in Phase B
+            const npcDef = npcDatabase.getNpc(result.message);
+            if (npcDef) {
+              hud.showMessage(`${npcDef.name}: "..."`)
+            }
+          }
         }
         break;
       case 'KeyF':
@@ -1311,6 +1326,7 @@ async function init(): Promise<void> {
 
     // Billboard enemy sprites toward camera (always — static visual)
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
+    updateNpcBillboards(ls.npcMeshes.meshMap, camera);
     updateForestBillboards(ls.forestMeshes, camera);
 
     // Sync health bar positions (enemies animate with hit shake and lunge)
