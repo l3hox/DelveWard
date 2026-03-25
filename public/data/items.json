@@ -685,6 +685,20 @@
     },
 
     {
+      "id": "rations",
+      "name": "Rations",
+      "type": "consumable", "subtype": "food", "quality": "common",
+      "icon": "bread",
+      "weight": 1, "value": 5,
+      "description": "A meager portion of dried meat and hard bread. Keeps the hunger at bay.",
+      "stats": {},
+      "modifiers": [],
+      "requirements": {},
+      "stackable": true, "stackMax": 20,
+      "effect": { "restoreHunger": 30 }
+    },
+
+    {
       "id": "bone",
       "name": "Old Bone",
       "type": "consumable", "subtype": "junk", "quality": "poor",

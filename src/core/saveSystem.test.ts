@@ -144,6 +144,7 @@ function createMinimalSaveData(): SaveData {
       playerName: 'Hero',
       gold: 50,
       torchFuel: 80, maxTorchFuel: 100,
+      hunger: 75, maxHunger: 100,
       statusEffects: [],
     },
     keys: ['key_bronze'],

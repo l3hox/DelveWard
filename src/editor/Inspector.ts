@@ -1627,6 +1627,7 @@ export class Inspector {
     if (item.effect) {
       const effects: string[] = [];
       if (item.effect.torchFuel) effects.push(`torch fuel: ${item.effect.torchFuel}`);
+      if (item.effect.restoreHunger) effects.push(`restores hunger: ${item.effect.restoreHunger}`);
       if (item.effect.curePoison) effects.push('cures poison');
       if (effects.length > 0) {
         this.addReadonlyField(section, 'effect', effects.join(', '));

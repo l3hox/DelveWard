@@ -2,6 +2,7 @@ import { HUD_WIDTH, HUD_HEIGHT, XP_BAR } from './hudLayout';
 import { drawCompass } from './compassRose';
 import { drawHealthBar } from './healthBar';
 import { drawTorchIndicator } from './torchIndicator';
+import { drawHungerBar } from './hungerBar';
 import { drawStatusIcons } from './statusEffectIcons';
 import { hasEffect } from '../core/statusEffects';
 import { drawMinimap } from './minimapRenderer';
@@ -110,6 +111,12 @@ export class HudOverlay {
       }
     }
 
+    // Starvation screen tint
+    if (gameState.hunger <= 0) {
+      this.ctx.fillStyle = 'rgba(100, 60, 0, 0.06)';
+      this.ctx.fillRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
+    }
+
     // Sword swing overlay
     if (swordSwing?.isActive) {
       swordSwing.draw(this.ctx, HUD_WIDTH, HUD_HEIGHT);
@@ -119,6 +126,7 @@ export class HudOverlay {
     drawHealthBar(this.ctx, gameState.hp, gameState.maxHp, this.time);
     drawStatusIcons(this.ctx, gameState.playerStatusEffects, this.time);
     drawTorchIndicator(this.ctx, gameState.torchFuel, gameState.maxTorchFuel, this.time);
+    drawHungerBar(this.ctx, gameState.hunger, gameState.maxHunger, this.time);
     drawMinimap(this.ctx, grid, gameState.exploredCells, playerState.col, playerState.row, playerState.facing, gameState.enemies, gameState.doors, gameState.stairs, gameState.secretWalls);
     drawInventoryPanel(this.ctx, gameState);
 

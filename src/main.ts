@@ -364,6 +364,10 @@ async function init(): Promise<void> {
   const torchFillLight = new THREE.PointLight(0xff994d, 3, 16.5);
   let flickerTarget = 3.5;
   let flickerTimer = 0;
+  let hungerDrainAccumulator = 0;
+  const HUNGER_DRAIN_INTERVAL = 10; // seconds per 1 hunger
+  let starvationAccumulator = 0;
+  const STARVATION_INTERVAL = 3; // seconds per 1 HP starvation damage
   scene.add(torchLight);
   scene.add(torchFillLight);
 
@@ -655,6 +659,8 @@ async function init(): Promise<void> {
       fireballExplosions.clear();
       blockedDoors.clear();
       gameState.attackCooldown = 0;
+      hungerDrainAccumulator = 0;
+      starvationAccumulator = 0;
 
       ls = buildLevelScene(
         targetLevel, gameState, camera, scene,
@@ -1508,6 +1514,25 @@ async function init(): Promise<void> {
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
       }
       gameState.playerStatusEffects = gameState.playerStatusEffects.filter(e => e.remaining > 0);
+
+      // Hunger drain (real-time, paused during overlays)
+      hungerDrainAccumulator += delta;
+      while (hungerDrainAccumulator >= HUNGER_DRAIN_INTERVAL) {
+        hungerDrainAccumulator -= HUNGER_DRAIN_INTERVAL;
+        gameState.drainHunger(1);
+      }
+
+      // Starvation damage when starving
+      if (gameState.hunger <= 0) {
+        starvationAccumulator += delta;
+        while (starvationAccumulator >= STARVATION_INTERVAL) {
+          starvationAccumulator -= STARVATION_INTERVAL;
+          gameState.hp = Math.max(0, gameState.hp - 1);
+          playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+        }
+      } else {
+        starvationAccumulator = 0;
+      }
     }
 
     // Player damage flash tick

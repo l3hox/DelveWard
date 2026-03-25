@@ -9,6 +9,7 @@ vi.mock('./itemDatabase', () => ({
       const items: Record<string, object> = {
         hp1:   { id: 'hp1',   name: 'Potion', type: 'consumable', subtype: 'health_potion', stats: { hp: 5 },  requirements: {}, effect: {} },
         oil1:  { id: 'oil1',  name: 'Oil',    type: 'consumable', subtype: 'torch_oil',     stats: {},         requirements: {}, effect: { torchFuel: 30 } },
+        food1: { id: 'food1', name: 'Rations', type: 'consumable', subtype: 'food',          stats: {},         requirements: {}, effect: { restoreHunger: 30 }, stackable: true, stackMax: 20 },
         sword: { id: 'sword', name: 'Sword',  type: 'weapon',     subtype: 'sword',          stats: { atk: 2 }, requirements: {}, modifiers: [] },
         ring:  { id: 'ring',  name: 'Ring',   type: 'accessory',  subtype: 'ring',           stats: { atk: 1, def: 1 }, requirements: {}, modifiers: [] },
       };
@@ -843,6 +844,79 @@ describe('GameState', () => {
     });
   });
 
+  // --- Hunger ---
+
+  describe('hunger', () => {
+    it('hunger defaults to 100/100', () => {
+      const gs = new GameState([]);
+      expect(gs.hunger).toBe(100);
+      expect(gs.maxHunger).toBe(100);
+    });
+
+    it('drainHunger reduces hunger', () => {
+      const gs = new GameState([]);
+      gs.drainHunger(10);
+      expect(gs.hunger).toBe(90);
+    });
+
+    it('drainHunger clamps at 0', () => {
+      const gs = new GameState([]);
+      gs.drainHunger(150);
+      expect(gs.hunger).toBe(0);
+    });
+
+    it('restoreHunger increases hunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 50;
+      gs.restoreHunger(30);
+      expect(gs.hunger).toBe(80);
+    });
+
+    it('restoreHunger clamps at maxHunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 90;
+      gs.restoreHunger(30);
+      expect(gs.hunger).toBe(100);
+    });
+
+    it('hunger persists across loadNewLevel', () => {
+      const gs = new GameState([]);
+      gs.hunger = 42;
+      gs.loadNewLevel([]);
+      expect(gs.hunger).toBe(42);
+    });
+
+    it('getPlayerState includes hunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 55;
+      const state = gs.getPlayerState();
+      expect(state.hunger).toBe(55);
+      expect(state.maxHunger).toBe(100);
+    });
+
+    it('restorePlayerState restores hunger', () => {
+      const gs = new GameState([]);
+      const state = gs.getPlayerState();
+      state.hunger = 30;
+      state.maxHunger = 100;
+      gs.restorePlayerState(state);
+      expect(gs.hunger).toBe(30);
+    });
+
+    it('restorePlayerState defaults hunger to 100 when missing', () => {
+      const gs = new GameState([]);
+      gs.hunger = 50;
+      const state = gs.getPlayerState();
+      // Simulate old save without hunger field
+      const oldState = { ...state } as Record<string, unknown>;
+      delete oldState.hunger;
+      delete oldState.maxHunger;
+      gs.restorePlayerState(oldState as Parameters<typeof gs.restorePlayerState>[0]);
+      expect(gs.hunger).toBe(100);
+      expect(gs.maxHunger).toBe(100);
+    });
+  });
+
   // --- Equipment ---
 
   describe('equipment', () => {
@@ -969,6 +1043,33 @@ describe('GameState', () => {
       gs.entityRegistry.createItem('oil1', 'common', { kind: 'backpack', slot: 0 });
       gs.useConsumable(0);
       expect(gs.torchFuel).toBe(200);
+    });
+
+    it('useConsumable food restores hunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 50;
+      gs.entityRegistry.createItem('food1', 'common', { kind: 'backpack', slot: 0 });
+      const used = gs.useConsumable(0);
+      expect(used).toBe(true);
+      expect(gs.hunger).toBe(80);
+      expect(gs.entityRegistry.getBackpackItems().length).toBe(0);
+    });
+
+    it('useConsumable food clamps at maxHunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 90;
+      gs.entityRegistry.createItem('food1', 'common', { kind: 'backpack', slot: 0 });
+      gs.useConsumable(0);
+      expect(gs.hunger).toBe(100);
+    });
+
+    it('useConsumableFromRegistry food restores hunger', () => {
+      const gs = new GameState([]);
+      gs.hunger = 40;
+      const entity = gs.entityRegistry.createItem('food1', 'common', { kind: 'backpack', slot: 0 });
+      const used = gs.useConsumableFromRegistry(entity.instanceId);
+      expect(used).toBe(true);
+      expect(gs.hunger).toBe(70);
     });
 
     it('useConsumable returns false for invalid index', () => {

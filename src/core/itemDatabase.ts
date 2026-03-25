@@ -6,7 +6,7 @@ export type ItemType = 'weapon' | 'armor' | 'accessory' | 'consumable';
 export type WeaponSubtype = 'sword' | 'axe' | 'dagger' | 'mace' | 'spear' | 'staff';
 export type ArmorSubtype = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'shield';
 export type AccessorySubtype = 'ring' | 'amulet';
-export type ConsumableSubtype = 'health_potion' | 'mana_potion' | 'torch_oil' | 'antidote' | 'junk';
+export type ConsumableSubtype = 'health_potion' | 'mana_potion' | 'torch_oil' | 'antidote' | 'food' | 'junk';
 
 export interface ItemStats {
   atk?: number;
@@ -35,10 +35,11 @@ export interface ItemRequirements {
   wis?: number;
 }
 
-// Consumable-only effect payload — torch fuel or cure flags.
+// Consumable-only effect payload — torch fuel, cure, or hunger restore.
 export interface ItemEffect {
   torchFuel?: number;
   curePoison?: boolean;
+  restoreHunger?: number;
 }
 
 export interface ItemDef {

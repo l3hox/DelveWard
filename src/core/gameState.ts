@@ -278,6 +278,8 @@ export class GameState {
   attackCooldown: number;
   torchFuel: number;
   maxTorchFuel: number;
+  hunger: number;
+  maxHunger: number;
   exploredCells: Set<string>;
 
   // Core RPG attributes (M1).
@@ -342,6 +344,8 @@ export class GameState {
     this.attackCooldown = 0;
     this.torchFuel = 200;
     this.maxTorchFuel = 200;
+    this.hunger = 10;
+    this.maxHunger = 100;
     this.exploredCells = new Set();
 
     // maxHp derived from VIT: 40 + VIT * 5
@@ -960,6 +964,14 @@ export class GameState {
 
   drainTorchFuel(amount: number): void {
     this.torchFuel = Math.max(0, this.torchFuel - amount);
+  }
+
+  drainHunger(amount: number): void {
+    this.hunger = Math.max(0, this.hunger - amount);
+  }
+
+  restoreHunger(amount: number): void {
+    this.hunger = Math.min(this.maxHunger, this.hunger + amount);
   }
 
   getDoor(col: number, row: number): DoorInstance | undefined {
@@ -1632,6 +1644,9 @@ export class GameState {
     } else if (itemDef.subtype === 'torch_oil') {
       this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
     }
+    if (itemDef.effect?.restoreHunger) {
+      this.restoreHunger(itemDef.effect.restoreHunger);
+    }
     if (itemDef.effect?.curePoison) {
       this.playerStatusEffects = removeEffectsByType(this.playerStatusEffects, 'poison');
     }
@@ -1712,6 +1727,9 @@ export class GameState {
       } else if (itemDef.subtype === 'torch_oil') {
         this.torchFuel = Math.min(this.maxTorchFuel, this.torchFuel + (itemDef.effect?.torchFuel ?? 0));
       }
+      if (itemDef.effect?.restoreHunger) {
+        this.restoreHunger(itemDef.effect.restoreHunger);
+      }
       if (itemDef.effect?.curePoison) {
         this.playerStatusEffects = removeEffectsByType(this.playerStatusEffects, 'poison');
       }
@@ -1758,6 +1776,7 @@ export class GameState {
     xp: number; level: number; attributePoints: number;
     playerName: string; gold: number;
     torchFuel: number; maxTorchFuel: number;
+    hunger: number; maxHunger: number;
     statusEffects: StatusEffect[];
   } {
     return {
@@ -1774,6 +1793,8 @@ export class GameState {
       gold: this.gold,
       torchFuel: this.torchFuel,
       maxTorchFuel: this.maxTorchFuel,
+      hunger: this.hunger,
+      maxHunger: this.maxHunger,
       statusEffects: this.playerStatusEffects.map(e => ({ ...e })),
     };
   }
@@ -1785,6 +1806,7 @@ export class GameState {
     xp: number; level: number; attributePoints: number;
     playerName: string; gold: number;
     torchFuel: number; maxTorchFuel: number;
+    hunger?: number; maxHunger?: number;
     statusEffects: StatusEffect[];
   }): void {
     this.hp = state.hp;
@@ -1800,6 +1822,8 @@ export class GameState {
     this.gold = state.gold;
     this.torchFuel = state.torchFuel;
     this.maxTorchFuel = state.maxTorchFuel;
+    this.hunger = state.hunger ?? 100;
+    this.maxHunger = state.maxHunger ?? 100;
     this.playerStatusEffects = state.statusEffects.map(e => ({ ...e }));
   }
 

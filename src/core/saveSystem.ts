@@ -76,6 +76,8 @@ export interface SaveData {
     torchFuel: number;
     maxTorchFuel: number;
     statusEffects: StatusEffect[];
+    hunger?: number;
+    maxHunger?: number;
   };
   keys: string[];
   entityRegistry: ItemEntity[];
@@ -233,6 +235,8 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
       torchFuel: gameState.torchFuel,
       maxTorchFuel: gameState.maxTorchFuel,
       statusEffects: gameState.playerStatusEffects.map(e => ({ ...e })),
+      hunger: gameState.hunger,
+      maxHunger: gameState.maxHunger,
     },
     keys: Array.from(gameState.inventory),
     entityRegistry: fullRegistry,
@@ -305,6 +309,8 @@ export function applySaveData(
   gameState.torchFuel = p.torchFuel;
   gameState.maxTorchFuel = p.maxTorchFuel;
   gameState.playerStatusEffects = p.statusEffects.map(e => ({ ...e }));
+  gameState.hunger = p.hunger ?? 100;
+  gameState.maxHunger = p.maxHunger ?? 100;
 
   // Restore key inventory.
   gameState.inventory.clear();

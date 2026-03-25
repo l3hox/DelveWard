@@ -24,24 +24,32 @@ export const MINIMAP = {
 // Health bar — bottom-left
 export const HEALTH_BAR = {
   x: MARGIN,
-  w: 160,
+  w: 140,
   h: 24,
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
 
 // Torch indicator — next to health bar
 export const TORCH_BAR = {
-  w: 120,
+  w: 100,
   h: 24,
   get x() { return HEALTH_BAR.x + HEALTH_BAR.w + MARGIN; },
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
 
-// XP bar — bottom-center (gap between torch and inventory)
-export const XP_BAR = {
-  w: 176,
+// Hunger bar — next to torch
+export const HUNGER_BAR = {
+  w: 80,
   h: 24,
   get x() { return TORCH_BAR.x + TORCH_BAR.w + MARGIN; },
+  get y() { return HUD_HEIGHT - MARGIN - this.h; },
+} as const;
+
+// XP bar — bottom (after hunger bar)
+export const XP_BAR = {
+  w: 120,
+  h: 24,
+  get x() { return HUNGER_BAR.x + HUNGER_BAR.w + MARGIN; },
   get y() { return HUD_HEIGHT - MARGIN - this.h; },
 } as const;
 

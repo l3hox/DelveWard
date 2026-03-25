@@ -15,6 +15,11 @@ export const HUD_COLORS = {
   torchLow: '#ff6600',
   torchBg: '#1a1200',
 
+  // Hunger
+  hungerFill: '#8a9a5a',
+  hungerLow: '#cc4400',
+  hungerBg: '#1a1408',
+
   // Compass
   compassActive: '#e8c84a',
   compassInactive: '#444444',

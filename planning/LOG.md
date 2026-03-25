@@ -4,6 +4,16 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-25 — M3 Phase E: Hunger System
+
+**Design**: Simple survival hunger mechanic — hunger stat (0–100) drains 1 per 10 seconds of real unpaused game time. Starvation at hunger=0 deals 1 HP every 3 seconds. Rations consumable restores 30 hunger. All timers use accumulator pattern and pause during overlays.
+
+**Architecture**: `hungerBar.ts` mirrors `torchIndicator.ts` exactly (same draw pattern: bg → bar bg → fill → icon → text% → border). HUD bottom row resized to fit 4 bars: HP(140) + Torch(100) + Hunger(80) + XP(120) = 464px. Hunger/starvation accumulators live in `main.ts` game loop alongside existing timers (attack cooldown, status effects). Both reset on load. Backward-compat: optional `hunger?`/`maxHunger?` in SaveData, `?? 100` fallback in both `restorePlayerState` and `applySaveData`.
+
+**Data**: `rations` item added to `items.json` (food subtype, restoreHunger: 30). Gregor's stock re-includes rations (was removed in Phase D pending hunger system).
+
+---
+
 ## 2026-03-24 — M3 Phase D: Trading System
 
 **Design**: Buy/sell trading overlay triggered by `openShop` dialog effect. NPCs with `stock` arrays in `npcs.json` are merchants. Buy price = `ceil(value × markup)`, sell price = `floor(value × 0.5)`. Items with `value: 0` are not sellable. Merchant stock is a fixed list (items are not consumed on purchase — infinite supply).
