@@ -4,6 +4,14 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-27 — M4 Phase 0: LayerState Refactor
+
+**Architecture**: Extracted 21 entity Maps + 2 Sets from GameState into a `LayerState` interface. GameState holds `layers: LayerState[]` + `activeLayerIndex`. TypeScript getter/setter pairs (`get doors() { return this.activeLayer.doors; }`) make the refactor transparent — all ~50 helper methods, all external code, all 765 tests work unchanged without modification. Only `gameState.ts` changed. Prepares for multi-layer in Phase B.
+
+**Decision**: When Phase B adds `DungeonLevel.layers?: LayerDef[]`, backward compat for levels without `layers` field is temporary — once all levels are converted, the compat codepath will be removed. No legacy cruft.
+
+---
+
 ## 2026-03-27 — M4 Plan: The Vertical World
 
 **Planning complete.** M4 introduces the layers-within-levels vertical world model. Key architecture decisions made (see `planning/m4/ADR.md`):

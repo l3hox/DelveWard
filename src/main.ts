@@ -422,8 +422,8 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-//  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
-  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
+//  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 

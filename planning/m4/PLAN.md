@@ -249,7 +249,7 @@ interface DungeonLevel {
 8. **LayerDef type** in `types.ts` — grid, entities, areas per layer
 9. **TextureArea extensions**: `openBottom?: boolean`, `openTop?: boolean` flags
 10. **DungeonLevel.layers** optional field — array of LayerDef. When present, the level is multi-layer.
-11. **Backward compatibility**: Level without `layers` treats its `grid`/`entities` as a single layer at y=0. Zero migration needed for existing dungeons.
+11. **Backward compatibility** (temporary): Level without `layers` treats its `grid`/`entities` as a single layer at y=0. Once all levels are converted to the layered format, remove the backward compat codepath — no legacy cruft.
 12. **LAYER_HEIGHT constant**: Default vertical spacing between layers (e.g., 4 units — ~2x wall height). Can be overridden per-layer via `yOffset`.
 13. **Multi-layer scene building**: `buildLevelScene()` iterates all layers, calls `buildLayerScene()` for each, positions each layer's group at its Y offset. All layers added to one scene.
 14. **Hollow rendering**: `buildDungeon()` checks area flags — skip floor plane if `openBottom`, skip ceiling plane if `openTop`. Wall faces adjacent to hollows still render (cliff edges visible).

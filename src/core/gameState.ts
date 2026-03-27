@@ -286,7 +286,9 @@ export interface LevelSnapshot {
 }
 
 
-export class GameState {
+// LayerState — holds all per-layer entity Maps + Sets.
+// Extracted from GameState to prepare for multi-layer support (M4 Phase B).
+export interface LayerState {
   doors: Map<string, DoorInstance>;
   keys: Map<string, KeyInstance>;
   levers: Map<string, LeverInstance>;
@@ -308,8 +310,82 @@ export class GameState {
   bookshelves: Map<string, BookshelfInstance>;
   altars: Map<string, AltarInstance>;
   barrels: Map<string, BarrelInstance>;
-  tempBuffs: TempBuff[];
   destroyedWalls: Set<string>;
+  exploredCells: Set<string>;
+}
+
+export function createEmptyLayerState(): LayerState {
+  return {
+    doors: new Map(), keys: new Map(), levers: new Map(),
+    plates: new Map(), triggers: new Map(), tripwires: new Map(),
+    gates: new Map(), trapLaunchers: new Map(), sconces: new Map(),
+    stairs: new Map(), enemies: new Map(), breakableWalls: new Map(),
+    secretWalls: new Map(), blocks: new Map(), chests: new Map(),
+    signs: new Map(), npcs: new Map(), fountains: new Map(),
+    bookshelves: new Map(), altars: new Map(), barrels: new Map(),
+    destroyedWalls: new Set(), exploredCells: new Set(),
+  };
+}
+
+
+export class GameState {
+  // Layer state — entity Maps stored in LayerState, accessed via getter/setter pairs.
+  // For single-layer levels, layers = [oneLayerState]. Multi-layer in Phase B.
+  layers: LayerState[];
+  activeLayerIndex: number;
+
+  get activeLayer(): LayerState { return this.layers[this.activeLayerIndex]; }
+
+  // Getter/setter pairs delegate to activeLayer — all existing code works unchanged.
+  get doors() { return this.activeLayer.doors; }
+  set doors(v) { this.activeLayer.doors = v; }
+  get keys() { return this.activeLayer.keys; }
+  set keys(v) { this.activeLayer.keys = v; }
+  get levers() { return this.activeLayer.levers; }
+  set levers(v) { this.activeLayer.levers = v; }
+  get plates() { return this.activeLayer.plates; }
+  set plates(v) { this.activeLayer.plates = v; }
+  get triggers() { return this.activeLayer.triggers; }
+  set triggers(v) { this.activeLayer.triggers = v; }
+  get tripwires() { return this.activeLayer.tripwires; }
+  set tripwires(v) { this.activeLayer.tripwires = v; }
+  get gates() { return this.activeLayer.gates; }
+  set gates(v) { this.activeLayer.gates = v; }
+  get trapLaunchers() { return this.activeLayer.trapLaunchers; }
+  set trapLaunchers(v) { this.activeLayer.trapLaunchers = v; }
+  get sconces() { return this.activeLayer.sconces; }
+  set sconces(v) { this.activeLayer.sconces = v; }
+  get stairs() { return this.activeLayer.stairs; }
+  set stairs(v) { this.activeLayer.stairs = v; }
+  get enemies() { return this.activeLayer.enemies; }
+  set enemies(v) { this.activeLayer.enemies = v; }
+  get breakableWalls() { return this.activeLayer.breakableWalls; }
+  set breakableWalls(v) { this.activeLayer.breakableWalls = v; }
+  get secretWalls() { return this.activeLayer.secretWalls; }
+  set secretWalls(v) { this.activeLayer.secretWalls = v; }
+  get blocks() { return this.activeLayer.blocks; }
+  set blocks(v) { this.activeLayer.blocks = v; }
+  get chests() { return this.activeLayer.chests; }
+  set chests(v) { this.activeLayer.chests = v; }
+  get signs() { return this.activeLayer.signs; }
+  set signs(v) { this.activeLayer.signs = v; }
+  get npcs() { return this.activeLayer.npcs; }
+  set npcs(v) { this.activeLayer.npcs = v; }
+  get fountains() { return this.activeLayer.fountains; }
+  set fountains(v) { this.activeLayer.fountains = v; }
+  get bookshelves() { return this.activeLayer.bookshelves; }
+  set bookshelves(v) { this.activeLayer.bookshelves = v; }
+  get altars() { return this.activeLayer.altars; }
+  set altars(v) { this.activeLayer.altars = v; }
+  get barrels() { return this.activeLayer.barrels; }
+  set barrels(v) { this.activeLayer.barrels = v; }
+  get destroyedWalls() { return this.activeLayer.destroyedWalls; }
+  set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
+  get exploredCells() { return this.activeLayer.exploredCells; }
+  set exploredCells(v) { this.activeLayer.exploredCells = v; }
+
+  // Player-global state (not per-layer)
+  tempBuffs: TempBuff[];
   inventory: Set<string>;
 
   // Global flags — quest/dialog conditions and world state.
@@ -333,7 +409,6 @@ export class GameState {
   maxTorchFuel: number;
   hunger: number;
   maxHunger: number;
-  exploredCells: Set<string>;
 
   // Core RPG attributes (M1).
   // WIS has no mechanical effect in M1 — reserved for M4 mana.
@@ -353,29 +428,10 @@ export class GameState {
   playerStatusEffects: StatusEffect[];
 
   constructor(entities: Entity[], grid?: string[], levelId: string = 'default') {
-    this.doors = new Map();
-    this.keys = new Map();
-    this.levers = new Map();
-    this.plates = new Map();
-    this.triggers = new Map();
-    this.tripwires = new Map();
-    this.gates = new Map();
-    this.trapLaunchers = new Map();
-    this.sconces = new Map();
-    this.stairs = new Map();
-    this.enemies = new Map();
-    this.breakableWalls = new Map();
-    this.secretWalls = new Map();
-    this.blocks = new Map();
-    this.chests = new Map();
-    this.signs = new Map();
-    this.npcs = new Map();
-    this.fountains = new Map();
-    this.bookshelves = new Map();
-    this.altars = new Map();
-    this.barrels = new Map();
+    this.layers = [createEmptyLayerState()];
+    this.activeLayerIndex = 0;
+
     this.tempBuffs = [];
-    this.destroyedWalls = new Set();
     this.inventory = new Set();
     this.flags = new Set();
     this.entityById = new Map();
@@ -404,7 +460,6 @@ export class GameState {
     this.maxTorchFuel = 200;
     this.hunger = 100;
     this.maxHunger = 100;
-    this.exploredCells = new Set();
 
     // maxHp derived from VIT: 40 + VIT * 5
     this.maxHp = 40 + this.vit * 5;
