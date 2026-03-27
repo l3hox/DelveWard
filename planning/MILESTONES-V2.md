@@ -96,7 +96,31 @@ NPCs, dialog, trading, quests. Now there's a *reason* to explore. Characters giv
 
 ---
 
-## Milestone 4: The Arcane Arts
+## Milestone 4: The Vertical World
+
+**Theme:** "I looked over the castle wall and saw mountains. Then I looked down and saw the dungeon I just climbed out of."
+
+The visual leap. Multiple levels visible at once. Outdoor sections. Decorative 3D meshes for cavern ceilings and distant vistas. The game stops looking like a corridor crawler and starts feeling like a *world*. This is the showcase milestone — the one that makes the game visually inspiring and motivates deeper game design work on magic, items, quests, and balance.
+
+| # | Feature | From |
+|---|---|---|
+| E1 | Multi-level simultaneous rendering | T1 |
+| E2 | Void cells (look down/up through levels) | T1 |
+| E3 | Outdoor cells (no ceiling, skybox, ambient light) | T1 |
+| E4 | Decorative 3D meshes (cavern ceilings, backdrops, set pieces) | T1 |
+| E5 | Thin walls (edge walls, fences, railings) | T1 |
+| E6 | Sub-grid entity positioning | T1 |
+| S5 | Pit traps (floor retracts, fall to level below) | T2 |
+| C7 | Enemy spawners | T2 |
+| V9 | Rolling boulders | T2 |
+
+**Playable moment:** Climb out of a dungeon onto castle walls. See mountain ranges in the distance (decorative mesh). Look down into the courtyard below (void cells). Cross a bridge over a ravine. A pit trap opens and you fall to the level below.
+
+**Test dungeon:** "The Cliffside Keep" — a vertical dungeon with a cavern base, castle mid-section, and outdoor battlements on top.
+
+---
+
+## Milestone 5: The Arcane Arts
 
 **Theme:** "I froze the water, walked across, and fireballed the archers."
 
@@ -119,30 +143,6 @@ Magic transforms combat and puzzle-solving. Ranged combat. Spell-world interacti
 **Playable moment:** An archer fires arrows down a long corridor. You cast Ice Wall to block them, circle around, and fireball the archer from behind. You freeze a water pool to cross it, then melt the ice behind you so enemies can't follow.
 
 **Test dungeon:** "The Elemental Sanctum" — rooms designed around spell-environment combos.
-
----
-
-## Milestone 5: The Vertical World
-
-**Theme:** "I looked over the castle wall and saw mountains. Then I looked down and saw the dungeon I just climbed out of."
-
-The visual leap. Multiple levels visible at once. Outdoor sections. Decorative 3D meshes for cavern ceilings and distant vistas. The game stops looking like a corridor crawler and starts feeling like a *world*.
-
-| # | Feature | From |
-|---|---|---|
-| E1 | Multi-level simultaneous rendering | T1 |
-| E2 | Void cells (look down/up through levels) | T1 |
-| E3 | Outdoor cells (no ceiling, skybox, ambient light) | T1 |
-| E4 | Decorative 3D meshes (cavern ceilings, backdrops, set pieces) | T1 |
-| E5 | Thin walls (edge walls, fences, railings) | T1 |
-| E6 | Sub-grid entity positioning | T1 |
-| S5 | Pit traps (floor retracts, fall to level below) | T2 |
-| C7 | Enemy spawners | T2 |
-| V9 | Rolling boulders | T2 |
-
-**Playable moment:** Climb out of a dungeon onto castle walls. See mountain ranges in the distance (decorative mesh). Look down into the courtyard below (void cells). Cross a bridge over a ravine. A pit trap opens and you fall to the level below.
-
-**Test dungeon:** "The Cliffside Keep" — a vertical dungeon with a cavern base, castle mid-section, and outdoor battlements on top.
 
 ---
 
@@ -244,8 +244,8 @@ No milestone should take more than a few weeks of sessions. If one feels endless
 | 1 | The Loot Game | Items, stats, leveling, enemy drops |
 | 2 | The Dangerous Dungeon | Traps, signals, secrets, puzzles, save/load |
 | 3 | The Living World | NPCs, dialog, trading, quests |
-| 4 | The Arcane Arts | Magic, ranged combat, spell-world interaction |
-| 5 | The Vertical World | Multi-level rendering, outdoor, decorative meshes |
+| 4 | The Vertical World | Multi-level rendering, outdoor, decorative meshes |
+| 5 | The Arcane Arts | Magic, ranged combat, spell-world interaction |
 | 6 | The Toolmaker | Level editor (COMPLETE — pulled forward) |
 | 7 | Scripting & Advanced | Script system, boss encounters, advanced AI |
 | 8 | Sound & Feel | Audio, camera polish, atmosphere |
