@@ -25,16 +25,35 @@ Dungeon
 ```
 
 **Key properties:**
-- All layers of a level are in the Three.js scene simultaneously — no culling, no selective loading
-- Void cells (`' '`) have no floor/ceiling → you see through to layers below/above
+- All layers of a level are in the Three.js scene simultaneously — geometry always rendered
+- Hollows (no floor, no ceiling, or both) defined via areas — you see through to layers below/above
 - Solid floors/ceilings naturally occlude — no special occlusion logic needed
 - Each layer has its own grid, entities, and optionally its own environment/ceiling settings
-- Entity simulation (AI, signals, projectiles) runs on all layers (single GameState)
-- Existing level transitions (stairs entity) remain as teleports between levels
+- Existing level transitions (stairs entity) remain as teleports between levels (different worlds)
 
-**Performance model:** Grid geometry is lightweight (~6 planes per cell). A 50×50 layer = ~2500 cells. Even 20 layers = 50,000 cells — well within Three.js capabilities. Entity dormancy (freeze AI on distant layers) can be added later if needed, but is not expected to be necessary for M4.
+**Hollow areas (replacing void cells for vertical openness):**
+- Instead of relying solely on the `' '` void char, use the existing **area system** to define hollows within walkable regions: `noFloor: true`, `noCeiling: true`, or both
+- A walkable cell with `noFloor` has no floor geometry → you see the layer below
+- A walkable cell with `noCeiling` has no ceiling geometry → you see the layer above
+- Cliff edges: walkable cells at the edge of a layer with hollows looking down
+- The `' '` void char remains for non-walkable empty space (outside the playable area)
 
-**Future evolution:** Ramps/stairs between layers (smooth within-grid transitions, not teleports). Possibly collapsing levels into one big layer stack for fully interconnected worlds. The layer model supports this — levels are just a loading/organization boundary, not a rendering one.
+**Dormancy system (Minecraft-style chunk simulation):**
+- All geometry is always rendered (lightweight)
+- Entity simulation (AI, signals, projectiles) uses a **simulation radius** around the player — both horizontal and vertical
+- Entities within the radius are fully simulated (AI ticks, movement, combat)
+- Entities outside the radius are **dormant** — no AI ticks, no movement, no status effect ticking. They exist in the Maps but are skipped during update loops.
+- Dormancy radius configurable (e.g., 8 cells horizontal, ±2 layers vertical)
+- Not strictly needed for M4 (expected world sizes are manageable), but the architecture should support it from the start to avoid a painful retrofit later
+- Future: horizontal dormancy enables large open-world levels without performance scaling concerns
+
+**Performance model:** Grid geometry is lightweight (~6 planes per cell). A 50×50 layer = ~2500 cells. Even 20 layers = 50,000 cells — well within Three.js capabilities. Dormancy keeps entity simulation costs bounded regardless of world size.
+
+**Future evolution:**
+- Ramps/stairs between layers (smooth within-grid transitions, not teleports)
+- Possibly collapsing levels into one big layer stack for fully interconnected worlds — levels become just a loading/organization boundary
+- True teleport entity type (distinct from stairs — portal to another level/location)
+- Horizontal world streaming for very large levels (load/unload geometry chunks)
 
 ---
 
@@ -84,13 +103,13 @@ Simplest visual upgrade. Extend the environment system with an outdoor preset an
 
 ## Phase B — Layer System + Void Cells
 
-THE defining feature. Refactor the level data model from single-grid to multi-layer. Render all layers simultaneously in one Three.js scene.
+THE defining feature. Refactor the level data model from single-grid to multi-layer. Render all layers simultaneously in one Three.js scene. Hollows (missing floor/ceiling) via areas.
 
-**Current state:** A `DungeonLevel` has one grid + one entity list. `buildLevelScene()` creates one level's geometry. Levels switch via teardown+rebuild. Void char `' '` exists but renders nothing.
+**Current state:** A `DungeonLevel` has one grid + one entity list. `buildLevelScene()` creates one level's geometry. Levels switch via teardown+rebuild. Void char `' '` exists but renders nothing. Areas already support per-region texture overrides.
 
 ### Data Model Change
 
-The `DungeonLevel` type gains a `layers` array. Each layer is what a level currently is — a grid + entities. For backward compatibility, a level with no `layers` field treats its existing `grid`/`entities` as layer 0.
+The `DungeonLevel` type gains a `layers` array. Each layer is what a level currently is — a grid + entities + areas. For backward compatibility, a level with no `layers` field treats its existing `grid`/`entities` as layer 0.
 
 ```typescript
 interface LayerDef {
@@ -102,7 +121,14 @@ interface LayerDef {
   ceiling?: boolean;              // per-layer ceiling (default: true)
   defaults?: TextureSet;
   charDefs?: CharDef[];
-  areas?: TextureArea[];
+  areas?: TextureArea[];          // includes hollow areas (noFloor/noCeiling)
+}
+
+// Extended area definition (existing TextureArea + new hollow flags)
+interface TextureArea {
+  // ... existing fields (fromCol, toCol, fromRow, toRow, textures) ...
+  noFloor?: boolean;              // NEW — skip floor geometry in this area
+  noCeiling?: boolean;            // NEW — skip ceiling geometry in this area
 }
 
 interface DungeonLevel {
@@ -112,27 +138,41 @@ interface DungeonLevel {
 }
 ```
 
+### Hollow Areas
+
+Vertical openness between layers is defined via the area system (already used for per-region textures):
+- `noFloor: true` on an area → walkable cells in that region have no floor geometry → you see the layer below
+- `noCeiling: true` → no ceiling geometry → you see the layer above
+- Both → full vertical opening (bridges, cliff edges, open atriums)
+- The `' '` void char remains for non-walkable empty space outside the playable area
+- Cliff edge = walkable cells with `noFloor` area, adjacent to normal cells with floor. Player walks to the edge and looks down.
+- This reuses existing area infrastructure (fromCol/toCol/fromRow/toRow rectangles) — no new data structure needed
+
 ### Game
-8. **LayerDef type** in `types.ts` — grid, entities, environment overrides per layer
-9. **DungeonLevel.layers** optional field — array of LayerDef. When present, the level is multi-layer.
-10. **Backward compatibility**: Level without `layers` treats its `grid`/`entities` as a single layer at y=0. Zero migration needed for existing dungeons.
-11. **LAYER_HEIGHT constant**: Default vertical spacing between layers (e.g., 4 units — ~2x wall height). Can be overridden per-layer via `yOffset`.
-12. **Multi-layer scene building**: `buildLevelScene()` iterates all layers, builds dungeon geometry + entity meshes for each, positions each layer's group at its Y offset. All layers added to one scene.
-13. **Void cell rendering**: `' '` cells skip floor AND ceiling geometry. Wall faces adjacent to void cells still render (cliff edges). Looking through void → you see the layer below/above.
-14. **GameState multi-layer**: Entity Maps include layer index in key (e.g., `"layer:col,row"` or separate Maps per layer). Entity lookups scoped to current layer for gameplay (movement, combat) but all layers simulated.
-15. **Player layer tracking**: GameState tracks which layer the player is on. Movement restricted to current layer's grid. Future: ramps allow layer transitions.
-16. **Camera Y position**: Camera sits at the player's layer Y offset + eye height. All layers visible in the 3D scene simultaneously.
-17. **Fog adjustment**: Fog distances increased for multi-layer visibility. Or fog disabled vertically (only horizontal fog).
-18. **Level loader**: Validate `layers` array — each layer has valid grid, entities. Cross-layer entity references not needed for M4.
+8. **LayerDef type** in `types.ts` — grid, entities, areas, environment overrides per layer
+9. **TextureArea extensions**: `noFloor?: boolean`, `noCeiling?: boolean` flags
+10. **DungeonLevel.layers** optional field — array of LayerDef. When present, the level is multi-layer.
+11. **Backward compatibility**: Level without `layers` treats its `grid`/`entities` as a single layer at y=0. Zero migration needed for existing dungeons.
+12. **LAYER_HEIGHT constant**: Default vertical spacing between layers (e.g., 4 units — ~2x wall height). Can be overridden per-layer via `yOffset`.
+13. **Multi-layer scene building**: `buildLevelScene()` iterates all layers, builds dungeon geometry + entity meshes for each, positions each layer's group at its Y offset. All layers added to one scene.
+14. **Hollow rendering**: `buildDungeon()` checks area flags — skip floor plane if `noFloor`, skip ceiling plane if `noCeiling`. Wall faces adjacent to hollows still render (cliff edges visible).
+15. **GameState multi-layer**: Entity Maps include layer index in key (e.g., `"layer:col,row"` or separate Maps per layer). Entity lookups scoped to current layer for gameplay (movement, combat). Dormancy applied per simulation radius.
+16. **Player layer tracking**: GameState tracks which layer the player is on. Movement restricted to current layer's grid. Future: ramps allow layer transitions.
+17. **Camera Y position**: Camera sits at the player's layer Y offset + eye height. All layers visible in the 3D scene simultaneously.
+18. **Fog adjustment**: Fog distances increased for multi-layer visibility. Possibly horizontal-only fog (no vertical fade).
+19. **Dormancy architecture**: Entity update loops check simulation radius (horizontal distance + layer distance from player). Entities outside radius are skipped (no AI, no movement, no status ticks). Geometry always rendered. Radius configurable (e.g., 8 cells horizontal, ±2 layers vertical). Simple distance check — no chunk system needed for M4.
+20. **Level loader**: Validate `layers` array — each layer has valid grid, entities. Validate `noFloor`/`noCeiling` area flags.
 
 ### Editor
-19. **Layer list panel**: Like the existing level list but for layers within a level. Add/remove/reorder layers, switch active layer for editing.
-20. **Layer Y-offset display**: Show computed or explicit Y offset per layer.
-21. **Void cell painting**: `' '` char in palette with clear visual distinction (checkered/transparent pattern on grid canvas, not solid black).
-22. **Per-layer properties**: Environment override, ceiling toggle, texture defaults — editable per layer in layer properties panel.
-23. **3D layer preview** (stretch): Wireframe side-view showing layer stacking. Not required for M4.
+21. **Layer list panel**: Displayed alongside the existing level list. Start with a single layer (current behavior). "Add Layer Above" / "Add Layer Below" buttons insert a new empty layer with default grid. Switch active layer for grid/entity editing.
+22. **Active layer editing**: Grid painter, entity placement, area editing all operate on the active layer. Layer switching preserves undo stack (tagged by layer index, like existing level switching).
+23. **Layer properties**: Y-offset (auto or explicit), environment override, ceiling toggle, texture defaults — per-layer in the properties panel. Reuse existing LevelProperties layout.
+24. **Hollow area flags**: `noFloor` / `noCeiling` checkboxes in the area editor (alongside existing texture fields). Grid canvas renders hollow areas with distinct visual (e.g., dashed floor pattern for noFloor, open top indicator for noCeiling).
+25. **Void cell painting**: `' '` char in palette retains clear visual distinction (checkered pattern).
+26. **Layer deletion**: Remove a layer (with confirmation). Entities on deleted layer are lost.
+27. **3D layer preview** (stretch): Wireframe side-view showing layer stacking. Not required for M4.
 
-**Decision needed:** Should entity IDs be unique per-layer or per-level? Recommendation: per-level (dungeon-wide unique), consistent with existing system. Layer index is part of the entity's position context, not its ID.
+**Decision:** Entity IDs remain per-level (dungeon-wide unique), consistent with existing system. Layer index is part of the entity's position context, not its ID.
 
 ---
 
