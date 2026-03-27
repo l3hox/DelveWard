@@ -8,13 +8,13 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Versioning
 
-`0.milestone` — e.g. `0.1` when Milestone 1 ships. Current tag: **v0.1.5**.
+`0.milestone` — e.g. `0.1` when Milestone 1 ships. Current tag: **v0.3.0**.
 
 ---
 
 ## Current Milestone
 
-**Milestone 3: The Living World** (v0.3)
+**Milestone 3: The Living World** (v0.3.0) — **Complete**
 
 Plan — see `planning/m3/PLAN.md`.
 
@@ -31,13 +31,14 @@ Plan — see `planning/m3/PLAN.md`.
 - [x] Phase D: Trading system (TradingOverlay, buy/sell, stock from npcs.json)
 - [x] Phase E: Hunger system (hunger stat, food items, HUD bar, starvation, editor display)
 - [x] Phase F: Dungeon objects + editor (fountain, bookshelf, altar, barrel — 3D geometry, interactions, palette, inspector)
-- [ ] Phase G: Content — M3 test dungeon (hub + dungeon levels, 3 quests)
+- [~] Phase G: Content — skipped (features tested manually)
 
 ### Completed milestones
 - [x] M0: Proof of concept (v0.0.9)
 - [x] M1: The Loot Game (v0.1)
 - [x] M6: Dungeon Editor (v0.1.5, pulled forward)
 - [x] M2: The Dangerous Dungeon (v0.2)
+- [x] M3: The Living World (v0.3.0)
 
 ---
 
