@@ -38,18 +38,10 @@ Dungeon
 - Cliff edges: walkable cells at the edge of a layer with hollows looking down
 - The `' '` void char remains for non-walkable empty space (outside the playable area)
 
-**Dormancy system (Minecraft-style chunk simulation):**
-- All geometry is always rendered (lightweight)
-- Entity simulation (AI, signals, projectiles) uses a **simulation radius** around the player — both horizontal and vertical
-- Entities within the radius are fully simulated (AI ticks, movement, combat)
-- Entities outside the radius are **dormant** — no AI ticks, no movement, no status effect ticking. They exist in the Maps but are skipped during update loops.
-- Dormancy radius configurable (e.g., 8 cells horizontal, ±2 layers vertical)
-- Not strictly needed for M4 (expected world sizes are manageable), but the architecture should support it from the start to avoid a painful retrofit later
-- Future: horizontal dormancy enables large open-world levels without performance scaling concerns
+**Performance model:** Grid geometry is lightweight (~6 planes per cell). A 50×50 layer = ~2500 cells. Even 20 layers = 50,000 cells — well within Three.js capabilities. All entities simulated on all layers for M4 — world sizes are manageable without optimization.
 
-**Performance model:** Grid geometry is lightweight (~6 planes per cell). A 50×50 layer = ~2500 cells. Even 20 layers = 50,000 cells — well within Three.js capabilities. Dormancy keeps entity simulation costs bounded regardless of world size.
-
-**Future evolution:**
+**Future evolution (not M4):**
+- **Dormancy system**: Spatial data structure (quadtree/octree) for entity simulation radius — simulate only entities near the player, both horizontal and vertical. Separate milestone when world sizes demand it.
 - Ramps/stairs between layers (smooth within-grid transitions, not teleports)
 - Possibly collapsing levels into one big layer stack for fully interconnected worlds — levels become just a loading/organization boundary
 - True teleport entity type (distinct from stairs — portal to another level/location)
@@ -156,12 +148,11 @@ Vertical openness between layers is defined via the area system (already used fo
 12. **LAYER_HEIGHT constant**: Default vertical spacing between layers (e.g., 4 units — ~2x wall height). Can be overridden per-layer via `yOffset`.
 13. **Multi-layer scene building**: `buildLevelScene()` iterates all layers, builds dungeon geometry + entity meshes for each, positions each layer's group at its Y offset. All layers added to one scene.
 14. **Hollow rendering**: `buildDungeon()` checks area flags — skip floor plane if `noFloor`, skip ceiling plane if `noCeiling`. Wall faces adjacent to hollows still render (cliff edges visible).
-15. **GameState multi-layer**: Entity Maps include layer index in key (e.g., `"layer:col,row"` or separate Maps per layer). Entity lookups scoped to current layer for gameplay (movement, combat). Dormancy applied per simulation radius.
+15. **GameState multi-layer**: Entity Maps include layer index in key (e.g., `"layer:col,row"` or separate Maps per layer). Entity lookups scoped to current layer for gameplay (movement, combat). All entities on all layers simulated.
 16. **Player layer tracking**: GameState tracks which layer the player is on. Movement restricted to current layer's grid. Future: ramps allow layer transitions.
 17. **Camera Y position**: Camera sits at the player's layer Y offset + eye height. All layers visible in the 3D scene simultaneously.
 18. **Fog adjustment**: Fog distances increased for multi-layer visibility. Possibly horizontal-only fog (no vertical fade).
-19. **Dormancy architecture**: Entity update loops check simulation radius (horizontal distance + layer distance from player). Entities outside radius are skipped (no AI, no movement, no status ticks). Geometry always rendered. Radius configurable (e.g., 8 cells horizontal, ±2 layers vertical). Simple distance check — no chunk system needed for M4.
-20. **Level loader**: Validate `layers` array — each layer has valid grid, entities. Validate `noFloor`/`noCeiling` area flags.
+19. **Level loader**: Validate `layers` array — each layer has valid grid, entities. Validate `noFloor`/`noCeiling` area flags.
 
 ### Editor
 21. **Layer list panel**: Displayed alongside the existing level list. Start with a single layer (current behavior). "Add Layer Above" / "Add Layer Below" buttons insert a new empty layer with default grid. Switch active layer for grid/entity editing.
