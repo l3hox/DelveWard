@@ -43,7 +43,7 @@ Dungeon
 - **Enemies are layer-locked** — no cross-layer AI, pathfinding, or aggro. Each enemy lives on one layer and only interacts with entities/player on that same layer.
 - **Projectiles are layer-locked** — projectiles travel within their originating layer only. No cross-layer projectile flight through hollows.
 - **Signals are cross-layer** — a lever on layer 0 can target a door on layer 2 (entity IDs are level-wide unique, signal resolution via ID).
-- **Per-layer environment is NOT supported in M4** — `THREE.Fog` and `scene.background` are scene-level singletons. One environment per level. Per-layer environment requires custom shader work (deferred).
+- **Environment mixing via areas** — areas can override the level environment (e.g., dungeon entrance within an outdoor level). Fog/ambient blends dynamically based on player position. Limitation: scene-wide `THREE.Fog` means the entire view uses the player's current zone fog. Per-material fog shader deferred.
 
 **Performance model:** Grid geometry is lightweight (~6 planes per cell). All entities simulated on all layers for M4 — world sizes are manageable without optimization. **Draw call budget needs validation** — Phase 0 includes a benchmark to confirm multi-layer rendering performance before committing to the "render everything" strategy.
 
@@ -55,7 +55,7 @@ Dungeon
 - **Dormancy system**: Spatial data structure for entity simulation radius — separate milestone
 - **XZ-only fog shader**: Custom fog that attenuates only on horizontal distance, not vertical
 - **Per-layer light masking**: Three.js rendering layers to scope lights per game layer
-- **Per-layer environment**: Requires custom fog/background per layer region
+- **Per-material fog shader**: True per-zone fog without scene-wide blending compromise
 - Ramps/stairs between layers (smooth within-grid transitions, not teleports)
 - Possibly collapsing levels into one big layer stack for fully interconnected worlds
 - True teleport entity type (distinct from stairs — portal to another level/location)
@@ -135,11 +135,29 @@ class GameState {
 
 ---
 
-## Phase A — Outdoor Environment
+## Phase A — Outdoor Environment + Environment Areas
 
-Simplest visual upgrade. Extend the environment system with an outdoor preset and richer skybox options. No architectural changes — purely additive.
+Extend the environment system with an outdoor preset, richer skybox options, and **environment areas** — allowing mixed environments within a single level (e.g., bright outdoor courtyard with a dark dungeon entrance).
 
-**Current state:** 3 environments (dungeon/mist/forest), 1 skybox (starry-night), ceiling toggle, fog per environment. Far plane 100, skybox radius 90.
+**Current state:** 3 environments (dungeon/mist/forest), 1 skybox (starry-night), ceiling toggle, fog per environment. Far plane 100, skybox radius 90. One environment per level (global).
+
+### Environment Areas
+
+The key addition: define environment zones as areas within a level/layer, reusing the existing area rectangle system.
+
+```typescript
+interface TextureArea {
+  // ... existing fields (fromCol, toCol, fromRow, toRow, textures) ...
+  environment?: Environment;      // NEW — override environment in this region
+}
+```
+
+**How it works:**
+- Each area can optionally specify an `environment` override (dungeon, mist, forest, outdoor)
+- The game tracks which environment area the player is currently standing in
+- `scene.fog`, ambient light, and background lerp smoothly toward the current area's environment config (e.g., 0.5s transition)
+- **Limitation**: `THREE.Fog` is a scene-wide singleton, so the entire scene gets the player's current area fog. Looking back out from a dark dungeon entrance, the outdoor area will also appear dark-fogged. Acceptable for M4 — first-person grid view means you mostly see what's ahead.
+- **Future**: Per-material fog via custom shaders could give true per-zone fog. The environment area data model supports this upgrade without changes.
 
 ### Game
 1. New `'outdoor'` environment preset in `environment.ts`: bright ambient (0x8899aa), distant fog (near: 20, far: 80), sky-blue background
@@ -147,12 +165,18 @@ Simplest visual upgrade. Extend the environment system with an outdoor preset an
 3. Far plane extension: 100 → 200 (needed for layer visibility too). Skybox radius scales to match.
 4. Optional directional light for outdoor environments (sun — simple warm directional, no shadow map for M4)
 5. Level JSON: `environment: 'outdoor'` supported, `skybox: 'daylight' | 'sunset' | 'starry-night'`
+6. **Environment area support**: `environment` field on `TextureArea`. Resolve player's current environment from area overlap (most specific area wins, fall back to level default).
+7. **Dynamic fog/ambient blending**: Each frame, lerp `scene.fog` near/far, fog color, ambient light color toward the target environment config. Smooth transition as player walks between zones.
 
 ### Editor
-6. Environment dropdown: add `'outdoor'` option
-7. Skybox dropdown: add `'daylight'`, `'sunset'` options
+8. Environment dropdown on level properties: add `'outdoor'` option
+9. Skybox dropdown: add `'daylight'`, `'sunset'` options
+10. **Environment field on area editor**: Optional environment dropdown per area (alongside existing texture fields). Shows which areas override the level environment.
 
-**Decision:** Per-level environment/skybox for M4. Dynamic day/night deferred to M8+.
+**Decisions:**
+- Per-level environment remains the default; areas override locally
+- Dynamic day/night deferred to M8+
+- Per-material fog shader deferred — dynamic blending is sufficient for M4
 
 ---
 
