@@ -290,14 +290,16 @@ Edge-based walls between two walkable cells. Enables fences, railings, room divi
 29. **Thin wall rendering**: `PlaneGeometry` at cell edge. Full-height = floor to ceiling. Half-height = waist-high (fences, railings) — player can see over but not walk through.
 30. **Movement blocking**: Player/enemy movement check extended — can't cross an edge with a thin wall on either side. Lookup uses active layer's thin wall Map.
 31. **Reciprocal check**: A thin wall at (5,3) wall='N' also blocks movement from (5,2) going south. The check must work from both sides.
-32. **Projectile interaction**: `solid: true` blocks projectiles. `solid: false` (half-height fences) — projectiles pass over.
-33. **Thin wall textures**: 3-4 built-in options (stone_half, iron_fence, wood_fence, railing). Procedural canvas textures.
-34. **Level loader validation**: thin_wall entity with valid wall direction, walkable cell.
+32. **Pathfinding**: Enemy AI pathfinding (`pathfinding.ts`) must respect thin walls. The walkability callback needs thin wall awareness — a cell is reachable but not from all directions. BFS neighbor expansion must check thin wall edges.
+33. **Projectile interaction**: `solid: true` blocks projectiles. `solid: false` (half-height fences) — projectiles pass over.
+34. **Thin wall textures**: 3-4 built-in options (stone_half, iron_fence, wood_fence, railing). Procedural canvas textures.
+35. **Level loader validation**: thin_wall entity with valid wall direction, walkable cell.
 
 ### Editor
-35. **Thin wall entity in palette**: New entity type with wall direction auto-detect (from adjacent walls)
-36. **Inspector fields**: wall direction dropdown, solid checkbox, height dropdown (full/half), texture dropdown
-37. **Grid icon**: Line on cell edge — position varies by wall direction, like bookshelf icon
+36. **Thin wall entity in palette**: New entity type with wall direction auto-detect (from adjacent walls)
+37. **Inspector fields**: wall direction dropdown, solid checkbox, height dropdown (full/half), texture dropdown
+38. **Grid icon**: Line on cell edge — position varies by wall direction, like bookshelf icon
+39. **Drag-to-paint for thin walls** (stretch): Paint a line of thin walls along a cell edge by dragging. Enables quick building perimeters for city buildings.
 
 ---
 
@@ -387,19 +389,33 @@ Grid-aligned boulders that roll in a direction when triggered. Grid-snapped move
 
 ---
 
-## Phase H — Sub-Grid Entity Positioning
+## Phase H — Sub-Grid Positioning + Item Billboard Sprites
 
-Fractional positioning for decorative props. Gameplay entities stay grid-aligned.
+Two improvements: props get fractional positioning, and ground items switch from flat floor planes to billboard sprites spread across the cell.
 
-**Depends on:** Phase D (props — the main consumer of sub-grid positioning).
+### H1: Prop sub-grid offsets
 
-### Game
+**Depends on:** Phase D (props).
+
 72. **Offset fields on PropInstance**: `offsetX?: number, offsetZ?: number` (range: -0.4 to 0.4)
 73. **Renderer adjustment**: Prop renderer adds offset to world position.
 74. **No gameplay impact**: Offsets are purely visual — no collision, no movement changes.
+75. **Editor**: Offset fields on prop inspector — two number inputs with slider or drag-to-position within cell.
 
-### Editor
-75. **Offset fields on prop inspector**: Two number inputs with slider or drag-to-position within cell.
+### H2: Item billboard sprites + quadrant spread
+
+**Current state:** Items on the ground are flat `PlaneGeometry` lying face-up (rotation.x = -Math.PI/2). Multiple items at the same cell overlap in the center. Items are invisible from a distance because they're flat on the floor.
+
+76. **Billboard item sprites**: Replace flat floor planes with upright billboard sprites (face camera every frame, like enemy/NPC sprites). Items become visible from across the room.
+77. **Quadrant spread**: When multiple items exist on the same cell, spread them to 4 quadrant positions instead of stacking at center:
+    - 1 item: center
+    - 2 items: NW quadrant, SE quadrant
+    - 3 items: NW, NE, S
+    - 4+: NW, NE, SW, SE (cap at 4 visible, rest hidden until pickup)
+    - Offset ~0.3 from cell center
+78. **Billboard update**: Add items to the billboard update loop (like `updateEnemyBillboards`). Or use `THREE.Sprite` which auto-faces camera.
+79. **Mesh rebuild on pickup**: After picking up an item, recalculate quadrant positions for remaining items at that cell (ties into the existing pickup mesh rebuild from Phase F barrel fix).
+80. **Applies to both** `itemRenderer.ts` and `consumableRenderer.ts`.
 
 ---
 
