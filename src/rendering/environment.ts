@@ -93,3 +93,33 @@ export function resolveEnvironmentAtCell(
   }
   return env;
 }
+
+/**
+ * Build a map of cell positions to Three.js rendering layer indices for multi-pass
+ * environment rendering. Each unique environment zone gets a layer (1-based).
+ * Returns the zone map, list of unique zones, and whether multi-pass is needed.
+ */
+export function buildEnvZoneMap(
+  grid: string[],
+  levelEnv: Environment,
+  areas?: Array<{ fromCol: number; toCol: number; fromRow: number; toRow: number; environment?: Environment }>,
+): { zoneMap: Map<string, number>; zones: Environment[]; multiZone: boolean } {
+  const zoneMap = new Map<string, number>();
+  const zoneIndex = new Map<Environment, number>();
+  const zones: Environment[] = [];
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const env = resolveEnvironmentAtCell(col, row, levelEnv, areas);
+      if (!zoneIndex.has(env)) {
+        zones.push(env);
+        zoneIndex.set(env, zones.length); // 1-based layer index
+      }
+      zoneMap.set(`${col},${row}`, zoneIndex.get(env)!);
+    }
+  }
+
+  return { zoneMap, zones, multiZone: zones.length > 1 };
+}

@@ -4,6 +4,18 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-27 — M4 Phase A2: Multi-Pass Environment Rendering
+
+**Architecture**: Used Three.js `Object3D.layers` bitmask for multi-pass rendering instead of stencil operations (cleaner, native). Each environment zone gets a render layer. Camera enables one zone per pass, with zone-specific fog/ambient/background. Depth buffer preserved between passes for correct occlusion.
+
+**Key technique**: Boundary door cells have floor, ceiling, walls, and door frames physically split into half-meshes at build time. Each half tagged to its side's environment zone — outdoor half renders with bright fog, indoor half with dark fog. Door panels split into half-depth groups in a parent group for correct animation.
+
+**Billboard fix**: Enabled `depthWrite: true` on billboard material. The shader already had `if (texColor.a < 0.1) discard` so only opaque pixels write depth. Prevents cross-zone overdraw. Minor alpha edge artifacts accepted for now.
+
+**Performance**: Single-zone levels skip multi-pass entirely (zero overhead). Multi-zone levels do N passes — each renders roughly 1/N of the geometry.
+
+---
+
 ## 2026-03-27 — M4 Phase A: Outdoor Environment + Environment Areas
 
 **Design**: New `'outdoor'` environment preset with bright ambient and distant fog. Two procedural skybox textures (daylight blue gradient + clouds, sunset warm gradient). Environment areas — `environment` field on `TextureArea` allows per-region environment overrides within a level. Dynamic fog/ambient blending via `lerpEnvironment()` — lerps scene fog, background, and ambient light toward the player's current zone each frame (~0.5s transition). Camera far plane extended 100→200 for future multi-layer visibility.

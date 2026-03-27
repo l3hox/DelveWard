@@ -9,7 +9,7 @@ const BOUNCE_SPEED = 3.0;
 type SlideAxis = 'y' | 'x' | 'z';
 
 interface PanelEntry {
-  panel: THREE.Mesh;
+  panel: THREE.Object3D;
   axis: SlideAxis;
   closedVal: number;
   openVal: number;
@@ -24,7 +24,7 @@ export class DoorAnimator {
    * Register a door panel for animation.
    * @param slideAxis 'y' = slide up (default), 'x' = slide east, 'z' = slide north
    */
-  register(key: string, panel: THREE.Mesh, isOpen: boolean, slideAxis: SlideAxis = 'y'): void {
+  register(key: string, panel: THREE.Object3D, isOpen: boolean, slideAxis: SlideAxis = 'y'): void {
     const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
     const panelHeight = WALL_HEIGHT - FRAME_WIDTH;
 

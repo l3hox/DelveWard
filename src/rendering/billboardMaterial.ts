@@ -67,6 +67,6 @@ export function createNeutralLitMaterial(map: THREE.Texture): THREE.ShaderMateri
     fog: true,
     transparent: true,
     side: THREE.DoubleSide,
-    depthWrite: false,
+    depthWrite: true,
   });
 }

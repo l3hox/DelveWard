@@ -36,13 +36,13 @@ import { DamageNumberManager } from './rendering/damageNumbers';
 import { EnemyHealthBarManager } from './rendering/enemyHealthBar';
 import { SwordSwingAnimator } from './rendering/swordSwing';
 import { DustMotes, SconceEmbers, WaterDrips, Fireflies } from './rendering/particles';
-import type { DungeonLevel, Dungeon, Entity } from './core/types';
+import type { DungeonLevel, Dungeon, Entity, Environment } from './core/types';
 import type { LevelSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
-import { applyEnvironment, getEnvironmentConfig, lerpEnvironment, resolveEnvironmentAtCell } from './rendering/environment';
+import { applyEnvironment, getEnvironmentConfig, lerpEnvironment, resolveEnvironmentAtCell, buildEnvZoneMap } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
 import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpGPUShaders, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
@@ -104,7 +104,7 @@ interface LevelScene {
   level: DungeonLevel;
   walkable: Set<string>;
   dungeonGroup: THREE.Group;
-  doorMeshes: { group: THREE.Group; panelMap: Map<string, THREE.Mesh> };
+  doorMeshes: { group: THREE.Group; panelMap: Map<string, THREE.Object3D> };
   doorAnimator: DoorAnimator;
   keyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
@@ -132,6 +132,10 @@ interface LevelScene {
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
+  // Multi-pass environment rendering
+  multiZone: boolean;
+  zones: Environment[];
+  zoneMap: Map<string, number>;
 }
 
 function buildLevelScene(
@@ -150,10 +154,14 @@ function buildLevelScene(
   const wallEntityCells = new Set<string>();
   for (const key of gameState.breakableWalls.keys()) wallEntityCells.add(key);
   for (const key of gameState.secretWalls.keys()) wallEntityCells.add(key);
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions, wallEntityCells);
+  // Multi-pass environment zone map
+  const { zoneMap, zones, multiZone } = buildEnvZoneMap(level.grid, level.environment ?? 'dungeon', level.areas);
+
+  const doorCells = new Set(gameState.doors.keys());
+  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions, wallEntityCells, multiZone ? zoneMap : undefined, multiZone ? doorCells : undefined);
   scene.add(dungeonGroup);
 
-  const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable);
+  const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable, multiZone ? zoneMap : undefined);
   scene.add(doorMeshes.group);
 
   const doorAnimator = new DoorAnimator();
@@ -277,6 +285,69 @@ function buildLevelScene(
     scene.add(skyboxMesh);
   }
 
+  // Tag entity meshes + skybox with environment zone layers for multi-pass rendering
+  if (multiZone) {
+    const tagMeshByKey = (obj: THREE.Object3D, key: string) => {
+      const zone = zoneMap.get(key);
+      if (zone !== undefined) obj.traverse(child => { child.layers.set(zone); });
+    };
+
+    // Tag all entity mesh maps
+    // (Door frames + panels tagged at build time in buildDoorMeshes)
+    for (const [key, mesh] of keyMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of plateMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of tripwireMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of sconceMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of enemyMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of npcMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of itemMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of consumableMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of blockMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of chestMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of signMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of fountainMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of bookshelfMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of altarMeshes.meshMap) tagMeshByKey(mesh, key);
+    for (const [key, mesh] of barrelMeshes.meshMap) tagMeshByKey(mesh, key);
+
+    // Lever handle groups
+    for (const [key, handle] of leverMeshes.handleMap) tagMeshByKey(handle, key);
+
+    // Wall entity meshes (breakable/secret walls)
+    for (const [key, entry] of wallEntityMeshes.meshMap) {
+      tagMeshByKey(entry.wallGroup, key);
+      tagMeshByKey(entry.floorCeilGroup, key);
+    }
+
+    // Groups without per-mesh zone keys — show in all zones
+    // (stair geometry, trap launchers, projectiles)
+    const allZoneGroups = [
+      stairMeshes.group,
+      trapLauncherMeshes.group, projectileMeshes.group,
+    ];
+    for (const g of allZoneGroups) {
+      g.traverse(child => { child.layers.enableAll(); });
+    }
+
+    // Forest billboards — tag by position (derive cell from world coords)
+    for (const billboard of forestMeshes.billboards) {
+      const col = Math.floor(billboard.position.x / CELL_SIZE);
+      const row = Math.floor(billboard.position.z / CELL_SIZE);
+      const zone = zoneMap.get(doorKey(col, row));
+      if (zone !== undefined) billboard.layers.set(zone);
+      else billboard.layers.enableAll();
+    }
+
+    // Sconce lights + health bars — visible in all zones
+    for (const [, light] of sconceMeshes.lightMap) {
+      light.layers.enableAll();
+    }
+    healthBarManager.getGroup().traverse(child => { child.layers.enableAll(); });
+
+    // Skybox renders only in the first zone (typically outdoor)
+    if (skyboxMesh) skyboxMesh.layers.set(1);
+  }
+
   return {
     level,
     walkable,
@@ -309,6 +380,9 @@ function buildLevelScene(
     consumableMeshes,
     skyboxMesh,
     player,
+    multiZone,
+    zones,
+    zoneMap,
   };
 }
 
@@ -398,6 +472,11 @@ async function init(): Promise<void> {
   const STARVATION_INTERVAL = 3; // seconds per 1 HP starvation damage
   scene.add(torchLight);
   scene.add(torchFillLight);
+
+  // Lights must be visible in all multi-pass environment zones
+  ambient.layers.enableAll();
+  torchLight.layers.enableAll();
+  torchFillLight.layers.enableAll();
 
   // Debug: fullbright toggle
   let debugFullbright = false;
@@ -1602,11 +1681,13 @@ async function init(): Promise<void> {
       // Temp buff tick
       gameState.tickTempBuffs(delta);
 
-      // Environment area blending
-      const ps = ls.player.getState();
-      const playerEnv = resolveEnvironmentAtCell(ps.col, ps.row, ls.level.environment ?? 'dungeon', ls.level.areas);
-      const targetCfg = getEnvironmentConfig(playerEnv);
-      lerpEnvironment(scene, ambient, targetCfg, delta * 2);
+      // Environment area blending (only for single-zone levels; multi-zone uses multi-pass rendering)
+      if (!ls.multiZone) {
+        const ps = ls.player.getState();
+        const playerEnv = resolveEnvironmentAtCell(ps.col, ps.row, ls.level.environment ?? 'dungeon', ls.level.areas);
+        const targetCfg = getEnvironmentConfig(playerEnv);
+        lerpEnvironment(scene, ambient, targetCfg, delta * 2);
+      }
 
       // Hunger drain (real-time, paused during overlays)
       hungerDrainAccumulator += delta;
@@ -1718,7 +1799,27 @@ async function init(): Promise<void> {
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
     hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing, levelUpNotification);
-    renderer.render(scene, camera);
+
+    // Multi-pass environment rendering: each zone gets its own fog/background
+    if (!ls.multiZone) {
+      renderer.render(scene, camera);
+    } else {
+      renderer.autoClear = false;
+      renderer.clear(true, true, true);
+      for (let i = 0; i < ls.zones.length; i++) {
+        const zoneLayer = i + 1;
+        camera.layers.disableAll();
+        camera.layers.enable(zoneLayer);
+        const cfg = getEnvironmentConfig(ls.zones[i]);
+        scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
+        scene.background = i === 0 ? new THREE.Color(cfg.fogColor) : null;
+        ambient.color.setHex(cfg.ambientColor);
+        renderer.render(scene, camera);
+      }
+      renderer.autoClear = true;
+      camera.layers.enableAll();
+    }
+
     requestAnimationFrame(animate);
   }
 
