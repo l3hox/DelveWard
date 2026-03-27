@@ -161,7 +161,13 @@ Vertical openness between layers is defined via the area system (already used fo
 24. **Hollow area flags**: `noFloor` / `noCeiling` checkboxes in the area editor (alongside existing texture fields). Grid canvas renders hollow areas with distinct visual (e.g., dashed floor pattern for noFloor, open top indicator for noCeiling).
 25. **Void cell painting**: `' '` char in palette retains clear visual distinction (checkered pattern).
 26. **Layer deletion**: Remove a layer (with confirmation). Entities on deleted layer are lost.
-27. **3D layer preview** (stretch): Wireframe side-view showing layer stacking. Not required for M4.
+27. **3D layer preview** (stretch): Wireframe side-view showing layer stacking.
+
+**Editor UX will be refined iteratively during implementation.** Expected enhancements as we go:
+- New layer inherits hollow pattern from adjacent layer (mirrors ceiling holes as floor holes, etc.)
+- Grid canvas shows lower layer faintly through hollow areas (see-through ghost grid)
+- 3D preview of layer stacking
+- Other quality-of-life as discovered during actual editing
 
 **Decision:** Entity IDs remain per-level (dungeon-wide unique), consistent with existing system. Layer index is part of the entity's position context, not its ID.
 
