@@ -261,6 +261,30 @@ function validateEntity(
       const w = checkWalkable('npc'); if (w) return w;
       break;
     }
+    case 'fountain': {
+      const w = checkWalkable('fountain'); if (w) return w;
+      if (e.healAmount !== undefined && (typeof e.healAmount !== 'number' || (e.healAmount as number) <= 0)) return `${pfx} fountain healAmount must be a positive number`;
+      break;
+    }
+    case 'bookshelf': {
+      const w = checkWalkable('bookshelf'); if (w) return w;
+      if (e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) return `${pfx} bookshelf wall must be N, S, E, or W`;
+      if (e.text !== undefined && typeof e.text !== 'string') return `${pfx} bookshelf text must be a string`;
+      break;
+    }
+    case 'altar': {
+      const w = checkWalkable('altar'); if (w) return w;
+      const validBuffTypes = ['atk', 'def', 'str', 'dex', 'vit', 'wis'];
+      if (e.buffType !== undefined && !validBuffTypes.includes(e.buffType as string)) return `${pfx} altar buffType must be one of ${validBuffTypes.join(', ')}`;
+      if (e.buffAmount !== undefined && (typeof e.buffAmount !== 'number' || (e.buffAmount as number) <= 0)) return `${pfx} altar buffAmount must be a positive number`;
+      if (e.buffDuration !== undefined && (typeof e.buffDuration !== 'number' || (e.buffDuration as number) <= 0)) return `${pfx} altar buffDuration must be a positive number`;
+      break;
+    }
+    case 'barrel': {
+      const w = checkWalkable('barrel'); if (w) return w;
+      if (e.hp !== undefined && (typeof e.hp !== 'number' || (e.hp as number) <= 0)) return `${pfx} barrel hp must be a positive number`;
+      break;
+    }
   }
 
   return null;

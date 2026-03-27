@@ -36,7 +36,7 @@ export function getWeaponCooldown(gameState: GameState): number {
 }
 
 export interface CombatResult {
-  type: 'miss' | 'hit' | 'kill' | 'no_target' | 'cooldown' | 'wall_hit' | 'wall_destroy';
+  type: 'miss' | 'hit' | 'kill' | 'no_target' | 'cooldown' | 'wall_hit' | 'wall_destroy' | 'barrel_hit' | 'barrel_destroy';
   damage?: number;
   targetCol?: number;
   targetRow?: number;
@@ -163,6 +163,12 @@ export function playerAttack(
         targetRow: frontRow,
         dropsOverride: bwall.drops,
       }];
+    }
+    const barrel = gameState.getBarrel(frontCol, frontRow);
+    if (barrel) {
+      const { damage } = resolveWeaponEffect(subtype, stats.atk, 0, stats.critChance);
+      const result = gameState.damageBarrel(frontCol, frontRow, damage);
+      return [{ type: result.destroyed ? 'barrel_destroy' : 'barrel_hit', damage, targetCol: frontCol, targetRow: frontRow, dropsOverride: result.drops }];
     }
     return [{ type: 'no_target' }];
   }

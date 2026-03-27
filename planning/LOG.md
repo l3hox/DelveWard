@@ -4,6 +4,18 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-27 — M3 Phase F: Dungeon Objects + Editor
+
+**Design**: 4 new entity types: fountain (one-shot HP heal), bookshelf (wall-mounted lore text via SignOverlay), altar (timed stat buff via new TempBuff system), barrel (breakable via combat, drops loot, blocks movement). All use simple 3D geometry per ADR-M3-06 — no billboards, no imported models.
+
+**Architecture — TempBuff system**: New `TempBuff` interface (`stat`, `amount`, `remaining`) and `tempBuffs: TempBuff[]` on GameState. Same-stat refresh (replace, don't stack). Ticked in game loop alongside status effects. Factored into `getEffectiveStats()` — atk/def buffs add to final values, str/dex/vit/wis buffs add to effective attributes. Separate from StatusEffect system (which is for DoT/debuffs).
+
+**Architecture — Barrel combat**: Barrels follow the breakable_wall damage pattern in `combat.ts` (attack key, not interact). Unlike breakable_wall, barrel destruction does NOT modify the grid (cell is already walkable) — just removes the entity from the Map and the mesh from the scene.
+
+**Bug fix — multi-item loot mesh management**: When multiple items drop at the same cell (barrel loot, enemy kills, wall destruction), the mesh system now correctly: (1) keeps only the first item's mesh visible (matching pickup order), (2) after each pickup, removes the old mesh from the group + map and rebuilds for the next remaining item. Previously, meshMap overwrites caused orphaned meshes or mesh/pickup order mismatches.
+
+---
+
 ## 2026-03-25 — M3 Phase E: Hunger System
 
 **Design**: Simple survival hunger mechanic — hunger stat (0–100) drains 1 per 10 seconds of real unpaused game time. Starvation at hunger=0 deals 1 HP every 3 seconds. Rations consumable restores 30 hunger. All timers use accumulator pattern and pause during overlays.

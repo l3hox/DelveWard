@@ -22,6 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
+  'fountain', 'bookshelf', 'altar', 'barrel',
 ] as const;
 
 export class Toolbar {
@@ -846,6 +847,79 @@ export class Toolbar {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('NPC', cx, cy);
+        break;
+      }
+      case 'fountain': {
+        // Blue basin circle with lighter water center
+        ctx.fillStyle = '#4488cc';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#2266aa';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#aaddff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'bookshelf': {
+        // Brown tall rectangle with book-spine lines
+        const bw = r * 1.4;
+        const bh = r * 1.8;
+        ctx.fillStyle = '#4a3020';
+        ctx.fillRect(cx - bw / 2, cy - bh / 2, bw, bh);
+        ctx.strokeStyle = '#2a1810';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.strokeRect(cx - bw / 2, cy - bh / 2, bw, bh);
+        // Book spine lines
+        ctx.lineWidth = Math.max(1, r * 0.1);
+        for (let i = -1; i <= 1; i++) {
+          const ly = cy + i * bh * 0.25;
+          ctx.beginPath();
+          ctx.moveTo(cx - bw / 2 + 2, ly);
+          ctx.lineTo(cx + bw / 2 - 2, ly);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'altar': {
+        // Gray platform with raised center pillar
+        const aW = r * 1.6;
+        const aH = r * 0.6;
+        ctx.fillStyle = '#777777';
+        ctx.fillRect(cx - aW / 2, cy, aW, aH);
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = Math.max(1, r * 0.15);
+        ctx.strokeRect(cx - aW / 2, cy, aW, aH);
+        const pW = r * 0.8;
+        const pH = r * 1.0;
+        ctx.fillStyle = '#999999';
+        ctx.fillRect(cx - pW / 2, cy - pH + aH * 0.2, pW, pH);
+        ctx.strokeStyle = '#666666';
+        ctx.strokeRect(cx - pW / 2, cy - pH + aH * 0.2, pW, pH);
+        break;
+      }
+      case 'barrel': {
+        // Brown circle with dark iron band ring
+        ctx.fillStyle = '#8b5e3c';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = Math.max(1.5, r * 0.2);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        // Inner band
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = Math.max(1, r * 0.12);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
         break;
       }
     }

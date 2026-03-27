@@ -36,6 +36,10 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   chest:          { state: 'closed', facing: 'S' },
   sign:           { wall: 'N', text: '' },
   npc:            { npcId: '' },
+  fountain:       { healAmount: 20 },
+  bookshelf:      { wall: 'N', text: '' },
+  altar:          { buffType: 'atk', buffAmount: 5, buffDuration: 60 },
+  barrel:         { hp: 10 },
 };
 
 export interface ValidationError {
@@ -685,6 +689,12 @@ export class EditorApp {
       }
     }
     if (type === 'sign' && this.level) {
+      const detected = this.autoDetectWall(col, row);
+      if (detected) {
+        entity.wall = detected;
+      }
+    }
+    if (type === 'bookshelf' && this.level) {
       const detected = this.autoDetectWall(col, row);
       if (detected) {
         entity.wall = detected;

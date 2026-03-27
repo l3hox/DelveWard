@@ -1018,6 +1018,80 @@ export class GridCanvas {
         break;
       }
 
+      case 'fountain': {
+        ctx.fillStyle = '#4488cc';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#aaddff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
+      case 'bookshelf': {
+        // Wall-mounted: position flush against the wall like sconce/lever
+        const bsWall = (entity.wall as string) || 'N';
+        const bsInset = Math.max(1, Math.min(tw, th) * 0.05);
+        const bsThick = Math.max(2, Math.min(tw, th) * 0.12);
+        const bsLen = Math.max(4, Math.min(tw, th) * 0.7);
+        let bsX: number, bsY: number, bsW: number, bsH: number;
+        if (bsWall === 'N') {
+          bsX = cx - bsLen / 2; bsY = py + bsInset; bsW = bsLen; bsH = bsThick;
+        } else if (bsWall === 'S') {
+          bsX = cx - bsLen / 2; bsY = py + th - bsInset - bsThick; bsW = bsLen; bsH = bsThick;
+        } else if (bsWall === 'W') {
+          bsX = px + bsInset; bsY = cy - bsLen / 2; bsW = bsThick; bsH = bsLen;
+        } else {
+          bsX = px + tw - bsInset - bsThick; bsY = cy - bsLen / 2; bsW = bsThick; bsH = bsLen;
+        }
+        ctx.fillStyle = '#4a3020';
+        ctx.fillRect(bsX, bsY, bsW, bsH);
+        ctx.strokeStyle = '#2a1810';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
+        ctx.strokeRect(bsX, bsY, bsW, bsH);
+        // Book spine lines across the short axis
+        const bsHoriz = bsWall === 'N' || bsWall === 'S';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.03);
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          if (bsHoriz) {
+            const lx = cx + i * bsLen * 0.25;
+            ctx.moveTo(lx, bsY + 1);
+            ctx.lineTo(lx, bsY + bsH - 1);
+          } else {
+            const ly = cy + i * bsLen * 0.25;
+            ctx.moveTo(bsX + 1, ly);
+            ctx.lineTo(bsX + bsW - 1, ly);
+          }
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case 'altar': {
+        const alR = iconRadius;
+        ctx.fillStyle = '#777777';
+        ctx.fillRect(cx - alR, cy - alR * 0.3, alR * 2, alR * 0.6);
+        ctx.fillStyle = '#999999';
+        ctx.fillRect(cx - alR * 0.35, cy - alR * 0.7, alR * 0.7, alR * 0.7);
+        break;
+      }
+
+      case 'barrel': {
+        ctx.fillStyle = '#8b5e3c';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+
       default:
         break;
     }

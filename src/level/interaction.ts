@@ -3,7 +3,7 @@ import { getFacingCell, FACING_DELTA, isWalkable } from '../core/grid';
 import type { GameState } from '../core/gameState';
 
 export interface InteractionResult {
-  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'block_pushed' | 'chest_opened' | 'chest_locked' | 'sign_read' | 'npc_interacted' | 'nothing';
+  type: 'door_opened' | 'door_closed' | 'door_blocked' | 'door_locked' | 'lever_activated' | 'sconce_taken' | 'block_pushed' | 'chest_opened' | 'chest_locked' | 'sign_read' | 'npc_interacted' | 'fountain_used' | 'bookshelf_read' | 'altar_activated' | 'nothing';
   message?: string;
   targets?: string[]; // entity IDs of affected doors (for mesh updates)
   targetCol?: number;
@@ -105,10 +105,40 @@ export function interact(
     return { type: 'npc_interacted', message: npc.npcId, targetCol: col, targetRow: row };
   }
 
+  // Fountain interaction — facing cell
+  const fountain = gameState.getFountain(col, row);
+  if (fountain) {
+    if (fountain.state === 'used') {
+      return { type: 'nothing', message: 'The fountain has dried up.' };
+    }
+    const result = gameState.useFountain(col, row);
+    if (result.healed) {
+      return { type: 'fountain_used', message: `Restored ${result.healAmount} HP.`, targetCol: col, targetRow: row };
+    }
+  }
+
+  // Altar interaction — facing cell
+  const altar = gameState.getAltar(col, row);
+  if (altar) {
+    if (altar.state === 'used') {
+      return { type: 'nothing', message: 'The altar has gone dark.' };
+    }
+    const result = gameState.useAltar(col, row);
+    if (result.activated) {
+      return { type: 'altar_activated', message: `${result.buffType.toUpperCase()} +${result.buffAmount} for ${result.buffDuration}s`, targetCol: col, targetRow: row };
+    }
+  }
+
   // Sign interaction — player stands on sign cell and faces the sign's wall
   const sign = gameState.getSignOnWall(playerState.col, playerState.row, playerState.facing);
   if (sign) {
     return { type: 'sign_read', message: sign.text };
+  }
+
+  // Bookshelf interaction — player stands on cell, faces bookshelf's wall
+  const bookshelf = gameState.getBookshelfOnWall(playerState.col, playerState.row, playerState.facing);
+  if (bookshelf) {
+    return { type: 'bookshelf_read', message: bookshelf.text };
   }
 
   return { type: 'nothing' };

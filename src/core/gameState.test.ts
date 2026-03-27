@@ -917,6 +917,171 @@ describe('GameState', () => {
     });
   });
 
+  // --- Fountain ---
+
+  describe('fountain', () => {
+    it('parses fountain entity', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'fountain', healAmount: 25 }]);
+      const f = gs.getFountain(3, 3);
+      expect(f).toBeDefined();
+      expect(f!.state).toBe('active');
+      expect(f!.healAmount).toBe(25);
+    });
+
+    it('useFountain heals and sets state to used', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'fountain', healAmount: 20 }]);
+      gs.hp = 30;
+      const result = gs.useFountain(3, 3);
+      expect(result.healed).toBe(true);
+      expect(result.healAmount).toBe(20);
+      expect(gs.hp).toBe(50);
+      expect(gs.getFountain(3, 3)!.state).toBe('used');
+    });
+
+    it('useFountain returns false when already used', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'fountain', healAmount: 20 }]);
+      gs.useFountain(3, 3);
+      const result = gs.useFountain(3, 3);
+      expect(result.healed).toBe(false);
+    });
+
+    it('useFountain clamps HP at maxHp', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'fountain', healAmount: 50 }]);
+      gs.hp = gs.maxHp - 5;
+      gs.useFountain(3, 3);
+      expect(gs.hp).toBe(gs.maxHp);
+    });
+  });
+
+  // --- Bookshelf ---
+
+  describe('bookshelf', () => {
+    it('parses bookshelf entity', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'bookshelf', wall: 'N', text: 'Lore text' }]);
+      const b = gs.getBookshelfOnWall(3, 3, 'N');
+      expect(b).toBeDefined();
+      expect(b!.text).toBe('Lore text');
+    });
+
+    it('getBookshelfOnWall returns undefined for wrong wall', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'bookshelf', wall: 'N', text: 'Lore' }]);
+      expect(gs.getBookshelfOnWall(3, 3, 'S')).toBeUndefined();
+    });
+  });
+
+  // --- Altar ---
+
+  describe('altar', () => {
+    it('parses altar entity', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'altar', buffType: 'def', buffAmount: 3, buffDuration: 30 }]);
+      const a = gs.getAltar(3, 3);
+      expect(a).toBeDefined();
+      expect(a!.state).toBe('active');
+      expect(a!.buffType).toBe('def');
+    });
+
+    it('useAltar activates buff and sets state to used', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'altar', buffType: 'atk', buffAmount: 5, buffDuration: 60 }]);
+      const result = gs.useAltar(3, 3);
+      expect(result.activated).toBe(true);
+      expect(result.buffType).toBe('atk');
+      expect(gs.getAltar(3, 3)!.state).toBe('used');
+      expect(gs.tempBuffs.length).toBe(1);
+      expect(gs.tempBuffs[0].stat).toBe('atk');
+    });
+
+    it('useAltar returns false when already used', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'altar', buffType: 'atk', buffAmount: 5, buffDuration: 60 }]);
+      gs.useAltar(3, 3);
+      const result = gs.useAltar(3, 3);
+      expect(result.activated).toBe(false);
+    });
+  });
+
+  // --- Barrel ---
+
+  describe('barrel', () => {
+    it('parses barrel entity', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'barrel', hp: 15 }]);
+      const b = gs.getBarrel(3, 3);
+      expect(b).toBeDefined();
+      expect(b!.hp).toBe(15);
+      expect(b!.maxHp).toBe(15);
+    });
+
+    it('damageBarrel reduces HP', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'barrel', hp: 20 }]);
+      const result = gs.damageBarrel(3, 3, 5);
+      expect(result.destroyed).toBe(false);
+      expect(gs.getBarrel(3, 3)!.hp).toBe(15);
+    });
+
+    it('damageBarrel destroys barrel when HP reaches 0', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'barrel', hp: 10 }]);
+      const result = gs.damageBarrel(3, 3, 15);
+      expect(result.destroyed).toBe(true);
+      expect(gs.getBarrel(3, 3)).toBeUndefined();
+    });
+
+    it('isBarrelAt returns true for existing barrel', () => {
+      const gs = new GameState([{ col: 3, row: 3, type: 'barrel', hp: 10 }]);
+      expect(gs.isBarrelAt(3, 3)).toBe(true);
+      expect(gs.isBarrelAt(4, 4)).toBe(false);
+    });
+  });
+
+  // --- Temp Buffs ---
+
+  describe('tempBuffs', () => {
+    it('addTempBuff adds a buff', () => {
+      const gs = new GameState([]);
+      gs.addTempBuff('atk', 5, 60);
+      expect(gs.tempBuffs.length).toBe(1);
+      expect(gs.getTempBuffTotal('atk')).toBe(5);
+    });
+
+    it('addTempBuff replaces same-stat buff', () => {
+      const gs = new GameState([]);
+      gs.addTempBuff('atk', 5, 60);
+      gs.addTempBuff('atk', 10, 30);
+      expect(gs.tempBuffs.length).toBe(1);
+      expect(gs.getTempBuffTotal('atk')).toBe(10);
+    });
+
+    it('tickTempBuffs expires buffs', () => {
+      const gs = new GameState([]);
+      gs.addTempBuff('atk', 5, 2);
+      gs.tickTempBuffs(3);
+      expect(gs.tempBuffs.length).toBe(0);
+      expect(gs.getTempBuffTotal('atk')).toBe(0);
+    });
+
+    it('getEffectiveStats includes temp buff', () => {
+      const gs = new GameState([]);
+      const baseDef = gs.getEffectiveStats().def;
+      gs.addTempBuff('def', 10, 60);
+      expect(gs.getEffectiveStats().def).toBe(baseDef + 10);
+    });
+
+    it('getPlayerState includes tempBuffs', () => {
+      const gs = new GameState([]);
+      gs.addTempBuff('str', 3, 30);
+      const state = gs.getPlayerState();
+      expect(state.tempBuffs.length).toBe(1);
+      expect(state.tempBuffs[0].stat).toBe('str');
+    });
+
+    it('restorePlayerState restores tempBuffs', () => {
+      const gs = new GameState([]);
+      gs.addTempBuff('atk', 5, 60);
+      const state = gs.getPlayerState();
+      const gs2 = new GameState([]);
+      gs2.restorePlayerState(state);
+      expect(gs2.tempBuffs.length).toBe(1);
+      expect(gs2.getTempBuffTotal('atk')).toBe(5);
+    });
+  });
+
   // --- Equipment ---
 
   describe('equipment', () => {

@@ -16,6 +16,11 @@ import type {
   ChestInstance,
   SignInstance,
   NPCInstance,
+  FountainInstance,
+  BookshelfInstance,
+  AltarInstance,
+  BarrelInstance,
+  TempBuff,
 } from './gameState';
 import type { ItemEntity } from './entities';
 import type { Facing } from './grid';
@@ -46,6 +51,10 @@ interface SerializedLevelSnapshot {
   chests: Record<string, ChestInstance>;
   signs: Record<string, SignInstance>;
   npcs: Record<string, NPCInstance>;
+  fountains?: Record<string, FountainInstance>;
+  bookshelves?: Record<string, BookshelfInstance>;
+  altars?: Record<string, AltarInstance>;
+  barrels?: Record<string, BarrelInstance>;
   destroyedWalls: string[];
   exploredCells: string[];
   registrySnapshot: ItemEntity[];
@@ -78,6 +87,7 @@ export interface SaveData {
     statusEffects: StatusEffect[];
     hunger?: number;
     maxHunger?: number;
+    tempBuffs?: TempBuff[];
   };
   keys: string[];
   entityRegistry: ItemEntity[];
@@ -134,6 +144,10 @@ export function serializeLevelSnapshot(snapshot: LevelSnapshot): SerializedLevel
     chests: mapToRecord(snapshot.chests),
     signs: mapToRecord(snapshot.signs),
     npcs: mapToRecord(snapshot.npcs),
+    fountains: mapToRecord(snapshot.fountains),
+    bookshelves: mapToRecord(snapshot.bookshelves),
+    altars: mapToRecord(snapshot.altars),
+    barrels: mapToRecord(snapshot.barrels),
     destroyedWalls: setToArray(snapshot.destroyedWalls),
     exploredCells: setToArray(snapshot.exploredCells),
     registrySnapshot: snapshot.registrySnapshot,
@@ -160,6 +174,10 @@ export function deserializeLevelSnapshot(data: SerializedLevelSnapshot): LevelSn
     chests: recordToMap(data.chests),
     signs: recordToMap(data.signs),
     npcs: recordToMap(data.npcs ?? {}),
+    fountains: recordToMap(data.fountains ?? {}),
+    bookshelves: recordToMap(data.bookshelves ?? {}),
+    altars: recordToMap(data.altars ?? {}),
+    barrels: recordToMap(data.barrels ?? {}),
     destroyedWalls: arrayToSet(data.destroyedWalls),
     exploredCells: arrayToSet(data.exploredCells),
     registrySnapshot: data.registrySnapshot,
@@ -237,6 +255,7 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
       statusEffects: gameState.playerStatusEffects.map(e => ({ ...e })),
       hunger: gameState.hunger,
       maxHunger: gameState.maxHunger,
+      tempBuffs: gameState.tempBuffs.map(b => ({ ...b })),
     },
     keys: Array.from(gameState.inventory),
     entityRegistry: fullRegistry,
@@ -311,6 +330,7 @@ export function applySaveData(
   gameState.playerStatusEffects = p.statusEffects.map(e => ({ ...e }));
   gameState.hunger = p.hunger ?? 100;
   gameState.maxHunger = p.maxHunger ?? 100;
+  gameState.tempBuffs = (p.tempBuffs ?? []).map(b => ({ ...b }));
 
   // Restore key inventory.
   gameState.inventory.clear();

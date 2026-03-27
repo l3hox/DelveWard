@@ -52,6 +52,10 @@ import { buildWallEntityMeshes, type WallEntityMeshes } from './rendering/wallEn
 import { buildBlockMeshes, animateBlockPush, type BlockMeshes } from './rendering/blockRenderer';
 import { buildChestMeshes, openChestMesh, closeChestMesh, type ChestMeshes } from './rendering/chestRenderer';
 import { buildSignMeshes, type SignMeshes } from './rendering/signRenderer';
+import { buildFountainMeshes, markFountainUsed } from './rendering/fountainRenderer';
+import { buildBookshelfMeshes } from './rendering/bookshelfRenderer';
+import { buildAltarMeshes, markAltarUsed } from './rendering/altarRenderer';
+import { buildBarrelMeshes } from './rendering/barrelRenderer';
 import { SignOverlay } from './hud/signOverlay';
 import { DialogOverlay } from './hud/dialogOverlay';
 import { npcDatabase } from './npcs/npcDatabase';
@@ -121,6 +125,10 @@ interface LevelScene {
   blockMeshes: BlockMeshes;
   chestMeshes: ChestMeshes;
   signMeshes: SignMeshes;
+  fountainMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  bookshelfMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  altarMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  barrelMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -211,6 +219,18 @@ function buildLevelScene(
   const signMeshes = buildSignMeshes(gameState);
   scene.add(signMeshes.group);
 
+  const fountainMeshes = buildFountainMeshes(gameState);
+  scene.add(fountainMeshes.group);
+
+  const bookshelfMeshes = buildBookshelfMeshes(gameState);
+  scene.add(bookshelfMeshes.group);
+
+  const altarMeshes = buildAltarMeshes(gameState);
+  scene.add(altarMeshes.group);
+
+  const barrelMeshes = buildBarrelMeshes(gameState);
+  scene.add(barrelMeshes.group);
+
   const npcMeshes = buildNpcMeshes(gameState.npcs);
   scene.add(npcMeshes.group);
 
@@ -247,7 +267,7 @@ function buildLevelScene(
     startFacing,
     walkable,
     gameState.isDoorOpen.bind(gameState),
-    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row),
+    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row),
     gameState.stairs,
   );
 
@@ -277,6 +297,10 @@ function buildLevelScene(
     blockMeshes,
     chestMeshes,
     signMeshes,
+    fountainMeshes,
+    bookshelfMeshes,
+    altarMeshes,
+    barrelMeshes,
     npcMeshes,
     enemyMeshes,
     enemyAnimator,
@@ -305,6 +329,10 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.blockMeshes.group,
     ls.chestMeshes.group,
     ls.signMeshes.group,
+    ls.fountainMeshes.group,
+    ls.bookshelfMeshes.group,
+    ls.altarMeshes.group,
+    ls.barrelMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
@@ -394,8 +422,8 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
-//  const dungeon: Dungeon = await loadDungeon('/levels/test_m2d.json');
+//  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
@@ -828,14 +856,26 @@ async function init(): Promise<void> {
         hud.showMessage(equipResult.denied);
       } else if (equipResult.item) {
         hud.showMessage(`Equipped: ${equipResult.item.name}`);
-        hideItemMesh(ls.itemMeshes.meshMap, col, row);
+        hideItemMesh(ls.itemMeshes.meshMap, ls.itemMeshes.group, col, row);
+        // Show mesh for next remaining equipment at this cell
+        const remainingEquip = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
+          .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type !== 'consumable'; });
+        if (remainingEquip) {
+          addSingleItemMesh(remainingEquip, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+        }
       }
 
       // Consumable pickup
       const pickedUpConsumable = gameState.pickupConsumableAt(col, row);
       if (pickedUpConsumable) {
         console.log(`Picked up: ${pickedUpConsumable.name}`);
-        hideConsumableMesh(ls.consumableMeshes.meshMap, col, row);
+        hideConsumableMesh(ls.consumableMeshes.meshMap, ls.consumableMeshes.group, col, row);
+        // Show mesh for next remaining consumable at this cell
+        const remainingCons = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
+          .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type === 'consumable'; });
+        if (remainingCons) {
+          addSingleConsumableMesh(remainingCons, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+        }
       }
 
       // Trigger / tripwire activation
@@ -1268,6 +1308,21 @@ async function init(): Promise<void> {
           if (result.type === 'sign_read' && result.message) {
             signOverlay.show(result.message);
           }
+          if (result.type === 'bookshelf_read' && result.message) {
+            signOverlay.show(result.message);
+          }
+          if (result.type === 'fountain_used' && result.message) {
+            hud.showMessage(result.message);
+            if (result.targetCol !== undefined && result.targetRow !== undefined) {
+              markFountainUsed(ls.fountainMeshes.meshMap, result.targetCol, result.targetRow);
+            }
+          }
+          if (result.type === 'altar_activated' && result.message) {
+            hud.showMessage(result.message);
+            if (result.targetCol !== undefined && result.targetRow !== undefined) {
+              markAltarUsed(ls.altarMeshes.meshMap, result.targetCol, result.targetRow);
+            }
+          }
           if (result.type === 'npc_interacted' && result.message) {
             const npcId = result.message;
             const npcDef = npcDatabase.getNpc(npcId);
@@ -1351,6 +1406,35 @@ async function init(): Promise<void> {
                 // Roll loot from wall drops
                 if (wallResult.drops) {
                   const lootResult = rollLoot('', wallResult.drops);
+                  gameState.gold += lootResult.gold;
+                  for (const drop of lootResult.items) {
+                    const entity = gameState.entityRegistry.createItem(
+                      drop.itemId, drop.quality,
+                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                      drop.modifiers,
+                    );
+                    const itemDef = itemDatabase.getItem(drop.itemId);
+                    if (itemDef && itemDef.type === 'consumable') {
+                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                    } else if (itemDef) {
+                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                    }
+                  }
+                }
+              }
+            }
+            if ((result.type === 'barrel_hit' || result.type === 'barrel_destroy') && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
+              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+              if (result.type === 'barrel_destroy') {
+                const barrelKey = doorKey(result.targetCol, result.targetRow);
+                const barrelMesh = ls.barrelMeshes.meshMap.get(barrelKey);
+                if (barrelMesh) {
+                  ls.barrelMeshes.group.remove(barrelMesh);
+                  ls.barrelMeshes.meshMap.delete(barrelKey);
+                }
+                // Roll loot from barrel drops
+                if (result.dropsOverride) {
+                  const lootResult = rollLoot('', result.dropsOverride);
                   gameState.gold += lootResult.gold;
                   for (const drop of lootResult.items) {
                     const entity = gameState.entityRegistry.createItem(
@@ -1514,6 +1598,9 @@ async function init(): Promise<void> {
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
       }
       gameState.playerStatusEffects = gameState.playerStatusEffects.filter(e => e.remaining > 0);
+
+      // Temp buff tick
+      gameState.tickTempBuffs(delta);
 
       // Hunger drain (real-time, paused during overlays)
       hungerDrainAccumulator += delta;

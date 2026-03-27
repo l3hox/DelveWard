@@ -180,6 +180,50 @@ export interface NPCInstance {
   npcId: string;
 }
 
+export type FountainState = 'active' | 'used';
+export interface FountainInstance {
+  id?: string;
+  col: number;
+  row: number;
+  state: FountainState;
+  healAmount: number;
+}
+
+export interface BookshelfInstance {
+  id?: string;
+  col: number;
+  row: number;
+  wall: Facing;
+  text: string;
+}
+
+export type BuffStat = 'atk' | 'def' | 'str' | 'dex' | 'vit' | 'wis';
+export type AltarState = 'active' | 'used';
+export interface AltarInstance {
+  id?: string;
+  col: number;
+  row: number;
+  state: AltarState;
+  buffType: BuffStat;
+  buffAmount: number;
+  buffDuration: number;
+}
+
+export interface BarrelInstance {
+  id?: string;
+  col: number;
+  row: number;
+  hp: number;
+  maxHp: number;
+  drops?: DropsOverride;
+}
+
+export interface TempBuff {
+  stat: BuffStat;
+  amount: number;
+  remaining: number;
+}
+
 export function doorKey(col: number, row: number): string {
   return `${col},${row}`;
 }
@@ -231,6 +275,10 @@ export interface LevelSnapshot {
   chests: Map<string, ChestInstance>;
   signs: Map<string, SignInstance>;
   npcs: Map<string, NPCInstance>;
+  fountains: Map<string, FountainInstance>;
+  bookshelves: Map<string, BookshelfInstance>;
+  altars: Map<string, AltarInstance>;
+  barrels: Map<string, BarrelInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -256,6 +304,11 @@ export class GameState {
   chests: Map<string, ChestInstance>;
   signs: Map<string, SignInstance>;
   npcs: Map<string, NPCInstance>;
+  fountains: Map<string, FountainInstance>;
+  bookshelves: Map<string, BookshelfInstance>;
+  altars: Map<string, AltarInstance>;
+  barrels: Map<string, BarrelInstance>;
+  tempBuffs: TempBuff[];
   destroyedWalls: Set<string>;
   inventory: Set<string>;
 
@@ -317,6 +370,11 @@ export class GameState {
     this.chests = new Map();
     this.signs = new Map();
     this.npcs = new Map();
+    this.fountains = new Map();
+    this.bookshelves = new Map();
+    this.altars = new Map();
+    this.barrels = new Map();
+    this.tempBuffs = [];
     this.destroyedWalls = new Set();
     this.inventory = new Set();
     this.flags = new Set();
@@ -344,7 +402,7 @@ export class GameState {
     this.attackCooldown = 0;
     this.torchFuel = 200;
     this.maxTorchFuel = 200;
-    this.hunger = 10;
+    this.hunger = 100;
     this.maxHunger = 100;
     this.exploredCells = new Set();
 
@@ -532,6 +590,44 @@ export class GameState {
             npcId,
           });
         }
+      } else if (e.type === 'fountain') {
+        this.fountains.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          state: (e.state as FountainState) ?? 'active',
+          healAmount: (e.healAmount as number) ?? 20,
+        });
+      } else if (e.type === 'bookshelf') {
+        const wall = (e.wall as Facing | undefined) ??
+          autoDetectLeverWall(e.col, e.row, grid);
+        this.bookshelves.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          wall,
+          text: (e.text as string) ?? '',
+        });
+      } else if (e.type === 'altar') {
+        this.altars.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          state: (e.state as AltarState) ?? 'active',
+          buffType: (e.buffType as BuffStat) ?? 'atk',
+          buffAmount: (e.buffAmount as number) ?? 5,
+          buffDuration: (e.buffDuration as number) ?? 60,
+        });
+      } else if (e.type === 'barrel') {
+        const hp = (e.hp as number) ?? 10;
+        this.barrels.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          hp,
+          maxHp: hp,
+          drops: e.drops as DropsOverride | undefined,
+        });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (enemyDatabase.getEnemy(enemyType)) {
@@ -761,6 +857,10 @@ export class GameState {
     for (const c of this.chests.values()) register(c, 'chest');
     for (const s of this.signs.values()) register(s, 'sign');
     for (const n of this.npcs.values()) register(n, 'npc');
+    for (const f of this.fountains.values()) register(f, 'fountain');
+    for (const bs of this.bookshelves.values()) register(bs, 'bookshelf');
+    for (const a of this.altars.values()) register(a, 'altar');
+    for (const b of this.barrels.values()) register(b, 'barrel');
   }
 
   resolveEntityPosition(id: string): { col: number; row: number } | undefined {
@@ -836,6 +936,22 @@ export class GameState {
     for (const [k, v] of this.npcs) {
       npcs.set(k, { ...v });
     }
+    const fountains = new Map<string, FountainInstance>();
+    for (const [k, v] of this.fountains) {
+      fountains.set(k, { ...v });
+    }
+    const bookshelves = new Map<string, BookshelfInstance>();
+    for (const [k, v] of this.bookshelves) {
+      bookshelves.set(k, { ...v });
+    }
+    const altars = new Map<string, AltarInstance>();
+    for (const [k, v] of this.altars) {
+      altars.set(k, { ...v });
+    }
+    const barrels = new Map<string, BarrelInstance>();
+    for (const [k, v] of this.barrels) {
+      barrels.set(k, { ...v });
+    }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     const registrySnapshot = this.entityRegistry.snapshot();
@@ -843,7 +959,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -919,6 +1035,30 @@ export class GameState {
         this.npcs.set(k, { ...v });
       }
     }
+    this.fountains = new Map<string, FountainInstance>();
+    if (snapshot.fountains) {
+      for (const [k, v] of snapshot.fountains) {
+        this.fountains.set(k, { ...v });
+      }
+    }
+    this.bookshelves = new Map<string, BookshelfInstance>();
+    if (snapshot.bookshelves) {
+      for (const [k, v] of snapshot.bookshelves) {
+        this.bookshelves.set(k, { ...v });
+      }
+    }
+    this.altars = new Map<string, AltarInstance>();
+    if (snapshot.altars) {
+      for (const [k, v] of snapshot.altars) {
+        this.altars.set(k, { ...v });
+      }
+    }
+    this.barrels = new Map<string, BarrelInstance>();
+    if (snapshot.barrels) {
+      for (const [k, v] of snapshot.barrels) {
+        this.barrels.set(k, { ...v });
+      }
+    }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);
     if (snapshot.registrySnapshot) {
@@ -954,6 +1094,10 @@ export class GameState {
     this.chests = new Map();
     this.signs = new Map();
     this.npcs = new Map();
+    this.fountains = new Map();
+    this.bookshelves = new Map();
+    this.altars = new Map();
+    this.barrels = new Map();
     this.destroyedWalls = new Set();
     this.entityById = new Map();
     this.exploredCells = new Set();
@@ -1314,6 +1458,86 @@ export class GameState {
     return this.npcs.has(doorKey(col, row));
   }
 
+  // --- Fountain helpers ---
+
+  getFountain(col: number, row: number): FountainInstance | undefined {
+    return this.fountains.get(doorKey(col, row));
+  }
+
+  useFountain(col: number, row: number): { healed: boolean; healAmount: number } {
+    const fountain = this.fountains.get(doorKey(col, row));
+    if (!fountain || fountain.state === 'used') return { healed: false, healAmount: 0 };
+    this.hp = Math.min(this.maxHp, this.hp + fountain.healAmount);
+    fountain.state = 'used';
+    return { healed: true, healAmount: fountain.healAmount };
+  }
+
+  // --- Bookshelf helpers ---
+
+  getBookshelfOnWall(col: number, row: number, wall: Facing): BookshelfInstance | undefined {
+    const shelf = this.bookshelves.get(doorKey(col, row));
+    if (shelf && shelf.wall === wall) return shelf;
+    return undefined;
+  }
+
+  // --- Altar helpers ---
+
+  getAltar(col: number, row: number): AltarInstance | undefined {
+    return this.altars.get(doorKey(col, row));
+  }
+
+  useAltar(col: number, row: number): { activated: boolean; buffType: BuffStat; buffAmount: number; buffDuration: number } {
+    const altar = this.altars.get(doorKey(col, row));
+    if (!altar || altar.state === 'used') return { activated: false, buffType: 'atk', buffAmount: 0, buffDuration: 0 };
+    altar.state = 'used';
+    this.addTempBuff(altar.buffType, altar.buffAmount, altar.buffDuration);
+    return { activated: true, buffType: altar.buffType, buffAmount: altar.buffAmount, buffDuration: altar.buffDuration };
+  }
+
+  // --- Barrel helpers ---
+
+  getBarrel(col: number, row: number): BarrelInstance | undefined {
+    return this.barrels.get(doorKey(col, row));
+  }
+
+  isBarrelAt(col: number, row: number): boolean {
+    return this.barrels.has(doorKey(col, row));
+  }
+
+  damageBarrel(col: number, row: number, damage: number): { destroyed: boolean; drops?: DropsOverride } {
+    const barrel = this.barrels.get(doorKey(col, row));
+    if (!barrel) return { destroyed: false };
+    barrel.hp = Math.max(0, barrel.hp - damage);
+    if (barrel.hp <= 0) {
+      this.barrels.delete(doorKey(col, row));
+      return { destroyed: true, drops: barrel.drops };
+    }
+    return { destroyed: false };
+  }
+
+  // --- Temp buff helpers ---
+
+  addTempBuff(stat: BuffStat, amount: number, duration: number): void {
+    // Same-stat refresh: replace existing buff of same stat type
+    this.tempBuffs = this.tempBuffs.filter(b => b.stat !== stat);
+    this.tempBuffs.push({ stat, amount, remaining: duration });
+  }
+
+  tickTempBuffs(delta: number): void {
+    for (const buff of this.tempBuffs) {
+      buff.remaining -= delta;
+    }
+    this.tempBuffs = this.tempBuffs.filter(b => b.remaining > 0);
+  }
+
+  getTempBuffTotal(stat: BuffStat): number {
+    let total = 0;
+    for (const buff of this.tempBuffs) {
+      if (buff.stat === stat) total += buff.amount;
+    }
+    return total;
+  }
+
   // --- Flag helpers ---
 
   hasFlag(flag: string): boolean {
@@ -1416,10 +1640,10 @@ export class GameState {
       }
     }
 
-    const effStr = this.str + bonusStr;
-    const effDex = this.dex + bonusDex;
-    const effVit = this.vit + bonusVit;
-    const effWis = this.wis + bonusWis;
+    const effStr = this.str + bonusStr + this.getTempBuffTotal('str');
+    const effDex = this.dex + bonusDex + this.getTempBuffTotal('dex');
+    const effVit = this.vit + bonusVit + this.getTempBuffTotal('vit');
+    const effWis = this.wis + bonusWis + this.getTempBuffTotal('wis');
 
     const strBonus = Math.floor(effStr / 2);
     const vitDefBonus = Math.floor(effVit / 4);
@@ -1427,8 +1651,8 @@ export class GameState {
     const dodge = Math.max(0, Math.min(25, Math.floor((effDex - 5) / 4)));
 
     return {
-      atk: weaponAtk + strBonus,
-      def: armorDef + vitDefBonus,
+      atk: weaponAtk + strBonus + this.getTempBuffTotal('atk'),
+      def: armorDef + vitDefBonus + this.getTempBuffTotal('def'),
       maxHp: 40 + effVit * 5 + hpBonus,
       critChance: baseCrit + weaponCrit,
       dodgeChance: dodge,
@@ -1778,6 +2002,7 @@ export class GameState {
     torchFuel: number; maxTorchFuel: number;
     hunger: number; maxHunger: number;
     statusEffects: StatusEffect[];
+    tempBuffs: TempBuff[];
   } {
     return {
       hp: this.hp,
@@ -1796,6 +2021,7 @@ export class GameState {
       hunger: this.hunger,
       maxHunger: this.maxHunger,
       statusEffects: this.playerStatusEffects.map(e => ({ ...e })),
+      tempBuffs: this.tempBuffs.map(b => ({ ...b })),
     };
   }
 
@@ -1808,6 +2034,7 @@ export class GameState {
     torchFuel: number; maxTorchFuel: number;
     hunger?: number; maxHunger?: number;
     statusEffects: StatusEffect[];
+    tempBuffs?: TempBuff[];
   }): void {
     this.hp = state.hp;
     this.maxHp = state.maxHp;
@@ -1825,6 +2052,7 @@ export class GameState {
     this.hunger = state.hunger ?? 100;
     this.maxHunger = state.maxHunger ?? 100;
     this.playerStatusEffects = state.statusEffects.map(e => ({ ...e }));
+    this.tempBuffs = (state.tempBuffs ?? []).map(b => ({ ...b }));
   }
 
   /** Return picked up keys for serialization. */

@@ -438,6 +438,48 @@ export class Inspector {
         }
         break;
       }
+
+      case 'fountain':
+        this.addNumberField('healAmount', (entity.healAmount as number) ?? 20, (val) => {
+          entity.healAmount = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        break;
+
+      case 'bookshelf':
+        this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+          entity.wall = val;
+          this.onEntityChanged?.();
+        });
+        this.addTextareaField('text', (entity.text as string) ?? '', (val) => {
+          entity.text = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
+      case 'altar':
+        this.addDropdownField('buffType', (entity.buffType as string) ?? 'atk',
+          ['atk', 'def', 'str', 'dex', 'vit', 'wis'], (val) => {
+            entity.buffType = val;
+            this.onEntityChanged?.();
+          });
+        this.addNumberField('buffAmount', (entity.buffAmount as number) ?? 5, (val) => {
+          entity.buffAmount = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        this.addNumberField('buffDuration', (entity.buffDuration as number) ?? 60, (val) => {
+          entity.buffDuration = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        break;
+
+      case 'barrel':
+        this.addNumberField('hp', (entity.hp as number) ?? 10, (val) => {
+          entity.hp = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        this.addDropsEditor(entity);
+        break;
     }
   }
 

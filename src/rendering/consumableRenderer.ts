@@ -37,8 +37,14 @@ export function addSingleConsumableMesh(
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(cx, ITEM_HEIGHT, cz);
 
+  // Keep first mesh at this cell — matches pickup order (first item picked up first)
+  const mapKey = doorKey(col, row);
+  if (meshMap.has(mapKey)) {
+    return;
+  }
+
   group.add(mesh);
-  meshMap.set(doorKey(col, row), mesh);
+  meshMap.set(mapKey, mesh);
 }
 
 export function buildConsumableMeshes(
@@ -77,12 +83,14 @@ export function buildConsumableMeshes(
 
 export function hideConsumableMesh(
   meshMap: Map<string, THREE.Mesh>,
+  group: THREE.Group,
   col: number,
   row: number,
 ): void {
   const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (mesh) {
-    mesh.visible = false;
+    group.remove(mesh);
+    meshMap.delete(key);
   }
 }
