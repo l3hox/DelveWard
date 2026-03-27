@@ -218,19 +218,11 @@
           "type": "npc",
           "id": "npc_3",
           "npcId": "nameless_girl"
-        },
-        {
-          "col": 12,
-          "row": 3,
-          "type": "npc",
-          "id": "npc_4",
-          "npcId": ""
         }
       ],
-      "environment": "dungeon",
-      "ceiling": false,
-      "skybox": "starry-night",
-      "dustMotes": true,
+      "environment": "outdoor",
+      "skybox": "daylight",
+      "dustMotes": false,
       "waterDrips": false,
       "defaults": {
         "wallTexture": "stone",
@@ -248,14 +240,24 @@
           "solid": true,
           "seeThrough": true,
           "wallTexture": "forest",
-          "floorTexture": "grass",
-          "ceilingTexture": "canopy"
+          "floorTexture": "grass"
         },
         {
           "char": "'",
           "solid": false,
-          "floorTexture": "grass",
-          "ceilingTexture": "canopy"
+          "floorTexture": "grass"
+        }
+      ],
+      "areas": [
+        {
+          "fromCol": 0,
+          "toCol": 16,
+          "fromRow": 4,
+          "toRow": 16,
+          "wallTexture": "stone",
+          "floorTexture": "stone_tile",
+          "ceilingTexture": "dark_rock",
+          "environment": "dungeon"
         }
       ]
     },

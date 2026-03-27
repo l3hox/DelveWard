@@ -1,4 +1,4 @@
-import type { CharDef, TextureArea } from '../core/types';
+import type { CharDef, TextureArea, Environment } from '../core/types';
 import type { EditorApp } from './EditorApp';
 import { WALL_TEXTURES, FLOOR_TEXTURES, CEILING_TEXTURES } from '../core/textureNames';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
@@ -189,8 +189,8 @@ export class LevelProperties {
     });
 
     this.addCollapsibleSection('Environment', 'environment', (body) => {
-      this.addDropdownField(body, 'environment', level.environment ?? 'dungeon', ['dungeon', 'mist', 'forest'], (val) => {
-        level.environment = val as 'dungeon' | 'mist' | 'forest';
+      this.addDropdownField(body, 'environment', level.environment ?? 'dungeon', ['dungeon', 'mist', 'forest', 'outdoor'], (val) => {
+        level.environment = val as Environment;
         this.onChanged?.();
       });
 
@@ -210,12 +210,12 @@ export class LevelProperties {
           body,
           'skybox',
           level.skybox ?? 'none',
-          ['none', 'starry-night'],
+          ['none', 'starry-night', 'daylight', 'sunset'],
           (val) => {
             if (val === 'none') {
               delete level.skybox;
             } else {
-              level.skybox = val as 'starry-night';
+              level.skybox = val as 'starry-night' | 'daylight' | 'sunset';
             }
             this.onChanged?.();
           }
@@ -524,6 +524,17 @@ export class LevelProperties {
         this.onChanged?.();
         this.refresh();
       }, setAreaRect);
+
+      this.addDropdownField(detail, 'environment', area.environment ?? 'inherit',
+        ['inherit', 'dungeon', 'mist', 'forest', 'outdoor'], (val) => {
+          this.onBeforeDiscreteChange?.();
+          if (val === 'inherit') {
+            delete area.environment;
+          } else {
+            area.environment = val as Environment;
+          }
+          this.onChanged?.();
+        });
 
       this.addOptionalDropdownField(detail, 'wallTexture', area.wallTexture, WALL_TEXTURES, (val) => {
         if (val === undefined) {

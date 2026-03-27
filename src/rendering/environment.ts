@@ -29,6 +29,12 @@ const ENVIRONMENTS: Record<Environment, EnvironmentConfig> = {
     fogFar: 20,
     ambientColor: 0x3a5530,
   },
+  outdoor: {
+    fogColor: 0x88aacc,
+    fogNear: 20,
+    fogFar: 80,
+    ambientColor: 0x8899aa,
+  },
 };
 
 let currentEnv: Environment = 'dungeon';
@@ -51,4 +57,39 @@ export function applyEnvironment(
   scene.background = new THREE.Color(cfg.fogColor);
   scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
   ambient.color.setHex(cfg.ambientColor);
+}
+
+export function lerpEnvironment(
+  scene: THREE.Scene,
+  ambient: THREE.AmbientLight,
+  target: EnvironmentConfig,
+  t: number,
+): void {
+  const fog = scene.fog as THREE.Fog | null;
+  if (!fog) return;
+
+  fog.near += (target.fogNear - fog.near) * t;
+  fog.far += (target.fogFar - fog.far) * t;
+  fog.color.lerp(new THREE.Color(target.fogColor), t);
+
+  const bg = scene.background as THREE.Color;
+  if (bg) bg.lerp(new THREE.Color(target.fogColor), t);
+
+  ambient.color.lerp(new THREE.Color(target.ambientColor), t);
+}
+
+export function resolveEnvironmentAtCell(
+  col: number,
+  row: number,
+  levelEnv: Environment,
+  areas?: Array<{ fromCol: number; toCol: number; fromRow: number; toRow: number; environment?: Environment }>,
+): Environment {
+  if (!areas) return levelEnv;
+  let env = levelEnv;
+  for (const area of areas) {
+    if (area.environment && col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
+      env = area.environment;
+    }
+  }
+  return env;
 }

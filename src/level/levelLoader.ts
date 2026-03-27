@@ -455,8 +455,8 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   obj.entities = validEntities as Entity[];
 
   // environment (optional)
+  const validEnvs = ['dungeon', 'mist', 'forest', 'outdoor'];
   if (obj.environment !== undefined) {
-    const validEnvs = ['dungeon', 'mist', 'forest'];
     if (!validEnvs.includes(obj.environment as string)) {
       throw new Error(`Level ${source}: "environment" must be one of ${validEnvs.join(', ')}`);
     }
@@ -464,7 +464,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
 
   // skybox (optional)
   if (obj.skybox !== undefined) {
-    const validSkyboxes = ['starry-night'];
+    const validSkyboxes = ['starry-night', 'daylight', 'sunset'];
     if (!validSkyboxes.includes(obj.skybox as string)) {
       throw new Error(`Level ${source}: "skybox" must be one of ${validSkyboxes.join(', ')}`);
     }
@@ -511,8 +511,12 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
         throw new Error(`Level ${source}: areas[${i}] is out of grid bounds`);
       }
 
-      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined) {
-        throw new Error(`Level ${source}: areas[${i}] must specify at least one texture`);
+      if (entry.environment !== undefined && !validEnvs.includes(entry.environment as string)) {
+        throw new Error(`Level ${source}: areas[${i}].environment must be one of ${validEnvs.join(', ')}`);
+      }
+
+      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined && entry.environment === undefined) {
+        throw new Error(`Level ${source}: areas[${i}] must specify at least one texture or an environment`);
       }
 
       validateTextures(entry, `areas[${i}]`, source);

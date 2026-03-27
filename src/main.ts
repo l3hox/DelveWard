@@ -42,7 +42,7 @@ import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
-import { applyEnvironment, getEnvironmentConfig } from './rendering/environment';
+import { applyEnvironment, getEnvironmentConfig, lerpEnvironment, resolveEnvironmentAtCell } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
 import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpGPUShaders, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
@@ -273,7 +273,7 @@ function buildLevelScene(
 
   let skyboxMesh: THREE.Mesh | undefined;
   if (level.skybox) {
-    skyboxMesh = createSkyboxMesh();
+    skyboxMesh = createSkyboxMesh(level.skybox);
     scene.add(skyboxMesh);
   }
 
@@ -365,7 +365,7 @@ async function init(): Promise<void> {
     CAMERA_FOV,
     window.innerWidth / window.innerHeight,
     0.1,
-    100
+    200
   );
 
   function applyCameraViewCrop(): void {
@@ -1601,6 +1601,12 @@ async function init(): Promise<void> {
 
       // Temp buff tick
       gameState.tickTempBuffs(delta);
+
+      // Environment area blending
+      const ps = ls.player.getState();
+      const playerEnv = resolveEnvironmentAtCell(ps.col, ps.row, ls.level.environment ?? 'dungeon', ls.level.areas);
+      const targetCfg = getEnvironmentConfig(playerEnv);
+      lerpEnvironment(scene, ambient, targetCfg, delta * 2);
 
       // Hunger drain (real-time, paused during overlays)
       hungerDrainAccumulator += delta;

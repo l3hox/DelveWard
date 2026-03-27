@@ -4,6 +4,14 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-27 — M4 Phase A: Outdoor Environment + Environment Areas
+
+**Design**: New `'outdoor'` environment preset with bright ambient and distant fog. Two procedural skybox textures (daylight blue gradient + clouds, sunset warm gradient). Environment areas — `environment` field on `TextureArea` allows per-region environment overrides within a level. Dynamic fog/ambient blending via `lerpEnvironment()` — lerps scene fog, background, and ambient light toward the player's current zone each frame (~0.5s transition). Camera far plane extended 100→200 for future multi-layer visibility.
+
+**Architecture**: `resolveEnvironmentAtCell()` mirrors the `resolveTextures()` area lookup pattern (last-match-wins). Level loader relaxed to allow environment-only areas (no textures required). Per-area ceiling control deferred to Phase B (openTop/openBottom hollow areas). Phase A2 (stencil multi-pass rendering for correct per-zone fog) is next.
+
+---
+
 ## 2026-03-27 — M4 Phase 0: LayerState Refactor
 
 **Architecture**: Extracted 21 entity Maps + 2 Sets from GameState into a `LayerState` interface. GameState holds `layers: LayerState[]` + `activeLayerIndex`. TypeScript getter/setter pairs (`get doors() { return this.activeLayer.doors; }`) make the refactor transparent — all ~50 helper methods, all external code, all 765 tests work unchanged without modification. Only `gameState.ts` changed. Prepares for multi-layer in Phase B.

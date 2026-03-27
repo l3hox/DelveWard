@@ -17,10 +17,11 @@ export interface TextureArea extends TextureSet {
   toCol: number;
   fromRow: number;
   toRow: number;
+  environment?: Environment;  // override environment in this region
 }
 
-export type Environment = 'dungeon' | 'mist' | 'forest';
-export type Skybox = 'starry-night';
+export type Environment = 'dungeon' | 'mist' | 'forest' | 'outdoor';
+export type Skybox = 'starry-night' | 'daylight' | 'sunset';
 
 export interface DungeonLevel {
   id?: string;               // optional stable identifier for save/load keying
