@@ -14,13 +14,30 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ## Current Milestone
 
-**Milestone 3: The Living World** (v0.3.0) — **Complete**
+**Milestone 4: The Vertical World** (v0.4)
 
-Plan — see `planning/m3/PLAN.md`.
+Plan — see `planning/m4/PLAN.md`. ADRs — see `planning/m4/ADR.md`.
 
 ---
 
 ## Next Steps
+
+### M4 Implementation
+- [ ] Phase 0: Foundation — LayerState refactor + rendering benchmark
+- [ ] Phase A: Outdoor environment + environment areas
+- [ ] Phase A2: Multi-pass environment rendering (stencil-based zone fog)
+- [ ] Phase B: Layer system + hollow areas
+- [ ] Phase B Editor: Layer management + hollow area editing
+- [ ] Phase C: Thin walls
+- [ ] Phase C Editor: Thin wall painting
+- [ ] Phase D: Decorative props
+- [ ] Phase D Editor: Prop palette + placement
+- [ ] Phase E: Pit traps
+- [ ] Phase E Editor: Pit trap entity
+- [ ] Phase F: Enemy spawners (nice-to-have)
+- [ ] Phase G: Rolling boulders (nice-to-have)
+- [ ] Phase H: Sub-grid positioning + item billboards (nice-to-have)
+- [ ] Phase I: Content — "The Cliffside Keep"
 
 ### M3 Implementation
 - [x] Phase A: NPC foundation (NpcDatabase, NPC entity, billboard rendering, flags, interaction, save/load)

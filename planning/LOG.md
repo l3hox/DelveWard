@@ -4,6 +4,22 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-27 — M4 Plan: The Vertical World
+
+**Planning complete.** M4 introduces the layers-within-levels vertical world model. Key architecture decisions made (see `planning/m4/ADR.md`):
+
+- **ADR-M4-01**: Layers within levels — layers are Y-stacked slices of the same world (always visible), levels are separate worlds (teleport transitions). `DungeonLevel.layers?: LayerDef[]`.
+- **ADR-M4-02**: LayerState wrapper pattern — entity Maps wrapped in `LayerState`, `GameState.layers: LayerState[]`. Protects 90 doorKey call sites from a risky key-format migration.
+- **ADR-M4-03**: Hollow areas via `openBottom`/`openTop` flags on TextureArea. Reuses existing area system.
+- **ADR-M4-04**: Environment areas with dynamic fog blending. Areas override level environment. Phase A2 adds stencil multi-pass rendering for correct per-zone fog.
+- **ADR-M4-05**: Enemies/projectiles layer-locked for M4. Signals cross-layer. No cross-layer AI.
+- **ADR-M4-06**: Thin walls entity-based (not grid edge data). Pathfinding must respect edges.
+- **ADR-M4-07**: Item billboard sprites with quadrant spread positioning.
+
+Developer council reviewed the plan — identified key risks (entity key migration, fog singleton, draw calls, light bleeding) and recommended Phase 0 (LayerState refactor + benchmark) before feature work. M4/M5 milestone order swapped (Vertical World before Arcane Arts) for visual showcase motivation.
+
+---
+
 ## 2026-03-27 — M3 Phase F: Dungeon Objects + Editor
 
 **Design**: 4 new entity types: fountain (one-shot HP heal), bookshelf (wall-mounted lore text via SignOverlay), altar (timed stat buff via new TempBuff system), barrel (breakable via combat, drops loot, blocks movement). All use simple 3D geometry per ADR-M3-06 — no billboards, no imported models.
