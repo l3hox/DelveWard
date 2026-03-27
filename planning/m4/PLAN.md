@@ -68,7 +68,8 @@ Dungeon
 | Phase | Name | Depends On | Status |
 |---|---|---|---|
 | 0 | Foundation: LayerState refactor + rendering benchmark | — | Pending |
-| A | Outdoor Environment | — | Pending |
+| A | Outdoor Environment + Environment Areas | — | Pending |
+| A2 | Multi-Pass Environment Rendering | A | Pending |
 | B | Layer System + Hollow Areas | 0 | Pending |
 | B Editor | Editor: Layer management + hollow areas | B | Pending |
 | C | Thin Walls | 0 | Pending |
@@ -176,7 +177,37 @@ interface TextureArea {
 **Decisions:**
 - Per-level environment remains the default; areas override locally
 - Dynamic day/night deferred to M8+
-- Per-material fog shader deferred — dynamic blending is sufficient for M4
+
+---
+
+## Phase A2 — Multi-Pass Environment Rendering
+
+Replace the dynamic-blending fog approach (Phase A) with proper multi-pass stencil rendering. Each environment zone renders with its own fog/sky, producing visually correct transitions — looking out a dungeon doorway shows bright sky, looking in shows dark corridors.
+
+**Depends on:** Phase A (environment areas + outdoor preset must exist).
+
+**Current limitation after Phase A:** `THREE.Fog` is a scene singleton. Dynamic blending updates fog based on player position, so the *entire* scene uses one fog value. Looking from indoors outward, the outdoor area is dark-fogged. This phase fixes that.
+
+### Approach: Stencil-masked multi-pass rendering
+
+1. **Zone classification**: Each mesh is tagged with its environment zone (derived from the area it sits in at build time). Meshes in outdoor areas → outdoor group. Meshes in dungeon areas → dungeon group. Boundary meshes (doorways) go to the zone they face into.
+2. **First pass — outdoor zone**: Set `scene.fog` to outdoor config, `scene.background` to sky. Render only outdoor-tagged meshes. Write stencil=1 for all rendered pixels.
+3. **Second pass — indoor zone**: Set `scene.fog` to dungeon config, `scene.background` to dark. Render only indoor-tagged meshes. Write stencil=2. Stencil test ensures no overdraw where outdoor already rendered.
+4. **Result**: Doorways naturally show the correct zone behind them. No fog bleeds between zones.
+
+### Implementation
+11. **`renderer.autoClear = false`** — manual clear control for multi-pass
+12. **Material stencil properties**: `stencilWrite`, `stencilRef`, `stencilFunc` on Three.js materials (available since r130+)
+13. **Zone tagging at build time**: `buildDungeon()` / entity renderers tag meshes with zone ID based on environment area overlap. Store as `mesh.userData.envZone`.
+14. **Render loop**: Before each pass, set `scene.fog` + `scene.background` to the zone's config, filter visible objects by zone tag, render, advance stencil.
+15. **Entrance light**: Point light or directional light placed at zone transition cells. Simulates light spilling from outdoor into indoor. Auto-placed based on adjacent cells having different zones.
+16. **Fallback**: If a level has only one environment zone, skip multi-pass — render normally (zero overhead for simple levels).
+
+### Complexity & Risk
+- Moderate complexity — stencil multi-pass is standard WebGL technique but needs careful setup
+- Main risk: mesh zone classification at doorway boundaries. A single mesh spanning two zones needs to be split or assigned to one zone.
+- Performance: two render passes instead of one. Acceptable — each pass renders roughly half the geometry.
+- If this proves too complex during implementation, Phase A's dynamic blending remains as a working fallback.
 
 ---
 
@@ -387,11 +418,12 @@ Test dungeon showcasing M4 features. A vertical level with 3 layers + indoor/out
 
 ### Must-have (core M4 identity)
 - **Phase 0**: Foundation refactor + benchmark — de-risks everything else
-- **Phase A**: Outdoor environment — immediate visual impact, needed for battlements
+- **Phase A**: Outdoor environment + environment areas — immediate visual impact
 - **Phase B**: Layer system + hollow areas — THE defining feature
 - **Phase C**: Thin walls — transforms level design, essential for castle/village aesthetics
 
 ### Should-have (strong value, reasonable scope)
+- **Phase A2**: Multi-pass environment rendering — visually correct zone transitions (falls back to A's blending if too complex)
 - **Phase D**: Decorative props — visual richness, makes the world feel real
 - **Phase E**: Pit traps — leverages layers, classic dungeon crawler mechanic
 
@@ -402,12 +434,13 @@ Test dungeon showcasing M4 features. A vertical level with 3 layers + indoor/out
 
 ### Recommended implementation order
 1. **0 (foundation)** — refactor + benchmark, de-risk before committing
-2. A (outdoor) — quick win, standalone
-3. B (layers + hollows) — hard core work, do early while fresh
-4. C (thin walls) — standalone, high design value
-5. D (decorative props) — visual richness
-6. E (pit traps) — depends on B, completes the vertical gameplay loop
-7. F-H — evaluate after A-E based on energy/interest
+2. A (outdoor + env areas) — quick win, dynamic blending as baseline
+3. A2 (multi-pass rendering) — upgrade A's blending to stencil-based. Evaluate after A — if blending looks good enough, defer.
+4. B (layers + hollows) — hard core work, do early while fresh
+5. C (thin walls) — standalone, high design value
+6. D (decorative props) — visual richness
+7. E (pit traps) — depends on B, completes the vertical gameplay loop
+8. F-H — evaluate after A-E based on energy/interest
 
 ---
 
