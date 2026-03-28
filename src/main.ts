@@ -104,7 +104,7 @@ interface LevelScene {
   level: DungeonLevel;
   walkable: Set<string>;
   dungeonGroup: THREE.Group;
-  doorMeshes: { group: THREE.Group; panelMap: Map<string, THREE.Object3D> };
+  doorMeshes: { group: THREE.Group; panelMap: Map<string, THREE.Object3D>; boundaryLights: Map<string, THREE.PointLight> };
   doorAnimator: DoorAnimator;
   keyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
@@ -885,7 +885,7 @@ async function init(): Promise<void> {
         blockedDoors.delete(key);
         const door = gameState.getDoor(entry.col, entry.row);
         if (door) door.state = 'closed';
-        updateDoorMesh(ls.doorMeshes.panelMap, entry.col, entry.row, false, ls.doorAnimator);
+        updateDoorMesh(ls.doorMeshes.panelMap, entry.col, entry.row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Still blocked — bounce animation and retry
         entry.timer = DOOR_RETRY_INTERVAL;
@@ -915,7 +915,7 @@ async function init(): Promise<void> {
       if (doorAtPlayer && doorAtPlayer.state === 'closed') {
         doorAtPlayer.state = 'open';
         const dk = doorKey(col, row);
-        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator);
+        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
       }
 
@@ -999,7 +999,7 @@ async function init(): Promise<void> {
       if (open) {
         // Opening — clear any blocked retry and open normally
         blockedDoors.delete(dk);
-        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator);
+        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Closing — check if cell is occupied
         const occupant = isDoorCellOccupied(col, row);
@@ -1011,7 +1011,7 @@ async function init(): Promise<void> {
           ls.doorAnimator.bounce(dk);
         } else {
           blockedDoors.delete(dk);
-          updateDoorMesh(ls.doorMeshes.panelMap, col, row, false, ls.doorAnimator);
+          updateDoorMesh(ls.doorMeshes.panelMap, col, row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         }
       }
     };
@@ -1317,11 +1317,11 @@ async function init(): Promise<void> {
           }
           if (result.type === 'door_opened') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, true, ls.doorAnimator);
+            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_closed') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, false, ls.doorAnimator);
+            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_blocked') {
             const facing = getFacingCell(ls.player.getState());
@@ -1332,7 +1332,7 @@ async function init(): Promise<void> {
             for (const t of result.targets) {
               const targetPos = gameState.resolveEntityPosition(t);
               if (targetPos) {
-                updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator);
+                updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator, ls.doorMeshes.boundaryLights);
               }
             }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
@@ -1604,6 +1604,14 @@ async function init(): Promise<void> {
       ls.skyboxMesh.position.copy(camera.position);
     }
     ls.doorAnimator.update(delta);
+
+    // Boundary door lights: intensity follows door open animation
+    for (const [key, light] of ls.doorMeshes.boundaryLights) {
+      const fraction = ls.doorAnimator.getOpenFraction(key);
+      light.intensity = fraction * 2; // max intensity when fully open
+      light.visible = fraction > 0.01;
+    }
+
     ls.leverAnimator.update(delta);
     ls.enemyAnimator.update(delta);
     transition.update(delta);

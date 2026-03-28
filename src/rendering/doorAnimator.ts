@@ -115,4 +115,14 @@ export class DoorAnimator {
       }
     }
   }
+
+  /** Returns 0 (fully closed) to 1 (fully open) for a door panel. */
+  getOpenFraction(key: string): number {
+    const entry = this.panels.get(key);
+    if (!entry) return 0;
+    const range = entry.openVal - entry.closedVal;
+    if (Math.abs(range) < 0.001) return 0;
+    const current = entry.panel.position[entry.axis];
+    return Math.max(0, Math.min(1, (current - entry.closedVal) / range));
+  }
 }

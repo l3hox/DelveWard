@@ -72,6 +72,7 @@ export interface DoorMeshes {
   group: THREE.Group;
   panelMap: Map<string, THREE.Object3D>;
   orientationMap: Map<string, DoorOrientation>;
+  boundaryLights: Map<string, THREE.PointLight>;  // entrance lights at zone boundary doors
 }
 
 const BUTTON_SIZE = 0.06;
@@ -179,6 +180,7 @@ export function buildDoorMeshes(
   const group = new THREE.Group();
   const panelMap = new Map<string, THREE.Object3D>();
   const orientationMap = new Map<string, DoorOrientation>();
+  const boundaryLights = new Map<string, THREE.PointLight>();
 
   const panelWidth = CELL_SIZE - FRAME_WIDTH * 2;
   const panelHeight = WALL_HEIGHT - FRAME_WIDTH;
@@ -332,9 +334,20 @@ export function buildDoorMeshes(
     group.add(panelObj);
     panelMap.set(key, panelObj);
     orientationMap.set(key, orientation);
+
+    // Entrance light at zone boundary doors — bright light visible only in indoor zone
+    if (splitZones) {
+      const indoorZone = Math.max(splitZones[0], splitZones[1]);
+      const light = new THREE.PointLight(0xffeedd, 3, 12);
+      light.position.set(cx, WALL_HEIGHT * 0.7, cz);
+      light.layers.set(indoorZone);
+      light.visible = door.state === 'open';  // initial state; game loop updates per-frame
+      group.add(light);
+      boundaryLights.set(key, light);
+    }
   }
 
-  return { group, panelMap, orientationMap };
+  return { group, panelMap, orientationMap, boundaryLights };
 }
 
 export function updateDoorMesh(
@@ -343,6 +356,7 @@ export function updateDoorMesh(
   row: number,
   isOpen: boolean,
   animator?: DoorAnimator,
+  boundaryLights?: Map<string, THREE.PointLight>,
 ): void {
   const key = doorKey(col, row);
   if (animator) {
@@ -353,4 +367,5 @@ export function updateDoorMesh(
       mesh.visible = !isOpen;
     }
   }
+  // Boundary light visibility toggled by animation fraction in game loop
 }

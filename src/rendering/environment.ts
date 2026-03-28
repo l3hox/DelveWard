@@ -33,7 +33,7 @@ const ENVIRONMENTS: Record<Environment, EnvironmentConfig> = {
     fogColor: 0x88aacc,
     fogNear: 20,
     fogFar: 80,
-    ambientColor: 0x8899aa,
+    ambientColor: 0xbbccee,
   },
 };
 

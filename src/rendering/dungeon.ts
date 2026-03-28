@@ -13,10 +13,26 @@ export const EYE_HEIGHT = WALL_HEIGHT * 0.65;
 const wallGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
 const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
 // Half-tile geometries for zone boundary cells (split along N-S or E-W axis)
+// UVs scaled to 0.5 on the split axis so texture scale matches full tiles.
 const halfTileNS = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE / 2); // north/south halves
+{
+  const uv = halfTileNS.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * 0.5);
+  uv.needsUpdate = true;
+}
 const halfTileEW = new THREE.PlaneGeometry(CELL_SIZE / 2, CELL_SIZE); // east/west halves
-// Half-wall geometries for zone boundary cells (split along passage axis)
+{
+  const uv = halfTileEW.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * 0.5);
+  uv.needsUpdate = true;
+}
+// Half-wall geometry for zone boundary cells (split along passage axis)
 const halfWallGeo = new THREE.PlaneGeometry(CELL_SIZE / 2, WALL_HEIGHT);
+{
+  const uv = halfWallGeo.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * 0.5);
+  uv.needsUpdate = true;
+}
 
 // Cached materials by texture name
 const wallMats = new Map<string, THREE.MeshLambertMaterial>();
