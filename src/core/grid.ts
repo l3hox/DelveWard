@@ -75,6 +75,10 @@ export class PlayerState {
     this.isBlocked = isBlocked;
   }
 
+  setWalkable(walkable: Set<string>): void {
+    this.walkable = walkable;
+  }
+
   moveForward(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
     const nc = this.col + dc;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState } from '../core/gameState';
+import type { GameState } from '../core/gameState';
 
 const KEY_SIZE = 0.4;
 const KEY_HEIGHT = 0.15; // just above the floor
@@ -76,10 +76,8 @@ export function buildKeyMeshes(gameState: GameState): KeyMeshes {
 
 export function hideKeyMesh(
   meshMap: Map<string, THREE.Mesh>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (mesh) {
     mesh.visible = false;

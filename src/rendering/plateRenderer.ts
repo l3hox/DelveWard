@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState } from '../core/gameState';
+import type { GameState } from '../core/gameState';
 
 const PLATE_SIZE = 0.8;
 const PLATE_HEIGHT = 0.02;
@@ -81,10 +81,8 @@ export function buildPlateMeshes(gameState: GameState): PlateMeshes {
 
 export function pressPlate(
   meshMap: Map<string, THREE.Mesh>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (!mesh) return;
   if (!pressedMat) pressedMat = new THREE.MeshLambertMaterial({ map: generatePlateTexture(true) });
@@ -94,10 +92,8 @@ export function pressPlate(
 
 export function releasePlate(
   meshMap: Map<string, THREE.Mesh>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (!mesh) return;
   if (!normalMat) normalMat = new THREE.MeshLambertMaterial({ map: generatePlateTexture(false) });

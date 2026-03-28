@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState, type AltarInstance } from '../core/gameState';
+import type { GameState, AltarInstance } from '../core/gameState';
 
 export interface AltarMeshes {
   group: THREE.Group;
@@ -51,10 +51,8 @@ export function buildAltarMeshes(gameState: GameState): AltarMeshes {
 
 export function markAltarUsed(
   meshMap: Map<string, THREE.Group>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const altarGroup = meshMap.get(key);
   if (!altarGroup) return;
 

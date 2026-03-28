@@ -4,6 +4,26 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-28 — M4 Phase B + B Editor: Layer System + Hollow Areas
+
+**Architecture — All layers active**: Initially had active/non-active layer distinction (active layer = full mesh tracking + interaction, non-active = visual only). Removed during implementation — all layers are now fully tracked with shared meshMaps using `"layerIndex:col,row"` prefixed keys (`meshKey()`, `layerDoorKey()`, `lk()` helpers). Enemies tick on all layers, trap launchers fire on all layers. Attacks restricted to player's layer. Future dormancy optimization deferred.
+
+**Architecture — Layer IDs as coordinates**: Layer IDs are stable numeric coordinates (`"0"` = ground, `"1"` = above, `"-1"` = below). Never shifted when layers are added/removed. `playerStart.layerIndex` stores the coordinate, resolved to array index via `resolveLayerCoord()`. This decouples the data model from array ordering.
+
+**Architecture — charDefs level-global**: Initially per-layer, moved to level-global during testing. Custom tile characters (forest `F`, etc.) need to be consistent across all layers in a level. charDefs validated once at level level, then `knownChars`/`walkableChars` passed to each layer's validation.
+
+**Architecture — Auto-detect hollow areas**: `openBottom`/`openTop` area flags are overrides. Default behavior: automatically skip floor when layer below has a non-wall cell at the same position, skip ceiling when layer above has a non-wall cell. Void, floor tiles, and seeThrough cells all count as "open". `buildDungeon()` accepts `layerAboveGrid`/`layerBelowGrid` parameters.
+
+**Design — Flush layer stacking**: `LAYER_HEIGHT = WALL_HEIGHT` (2.5 units). No gap between layers — floor of layer N+1 sits directly on ceiling of layer N.
+
+**Design — Door slide axis**: Doors slide sideways (not up) when there's no ceiling above — either `ceiling: false` on the layer or the cell above (on layer above) is not a solid wall.
+
+**Design — playerStart is global**: In dungeon mode, `playerStart` exists only on the Dungeon object, not per-level. Stripped from per-level serialization. Includes `layerIndex` coordinate.
+
+**Editor**: Layer list panel with reversed display order (highest layer first). Add Layer Above/Below buttons (only at extremes of the stack). Convert to Layers for non-layered levels. openBottom/openTop checkboxes in area editor. playerStart layer dropdown + pick-on-active-layer. New levels created in layered mode by default. Working-surface sync pattern (level.grid/entities swapped on layer switch, synced back before save).
+
+---
+
 ## 2026-03-27 — M4 Phase A2: Multi-Pass Environment Rendering
 
 **Architecture**: Used Three.js `Object3D.layers` bitmask for multi-pass rendering instead of stencil operations (cleaner, native). Each environment zone gets a render layer. Camera enables one zone per pass, with zone-specific fog/ambient/background. Depth buffer preserved between passes for correct occlusion.

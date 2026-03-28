@@ -352,13 +352,11 @@ export function buildDoorMeshes(
 
 export function updateDoorMesh(
   panelMap: Map<string, THREE.Object3D>,
-  col: number,
-  row: number,
+  key: string,
   isOpen: boolean,
   animator?: DoorAnimator,
   boundaryLights?: Map<string, THREE.PointLight>,
 ): void {
-  const key = doorKey(col, row);
   if (animator) {
     animator.setOpen(key, isOpen);
   } else {

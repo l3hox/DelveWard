@@ -1,4 +1,4 @@
-import type { DungeonLevel, Dungeon, Entity } from '../core/types';
+import type { DungeonLevel, Dungeon, Entity, LayerDef } from '../core/types';
 import type { Facing } from '../core/grid';
 import { WALKABLE_CELLS } from '../core/grid';
 import { WALL_TEXTURE_SET, FLOOR_TEXTURE_SET, CEILING_TEXTURE_SET } from '../core/textureNames';
@@ -6,6 +6,35 @@ import { enemyDatabase } from '../enemies/enemyDatabase';
 import { npcDatabase } from '../npcs/npcDatabase';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
+
+/** Get all entities from a level, searching all layers if present. */
+export function getAllLevelEntities(level: DungeonLevel): Entity[] {
+  if (level.layers && level.layers.length > 0) {
+    const all: Entity[] = [];
+    for (const layer of level.layers) {
+      all.push(...layer.entities);
+    }
+    return all;
+  }
+  return level.entities;
+}
+
+/** Resolve a layer coordinate (numeric ID like 0, 1, -1) to an array index. Returns 0 if not found. */
+export function resolveLayerCoord(level: DungeonLevel, coord: number): number {
+  if (!level.layers) return 0;
+  const id = String(coord);
+  const idx = level.layers.findIndex(l => l.id === id);
+  return idx >= 0 ? idx : 0;
+}
+
+/** Find which layer index an entity is on (by id). Returns 0 for non-layered levels. */
+export function findEntityLayerIndex(level: DungeonLevel, entityId: string): number {
+  if (!level.layers) return 0;
+  for (let li = 0; li < level.layers.length; li++) {
+    if (level.layers[li].entities.some(e => e.id === entityId)) return li;
+  }
+  return 0;
+}
 const BUILTIN_CHARS = new Set(['.', '#', ' ']);
 
 function validateTextures(
@@ -290,6 +319,116 @@ function validateEntity(
   return null;
 }
 
+/**
+ * Validate a single layer definition (grid, entities, areas, defaults).
+ * charDefs are level-global and passed in as knownChars/walkableChars.
+ * Entity IDs are collected into the provided set for cross-layer uniqueness checking.
+ * Returns the validated layer with only valid entities.
+ */
+function validateLayerDef(
+  layer: Record<string, unknown>,
+  layerIndex: number,
+  source: string,
+  globalEntityIds: Set<string>,
+  knownChars: Set<string>,
+  walkableChars: Set<string>,
+): LayerDef {
+  const pfx = `Level ${source} layers[${layerIndex}]`;
+
+  // grid
+  if (!Array.isArray(layer.grid) || layer.grid.length === 0 || !layer.grid.every((r: unknown) => typeof r === 'string')) {
+    throw new Error(`${pfx}: "grid" must be a non-empty array of strings`);
+  }
+  const grid = layer.grid as string[];
+  const rowLen = grid[0].length;
+  if (!grid.every((r) => r.length === rowLen)) {
+    throw new Error(`${pfx}: all grid rows must be the same length`);
+  }
+
+  // grid char validation (uses level-global charDefs)
+  for (const row of grid) {
+    for (const ch of row) {
+      if (!knownChars.has(ch)) throw new Error(`${pfx}: unknown cell character '${ch}'`);
+    }
+  }
+
+  // entities
+  if (!Array.isArray(layer.entities)) {
+    throw new Error(`${pfx}: "entities" must be an array`);
+  }
+  migrateEntities(layer.entities as Entity[]);
+
+  // Collect entity IDs cross-layer
+  for (const ent of layer.entities as Array<Record<string, unknown>>) {
+    if (ent.id) {
+      if (globalEntityIds.has(ent.id as string)) throw new Error(`${pfx}: duplicate entity id "${ent.id}"`);
+      globalEntityIds.add(ent.id as string);
+    }
+  }
+
+  const validEntities: Record<string, unknown>[] = [];
+  const VALID_SIGNAL_MODES = new Set(['toggle', 'momentary', 'one_shot', 'timed']);
+  const VALID_GATE_TYPES = new Set(['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat']);
+
+  for (let i = 0; i < layer.entities.length; i++) {
+    const e = layer.entities[i] as Record<string, unknown>;
+    if (typeof e !== 'object' || e === null || Array.isArray(e)) throw new Error(`${pfx}: entities[${i}] must be an object`);
+    if (typeof e.col !== 'number' || typeof e.row !== 'number') throw new Error(`${pfx}: entities[${i}] must have numeric col and row`);
+    if (typeof e.type !== 'string') throw new Error(`${pfx}: entities[${i}] must have a string type`);
+    const err = validateEntity(e, i, grid, rowLen, walkableChars, globalEntityIds, `${source} layers[${layerIndex}]`, VALID_SIGNAL_MODES, VALID_GATE_TYPES);
+    if (err) { console.warn(`${err} — entity skipped`); continue; }
+    validEntities.push(e);
+  }
+  layer.entities = validEntities;
+
+  // defaults
+  if (layer.defaults !== undefined) {
+    if (typeof layer.defaults !== 'object' || layer.defaults === null || Array.isArray(layer.defaults)) {
+      throw new Error(`${pfx}: "defaults" must be an object`);
+    }
+    validateTextures(layer.defaults as Record<string, unknown>, 'defaults', `${source} layers[${layerIndex}]`);
+  }
+
+  // areas
+  const validEnvs = ['dungeon', 'mist', 'forest', 'outdoor'];
+  if (layer.areas !== undefined) {
+    if (!Array.isArray(layer.areas)) throw new Error(`${pfx}: "areas" must be an array`);
+    for (let i = 0; i < layer.areas.length; i++) {
+      const area = layer.areas[i];
+      if (typeof area !== 'object' || area === null || Array.isArray(area)) throw new Error(`${pfx}: areas[${i}] must be an object`);
+      const entry = area as Record<string, unknown>;
+      if (typeof entry.fromCol !== 'number' || typeof entry.toCol !== 'number' || typeof entry.fromRow !== 'number' || typeof entry.toRow !== 'number') {
+        throw new Error(`${pfx}: areas[${i}] must have numeric fromCol, toCol, fromRow, toRow`);
+      }
+      if (entry.fromCol > entry.toCol || entry.fromRow > entry.toRow) throw new Error(`${pfx}: areas[${i}] has fromCol > toCol or fromRow > toRow`);
+      if (entry.fromCol < 0 || (entry.toCol as number) >= rowLen || entry.fromRow < 0 || (entry.toRow as number) >= grid.length) {
+        throw new Error(`${pfx}: areas[${i}] is out of grid bounds`);
+      }
+      if (entry.environment !== undefined && !validEnvs.includes(entry.environment as string)) {
+        throw new Error(`${pfx}: areas[${i}].environment must be one of ${validEnvs.join(', ')}`);
+      }
+      if (entry.openBottom !== undefined && typeof entry.openBottom !== 'boolean') throw new Error(`${pfx}: areas[${i}].openBottom must be a boolean`);
+      if (entry.openTop !== undefined && typeof entry.openTop !== 'boolean') throw new Error(`${pfx}: areas[${i}].openTop must be a boolean`);
+      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined && entry.environment === undefined && !entry.openBottom && !entry.openTop) {
+        throw new Error(`${pfx}: areas[${i}] must specify at least one texture, an environment, or a hollow flag`);
+      }
+      validateTextures(entry, `areas[${i}]`, `${source} layers[${layerIndex}]`);
+    }
+  }
+
+  // ceiling (optional boolean)
+  if (layer.ceiling !== undefined && typeof layer.ceiling !== 'boolean') {
+    throw new Error(`${pfx}: "ceiling" must be a boolean`);
+  }
+
+  // yOffset (optional number)
+  if (layer.yOffset !== undefined && typeof layer.yOffset !== 'number') {
+    throw new Error(`${pfx}: "yOffset" must be a number`);
+  }
+
+  return layer as unknown as LayerDef;
+}
+
 export function validateLevel(data: unknown, source: string): DungeonLevel {
   if (typeof data !== 'object' || data === null) {
     throw new Error(`Level data from ${source} is not an object`);
@@ -302,18 +441,11 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "name" must be a string`);
   }
 
-  // grid (basic structure — char validation happens after charDefs)
-  if (!Array.isArray(obj.grid) || obj.grid.length === 0 || !obj.grid.every((r: unknown) => typeof r === 'string')) {
-    throw new Error(`Level ${source}: "grid" must be a non-empty array of strings`);
-  }
+  // For layered levels, we need to validate charDefs first (level-global), then layers.
+  // For non-layered levels, the existing flow validates grid → charDefs → grid chars.
+  const hasLayers = obj.layers !== undefined;
 
-  const grid = obj.grid as string[];
-  const rowLen = grid[0].length;
-  if (!grid.every((r) => r.length === rowLen)) {
-    throw new Error(`Level ${source}: all grid rows must be the same length`);
-  }
-
-  // charDefs (optional — validate BEFORE grid chars so custom chars are known)
+  // charDefs (optional, level-global — validate BEFORE grid/layers so custom chars are known)
   const charDefChars = new Set<string>();
   const walkableChars = new Set(WALKABLE_CELLS);
 
@@ -366,14 +498,47 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     }
   }
 
-  // grid char validation (now with extended known chars)
+  // Known chars = built-in + charDefs (level-global, shared across all layers)
   const extendedKnown = new Set(BUILTIN_CHARS);
   for (const ch of charDefChars) extendedKnown.add(ch);
 
-  for (const row of grid) {
-    for (const ch of row) {
-      if (!extendedKnown.has(ch)) {
-        throw new Error(`Level ${source}: unknown cell character '${ch}'`);
+  // Layers validation — charDefs are now known, pass to each layer
+  if (hasLayers) {
+    if (!Array.isArray(obj.layers) || obj.layers.length === 0) {
+      throw new Error(`Level ${source}: "layers" must be a non-empty array`);
+    }
+    const globalEntityIds = new Set<string>();
+    const validatedLayers: LayerDef[] = [];
+    for (let li = 0; li < obj.layers.length; li++) {
+      const rawLayer = obj.layers[li];
+      if (typeof rawLayer !== 'object' || rawLayer === null || Array.isArray(rawLayer)) {
+        throw new Error(`Level ${source}: layers[${li}] must be an object`);
+      }
+      validatedLayers.push(validateLayerDef(rawLayer as Record<string, unknown>, li, source, globalEntityIds, extendedKnown, walkableChars));
+    }
+    obj.layers = validatedLayers;
+    // Set top-level grid/entities from layer 0 for backward-compat access
+    obj.grid = validatedLayers[0].grid;
+    obj.entities = validatedLayers[0].entities;
+  }
+
+  // Ensure grid is set (either directly or from layer 0 above)
+  if (!Array.isArray(obj.grid) || obj.grid.length === 0 || !obj.grid.every((r: unknown) => typeof r === 'string')) {
+    throw new Error(`Level ${source}: "grid" must be a non-empty array of strings`);
+  }
+  const grid = obj.grid as string[];
+  const rowLen = grid[0].length;
+  if (!grid.every((r) => r.length === rowLen)) {
+    throw new Error(`Level ${source}: all grid rows must be the same length`);
+  }
+
+  // Grid char validation (skip for layered levels — already validated per-layer above)
+  if (!hasLayers) {
+    for (const row of grid) {
+      for (const ch of row) {
+        if (!extendedKnown.has(ch)) {
+          throw new Error(`Level ${source}: unknown cell character '${ch}'`);
+        }
       }
     }
   }
@@ -515,8 +680,15 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
         throw new Error(`Level ${source}: areas[${i}].environment must be one of ${validEnvs.join(', ')}`);
       }
 
-      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined && entry.environment === undefined) {
-        throw new Error(`Level ${source}: areas[${i}] must specify at least one texture or an environment`);
+      if (entry.openBottom !== undefined && typeof entry.openBottom !== 'boolean') {
+        throw new Error(`Level ${source}: areas[${i}].openBottom must be a boolean`);
+      }
+      if (entry.openTop !== undefined && typeof entry.openTop !== 'boolean') {
+        throw new Error(`Level ${source}: areas[${i}].openTop must be a boolean`);
+      }
+
+      if (entry.wallTexture === undefined && entry.floorTexture === undefined && entry.ceilingTexture === undefined && entry.environment === undefined && !entry.openBottom && !entry.openTop) {
+        throw new Error(`Level ${source}: areas[${i}] must specify at least one texture, an environment, or a hollow flag`);
       }
 
       validateTextures(entry, `areas[${i}]`, source);
@@ -569,7 +741,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
   }
 
   // Validate or migrate dungeon-level playerStart
-  let dungeonPlayerStart: { levelId: string; col: number; row: number; facing: Facing };
+  let dungeonPlayerStart: { levelId: string; col: number; row: number; facing: Facing; layerIndex?: number };
 
   if (obj.playerStart !== undefined) {
     const dps = obj.playerStart as Record<string, unknown>;
@@ -592,10 +764,14 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
     const startLevel = levels.find(l => l.id === dps.levelId)!;
     const startCol = dps.col as number;
     const startRow = dps.row as number;
-    const startRowLen = startLevel.grid[0].length;
+    const startLayerCoord = typeof dps.layerIndex === 'number' ? dps.layerIndex : 0;
+    // Resolve layer coordinate to array index, then use that layer's grid
+    const startLayerArrayIdx = resolveLayerCoord(startLevel, startLayerCoord);
+    const startGrid = startLevel.layers?.[startLayerArrayIdx]?.grid ?? startLevel.grid;
+    const startRowLen = startGrid[0].length;
 
-    if (startRow < 0 || startRow >= startLevel.grid.length || startCol < 0 || startCol >= startRowLen) {
-      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is out of grid bounds on level "${dps.levelId}"`);
+    if (startRow < 0 || startRow >= startGrid.length || startCol < 0 || startCol >= startRowLen) {
+      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is out of grid bounds on level "${dps.levelId}" layer ${startLayerCoord}`);
     }
 
     const startWalkable = new Set(WALKABLE_CELLS);
@@ -604,8 +780,8 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
         if (!def.solid) startWalkable.add(def.char);
       }
     }
-    if (!startWalkable.has(startLevel.grid[startRow][startCol])) {
-      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is on a non-walkable tile on level "${dps.levelId}"`);
+    if (!startWalkable.has(startGrid[startRow][startCol])) {
+      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is on a non-walkable tile on level "${dps.levelId}" layer ${startLayerCoord}`);
     }
 
     dungeonPlayerStart = {
@@ -613,6 +789,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
       col: startCol,
       row: startRow,
       facing: dps.facing as Facing,
+      layerIndex: startLayerCoord !== 0 ? startLayerCoord : undefined,
     };
   } else {
     // Migration: promote first level's playerStart to dungeon level
@@ -629,34 +806,39 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
   }
 
   // Cross-level validation: stairs must reference valid stair entities on other levels
-  // and the spawn cell (one step in facing direction from target) must be walkable
+  // and the spawn cell (one step in facing direction from target) must be walkable.
+  // Searches all layers' entities for layered levels.
   for (let i = 0; i < levels.length; i++) {
     const level = levels[i];
-    for (let j = 0; j < level.entities.length; j++) {
-      const e = level.entities[j];
+    const allEntities = getAllLevelEntities(level);
+    for (let j = 0; j < allEntities.length; j++) {
+      const e = allEntities[j];
       if (e.type === 'stairs') {
         const targetId = e.target as string;
 
-        // Find the target stair entity across all OTHER levels
+        // Find the target stair entity across all OTHER levels (search all layers)
         let targetStair: Entity | undefined;
         let targetLevel: DungeonLevel | undefined;
+        let targetLayerIndex = 0;
         for (const otherLevel of levels) {
           if (otherLevel === level) continue; // target must be on a different level
-          targetStair = otherLevel.entities.find(oe => oe.id === targetId);
+          targetStair = getAllLevelEntities(otherLevel).find(oe => oe.id === targetId);
           if (targetStair) {
             targetLevel = otherLevel;
+            targetLayerIndex = findEntityLayerIndex(otherLevel, targetId);
             break;
           }
         }
 
         if (!targetStair || !targetLevel) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target "${targetId}" does not match any stair entity on another level`);
+          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" does not match any stair entity on another level`);
         }
         if (targetStair.type !== 'stairs') {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs target "${targetId}" is not a stairs entity`);
+          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" is not a stairs entity`);
         }
 
-        // Validate spawn cell: one step in target stair's facing direction
+        // Validate spawn cell using the target stair's layer grid
+        const targetGrid = targetLevel.layers?.[targetLayerIndex]?.grid ?? targetLevel.grid;
         const FACING_OFFSETS: Record<string, [number, number]> = {
           N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
         };
@@ -664,8 +846,8 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
         const spawnCol = targetStair.col + dc;
         const spawnRow = targetStair.row + dr;
 
-        if (spawnRow < 0 || spawnRow >= targetLevel.grid.length || spawnCol < 0 || spawnCol >= targetLevel.grid[0].length) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs spawn position (${spawnCol},${spawnRow}) is out of bounds on level "${targetLevel.id}"`);
+        if (spawnRow < 0 || spawnRow >= targetGrid.length || spawnCol < 0 || spawnCol >= targetGrid[0].length) {
+          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is out of bounds on level "${targetLevel.id}"`);
         }
 
         const walkableChars = new Set(WALKABLE_CELLS);
@@ -674,8 +856,8 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
             if (!def.solid) walkableChars.add(def.char);
           }
         }
-        if (!walkableChars.has(targetLevel.grid[spawnRow][spawnCol])) {
-          throw new Error(`Dungeon ${source}: levels[${i}] entities[${j}] stairs spawn position (${spawnCol},${spawnRow}) is not walkable on level "${targetLevel.id}"`);
+        if (!walkableChars.has(targetGrid[spawnRow][spawnCol])) {
+          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is not walkable on level "${targetLevel.id}" layer ${targetLayerIndex}`);
         }
       }
     }

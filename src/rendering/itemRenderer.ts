@@ -21,6 +21,7 @@ export function addSingleItemMesh(
   gameState: GameState,
   group: THREE.Group,
   meshMap: Map<string, THREE.Mesh>,
+  layerIndex?: number,
 ): void {
   const def = itemDatabase.getItem(entity.itemId);
   if (!def) return;
@@ -40,7 +41,7 @@ export function addSingleItemMesh(
   mesh.position.set(cx, ITEM_HEIGHT, cz);
 
   // Keep first mesh at this cell — matches pickup order (first item picked up first)
-  const mapKey = doorKey(col, row);
+  const mapKey = layerIndex !== undefined ? `${layerIndex}:${doorKey(col, row)}` : doorKey(col, row);
   if (meshMap.has(mapKey)) {
     return;
   }
@@ -56,7 +57,7 @@ export function buildItemMeshes(
   const meshMap = new Map<string, THREE.Mesh>();
   const geo = new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE);
 
-  const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId);
+  const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId, gameState.activeLayerIndex);
 
   for (const entity of groundEntities) {
     const def = itemDatabase.getItem(entity.itemId);
@@ -86,10 +87,8 @@ export function buildItemMeshes(
 export function hideItemMesh(
   meshMap: Map<string, THREE.Mesh>,
   group: THREE.Group,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (mesh) {
     group.remove(mesh);

@@ -4,6 +4,7 @@ import { Toolbar } from './Toolbar';
 import { Inspector } from './Inspector';
 import { LevelProperties } from './LevelProperties';
 import { LevelList } from './LevelList';
+import { LayerList } from './LayerList';
 import {
   openLevelFile, exportLevelFile, exportDungeonFile,
   serializeLevel, serializeDungeon,
@@ -48,6 +49,7 @@ toolbar.setActiveTool('select');
 const inspector = new Inspector(document.getElementById('inspector')!, app);
 const levelProps = new LevelProperties(document.getElementById('level-props-content')!, app);
 const levelList = new LevelList(document.getElementById('level-list')!, app);
+const layerList = new LayerList(document.getElementById('layer-list')!, app);
 
 // --- Dialog editor components ---
 const dialogCanvasEl = document.getElementById('dialog-canvas') as HTMLCanvasElement;
@@ -169,6 +171,7 @@ function refreshAllUI(): void {
   updateStairHighlight();
   levelProps.refresh();
   levelList.refresh();
+  layerList.refresh();
   gridCanvas.updateCursor();
   gridCanvas.markDirty();
   updateDirtyDisplay();
@@ -278,6 +281,7 @@ async function performSave(filename: string): Promise<void> {
   if (savingInProgress) return;
   if (!app.level) return;
 
+  app.syncToActiveLayer();
   const content = app.isDungeonMode()
     ? JSON.stringify(serializeDungeon(app.dungeon!), null, 2)
     : JSON.stringify(serializeLevel(app.level), null, 2);
@@ -518,6 +522,44 @@ levelList.onBeginTextEdit = () => {
 
 levelList.onCommitTextEdit = () => {
   if (app.level) app.undo.commitBatch(app.level);
+};
+
+// --- LayerList callbacks ---
+
+layerList.onLayerSwitch = (index) => {
+  app.switchToLayer(index);
+  refreshAllUI();
+};
+
+layerList.onAddLayerAbove = () => {
+  const newIndex = app.insertLayer('above');
+  if (newIndex >= 0) {
+    app.switchToLayer(newIndex);
+    markDirty();
+    refreshAllUI();
+  }
+};
+
+layerList.onAddLayerBelow = () => {
+  const newIndex = app.insertLayer('below');
+  if (newIndex >= 0) {
+    app.switchToLayer(newIndex);
+    markDirty();
+    refreshAllUI();
+  }
+};
+
+layerList.onRemoveLayer = (index) => {
+  if (app.removeLayerFromLevel(index)) {
+    markDirty();
+    refreshAllUI();
+  }
+};
+
+layerList.onConvertToLayers = () => {
+  app.convertToLayers();
+  markDirty();
+  refreshAllUI();
 };
 
 // Selection callback — update inspector

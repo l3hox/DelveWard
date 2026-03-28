@@ -18,16 +18,28 @@ export interface TextureArea extends TextureSet {
   fromRow: number;
   toRow: number;
   environment?: Environment;  // override environment in this region
+  openBottom?: boolean;       // skip floor geometry (hollow area — see through to layer below)
+  openTop?: boolean;          // skip ceiling geometry (hollow area — see through to layer above)
 }
 
 export type Environment = 'dungeon' | 'mist' | 'forest' | 'outdoor';
 export type Skybox = 'starry-night' | 'daylight' | 'sunset';
 
+export interface LayerDef {
+  id?: string;                    // e.g. "ground", "upper"
+  yOffset?: number;               // explicit Y, default: index * LAYER_HEIGHT
+  grid: string[];
+  entities: Entity[];
+  ceiling?: boolean;              // default: true
+  defaults?: TextureSet;
+  areas?: TextureArea[];
+}
+
 export interface DungeonLevel {
   id?: string;               // optional stable identifier for save/load keying
   name: string;
   grid: string[];            // each string = one row of chars
-  playerStart?: { col: number; row: number; facing: Facing };  // optional — single-level mode only
+  playerStart?: { col: number; row: number; facing: Facing; layerIndex?: number };  // optional — single-level mode only
   entities: Entity[];
   environment?: Environment;     // visual environment preset (default: 'dungeon')
   ceiling?: boolean;             // render ceiling geometry (default: true)
@@ -38,12 +50,13 @@ export interface DungeonLevel {
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];
+  layers?: LayerDef[];           // if present, grid/entities/areas/defaults/ceiling are per-layer; charDefs are level-global
 }
 
 export interface Dungeon {
   name: string;
   levels: DungeonLevel[];
-  playerStart: { levelId: string; col: number; row: number; facing: Facing };
+  playerStart: { levelId: string; col: number; row: number; facing: Facing; layerIndex?: number };
 }
 
 // Grid char legend:

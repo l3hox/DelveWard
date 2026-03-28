@@ -18,7 +18,7 @@ export type EquipSlot =
 
 // ItemLocation — discriminant union covering all three states an item can occupy.
 export type ItemLocation =
-  | { kind: 'world'; levelId: string; col: number; row: number }
+  | { kind: 'world'; levelId: string; col: number; row: number; layerIndex?: number }
   | { kind: 'backpack'; slot: number }
   | { kind: 'equipped'; slot: EquipSlot };
 
@@ -94,11 +94,12 @@ export class EntityRegistry {
     return result;
   }
 
-  // All ground items in a level — used by renderers to build scene objects.
-  getAllGroundItemsForLevel(levelId: string): ItemEntity[] {
+  // All ground items in a level (optionally filtered by layer) — used by renderers to build scene objects.
+  getAllGroundItemsForLevel(levelId: string, layerIndex?: number): ItemEntity[] {
     const result: ItemEntity[] = [];
     for (const entity of this.items.values()) {
       if (entity.location.kind === 'world' && entity.location.levelId === levelId) {
+        if (layerIndex !== undefined && (entity.location.layerIndex ?? 0) !== layerIndex) continue;
         result.push(entity);
       }
     }

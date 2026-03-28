@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState } from '../core/gameState';
+import type { GameState } from '../core/gameState';
 
 const WIRE_HEIGHT = 0.25; // ankle height
 const WIRE_RADIUS = 0.008; // thin wire thickness
@@ -49,8 +49,7 @@ export function buildTripwireMeshes(gameState: GameState): TripwireMeshes {
   return { group, meshMap };
 }
 
-export function hideTripwire(meshMap: Map<string, THREE.Mesh>, col: number, row: number): void {
-  const key = doorKey(col, row);
+export function hideTripwire(meshMap: Map<string, THREE.Mesh>, key: string): void {
   const mesh = meshMap.get(key);
   if (mesh) mesh.visible = false;
 }

@@ -93,7 +93,7 @@ export class LevelProperties {
                 this.onStatusHintChanged?.();
                 return;
               }
-              dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing };
+              dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing, layerIndex: this.app.hasLayers() ? this.app.getActiveLayerCoord() : undefined };
               this.app.coordPickCallback = null;
               this.app.statusHint = null;
               this.onStatusHintChanged?.();
@@ -105,7 +105,7 @@ export class LevelProperties {
           return;
         }
 
-        // This IS the start level — show position + facing + pick
+        // This IS the start level — show position + facing + layer + pick
         const ps = dungeon.playerStart;
 
         const posLabel = document.createElement('div');
@@ -117,6 +117,18 @@ export class LevelProperties {
           ps.facing = val as Facing;
           this.onChanged?.();
         });
+
+        // Layer dropdown (only for layered levels)
+        if (this.app.hasLayers() && level.layers) {
+          const layerOptions = level.layers.map(l => l.id ?? '0');
+          const currentLayerCoord = String(ps.layerIndex ?? 0);
+          this.addDropdownField(body, 'layer', currentLayerCoord, layerOptions, (val) => {
+            this.onBeforeDiscreteChange?.();
+            ps.layerIndex = parseInt(val, 10) || 0;
+            this.onChanged?.();
+            this.refresh();
+          });
+        }
 
         const pickBtn = document.createElement('button');
         pickBtn.className = 'btn-add';
@@ -133,6 +145,9 @@ export class LevelProperties {
               }
             dungeon.playerStart.col = col;
             dungeon.playerStart.row = row;
+            if (this.app.hasLayers()) {
+              dungeon.playerStart.layerIndex = this.app.getActiveLayerCoord();
+            }
             this.app.coordPickCallback = null;
             this.app.statusHint = null;
             this.onStatusHintChanged?.();
@@ -162,6 +177,18 @@ export class LevelProperties {
           this.onChanged?.();
         });
 
+        // Layer dropdown (only for layered levels)
+        if (this.app.hasLayers() && level.layers) {
+          const layerOptions = level.layers.map(l => l.id ?? '0');
+          const currentLayerCoord = String(ps.layerIndex ?? 0);
+          this.addDropdownField(body, 'layer', currentLayerCoord, layerOptions, (val) => {
+            this.onBeforeDiscreteChange?.();
+            ps.layerIndex = parseInt(val, 10) || 0;
+            this.onChanged?.();
+            this.refresh();
+          });
+        }
+
         const pickBtn = document.createElement('button');
         pickBtn.className = 'btn-add';
         pickBtn.textContent = 'Pick position';
@@ -177,6 +204,9 @@ export class LevelProperties {
               }
             ps.col = col;
             ps.row = row;
+            if (this.app.hasLayers()) {
+              ps.layerIndex = this.app.getActiveLayerCoord();
+            }
             this.app.coordPickCallback = null;
             this.app.statusHint = null;
             this.onStatusHintChanged?.();
@@ -565,6 +595,16 @@ export class LevelProperties {
         this.onChanged?.();
         this.refresh();
       }, 'ceiling');
+
+      // Hollow area flags (multi-layer vertical openness)
+      this.addCheckboxField(detail, 'openBottom (skip floor)', area.openBottom ?? false, (val) => {
+        if (val) { area.openBottom = true; } else { delete area.openBottom; }
+        this.onChanged?.();
+      });
+      this.addCheckboxField(detail, 'openTop (skip ceiling)', area.openTop ?? false, (val) => {
+        if (val) { area.openTop = true; } else { delete area.openTop; }
+        this.onChanged?.();
+      });
 
       entry.appendChild(detail);
     }

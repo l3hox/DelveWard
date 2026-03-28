@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState } from '../core/gameState';
+import type { GameState } from '../core/gameState';
 import { createNeutralLitMaterial } from './billboardMaterial';
 import { enemyDatabase, DEFAULT_SPRITE_SIZE } from '../enemies/enemyDatabase';
 
@@ -76,10 +76,8 @@ export function updateEnemyBillboards(
 
 export function hideEnemyMesh(
   meshMap: Map<string, THREE.Mesh>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const mesh = meshMap.get(key);
   if (mesh) mesh.visible = false;
 }
@@ -87,12 +85,10 @@ export function hideEnemyMesh(
 export function updateEnemyMeshPosition(
   meshMap: Map<string, THREE.Mesh>,
   oldKey: string,
-  newCol: number,
-  newRow: number,
+  newKey: string,
 ): void {
   const mesh = meshMap.get(oldKey);
   if (!mesh) return;
   meshMap.delete(oldKey);
-  const newKey = doorKey(newCol, newRow);
   meshMap.set(newKey, mesh);
 }

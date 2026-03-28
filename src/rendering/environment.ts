@@ -123,3 +123,29 @@ export function buildEnvZoneMap(
 
   return { zoneMap, zones, multiZone: zones.length > 1 };
 }
+
+/**
+ * Build a zone map for a layer using pre-assigned zone indices from another layer.
+ * Environments not in the existing mapping default to zone 1.
+ */
+export function buildEnvZoneMapWithExistingZones(
+  grid: string[],
+  levelEnv: Environment,
+  areas: Array<{ fromCol: number; toCol: number; fromRow: number; toRow: number; environment?: Environment }> | undefined,
+  existingZones: Environment[],
+): Map<string, number> {
+  const zoneIndex = new Map<Environment, number>();
+  for (let i = 0; i < existingZones.length; i++) {
+    zoneIndex.set(existingZones[i], i + 1);
+  }
+  const zoneMap = new Map<string, number>();
+  const rows = grid.length;
+  const cols = grid[0].length;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const env = resolveEnvironmentAtCell(col, row, levelEnv, areas);
+      zoneMap.set(`${col},${row}`, zoneIndex.get(env) ?? 1);
+    }
+  }
+  return zoneMap;
+}

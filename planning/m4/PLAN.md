@@ -60,6 +60,7 @@ Dungeon
 - Possibly collapsing levels into one big layer stack for fully interconnected worlds
 - True teleport entity type (distinct from stairs — portal to another level/location)
 - Cross-layer AI, projectiles, and sound attenuation
+- **Boundary entrance lights on all open outdoor/indoor edges** — currently only boundary doors get a PointLight. Extend to any walkable cell edge where outdoor and indoor zones meet without a wall (open passages, archways). Auto-detect from zone map + wall presence.
 
 ---
 

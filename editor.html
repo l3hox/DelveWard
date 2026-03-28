@@ -702,6 +702,16 @@
         margin-bottom: 8px;
       }
 
+      #layer-list {
+        display: none;
+      }
+      #layer-list.visible {
+        display: block;
+        border-bottom: 1px solid #333;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+      }
+
       .level-list-header {
         color: #fff;
         font-size: 13px;
@@ -912,6 +922,7 @@
     <div id="main-area">
       <div id="level-properties">
         <div id="level-list"></div>
+        <div id="layer-list"></div>
         <div id="level-props-content"></div>
       </div>
       <div id="canvas-container">

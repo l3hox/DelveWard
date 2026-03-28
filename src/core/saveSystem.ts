@@ -1,4 +1,4 @@
-import type { LevelSnapshot, GameState } from './gameState';
+import type { LevelSnapshot, MultiLayerSnapshot, GameState } from './gameState';
 import type {
   DoorInstance,
   KeyInstance,
@@ -62,6 +62,11 @@ interface SerializedLevelSnapshot {
   signalState?: any;
 }
 
+interface SerializedMultiLayerSnapshot {
+  layers: SerializedLevelSnapshot[];
+  activeLayerIndex: number;
+}
+
 export interface SaveData {
   version: 1;
   timestamp: number;
@@ -92,7 +97,7 @@ export interface SaveData {
   keys: string[];
   entityRegistry: ItemEntity[];
   flags: string[];
-  levelSnapshots: Record<string, SerializedLevelSnapshot>;
+  levelSnapshots: Record<string, SerializedMultiLayerSnapshot | SerializedLevelSnapshot>;
   levelGrids: Record<string, string[]>;
   quests?: Record<string, { status: string; stageIndex: number }>;
 }
@@ -185,6 +190,29 @@ export function deserializeLevelSnapshot(data: SerializedLevelSnapshot): LevelSn
   };
 }
 
+export function serializeMultiLayerSnapshot(snapshot: MultiLayerSnapshot): SerializedMultiLayerSnapshot {
+  return {
+    layers: snapshot.layers.map(serializeLevelSnapshot),
+    activeLayerIndex: snapshot.activeLayerIndex,
+  };
+}
+
+export function deserializeMultiLayerSnapshot(data: SerializedMultiLayerSnapshot | SerializedLevelSnapshot): MultiLayerSnapshot {
+  // Backward compat: old saves have flat SerializedLevelSnapshot (no 'layers' property)
+  if ('layers' in data && Array.isArray(data.layers)) {
+    const multi = data as SerializedMultiLayerSnapshot;
+    return {
+      layers: multi.layers.map(deserializeLevelSnapshot),
+      activeLayerIndex: multi.activeLayerIndex,
+    };
+  }
+  // Wrap single-layer snapshot
+  return {
+    layers: [deserializeLevelSnapshot(data as SerializedLevelSnapshot)],
+    activeLayerIndex: 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Save/load assembly
 // ---------------------------------------------------------------------------
@@ -195,7 +223,7 @@ interface BuildSaveDataParams {
   playerRow: number;
   playerFacing: Facing;
   currentLevelId: string;
-  levelSnapshots: Map<string, LevelSnapshot>;
+  levelSnapshots: Map<string, MultiLayerSnapshot>;
   dungeon: Dungeon;
   questState?: Record<string, { status: string; stageIndex: number }>;
 }
@@ -209,7 +237,7 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
 
   // Merge all known snapshots: previously-visited levels + the active level.
   // The active level's snapshot wins (it's freshest).
-  const allSnapshots = new Map<string, LevelSnapshot>(levelSnapshots);
+  const allSnapshots = new Map<string, MultiLayerSnapshot>(levelSnapshots);
   allSnapshots.set(currentLevelId, activeSnapshot);
 
   // Capture the full registry AFTER saveLevelState so that the active level's
@@ -218,9 +246,9 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
   const fullRegistry = gameState.entityRegistry.snapshot();
 
   // Serialize all level snapshots.
-  const serializedSnapshots: Record<string, SerializedLevelSnapshot> = {};
+  const serializedSnapshots: Record<string, SerializedMultiLayerSnapshot> = {};
   for (const [id, snapshot] of allSnapshots) {
-    serializedSnapshots[id] = serializeLevelSnapshot(snapshot);
+    serializedSnapshots[id] = serializeMultiLayerSnapshot(snapshot);
   }
 
   // Capture each level's current grid (may have been mutated by breakable walls, etc.).
@@ -268,7 +296,7 @@ export function buildSaveData(params: BuildSaveDataParams): SaveData {
 
 interface ApplySaveDataResult {
   targetLevelId: string;
-  levelSnapshots: Map<string, LevelSnapshot>;
+  levelSnapshots: Map<string, MultiLayerSnapshot>;
   playerCol: number;
   playerRow: number;
   playerFacing: Facing;
@@ -290,10 +318,10 @@ export function applySaveData(
 
   // Deserialize all level snapshots except the active one — that goes through
   // loadLevelState below, which also re-initialises the signal manager.
-  const levelSnapshots = new Map<string, LevelSnapshot>();
+  const levelSnapshots = new Map<string, MultiLayerSnapshot>();
   for (const [id, serialized] of Object.entries(data.levelSnapshots)) {
     if (id !== data.currentLevelId) {
-      levelSnapshots.set(id, deserializeLevelSnapshot(serialized));
+      levelSnapshots.set(id, deserializeMultiLayerSnapshot(serialized));
     }
   }
 
@@ -301,7 +329,7 @@ export function applySaveData(
   // entity index, and internal Maps are all rebuilt consistently.
   const activeSerializedSnapshot = data.levelSnapshots[data.currentLevelId];
   if (activeSerializedSnapshot) {
-    const activeSnapshot = deserializeLevelSnapshot(activeSerializedSnapshot);
+    const activeSnapshot = deserializeMultiLayerSnapshot(activeSerializedSnapshot);
     gameState.currentLevelId = data.currentLevelId;
     gameState.loadLevelState(activeSnapshot);
   }

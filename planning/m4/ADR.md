@@ -65,15 +65,18 @@ class GameState {
 
 ### Alternatives Rejected
 
-**Flat `"layer:col,row"` key encoding:** Rejected. `doorKey()` is called ~90 times across 30+ files. Changing the key format is a project-wide refactor with silent runtime failures on missed sites. No compile-time protection — a missed call produces a key that never matches. The LayerState pattern confines the layer dimension to one access point.
+**Flat `"layer:col,row"` key encoding at the GameState level:** Rejected. `doorKey()` is called ~90 times across 30+ files. Changing the key format is a project-wide refactor with silent runtime failures on missed sites. The LayerState pattern confines the layer dimension to one access point.
+
+**Note (Phase B update):** The rendering layer DOES use prefixed keys (`"layerIndex:col,row"` via `meshKey()`/`layerDoorKey()`) for shared meshMaps that track all layers' meshes. This is separate from GameState — the entity Maps within each `LayerState` still use unprefixed `doorKey()`. The `lk()` helper in the game loop bridges the two: it reads `gameState.activeLayerIndex` to prefix a `doorKey` for mesh lookup.
 
 ### Consequences
 
-- Zero changes to `doorKey()` and its ~90 call sites
+- Zero changes to `doorKey()` and its ~90 call sites in GameState/entity code
 - Phase 0 refactor is contained: move Maps into LayerState, add accessor
 - Cross-layer signal resolution navigates between LayerState instances by entity ID
 - Save system: `layers: SerializedLevelSnapshot[]` — explicit structure
 - `_rebuildEntityIndex()` must include `layerIndex` in the entity-by-ID index
+- Renderer meshMaps use `"li:col,row"` prefixed keys (ADR-M4-08)
 
 ---
 
@@ -88,11 +91,14 @@ Vertical openness between layers (cliff edges, atriums, bridges) needs a way to 
 
 ### Decision
 
-**Extend the existing area system with `openBottom`/`openTop` boolean flags on `TextureArea`.**
+**Auto-detect from adjacent layers, with area overrides.**
 
-- `openBottom: true` → skip floor geometry in that area region → see layer below
-- `openTop: true` → skip ceiling geometry → see layer above
-- Both → full vertical opening
+Default behavior: `buildDungeon()` checks the adjacent layer's grid at the same cell position. If the neighbor cell is not a solid wall (floor, void, seeThrough), the floor/ceiling is automatically skipped. No manual flagging needed for typical multi-layer layouts.
+
+Area `openBottom`/`openTop` boolean flags on `TextureArea` serve as **explicit overrides** — they force the surface open or closed regardless of what's on the adjacent layer. Useful for forcing a ceiling closed under a walkable cell above, or forcing a floor open over a wall below.
+
+- Auto-detect: `buildDungeon()` accepts `layerAboveGrid`/`layerBelowGrid` parameters
+- Override: `openBottom: true/false` and `openTop: true/false` on areas (explicit value wins)
 - The `' '` void char remains for non-walkable empty space
 
 Named `openBottom`/`openTop` (not `noFloor`/`noCeiling`) to avoid confusion with the existing level-wide `ceiling: boolean` field.
@@ -158,8 +164,8 @@ With multiple layers simulated simultaneously, the question is which game system
 
 ### Decision
 
-**Layer-locked for M4:**
-- **Enemy AI**: Enemies exist on one layer, pathfind only within that layer, aggro only toward player on the same layer.
+**Layer-locked for M4** (but all layers tick — see ADR-M4-08):
+- **Enemy AI**: Enemies pathfind within their own layer, attacks only connect on the player's layer. AI ticks on ALL layers (enemies move, regen, take status damage even when player is on another layer).
 - **Projectiles**: Travel within originating layer only. No cross-layer flight through hollows.
 - **Player movement**: Restricted to current layer grid. Layer transitions via pit traps or stairs (future: ramps).
 - **Combat**: Player attacks and enemy attacks only affect entities on the same layer.
@@ -240,3 +246,64 @@ Ground items are currently rendered as flat `PlaneGeometry` lying on the floor (
 - Billboard update loop needed (or use `THREE.Sprite`)
 - Pickup mesh rebuild already exists (Phase F barrel loot fix) — extends naturally
 - Both `itemRenderer.ts` and `consumableRenderer.ts` affected
+
+---
+
+## ADR-M4-08 — All Layers Active (No Dormancy)
+
+**Status:** Accepted
+**Date:** 2026-03-28
+
+### Context
+
+Phase B initially had an active/non-active layer distinction: the player's layer got full mesh tracking, animators, and AI ticking; other layers were visual-only (static meshes, no interaction, no AI). This was simpler but meant enemies on other layers were frozen, doors didn't animate, and traps didn't fire.
+
+### Decision
+
+**All layers are fully active.** No dormancy — every layer has full mesh tracking, animators, and AI ticking every frame.
+
+- Shared meshMaps use `"layerIndex:col,row"` prefixed keys (`meshKey()`, `layerDoorKey()`)
+- One set of animators (DoorAnimator, LeverAnimator, EnemyAnimator, HealthBarManager) handles all layers
+- `lk()` helper in the game loop prefixes keys with `gameState.activeLayerIndex` for correct layer targeting
+- Enemy AI ticks all layers per frame; attacks restricted to player's layer
+- Trap launchers tick all layers
+- Signals already cross-layer (ADR-M4-05)
+
+### Alternatives Rejected
+
+**Keep non-active layers visual-only:** Rejected. Cross-layer signals need doors on other layers to animate. Enemies should be alive even when the player isn't on their layer. The "everything active" model is simpler to reason about and prevents bugs from dormancy edge cases.
+
+**Per-layer LevelScene arrays:** Rejected. Would require `doorAnimators[]`, `enemyAnimators[]`, etc. with ~50 access sites each converting to `[layerIndex]`. The merged-key approach (`"0:3,4"` format) avoids parallel arrays and keeps a single animator per type.
+
+### Consequences
+
+- Draw calls scale linearly with layer count (acceptable for ~5 layers)
+- Future dormancy optimization: spatial data structures with local-neighborhood activation. The prefixed-key scheme is compatible — dormant layers would simply skip their tick, not their mesh tracking
+- The `lk()` helper pattern makes layer-aware lookups mechanical — wrap any `doorKey` in `lk()` for the mesh-level key
+
+---
+
+## ADR-M4-09 — Layer IDs as Stable Numeric Coordinates
+
+**Status:** Accepted
+**Date:** 2026-03-28
+
+### Context
+
+Layers are stored in an array ordered by Y position (lowest first). When inserting layers above or below, array indices shift. References to layers (e.g., `playerStart.layerIndex`) need to survive insertions.
+
+### Decision
+
+**Layer IDs are stable numeric coordinates.** Ground = `"0"`, above = `"1"`, `"2"`, ..., below = `"-1"`, `"-2"`, ...
+
+- IDs never change after creation — inserting a new layer at the bottom shifts array indices but not IDs
+- All references (playerStart, stair targets) store the coordinate, not the array index
+- `resolveLayerCoord(level, coord)` converts coordinate → array index at runtime
+- No shifting logic needed on insert/remove
+
+### Consequences
+
+- `playerStart.layerIndex: 0` always means "ground floor" regardless of how many layers are added below
+- Editor and game both use the same resolution function
+- Stair cross-level references resolved via entity ID + `findEntityLayerIndex()`, not layer coordinate (entities are unique)
+- The coordinate maps intuitively to floor numbers in the level design

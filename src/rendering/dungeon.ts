@@ -9,6 +9,7 @@ import { doorKey } from '../core/gameState';
 export const CELL_SIZE = 2;
 export const WALL_HEIGHT = 2.5;
 export const EYE_HEIGHT = WALL_HEIGHT * 0.65;
+export const LAYER_HEIGHT = WALL_HEIGHT;  // layers stack flush — floor of layer N+1 sits on ceiling of layer N
 
 const wallGeo = new THREE.PlaneGeometry(CELL_SIZE, WALL_HEIGHT);
 const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
@@ -94,7 +95,7 @@ function resolveWallMat(
   return fallbackMat;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>): THREE.Group {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[]): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -130,6 +131,36 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const isStair = stairPositions?.has(doorKey(col, row)) ?? false;
       const zoneLayer = envZoneMap?.get(doorKey(col, row));
 
+      // Hollow area flags — skip floor/ceiling for vertical openness between layers.
+      // Auto-detect: if adjacent layer cell is not a solid wall, the surface is open.
+      // Area openBottom/openTop flags override the auto-detect.
+      let isOpenBottom = false;
+      let isOpenTop = false;
+
+      // Auto-detect from adjacent layers: open if neighbor cell is not a solid wall
+      if (layerBelowGrid && row < layerBelowGrid.length && col < layerBelowGrid[0].length) {
+        const belowChar = layerBelowGrid[row][col];
+        const belowDef = charDefMap.get(belowChar);
+        const belowIsSolidWall = belowChar === '#' || (belowDef !== undefined && belowDef.solid && !belowDef.seeThrough);
+        if (!belowIsSolidWall) isOpenBottom = true;
+      }
+      if (layerAboveGrid && row < layerAboveGrid.length && col < layerAboveGrid[0].length) {
+        const aboveChar = layerAboveGrid[row][col];
+        const aboveDef = charDefMap.get(aboveChar);
+        const aboveIsSolidWall = aboveChar === '#' || (aboveDef !== undefined && aboveDef.solid && !aboveDef.seeThrough);
+        if (!aboveIsSolidWall) isOpenTop = true;
+      }
+
+      // Area flags override auto-detect (explicit true forces open, explicit false forces closed)
+      if (areas) {
+        for (const area of areas) {
+          if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
+            if (area.openBottom !== undefined) isOpenBottom = area.openBottom;
+            if (area.openTop !== undefined) isOpenTop = area.openTop;
+          }
+        }
+      }
+
       // Detect zone boundary on door cells: split floor/ceiling into halves
       let splitAxis: 'NS' | 'EW' | null = null;
       let neighborZone: number | undefined;
@@ -145,7 +176,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         else if (zW !== undefined && zW !== zoneLayer) { splitAxis = 'EW'; neighborZone = zW; }
       }
 
-      if (!isStair) {
+      if (!isStair && !isOpenBottom) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           // Boundary cell: split floor into two halves, each tagged to its zone
           if (splitAxis === 'NS') {
@@ -184,7 +215,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // Ceiling (skip for stair cells — stairRenderer provides the geometry)
-      if (ceiling && !isStair) {
+      if (ceiling && !isStair && !isOpenTop) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           if (splitAxis === 'NS') {
             const ceilN = new THREE.Mesh(halfTileNS, cellCeilMat);

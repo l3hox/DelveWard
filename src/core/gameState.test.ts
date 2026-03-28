@@ -221,9 +221,9 @@ describe('GameState', () => {
         { col: 1, row: 1, type: 'lever', id: 'lever_1', targets: ['door_1'] },
       ]);
       expect(gs.entityById.has('door_1')).toBe(true);
-      expect(gs.entityById.get('door_1')).toEqual({ col: 3, row: 3, type: 'door' });
+      expect(gs.entityById.get('door_1')).toEqual({ col: 3, row: 3, type: 'door', layerIndex: 0 });
       expect(gs.entityById.has('lever_1')).toBe(true);
-      expect(gs.entityById.get('lever_1')).toEqual({ col: 1, row: 1, type: 'lever' });
+      expect(gs.entityById.get('lever_1')).toEqual({ col: 1, row: 1, type: 'lever', layerIndex: 0 });
     });
 
     it('entities without id are not indexed', () => {
@@ -268,7 +268,7 @@ describe('GameState', () => {
 
       expect(gs.entityById.has('door_old')).toBe(false);
       expect(gs.entityById.has('door_new')).toBe(true);
-      expect(gs.entityById.get('door_new')).toEqual({ col: 3, row: 3, type: 'door' });
+      expect(gs.entityById.get('door_new')).toEqual({ col: 3, row: 3, type: 'door', layerIndex: 0 });
     });
   });
 
@@ -286,7 +286,7 @@ describe('GameState', () => {
 
       gs2.loadLevelState(snap);
       expect(gs2.entityById.has('door_snap')).toBe(true);
-      expect(gs2.entityById.get('door_snap')).toEqual({ col: 2, row: 2, type: 'door' });
+      expect(gs2.entityById.get('door_snap')).toEqual({ col: 2, row: 2, type: 'door', layerIndex: 0 });
     });
   });
 
@@ -679,13 +679,14 @@ describe('GameState', () => {
       gs.exploredCells.add('1,0');
 
       const snap = gs.saveLevelState();
+      const layer0 = snap.layers[0];
 
-      expect(snap.doors.size).toBe(1);
-      expect(snap.keys.size).toBe(1);
-      expect(snap.levers.size).toBe(1);
-      expect(snap.plates.size).toBe(1);
-      expect(snap.exploredCells.size).toBe(2);
-      expect(snap.exploredCells.has('0,0')).toBe(true);
+      expect(layer0.doors.size).toBe(1);
+      expect(layer0.keys.size).toBe(1);
+      expect(layer0.levers.size).toBe(1);
+      expect(layer0.plates.size).toBe(1);
+      expect(layer0.exploredCells.size).toBe(2);
+      expect(layer0.exploredCells.has('0,0')).toBe(true);
     });
 
     it('snapshot is a deep copy — mutating GameState after save does not affect snapshot', () => {
@@ -699,8 +700,8 @@ describe('GameState', () => {
       gs.exploredCells.add('2,2');
 
       // Snapshot should be unchanged
-      expect(snap.doors.get('1,1')!.state).toBe('closed');
-      expect(snap.exploredCells.has('2,2')).toBe(false);
+      expect(snap.layers[0].doors.get('1,1')!.state).toBe('closed');
+      expect(snap.layers[0].exploredCells.has('2,2')).toBe(false);
     });
   });
 
@@ -728,8 +729,8 @@ describe('GameState', () => {
       gs2.loadLevelState(snap);
 
       // Mutate the snapshot directly
-      snap.doors.get('1,1')!.state = 'open';
-      snap.exploredCells.add('9,9');
+      snap.layers[0].doors.get('1,1')!.state = 'open';
+      snap.layers[0].exploredCells.add('9,9');
 
       // gs2 should be unaffected
       expect(gs2.getDoor(1, 1)!.state).toBe('closed');
@@ -800,7 +801,7 @@ describe('GameState', () => {
         { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
       const snap = gs.saveLevelState();
-      expect(snap.stairs.size).toBe(1);
+      expect(snap.layers[0].stairs.size).toBe(1);
     });
 
     it('stairs are restored from level snapshots', () => {
@@ -1267,7 +1268,7 @@ describe('GameState', () => {
         { col: 2, row: 2, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
       ], undefined, 'test_level');
       const snap = gs.saveLevelState();
-      expect(snap.registrySnapshot.length).toBe(2);
+      expect(snap.layers[0].registrySnapshot.length).toBe(2);
 
       const gs2 = new GameState([], undefined, 'test_level');
       gs2.loadLevelState(snap);
@@ -1280,12 +1281,12 @@ describe('GameState', () => {
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
       ], undefined, 'test_level');
       const snap = gs.saveLevelState();
-      const snapLen = snap.registrySnapshot.length;
+      const snapLen = snap.layers[0].registrySnapshot.length;
       // Remove the entity from live state
       const entities = gs.entityRegistry.getAllGroundItemsForLevel('test_level');
       gs.entityRegistry.removeItem(entities[0].instanceId);
       // Snapshot should be unaffected
-      expect(snap.registrySnapshot.length).toBe(snapLen);
+      expect(snap.layers[0].registrySnapshot.length).toBe(snapLen);
     });
   });
 

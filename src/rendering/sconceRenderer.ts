@@ -100,10 +100,8 @@ export function buildSconceMeshes(gameState: GameState): SconceMeshes {
 export function extinguishSconce(
   meshMap: Map<string, THREE.Group>,
   lightMap: Map<string, THREE.PointLight>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = `${col},${row}`;
   const sconceGroup = meshMap.get(key);
   if (sconceGroup) {
     // Hide torch handle and flame — only bracket + arm remain

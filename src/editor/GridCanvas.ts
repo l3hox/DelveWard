@@ -1180,16 +1180,18 @@ export class GridCanvas {
     const level = this.app.level!;
     const { ctx } = this;
 
-    let ps: { col: number; row: number; facing: Facing } | undefined;
+    let ps: { col: number; row: number; facing: Facing; layerIndex?: number } | undefined;
     if (this.app.dungeon) {
       const dp = this.app.dungeon.playerStart;
       if (dp.levelId === level.id) {
         ps = dp;
       }
     } else {
-      ps = level.playerStart;
+      ps = level.playerStart ?? undefined;
     }
     if (!ps) return;
+    // Only show player start on the matching layer
+    if (this.app.hasLayers() && (ps.layerIndex ?? 0) !== this.app.getActiveLayerCoord()) return;
 
     const { col, row, facing } = ps;
 

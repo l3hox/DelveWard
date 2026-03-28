@@ -31,6 +31,8 @@ export class Player {
   private commandQueue: Array<() => void> = [];
 
   public slowMultiplier = 1;
+  public yOffset = 0;         // additional Y offset (used for debug layer flying)
+  public targetYOffset = 0;   // target Y offset (lerped in update)
 
   private stairs?: Map<string, StairInstance>;
 
@@ -185,7 +187,14 @@ export class Player {
       this.currentPitch = this.targetPitch;
     }
 
+    // Lerp debug Y offset
+    this.yOffset += (this.targetYOffset - this.yOffset) * alpha;
+    if (Math.abs(this.yOffset - this.targetYOffset) < 0.005) {
+      this.yOffset = this.targetYOffset;
+    }
+
     this.camera.position.copy(this.currentPos);
+    this.camera.position.y += this.yOffset;
     // Pull camera back from cell center along facing direction
     this.camera.position.x += Math.sin(this.currentAngle) * CAMERA_BACK_OFFSET;
     this.camera.position.z += Math.cos(this.currentAngle) * CAMERA_BACK_OFFSET;
@@ -201,5 +210,12 @@ export class Player {
 
   getWorldPosition(): THREE.Vector3 {
     return this.currentPos.clone();
+  }
+
+  /** Switch the grid and walkable set (used when changing layers). */
+  switchGrid(grid: string[], walkable: Set<string>, stairs?: Map<string, StairInstance>): void {
+    this.grid = grid;
+    this.stairs = stairs;
+    this.state.setWalkable(walkable);
   }
 }

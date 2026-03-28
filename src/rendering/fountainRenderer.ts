@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState, type FountainInstance } from '../core/gameState';
+import type { GameState, FountainInstance } from '../core/gameState';
 
 export interface FountainMeshes {
   group: THREE.Group;
@@ -59,10 +59,8 @@ export function buildFountainMeshes(gameState: GameState): FountainMeshes {
 
 export function markFountainUsed(
   meshMap: Map<string, THREE.Group>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const fountainGroup = meshMap.get(key);
   if (!fountainGroup) return;
 

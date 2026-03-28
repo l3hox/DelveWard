@@ -1,5 +1,5 @@
 import { validateLevel, validateDungeon } from '../level/levelLoader';
-import type { Dungeon, DungeonLevel } from '../core/types';
+import type { Dungeon, DungeonLevel, LayerDef } from '../core/types';
 
 declare global {
   interface Window {
@@ -18,20 +18,39 @@ export type OpenResult =
 
 export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const hasLayers = level.layers !== undefined && level.layers.length > 0;
   if (level.id !== undefined) out.id = level.id;
   out.name = level.name;
-  out.grid = level.grid;
   if (level.playerStart) out.playerStart = level.playerStart;
-  out.entities = level.entities;
   if (level.environment !== undefined) out.environment = level.environment;
-  if (level.ceiling !== undefined) out.ceiling = level.ceiling;
   if (level.skybox !== undefined) out.skybox = level.skybox;
   if (level.fireflies !== undefined) out.fireflies = level.fireflies;
   if (level.dustMotes !== undefined) out.dustMotes = level.dustMotes;
   if (level.waterDrips !== undefined) out.waterDrips = level.waterDrips;
-  if (level.defaults !== undefined) out.defaults = level.defaults;
   if (level.charDefs !== undefined && level.charDefs.length > 0) out.charDefs = level.charDefs;
-  if (level.areas !== undefined && level.areas.length > 0) out.areas = level.areas;
+  if (hasLayers) {
+    // Per-layer fields live only in layers, not duplicated at top level
+    out.layers = level.layers!.map(serializeLayerDef);
+  } else {
+    out.grid = level.grid;
+    out.entities = level.entities;
+    if (level.ceiling !== undefined) out.ceiling = level.ceiling;
+    if (level.defaults !== undefined) out.defaults = level.defaults;
+    if (level.areas !== undefined && level.areas.length > 0) out.areas = level.areas;
+  }
+  return out;
+}
+
+function serializeLayerDef(layer: LayerDef): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (layer.id !== undefined) out.id = layer.id;
+  if (layer.yOffset !== undefined) out.yOffset = layer.yOffset;
+  out.grid = layer.grid;
+  out.entities = layer.entities;
+  if (layer.ceiling !== undefined) out.ceiling = layer.ceiling;
+  if (layer.defaults !== undefined) out.defaults = layer.defaults;
+  // charDefs are level-global, not serialized per-layer
+  if (layer.areas !== undefined && layer.areas.length > 0) out.areas = layer.areas;
   return out;
 }
 
@@ -39,7 +58,12 @@ export function serializeDungeon(dungeon: Dungeon): Record<string, unknown> {
   return {
     name: dungeon.name,
     playerStart: dungeon.playerStart,
-    levels: dungeon.levels.map(serializeLevel),
+    levels: dungeon.levels.map(l => {
+      const serialized = serializeLevel(l);
+      // playerStart is global on the dungeon, not per-level
+      delete serialized.playerStart;
+      return serialized;
+    }),
   };
 }
 
@@ -65,7 +89,7 @@ export function openLevelFile(): Promise<OpenResult> {
           if (data.levels && Array.isArray(data.levels)) {
             const dungeon = validateDungeon(data, file.name);
             resolve({ type: 'dungeon', dungeon });
-          } else if (data.grid) {
+          } else if (data.grid || data.layers) {
             resolve({ type: 'level', level: validateLevel(data, file.name) });
           } else {
             alert('Unrecognized JSON format: expected a dungeon or level file');
@@ -164,7 +188,7 @@ export async function loadFromServer(filename: string): Promise<OpenResult> {
   if (data.levels && Array.isArray(data.levels)) {
     const dungeon = validateDungeon(data, filename);
     return { type: 'dungeon', dungeon };
-  } else if (data.grid) {
+  } else if (data.grid || data.layers) {
     return { type: 'level', level: validateLevel(data, filename) };
   } else {
     throw new Error('Unrecognized JSON format');

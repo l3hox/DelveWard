@@ -763,7 +763,7 @@ describe('validateDungeon', () => {
         }),
         validDungeonLevel('level2'),
       ],
-    }), 'test')).toThrow('stairs target "nonexistent_stair" does not match any stair entity on another level');
+    }), 'test')).toThrow('target "nonexistent_stair" does not match any stair entity on another level');
   });
 
   it('rejects stair whose target entity is not a stairs type', () => {
@@ -780,7 +780,7 @@ describe('validateDungeon', () => {
           ],
         }),
       ],
-    }), 'test')).toThrow('stairs target "some_door" is not a stairs entity');
+    }), 'test')).toThrow('target "some_door" is not a stairs entity');
   });
 
   it('rejects stair whose spawn position is out of bounds', () => {
@@ -810,7 +810,7 @@ describe('validateDungeon', () => {
           ],
         },
       ],
-    }, 'test')).toThrow('stairs spawn position (1,-1) is out of bounds on level "level2"');
+    }, 'test')).toThrow('spawn position (1,-1) is out of bounds on level "level2"');
   });
 
   it('rejects stair whose spawn position is not walkable', () => {
@@ -828,7 +828,7 @@ describe('validateDungeon', () => {
           ],
         }),
       ],
-    }), 'test')).toThrow('stairs spawn position (1,0) is not walkable on level "level2"');
+    }), 'test')).toThrow('spawn position (1,0) is not walkable on level "level2"');
   });
 
   it('accepts stairs with valid cross-references', () => {

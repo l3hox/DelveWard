@@ -63,18 +63,18 @@ export function buildBlockMeshes(gameState: GameState): BlockMeshes {
 
 export function animateBlockPush(
   meshMap: Map<string, THREE.Mesh>,
+  fromKey: string,
   fromCol: number,
   fromRow: number,
+  toKey: string,
   toCol: number,
   toRow: number,
 ): void {
-  const fromKey = doorKey(fromCol, fromRow);
   const found = meshMap.get(fromKey);
   if (!found) return;
   const mesh: THREE.Mesh = found;
 
   meshMap.delete(fromKey);
-  const toKey = doorKey(toCol, toRow);
   meshMap.set(toKey, mesh);
 
   const targetX = toCol * CELL_SIZE + CELL_SIZE / 2;

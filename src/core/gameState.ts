@@ -1,4 +1,4 @@
-import type { Entity } from './types';
+import type { Entity, LayerDef } from './types';
 import type { Facing } from './grid';
 import type { DropsOverride } from './lootTable';
 import { FACING_DELTA } from './grid';
@@ -233,6 +233,16 @@ export function parseDoorKey(key: string): [number, number] {
   return [col, row];
 }
 
+/** Layer-prefixed mesh key: "layerIndex:col,row". Used by renderers to track meshes across layers. */
+export function meshKey(layerIndex: number, col: number, row: number): string {
+  return `${layerIndex}:${col},${row}`;
+}
+
+/** Prefix a doorKey with a layer index for mesh lookup. */
+export function layerDoorKey(layerIndex: number, key: string): string {
+  return `${layerIndex}:${key}`;
+}
+
 // Scans adjacent cells in N→S→E→W priority order. Falls back to N if no wall found.
 function autoDetectLeverWall(col: number, row: number, grid?: string[]): Facing {
   if (!grid) return 'N';
@@ -285,6 +295,11 @@ export interface LevelSnapshot {
   signalState?: ReturnType<SignalManager['saveState']>;
 }
 
+
+export interface MultiLayerSnapshot {
+  layers: LevelSnapshot[];
+  activeLayerIndex: number;
+}
 
 // LayerState — holds all per-layer entity Maps + Sets.
 // Extracted from GameState to prepare for multi-layer support (M4 Phase B).
@@ -392,8 +407,8 @@ export class GameState {
   // Persisted across levels and in save data.
   flags: Set<string>;
 
-  // Index: entity ID → position + type (derived state, rebuilt after parse/load)
-  entityById: Map<string, { col: number; row: number; type: string }>;
+  // Index: entity ID → position + type + layer (derived state, rebuilt after parse/load)
+  entityById: Map<string, { col: number; row: number; type: string; layerIndex: number }>;
 
   // Entity registry — single source of truth for all item instances.
   entityRegistry: EntityRegistry;
@@ -698,6 +713,7 @@ export class GameState {
           levelId: this.currentLevelId,
           col: e.col,
           row: e.row,
+          layerIndex: this.activeLayerIndex,
         };
         this.entityRegistry.createItem(e.itemId as string, 'common', location);
       } else if (e.type === 'consumable') {
@@ -706,6 +722,7 @@ export class GameState {
           levelId: this.currentLevelId,
           col: e.col,
           row: e.row,
+          layerIndex: this.activeLayerIndex,
         };
         this.entityRegistry.createItem(e.itemId as string, 'common', location);
       }
@@ -741,109 +758,122 @@ export class GameState {
   private _initSignalManager(): void {
     this.signalManager.clear();
 
-    // Register levers and plates as sources
-    for (const lever of this.levers.values()) {
-      if (lever.id) {
-        this.signalManager.registerSource(
-          lever.id, lever.targets,
-          lever.signalMode ?? 'toggle',
-          lever.signalDuration, lever.signalDelay,
-        );
+    const savedIndex = this.activeLayerIndex;
+
+    for (let li = 0; li < this.layers.length; li++) {
+      this.activeLayerIndex = li;
+
+      // Register levers and plates as sources
+      for (const lever of this.levers.values()) {
+        if (lever.id) {
+          this.signalManager.registerSource(
+            lever.id, lever.targets,
+            lever.signalMode ?? 'toggle',
+            lever.signalDuration, lever.signalDelay,
+          );
+        }
       }
-    }
-    for (const plate of this.plates.values()) {
-      if (plate.id) {
-        this.signalManager.registerSource(
-          plate.id, plate.targets,
-          plate.signalMode ?? 'toggle',
-          plate.signalDuration, plate.signalDelay,
-        );
+      for (const plate of this.plates.values()) {
+        if (plate.id) {
+          this.signalManager.registerSource(
+            plate.id, plate.targets,
+            plate.signalMode ?? 'toggle',
+            plate.signalDuration, plate.signalDelay,
+          );
+        }
+      }
+
+      // Register triggers and tripwires as sources
+      for (const trigger of this.triggers.values()) {
+        if (trigger.id) {
+          this.signalManager.registerSource(
+            trigger.id, trigger.targets,
+            trigger.signalMode,
+            trigger.signalDuration, trigger.signalDelay,
+          );
+        }
+      }
+      for (const tripwire of this.tripwires.values()) {
+        if (tripwire.id) {
+          this.signalManager.registerSource(
+            tripwire.id, tripwire.targets,
+            tripwire.signalMode,
+            tripwire.signalDuration, tripwire.signalDelay,
+          );
+        }
+      }
+
+      // Register standalone gates
+      for (const gate of this.gates.values()) {
+        if (gate.id) {
+          this.signalManager.registerGate(
+            gate.id, gate.gateType, gate.targets,
+            gate.delay, gate.interval,
+          );
+        }
+      }
+
+      // Register mechanical doors as receivers
+      for (const door of this.doors.values()) {
+        if (door.id && door.mechanical) {
+          this.signalManager.registerReceiver(door.id, door.gateMode ?? 'or');
+        }
+      }
+
+      // Register trap launchers as receivers
+      for (const launcher of this.trapLaunchers.values()) {
+        if (launcher.id) {
+          this.signalManager.registerReceiver(launcher.id, 'or');
+        }
+      }
+
+      // Register chests with gateMode as receivers
+      for (const chest of this.chests.values()) {
+        if (chest.id && chest.gateMode) {
+          this.signalManager.registerReceiver(chest.id, chest.gateMode);
+        }
+      }
+
+      // Register chests with targets as sources (booby-trapped chests)
+      for (const chest of this.chests.values()) {
+        if (chest.id && chest.targets && chest.targets.length > 0) {
+          this.signalManager.registerSource(chest.id, chest.targets, 'toggle');
+        }
       }
     }
 
-    // Register triggers and tripwires as sources
-    for (const trigger of this.triggers.values()) {
-      if (trigger.id) {
-        this.signalManager.registerSource(
-          trigger.id, trigger.targets,
-          trigger.signalMode,
-          trigger.signalDuration, trigger.signalDelay,
-        );
-      }
-    }
-    for (const tripwire of this.tripwires.values()) {
-      if (tripwire.id) {
-        this.signalManager.registerSource(
-          tripwire.id, tripwire.targets,
-          tripwire.signalMode,
-          tripwire.signalDuration, tripwire.signalDelay,
-        );
-      }
-    }
+    this.activeLayerIndex = savedIndex;
 
-    // Register standalone gates
-    for (const gate of this.gates.values()) {
-      if (gate.id) {
-        this.signalManager.registerGate(
-          gate.id, gate.gateType, gate.targets,
-          gate.delay, gate.interval,
-        );
-      }
-    }
-
-    // Register mechanical doors as receivers
-    for (const door of this.doors.values()) {
-      if (door.id && door.mechanical) {
-        this.signalManager.registerReceiver(door.id, door.gateMode ?? 'or');
-      }
-    }
-
-    // Register trap launchers as receivers
-    for (const launcher of this.trapLaunchers.values()) {
-      if (launcher.id) {
-        this.signalManager.registerReceiver(launcher.id, 'or');
-      }
-    }
-
-    // Register chests with gateMode as receivers
-    for (const chest of this.chests.values()) {
-      if (chest.id && chest.gateMode) {
-        this.signalManager.registerReceiver(chest.id, chest.gateMode);
-      }
-    }
-
-    // Register chests with targets as sources (booby-trapped chests)
-    for (const chest of this.chests.values()) {
-      if (chest.id && chest.targets && chest.targets.length > 0) {
-        this.signalManager.registerSource(chest.id, chest.targets, 'toggle');
-      }
-    }
-
-    // Wire receiver-changed callback to update door state and fire trap launchers
+    // Wire receiver-changed callback to update door state and fire trap launchers.
+    // Uses entityById (which includes layerIndex) for cross-layer lookups.
     this.signalManager.setReceiverChangedCallback((entityId, active) => {
-      const pos = this.resolveEntityPosition(entityId);
-      if (!pos) return;
-      const door = this.getDoor(pos.col, pos.row);
+      const entry = this.entityById.get(entityId);
+      if (!entry) return;
+      const saved = this.activeLayerIndex;
+      this.activeLayerIndex = entry.layerIndex;
+      const door = this.getDoor(entry.col, entry.row);
       if (door) {
         door.state = active ? 'open' : 'closed';
-        this.onDoorSignalChanged?.(pos.col, pos.row, active);
+        this.onDoorSignalChanged?.(entry.col, entry.row, active);
+        this.activeLayerIndex = saved;
         return;
       }
       // Check if this receiver is a chest
-      const chest = this.chests.get(doorKey(pos.col, pos.row));
+      const chest = this.chests.get(doorKey(entry.col, entry.row));
       if (chest) {
         if (active) {
           chest.state = 'open';
           this._activateChestSignal(chest);
-          this.onChestSignalChanged?.(pos.col, pos.row, true);
+          this.onChestSignalChanged?.(entry.col, entry.row, true);
         } else {
           chest.state = 'closed';
-          this.onChestSignalChanged?.(pos.col, pos.row, false);
+          this.onChestSignalChanged?.(entry.col, entry.row, false);
         }
+        this.activeLayerIndex = saved;
         return;
       }
       // Check if this receiver is a trap launcher
-      const launcher = this.trapLaunchers.get(doorKey(pos.col, pos.row));
+      const launcher = this.trapLaunchers.get(doorKey(entry.col, entry.row));
       if (launcher && active && launcher.nextFireAt === 0) {
         this.onLauncherFire?.(launcher);
         if (launcher.fireMode === 'repeat') {
@@ -853,26 +883,31 @@ export class GameState {
       if (launcher && !active) {
         launcher.nextFireAt = 0;  // cancel reload schedule
       }
+      this.activeLayerIndex = saved;
     });
 
-    // Wire source-deactivated callback to reset timed sources
+    // Wire source-deactivated callback to reset timed sources.
+    // Uses entityById for cross-layer lookups.
     this.signalManager.setSourceDeactivatedCallback((entityId) => {
-      const pos = this.resolveEntityPosition(entityId);
-      if (!pos) return;
-      const lever = this.getLever(pos.col, pos.row);
+      const entry = this.entityById.get(entityId);
+      if (!entry) return;
+      const saved = this.activeLayerIndex;
+      this.activeLayerIndex = entry.layerIndex;
+      const lever = this.getLever(entry.col, entry.row);
       if (lever && lever.state === 'down') {
         lever.state = 'up';
-        this.onLeverReset?.(pos.col, pos.row);
+        this.onLeverReset?.(entry.col, entry.row);
       }
-      const plate = this.plates.get(doorKey(pos.col, pos.row));
+      const plate = this.plates.get(doorKey(entry.col, entry.row));
       if (plate && plate.activated) {
         plate.activated = false;
-        this.onPlateReset?.(pos.col, pos.row);
+        this.onPlateReset?.(entry.col, entry.row);
       }
-      const trigger = this.triggers.get(doorKey(pos.col, pos.row));
+      const trigger = this.triggers.get(doorKey(entry.col, entry.row));
       if (trigger && trigger.fired) {
         trigger.fired = false;
       }
+      this.activeLayerIndex = saved;
     });
   }
 
@@ -893,36 +928,41 @@ export class GameState {
 
   private _rebuildEntityIndex(): void {
     this.entityById.clear();
-    const register = (inst: { id?: string; col: number; row: number }, type: string) => {
-      if (inst.id) this.entityById.set(inst.id, { col: inst.col, row: inst.row, type });
+    const register = (inst: { id?: string; col: number; row: number }, type: string, layerIndex: number) => {
+      if (inst.id) this.entityById.set(inst.id, { col: inst.col, row: inst.row, type, layerIndex });
     };
-    for (const d of this.doors.values()) register(d, 'door');
-    for (const k of this.keys.values()) register(k, 'key');
-    for (const l of this.levers.values()) register(l, 'lever');
-    for (const p of this.plates.values()) register(p, 'pressure_plate');
-    for (const t of this.triggers.values()) register(t, 'trigger');
-    for (const tw of this.tripwires.values()) register(tw, 'tripwire');
-    for (const g of this.gates.values()) register(g, 'gate');
-    for (const tl of this.trapLaunchers.values()) register(tl, 'trap_launcher');
-    for (const s of this.sconces.values()) register(s, 'torch_sconce');
-    for (const s of this.stairs.values()) register(s, 'stairs');
-    for (const bw of this.breakableWalls.values()) register(bw, 'breakable_wall');
-    for (const sw of this.secretWalls.values()) register(sw, 'secret_wall');
-    for (const b of this.blocks.values()) register(b, 'block');
-    for (const c of this.chests.values()) register(c, 'chest');
-    for (const s of this.signs.values()) register(s, 'sign');
-    for (const n of this.npcs.values()) register(n, 'npc');
-    for (const f of this.fountains.values()) register(f, 'fountain');
-    for (const bs of this.bookshelves.values()) register(bs, 'bookshelf');
-    for (const a of this.altars.values()) register(a, 'altar');
-    for (const b of this.barrels.values()) register(b, 'barrel');
+    const savedIndex = this.activeLayerIndex;
+    for (let li = 0; li < this.layers.length; li++) {
+      this.activeLayerIndex = li;
+      for (const d of this.doors.values()) register(d, 'door', li);
+      for (const k of this.keys.values()) register(k, 'key', li);
+      for (const l of this.levers.values()) register(l, 'lever', li);
+      for (const p of this.plates.values()) register(p, 'pressure_plate', li);
+      for (const t of this.triggers.values()) register(t, 'trigger', li);
+      for (const tw of this.tripwires.values()) register(tw, 'tripwire', li);
+      for (const g of this.gates.values()) register(g, 'gate', li);
+      for (const tl of this.trapLaunchers.values()) register(tl, 'trap_launcher', li);
+      for (const s of this.sconces.values()) register(s, 'torch_sconce', li);
+      for (const s of this.stairs.values()) register(s, 'stairs', li);
+      for (const bw of this.breakableWalls.values()) register(bw, 'breakable_wall', li);
+      for (const sw of this.secretWalls.values()) register(sw, 'secret_wall', li);
+      for (const b of this.blocks.values()) register(b, 'block', li);
+      for (const c of this.chests.values()) register(c, 'chest', li);
+      for (const s of this.signs.values()) register(s, 'sign', li);
+      for (const n of this.npcs.values()) register(n, 'npc', li);
+      for (const f of this.fountains.values()) register(f, 'fountain', li);
+      for (const bs of this.bookshelves.values()) register(bs, 'bookshelf', li);
+      for (const a of this.altars.values()) register(a, 'altar', li);
+      for (const b of this.barrels.values()) register(b, 'barrel', li);
+    }
+    this.activeLayerIndex = savedIndex;
   }
 
-  resolveEntityPosition(id: string): { col: number; row: number } | undefined {
+  resolveEntityPosition(id: string): { col: number; row: number; layerIndex: number } | undefined {
     return this.entityById.get(id);
   }
 
-  saveLevelState(): LevelSnapshot {
+  private _snapshotActiveLayer(includeGlobal = false): LevelSnapshot {
     const doors = new Map<string, DoorInstance>();
     for (const [k, v] of this.doors) {
       doors.set(k, { ...v });
@@ -1009,8 +1049,9 @@ export class GameState {
     }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
-    const registrySnapshot = this.entityRegistry.snapshot();
-    const signalState = this.signalManager.saveState();
+    // Global state (registrySnapshot + signalState) is only included for the first layer.
+    const registrySnapshot = includeGlobal ? this.entityRegistry.snapshot() : [] as ItemEntity[];
+    const signalState = includeGlobal ? this.signalManager.saveState() : undefined;
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
@@ -1019,7 +1060,18 @@ export class GameState {
     };
   }
 
-  loadLevelState(snapshot: LevelSnapshot): void {
+  saveLevelState(): MultiLayerSnapshot {
+    const savedIndex = this.activeLayerIndex;
+    const layerSnapshots: LevelSnapshot[] = [];
+    for (let li = 0; li < this.layers.length; li++) {
+      this.activeLayerIndex = li;
+      layerSnapshots.push(this._snapshotActiveLayer(li === 0));
+    }
+    this.activeLayerIndex = savedIndex;
+    return { layers: layerSnapshots, activeLayerIndex: savedIndex };
+  }
+
+  private _restoreActiveLayer(snapshot: LevelSnapshot): void {
     this.doors = new Map<string, DoorInstance>();
     for (const [k, v] of snapshot.doors) {
       this.doors.set(k, { ...v });
@@ -1116,49 +1168,70 @@ export class GameState {
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);
-    if (snapshot.registrySnapshot) {
-      this.entityRegistry.restore(snapshot.registrySnapshot);
-    }
-    this._rebuildEntityIndex();
-    this._initSignalManager();
+    // Note: _rebuildEntityIndex and _initSignalManager are NOT called here — caller handles.
+  }
 
-    // Restore saved signal state (source active flags, timers, gate states)
-    // so that signal evaluation works correctly after returning to a level.
-    if (snapshot.signalState) {
-      this.signalManager.loadState(snapshot.signalState);
+  loadLevelState(snapshot: LevelSnapshot | MultiLayerSnapshot): void {
+    if ('layers' in snapshot && Array.isArray(snapshot.layers)) {
+      // Multi-layer path
+      const multi = snapshot as MultiLayerSnapshot;
+      this.layers = multi.layers.map(() => createEmptyLayerState());
+      for (let li = 0; li < multi.layers.length; li++) {
+        this.activeLayerIndex = li;
+        this._restoreActiveLayer(multi.layers[li]);
+      }
+      this.activeLayerIndex = multi.activeLayerIndex;
+      // Global state stored in the first layer snapshot
+      if (multi.layers[0].registrySnapshot) {
+        this.entityRegistry.restore(multi.layers[0].registrySnapshot);
+      }
+      this._rebuildEntityIndex();
+      this._initSignalManager();
+      // Restore saved signal state (source active flags, timers, gate states)
+      // so that signal evaluation works correctly after returning to a level.
+      if (multi.layers[0].signalState) {
+        this.signalManager.loadState(multi.layers[0].signalState);
+      }
+    } else {
+      // Single-layer backward-compat path
+      const single = snapshot as LevelSnapshot;
+      this.layers = [createEmptyLayerState()];
+      this.activeLayerIndex = 0;
+      this._restoreActiveLayer(single);
+      if (single.registrySnapshot) {
+        this.entityRegistry.restore(single.registrySnapshot);
+      }
+      this._rebuildEntityIndex();
+      this._initSignalManager();
+      // Restore saved signal state (source active flags, timers, gate states)
+      // so that signal evaluation works correctly after returning to a level.
+      if (single.signalState) {
+        this.signalManager.loadState(single.signalState);
+      }
     }
   }
 
-  loadNewLevel(entities: Entity[], grid?: string[], levelId?: string): void {
+  loadNewLevel(entities: Entity[], grid?: string[], levelId?: string, layerDefs?: LayerDef[]): void {
     const oldLevelId = this.currentLevelId;
     if (levelId) this.currentLevelId = levelId;
-    this.doors = new Map();
-    this.keys = new Map();
-    this.levers = new Map();
-    this.plates = new Map();
-    this.triggers = new Map();
-    this.tripwires = new Map();
-    this.gates = new Map();
-    this.trapLaunchers = new Map();
-    this.sconces = new Map();
-    this.stairs = new Map();
-    this.enemies = new Map();
-    this.breakableWalls = new Map();
-    this.secretWalls = new Map();
-    this.blocks = new Map();
-    this.chests = new Map();
-    this.signs = new Map();
-    this.npcs = new Map();
-    this.fountains = new Map();
-    this.bookshelves = new Map();
-    this.altars = new Map();
-    this.barrels = new Map();
-    this.destroyedWalls = new Set();
-    this.entityById = new Map();
-    this.exploredCells = new Set();
     // Clear only ground items for the old level; equipped/backpack items survive transitions.
     this.entityRegistry.clearLevel(oldLevelId);
-    this._parseEntities(entities, grid);
+    this.entityById = new Map();
+
+    if (layerDefs && layerDefs.length > 0) {
+      // Multi-layer: create a fresh LayerState per layer and parse entities into each.
+      this.layers = layerDefs.map(() => createEmptyLayerState());
+      for (let i = 0; i < layerDefs.length; i++) {
+        this.activeLayerIndex = i;
+        this._parseEntities(layerDefs[i].entities, layerDefs[i].grid);
+      }
+      this.activeLayerIndex = 0;
+    } else {
+      // Single-layer (existing behavior).
+      this.layers = [createEmptyLayerState()];
+      this.activeLayerIndex = 0;
+      this._parseEntities(entities, grid);
+    }
   }
 
   drainTorchFuel(amount: number): void {
@@ -1901,6 +1974,7 @@ export class GameState {
       levelId: this.currentLevelId,
       col,
       row,
+      layerIndex: this.activeLayerIndex,
     });
 
     this.maxHp = this.getEffectiveStats().maxHp;

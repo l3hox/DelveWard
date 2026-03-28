@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { buildDungeon, CELL_SIZE } from './rendering/dungeon';
+import { buildDungeon, CELL_SIZE, LAYER_HEIGHT } from './rendering/dungeon';
 import { Player } from './rendering/player';
-import { loadDungeon } from './level/levelLoader';
+import { loadDungeon, getAllLevelEntities, findEntityLayerIndex, resolveLayerCoord } from './level/levelLoader';
 import { buildWalkableSet, getFacingCell, FACING_DELTA } from './core/grid';
-import { GameState, doorKey } from './core/gameState';
+import { GameState, doorKey, meshKey, layerDoorKey } from './core/gameState';
 import { ProjectileManager } from './core/projectileManager';
 import type { TrapLauncherInstance } from './core/gameState';
 import { interact } from './level/interaction';
-import { buildDoorMeshes, updateDoorMesh } from './rendering/doorRenderer';
+import { buildDoorMeshes, updateDoorMesh, type DoorMeshes, type DoorOrientation } from './rendering/doorRenderer';
 import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate, releasePlate } from './rendering/plateRenderer';
 import { buildTripwireMeshes, hideTripwire } from './rendering/tripwireRenderer';
@@ -36,13 +36,13 @@ import { DamageNumberManager } from './rendering/damageNumbers';
 import { EnemyHealthBarManager } from './rendering/enemyHealthBar';
 import { SwordSwingAnimator } from './rendering/swordSwing';
 import { DustMotes, SconceEmbers, WaterDrips, Fireflies } from './rendering/particles';
-import type { DungeonLevel, Dungeon, Entity, Environment } from './core/types';
-import type { LevelSnapshot } from './core/gameState';
+import type { DungeonLevel, Dungeon, Entity, Environment, LayerDef } from './core/types';
+import type { MultiLayerSnapshot } from './core/gameState';
 import type { Facing } from './core/grid';
 import { itemDatabase } from './core/itemDatabase';
 import type { InventoryAction } from './hud/inventoryOverlay';
 import { checkAssets } from './core/assetCheck';
-import { applyEnvironment, getEnvironmentConfig, lerpEnvironment, resolveEnvironmentAtCell, buildEnvZoneMap } from './rendering/environment';
+import { applyEnvironment, getEnvironmentConfig, lerpEnvironment, resolveEnvironmentAtCell, buildEnvZoneMap, buildEnvZoneMapWithExistingZones } from './rendering/environment';
 import { createSkyboxMesh } from './rendering/skybox';
 import { buildTrapLauncherMeshes } from './rendering/trapLauncherRenderer';
 import { createProjectileMeshes, updateProjectileMeshes, clearProjectileMeshes, warmUpGPUShaders, FireballExplosions, type ProjectileMeshes } from './rendering/projectileRenderer';
@@ -104,7 +104,7 @@ interface LevelScene {
   level: DungeonLevel;
   walkable: Set<string>;
   dungeonGroup: THREE.Group;
-  doorMeshes: { group: THREE.Group; panelMap: Map<string, THREE.Object3D>; boundaryLights: Map<string, THREE.PointLight> };
+  doorMeshes: DoorMeshes;
   doorAnimator: DoorAnimator;
   keyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   plateMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
@@ -136,6 +136,8 @@ interface LevelScene {
   multiZone: boolean;
   zones: Environment[];
   zoneMap: Map<string, number>;
+  // Multi-layer support
+  layerGrids: string[][];
 }
 
 function buildLevelScene(
@@ -147,242 +149,451 @@ function buildLevelScene(
   startRow: number,
   startFacing: Facing,
 ): LevelScene {
+  // Resolve layer definitions — backward compat: wrap flat level as single-layer list
+  const layerDefs: LayerDef[] = level.layers ?? [{
+    grid: level.grid,
+    entities: level.entities,
+    defaults: level.defaults,
+    areas: level.areas,
+    ceiling: level.ceiling,
+  }];
+  const activeLayerIdx = gameState.activeLayerIndex;
+  const activeLayerDef = layerDefs[activeLayerIdx];
+
   const walkable = buildWalkableSet(level.charDefs);
 
-  const stairPositions = new Set(gameState.stairs.keys());
-  // Wall entity cells: breakable + secret walls that need dungeon builder to skip wall faces
-  const wallEntityCells = new Set<string>();
-  for (const key of gameState.breakableWalls.keys()) wallEntityCells.add(key);
-  for (const key of gameState.secretWalls.keys()) wallEntityCells.add(key);
-  // Multi-pass environment zone map
-  const { zoneMap, zones, multiZone } = buildEnvZoneMap(level.grid, level.environment ?? 'dungeon', level.areas);
+  // Multi-pass environment zone map — derived from the active layer
+  const { zoneMap, zones, multiZone } = buildEnvZoneMap(
+    activeLayerDef.grid,
+    level.environment ?? 'dungeon',
+    activeLayerDef.areas ?? level.areas,
+  );
 
-  const doorCells = new Set(gameState.doors.keys());
-  const dungeonGroup = buildDungeon(level.grid, level.defaults, level.areas, level.charDefs, level.ceiling !== false, stairPositions, wallEntityCells, multiZone ? zoneMap : undefined, multiZone ? doorCells : undefined);
-  scene.add(dungeonGroup);
+  // Shared structures — all layers' meshes merged with layer-prefixed keys
+  const allDungeonGroup = new THREE.Group();
+  scene.add(allDungeonGroup);
 
-  const doorMeshes = buildDoorMeshes(level.grid, gameState, walkable, multiZone ? zoneMap : undefined);
-  scene.add(doorMeshes.group);
+  const sharedDoorGroup = new THREE.Group();
+  scene.add(sharedDoorGroup);
+  const sharedDoorPanelMap = new Map<string, THREE.Object3D>();
+  const sharedDoorOrientationMap = new Map<string, DoorOrientation>();
+  const sharedDoorBoundaryLights = new Map<string, THREE.PointLight>();
+
+  const sharedKeyGroup = new THREE.Group();
+  scene.add(sharedKeyGroup);
+  const sharedKeyMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedPlateGroup = new THREE.Group();
+  scene.add(sharedPlateGroup);
+  const sharedPlateMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedTripwireGroup = new THREE.Group();
+  scene.add(sharedTripwireGroup);
+  const sharedTripwireMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedLeverGroup = new THREE.Group();
+  scene.add(sharedLeverGroup);
+  const sharedLeverHandleMap = new Map<string, THREE.Group>();
+
+  const sharedSconceGroup = new THREE.Group();
+  scene.add(sharedSconceGroup);
+  const sharedSconceMeshMap = new Map<string, THREE.Group>();
+  const sharedSconceLightMap = new Map<string, THREE.PointLight>();
+
+  const sharedStairGroup = new THREE.Group();
+  scene.add(sharedStairGroup);
+
+  const sharedForestGroup = new THREE.Group();
+  scene.add(sharedForestGroup);
+  const sharedForestBillboards: THREE.Mesh[] = [];
+
+  const sharedTrapLauncherGroup = new THREE.Group();
+  scene.add(sharedTrapLauncherGroup);
+
+  const sharedWallEntityGroup = new THREE.Group();
+  scene.add(sharedWallEntityGroup);
+  const sharedWallEntityMeshMap = new Map<string, { wallGroup: THREE.Group; floorCeilGroup: THREE.Group }>();
+
+  const sharedBlockGroup = new THREE.Group();
+  scene.add(sharedBlockGroup);
+  const sharedBlockMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedChestGroup = new THREE.Group();
+  scene.add(sharedChestGroup);
+  const sharedChestMeshMap = new Map<string, THREE.Group>();
+
+  const sharedSignGroup = new THREE.Group();
+  scene.add(sharedSignGroup);
+  const sharedSignMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedFountainGroup = new THREE.Group();
+  scene.add(sharedFountainGroup);
+  const sharedFountainMeshMap = new Map<string, THREE.Group>();
+
+  const sharedBookshelfGroup = new THREE.Group();
+  scene.add(sharedBookshelfGroup);
+  const sharedBookshelfMeshMap = new Map<string, THREE.Group>();
+
+  const sharedAltarGroup = new THREE.Group();
+  scene.add(sharedAltarGroup);
+  const sharedAltarMeshMap = new Map<string, THREE.Group>();
+
+  const sharedBarrelGroup = new THREE.Group();
+  scene.add(sharedBarrelGroup);
+  const sharedBarrelMeshMap = new Map<string, THREE.Group>();
+
+  const sharedNpcGroup = new THREE.Group();
+  scene.add(sharedNpcGroup);
+  const sharedNpcMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedEnemyGroup = new THREE.Group();
+  scene.add(sharedEnemyGroup);
+  const sharedEnemyMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedItemGroup = new THREE.Group();
+  scene.add(sharedItemGroup);
+  const sharedItemMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedConsumableGroup = new THREE.Group();
+  scene.add(sharedConsumableGroup);
+  const sharedConsumableMeshMap = new Map<string, THREE.Mesh>();
 
   const doorAnimator = new DoorAnimator();
-  const hasCeiling = level.ceiling !== false;
-  for (const [key, panel] of doorMeshes.panelMap) {
-    const door = gameState.doors.get(key);
-    let slideAxis: 'y' | 'x' | 'z' = 'y';
-    if (!hasCeiling) {
-      const orient = doorMeshes.orientationMap.get(key);
-      slideAxis = orient === 'NS' ? 'z' : 'x';
-    }
-    doorAnimator.register(key, panel, door ? door.state === 'open' : false, slideAxis);
-  }
-
-  const keyMeshes = buildKeyMeshes(gameState);
-  scene.add(keyMeshes.group);
-
-  const plateMeshes = buildPlateMeshes(gameState);
-  scene.add(plateMeshes.group);
-
-  const tripwireMeshes = buildTripwireMeshes(gameState);
-  scene.add(tripwireMeshes.group);
-
-  const leverMeshes = buildLeverMeshes(gameState);
-  scene.add(leverMeshes.group);
-
   const leverAnimator = new LeverAnimator();
-  for (const [key, pivot] of leverMeshes.handleMap) {
-    const lever = gameState.levers.get(key);
-    leverAnimator.register(key, pivot, lever ? lever.state : 'up');
-  }
-
-  const sconceMeshes = buildSconceMeshes(gameState);
-  scene.add(sconceMeshes.group);
-
-  const stairMeshes = buildStairMeshes(gameState.stairs, level.defaults, level.areas);
-  scene.add(stairMeshes.group);
-
-  const forestMeshes = buildForestMeshes(level.grid, level.charDefs);
-  scene.add(forestMeshes.group);
-
-  const trapLauncherMeshes = buildTrapLauncherMeshes(gameState);
-  scene.add(trapLauncherMeshes.group);
-
-  const projectileMeshes = createProjectileMeshes();
-  scene.add(projectileMeshes.group);
-
-  // Wall entity meshes (breakable + secret walls — combined into one renderer)
-  const allWallEntities = new Map<string, { col: number; row: number }>();
-  for (const [k, v] of gameState.breakableWalls) allWallEntities.set(k, v);
-  for (const [k, v] of gameState.secretWalls) allWallEntities.set(k, v);
-  const wallEntityMeshes = buildWallEntityMeshes(
-    allWallEntities, level.grid, level.defaults, level.areas, level.charDefs,
-  );
-  scene.add(wallEntityMeshes.group);
-
-  const blockMeshes = buildBlockMeshes(gameState);
-  scene.add(blockMeshes.group);
-
-  const chestMeshes = buildChestMeshes(gameState);
-  scene.add(chestMeshes.group);
-
-  const signMeshes = buildSignMeshes(gameState);
-  scene.add(signMeshes.group);
-
-  const fountainMeshes = buildFountainMeshes(gameState);
-  scene.add(fountainMeshes.group);
-
-  const bookshelfMeshes = buildBookshelfMeshes(gameState);
-  scene.add(bookshelfMeshes.group);
-
-  const altarMeshes = buildAltarMeshes(gameState);
-  scene.add(altarMeshes.group);
-
-  const barrelMeshes = buildBarrelMeshes(gameState);
-  scene.add(barrelMeshes.group);
-
-  const npcMeshes = buildNpcMeshes(gameState.npcs);
-  scene.add(npcMeshes.group);
-
-  const enemyMeshes = buildEnemyMeshes(gameState);
-  scene.add(enemyMeshes.group);
-
-  const itemMeshes = buildItemMeshes(gameState);
-  scene.add(itemMeshes.group);
-
-  const consumableMeshes = buildConsumableMeshes(gameState);
-  scene.add(consumableMeshes.group);
-
   const enemyAnimator = new EnemyAnimator();
-  for (const [key, mesh] of enemyMeshes.meshMap) {
-    const enemy = gameState.enemies.get(key);
-    if (enemy) enemyAnimator.register(key, mesh, enemy.col, enemy.row);
-  }
-
   const healthBarManager = new EnemyHealthBarManager();
-  for (const [key, enemy] of gameState.enemies) {
-    const mesh = enemyMeshes.meshMap.get(key);
-    if (mesh) {
-      const spriteHeight = enemyDatabase.getEnemy(enemy.type)?.sprite.size ?? DEFAULT_SPRITE_SIZE;
-      healthBarManager.create(key, mesh, enemy.maxHp, spriteHeight);
+
+  const charDefMap = new Map<string, import('./core/types').CharDef>();
+  if (level.charDefs) for (const def of level.charDefs) charDefMap.set(def.char, def);
+
+  // Helper: merge a Map into a shared Map, prefixing all keys with "li:"
+  function mergeMap<T>(target: Map<string, T>, source: Map<string, T>, li: number): void {
+    for (const [key, value] of source) {
+      target.set(layerDoorKey(li, key), value);
     }
   }
-  scene.add(healthBarManager.getGroup());
 
-  const player = new Player(
-    camera,
-    level.grid,
-    startCol,
-    startRow,
-    startFacing,
-    walkable,
-    gameState.isDoorOpen.bind(gameState),
-    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row),
-    gameState.stairs,
-  );
+  // Single loop over ALL layers
+  for (let li = 0; li < layerDefs.length; li++) {
+    gameState.activeLayerIndex = li;
+    const ld = layerDefs[li];
+    const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
+    const ldDefaults = ld.defaults ?? level.defaults;
+    const ldAreas = ld.areas ?? level.areas;
+    const ldCeiling = (ld.ceiling ?? level.ceiling) !== false;
+    const ldWalkable = buildWalkableSet(level.charDefs);
+
+    const ldStairPositions = new Set(gameState.stairs.keys());
+    const ldWallEntityCells = new Set<string>();
+    for (const key of gameState.breakableWalls.keys()) ldWallEntityCells.add(key);
+    for (const key of gameState.secretWalls.keys()) ldWallEntityCells.add(key);
+
+    // Zone map for this layer — active layer uses the primary zone map, others reuse its zone assignments
+    const ldZoneMap = li === activeLayerIdx
+      ? (multiZone ? zoneMap : undefined)
+      : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
+
+    // Dungeon geometry
+    const ldAboveGrid = layerDefs[li + 1]?.grid;
+    const ldBelowGrid = layerDefs[li - 1]?.grid;
+    const ldDoorCells = new Set(gameState.doors.keys());
+    const ldDungeonGroup = buildDungeon(
+      ld.grid, ldDefaults, ldAreas, level.charDefs, ldCeiling,
+      ldStairPositions, ldWallEntityCells,
+      ldZoneMap,
+      (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
+      ldAboveGrid, ldBelowGrid,
+    );
+    ldDungeonGroup.position.y = yOffset;
+    allDungeonGroup.add(ldDungeonGroup);
+
+    // Door meshes
+    const ldDoorMeshes = buildDoorMeshes(ld.grid, gameState, ldWalkable, ldZoneMap);
+    ldDoorMeshes.group.position.y = yOffset;
+    sharedDoorGroup.add(ldDoorMeshes.group);
+    mergeMap(sharedDoorPanelMap, ldDoorMeshes.panelMap, li);
+    mergeMap(sharedDoorOrientationMap, ldDoorMeshes.orientationMap, li);
+    mergeMap(sharedDoorBoundaryLights, ldDoorMeshes.boundaryLights, li);
+
+    // Register doors with animator using prefixed keys
+    const ldHasCeiling = ldCeiling;
+    for (const [key, panel] of ldDoorMeshes.panelMap) {
+      const door = gameState.doors.get(key);
+      let slideAxis: 'y' | 'x' | 'z' = 'y';
+      let ceilingOpenAbove = !ldHasCeiling;
+      if (!ceilingOpenAbove && ldAboveGrid && door) {
+        const { col, row } = door;
+        if (row < ldAboveGrid.length && col < ldAboveGrid[0].length) {
+          const aboveChar = ldAboveGrid[row][col];
+          const aboveDef = charDefMap.get(aboveChar);
+          const isSolidWall = aboveChar === '#' || (aboveDef !== undefined && aboveDef.solid && !aboveDef.seeThrough);
+          if (!isSolidWall) ceilingOpenAbove = true;
+        }
+      }
+      if (ceilingOpenAbove) {
+        const orient = ldDoorMeshes.orientationMap.get(key);
+        slideAxis = orient === 'NS' ? 'z' : 'x';
+      }
+      doorAnimator.register(layerDoorKey(li, key), panel, door ? door.state === 'open' : false, slideAxis);
+    }
+
+    // Key meshes
+    const ldKeyMeshes = buildKeyMeshes(gameState);
+    ldKeyMeshes.group.position.y = yOffset;
+    sharedKeyGroup.add(ldKeyMeshes.group);
+    mergeMap(sharedKeyMeshMap, ldKeyMeshes.meshMap, li);
+
+    // Plate meshes
+    const ldPlateMeshes = buildPlateMeshes(gameState);
+    ldPlateMeshes.group.position.y = yOffset;
+    sharedPlateGroup.add(ldPlateMeshes.group);
+    mergeMap(sharedPlateMeshMap, ldPlateMeshes.meshMap, li);
+
+    // Tripwire meshes
+    const ldTripwireMeshes = buildTripwireMeshes(gameState);
+    ldTripwireMeshes.group.position.y = yOffset;
+    sharedTripwireGroup.add(ldTripwireMeshes.group);
+    mergeMap(sharedTripwireMeshMap, ldTripwireMeshes.meshMap, li);
+
+    // Lever meshes
+    const ldLeverMeshes = buildLeverMeshes(gameState);
+    ldLeverMeshes.group.position.y = yOffset;
+    sharedLeverGroup.add(ldLeverMeshes.group);
+    mergeMap(sharedLeverHandleMap, ldLeverMeshes.handleMap, li);
+    for (const [key, pivot] of ldLeverMeshes.handleMap) {
+      const lever = gameState.levers.get(key);
+      leverAnimator.register(layerDoorKey(li, key), pivot, lever ? lever.state : 'up');
+    }
+
+    // Sconce meshes
+    const ldSconceMeshes = buildSconceMeshes(gameState);
+    ldSconceMeshes.group.position.y = yOffset;
+    sharedSconceGroup.add(ldSconceMeshes.group);
+    mergeMap(sharedSconceMeshMap, ldSconceMeshes.meshMap, li);
+    mergeMap(sharedSconceLightMap, ldSconceMeshes.lightMap, li);
+
+    // Stair meshes
+    const ldStairMeshes = buildStairMeshes(gameState.stairs, ldDefaults, ldAreas);
+    ldStairMeshes.group.position.y = yOffset;
+    sharedStairGroup.add(ldStairMeshes.group);
+
+    // Forest meshes
+    const ldForestMeshes = buildForestMeshes(ld.grid, level.charDefs);
+    ldForestMeshes.group.position.y = yOffset;
+    sharedForestGroup.add(ldForestMeshes.group);
+    for (const b of ldForestMeshes.billboards) sharedForestBillboards.push(b);
+
+    // Trap launcher meshes
+    const ldTrapLauncherMeshes = buildTrapLauncherMeshes(gameState);
+    ldTrapLauncherMeshes.group.position.y = yOffset;
+    sharedTrapLauncherGroup.add(ldTrapLauncherMeshes.group);
+
+    // Wall entity meshes (breakable + secret walls)
+    const ldAllWallEntities = new Map<string, { col: number; row: number }>();
+    for (const [k, v] of gameState.breakableWalls) ldAllWallEntities.set(k, v);
+    for (const [k, v] of gameState.secretWalls) ldAllWallEntities.set(k, v);
+    const ldWallEntityMeshes = buildWallEntityMeshes(ldAllWallEntities, ld.grid, ldDefaults, ldAreas, level.charDefs);
+    ldWallEntityMeshes.group.position.y = yOffset;
+    sharedWallEntityGroup.add(ldWallEntityMeshes.group);
+    mergeMap(sharedWallEntityMeshMap, ldWallEntityMeshes.meshMap, li);
+
+    // Block meshes
+    const ldBlockMeshes = buildBlockMeshes(gameState);
+    ldBlockMeshes.group.position.y = yOffset;
+    sharedBlockGroup.add(ldBlockMeshes.group);
+    mergeMap(sharedBlockMeshMap, ldBlockMeshes.meshMap, li);
+
+    // Chest meshes
+    const ldChestMeshes = buildChestMeshes(gameState);
+    ldChestMeshes.group.position.y = yOffset;
+    sharedChestGroup.add(ldChestMeshes.group);
+    mergeMap(sharedChestMeshMap, ldChestMeshes.meshMap, li);
+
+    // Sign meshes
+    const ldSignMeshes = buildSignMeshes(gameState);
+    ldSignMeshes.group.position.y = yOffset;
+    sharedSignGroup.add(ldSignMeshes.group);
+    mergeMap(sharedSignMeshMap, ldSignMeshes.meshMap, li);
+
+    // Fountain meshes
+    const ldFountainMeshes = buildFountainMeshes(gameState);
+    ldFountainMeshes.group.position.y = yOffset;
+    sharedFountainGroup.add(ldFountainMeshes.group);
+    mergeMap(sharedFountainMeshMap, ldFountainMeshes.meshMap, li);
+
+    // Bookshelf meshes
+    const ldBookshelfMeshes = buildBookshelfMeshes(gameState);
+    ldBookshelfMeshes.group.position.y = yOffset;
+    sharedBookshelfGroup.add(ldBookshelfMeshes.group);
+    mergeMap(sharedBookshelfMeshMap, ldBookshelfMeshes.meshMap, li);
+
+    // Altar meshes
+    const ldAltarMeshes = buildAltarMeshes(gameState);
+    ldAltarMeshes.group.position.y = yOffset;
+    sharedAltarGroup.add(ldAltarMeshes.group);
+    mergeMap(sharedAltarMeshMap, ldAltarMeshes.meshMap, li);
+
+    // Barrel meshes
+    const ldBarrelMeshes = buildBarrelMeshes(gameState);
+    ldBarrelMeshes.group.position.y = yOffset;
+    sharedBarrelGroup.add(ldBarrelMeshes.group);
+    mergeMap(sharedBarrelMeshMap, ldBarrelMeshes.meshMap, li);
+
+    // NPC meshes
+    const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
+    ldNpcMeshes.group.position.y = yOffset;
+    sharedNpcGroup.add(ldNpcMeshes.group);
+    mergeMap(sharedNpcMeshMap, ldNpcMeshes.meshMap, li);
+
+    // Enemy meshes
+    const ldEnemyMeshes = buildEnemyMeshes(gameState);
+    ldEnemyMeshes.group.position.y = yOffset;
+    sharedEnemyGroup.add(ldEnemyMeshes.group);
+    mergeMap(sharedEnemyMeshMap, ldEnemyMeshes.meshMap, li);
+    for (const [key, mesh] of ldEnemyMeshes.meshMap) {
+      const enemy = gameState.enemies.get(key);
+      if (enemy) enemyAnimator.register(layerDoorKey(li, key), mesh, enemy.col, enemy.row);
+    }
+    for (const [key, enemy] of gameState.enemies) {
+      const mesh = ldEnemyMeshes.meshMap.get(key);
+      if (mesh) {
+        const spriteHeight = enemyDatabase.getEnemy(enemy.type)?.sprite.size ?? DEFAULT_SPRITE_SIZE;
+        healthBarManager.create(layerDoorKey(li, key), mesh, enemy.maxHp, spriteHeight);
+      }
+    }
+
+    // Item meshes
+    const ldItemMeshes = buildItemMeshes(gameState);
+    ldItemMeshes.group.position.y = yOffset;
+    sharedItemGroup.add(ldItemMeshes.group);
+    mergeMap(sharedItemMeshMap, ldItemMeshes.meshMap, li);
+
+    // Consumable meshes
+    const ldConsumableMeshes = buildConsumableMeshes(gameState);
+    ldConsumableMeshes.group.position.y = yOffset;
+    sharedConsumableGroup.add(ldConsumableMeshes.group);
+    mergeMap(sharedConsumableMeshMap, ldConsumableMeshes.meshMap, li);
+
+    // Zone tagging for multi-pass rendering
+    if (ldZoneMap) {
+      const tagByKey = (obj: THREE.Object3D, key: string) => {
+        const zone = ldZoneMap.get(key);
+        if (zone !== undefined) obj.traverse(child => { child.layers.set(zone); });
+      };
+      // (Door frames + panels tagged at build time in buildDoorMeshes)
+      for (const [key, mesh] of ldKeyMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldPlateMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldTripwireMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, handle] of ldLeverMeshes.handleMap) tagByKey(handle, key);
+      for (const [key, mesh] of ldSconceMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldEnemyMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldNpcMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldItemMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldConsumableMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldBlockMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldChestMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldSignMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldFountainMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldBookshelfMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldAltarMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldBarrelMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, entry] of ldWallEntityMeshes.meshMap) {
+        tagByKey(entry.wallGroup, key);
+        tagByKey(entry.floorCeilGroup, key);
+      }
+      // Groups without per-cell zone keys — show in all zones
+      ldStairMeshes.group.traverse(child => { child.layers.enableAll(); });
+      ldTrapLauncherMeshes.group.traverse(child => { child.layers.enableAll(); });
+      for (const billboard of ldForestMeshes.billboards) {
+        const col = Math.floor(billboard.position.x / CELL_SIZE);
+        const row = Math.floor(billboard.position.z / CELL_SIZE);
+        const zone = ldZoneMap.get(doorKey(col, row));
+        if (zone !== undefined) billboard.layers.set(zone);
+        else billboard.layers.enableAll();
+      }
+      for (const [, light] of ldSconceMeshes.lightMap) light.layers.enableAll();
+    }
+  }
+
+  // Restore active layer index
+  gameState.activeLayerIndex = activeLayerIdx;
+
+  scene.add(healthBarManager.getGroup());
+  // Health bars visible in all zones
+  if (multiZone) healthBarManager.getGroup().traverse(child => { child.layers.enableAll(); });
+
+  // Projectiles are shared (single layer — always active layer)
+  const projectileMeshes = createProjectileMeshes();
+  projectileMeshes.group.position.y = activeLayerIdx * LAYER_HEIGHT;
+  scene.add(projectileMeshes.group);
+  if (multiZone) projectileMeshes.group.traverse(child => { child.layers.enableAll(); });
 
   let skyboxMesh: THREE.Mesh | undefined;
   if (level.skybox) {
     skyboxMesh = createSkyboxMesh(level.skybox);
     scene.add(skyboxMesh);
-  }
-
-  // Tag entity meshes + skybox with environment zone layers for multi-pass rendering
-  if (multiZone) {
-    const tagMeshByKey = (obj: THREE.Object3D, key: string) => {
-      const zone = zoneMap.get(key);
-      if (zone !== undefined) obj.traverse(child => { child.layers.set(zone); });
-    };
-
-    // Tag all entity mesh maps
-    // (Door frames + panels tagged at build time in buildDoorMeshes)
-    for (const [key, mesh] of keyMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of plateMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of tripwireMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of sconceMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of enemyMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of npcMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of itemMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of consumableMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of blockMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of chestMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of signMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of fountainMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of bookshelfMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of altarMeshes.meshMap) tagMeshByKey(mesh, key);
-    for (const [key, mesh] of barrelMeshes.meshMap) tagMeshByKey(mesh, key);
-
-    // Lever handle groups
-    for (const [key, handle] of leverMeshes.handleMap) tagMeshByKey(handle, key);
-
-    // Wall entity meshes (breakable/secret walls)
-    for (const [key, entry] of wallEntityMeshes.meshMap) {
-      tagMeshByKey(entry.wallGroup, key);
-      tagMeshByKey(entry.floorCeilGroup, key);
-    }
-
-    // Groups without per-mesh zone keys — show in all zones
-    // (stair geometry, trap launchers, projectiles)
-    const allZoneGroups = [
-      stairMeshes.group,
-      trapLauncherMeshes.group, projectileMeshes.group,
-    ];
-    for (const g of allZoneGroups) {
-      g.traverse(child => { child.layers.enableAll(); });
-    }
-
-    // Forest billboards — tag by position (derive cell from world coords)
-    for (const billboard of forestMeshes.billboards) {
-      const col = Math.floor(billboard.position.x / CELL_SIZE);
-      const row = Math.floor(billboard.position.z / CELL_SIZE);
-      const zone = zoneMap.get(doorKey(col, row));
-      if (zone !== undefined) billboard.layers.set(zone);
-      else billboard.layers.enableAll();
-    }
-
-    // Sconce lights + health bars — visible in all zones
-    for (const [, light] of sconceMeshes.lightMap) {
-      light.layers.enableAll();
-    }
-    healthBarManager.getGroup().traverse(child => { child.layers.enableAll(); });
-
     // Skybox renders only in the first zone (typically outdoor)
-    if (skyboxMesh) skyboxMesh.layers.set(1);
+    if (multiZone) skyboxMesh.layers.set(1);
   }
+
+  // Player uses the grid of its starting layer
+  const playerLayerGrid = layerDefs[activeLayerIdx]?.grid ?? activeLayerDef.grid;
+  const playerWalkable = buildWalkableSet(level.charDefs);
+  const player = new Player(
+    camera,
+    playerLayerGrid,
+    startCol,
+    startRow,
+    startFacing,
+    playerWalkable,
+    gameState.isDoorOpen.bind(gameState),
+    (col, row) => gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row),
+    gameState.stairs,
+  );
+  player.yOffset = activeLayerIdx * LAYER_HEIGHT;
+  player.targetYOffset = player.yOffset;
 
   return {
     level,
     walkable,
-    dungeonGroup,
-    doorMeshes,
+    dungeonGroup: allDungeonGroup,
+    doorMeshes: {
+      group: sharedDoorGroup,
+      panelMap: sharedDoorPanelMap,
+      orientationMap: sharedDoorOrientationMap,
+      boundaryLights: sharedDoorBoundaryLights,
+    },
     doorAnimator,
-    keyMeshes,
-    plateMeshes,
-    tripwireMeshes,
-    leverMeshes,
+    keyMeshes: { group: sharedKeyGroup, meshMap: sharedKeyMeshMap },
+    plateMeshes: { group: sharedPlateGroup, meshMap: sharedPlateMeshMap },
+    tripwireMeshes: { group: sharedTripwireGroup, meshMap: sharedTripwireMeshMap },
+    leverMeshes: { group: sharedLeverGroup, handleMap: sharedLeverHandleMap },
     leverAnimator,
-    sconceMeshes,
-    stairMeshes,
-    forestMeshes,
-    trapLauncherMeshes,
+    sconceMeshes: { group: sharedSconceGroup, meshMap: sharedSconceMeshMap, lightMap: sharedSconceLightMap },
+    stairMeshes: { group: sharedStairGroup },
+    forestMeshes: { group: sharedForestGroup, billboards: sharedForestBillboards },
+    trapLauncherMeshes: { group: sharedTrapLauncherGroup },
     projectileMeshes,
-    wallEntityMeshes,
-    blockMeshes,
-    chestMeshes,
-    signMeshes,
-    fountainMeshes,
-    bookshelfMeshes,
-    altarMeshes,
-    barrelMeshes,
-    npcMeshes,
-    enemyMeshes,
+    wallEntityMeshes: { group: sharedWallEntityGroup, meshMap: sharedWallEntityMeshMap },
+    blockMeshes: { group: sharedBlockGroup, meshMap: sharedBlockMeshMap },
+    chestMeshes: { group: sharedChestGroup, meshMap: sharedChestMeshMap },
+    signMeshes: { group: sharedSignGroup, meshMap: sharedSignMeshMap },
+    fountainMeshes: { group: sharedFountainGroup, meshMap: sharedFountainMeshMap },
+    bookshelfMeshes: { group: sharedBookshelfGroup, meshMap: sharedBookshelfMeshMap },
+    altarMeshes: { group: sharedAltarGroup, meshMap: sharedAltarMeshMap },
+    barrelMeshes: { group: sharedBarrelGroup, meshMap: sharedBarrelMeshMap },
+    npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
+    enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,
     healthBarManager,
-    itemMeshes,
-    consumableMeshes,
+    itemMeshes: { group: sharedItemGroup, meshMap: sharedItemMeshMap },
+    consumableMeshes: { group: sharedConsumableGroup, meshMap: sharedConsumableMeshMap },
     skyboxMesh,
     player,
     multiZone,
     zones,
     zoneMap,
+    layerGrids: layerDefs.map(ld => ld.grid),
   };
 }
 
@@ -478,9 +689,11 @@ async function init(): Promise<void> {
   torchLight.layers.enableAll();
   torchFillLight.layers.enableAll();
 
-  // Debug: fullbright toggle
+  // Debug: fullbright toggle + layer flying
   let debugFullbright = false;
   const debugLight = new THREE.AmbientLight(0xffffff, 2);
+  debugLight.layers.enableAll();
+  let debugLayerIndex = 0; // current debug layer (may differ from gameState.activeLayerIndex)
 
   // --- Databases + textures (preload before scene build so sprites appear immediately) ---
   await Promise.all([enemyDatabase.load(), npcDatabase.load()]);
@@ -501,13 +714,13 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1-layered.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
   let currentLevelId = firstLevel.id!;
-  const levelSnapshots = new Map<string, LevelSnapshot>();
+  const levelSnapshots = new Map<string, MultiLayerSnapshot>();
   // Preserve original grids for restart (grids are mutated by breakable/secret wall opening)
   const originalGrids = new Map<string, string[]>();
   for (const level of dungeon.levels) {
@@ -516,6 +729,13 @@ async function init(): Promise<void> {
   applyEnvironment(firstLevel.environment, scene, ambient);
 
   const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
+  // Re-init for multi-layer levels (constructor only handles single layer)
+  if (firstLevel.layers) {
+    gameState.loadNewLevel(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name, firstLevel.layers);
+  }
+  // Set starting layer from playerStart
+  const startLayerIndex = resolveLayerCoord(firstLevel, dungeon.playerStart.layerIndex ?? 0);
+  gameState.activeLayerIndex = startLayerIndex;
 
   const projectileManager = new ProjectileManager();
 
@@ -632,10 +852,8 @@ async function init(): Promise<void> {
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
-    col: number,
-    row: number,
+    key: string,
   ): void {
-    const key = doorKey(col, row);
     const mesh = meshMap.get(key);
     if (!mesh) return;
     const mat = mesh.material as THREE.ShaderMaterial;
@@ -648,9 +866,9 @@ async function init(): Promise<void> {
   }
 
   function handleEnemyKill(key: string, col: number, row: number, enemy: EnemyInstance): void {
-    ls.healthBarManager.remove(key);
-    hideEnemyMesh(ls.enemyMeshes.meshMap, col, row);
-    ls.enemyAnimator.remove(key);
+    ls.healthBarManager.remove(lk(key));
+    hideEnemyMesh(ls.enemyMeshes.meshMap, lk(doorKey(col, row)));
+    ls.enemyAnimator.remove(lk(key));
     gameState.enemies.delete(key);
     const enemyDef = enemyDatabase.getEnemy(enemy.type);
     if (enemyDef) {
@@ -662,14 +880,14 @@ async function init(): Promise<void> {
     for (const drop of lootResult.items) {
       const entity = gameState.entityRegistry.createItem(
         drop.itemId, drop.quality,
-        { kind: 'world', levelId: gameState.currentLevelId, col, row },
+        { kind: 'world', levelId: gameState.currentLevelId, col, row, layerIndex: gameState.activeLayerIndex },
         drop.modifiers,
       );
       const itemDef = itemDatabase.getItem(drop.itemId);
       if (itemDef && itemDef.type === 'consumable') {
-        addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+        addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
       } else if (itemDef) {
-        addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+        addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
       }
     }
   }
@@ -685,7 +903,8 @@ async function init(): Promise<void> {
       const origGrid = originalGrids.get(currentLevelId);
       if (origGrid) startLevel.grid = [...origGrid];
       levelSnapshots.clear();
-      gameState.loadNewLevel(startLevel.entities, startLevel.grid, startLevel.id ?? startLevel.name);
+      gameState.loadNewLevel(startLevel.entities, startLevel.grid, startLevel.id ?? startLevel.name, startLevel.layers);
+      gameState.activeLayerIndex = resolveLayerCoord(startLevel, dungeon.playerStart.layerIndex ?? 0);
       projectileManager.clear();
       fireballExplosions.clear();
       gameState.hp = gameState.maxHp;
@@ -776,11 +995,11 @@ async function init(): Promise<void> {
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(targetLevel.dustMotes !== false);
-      waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
+      waterDrips.setLevel(activeGrid(), targetLevel.charDefs);
       waterDrips.setVisible(targetLevel.waterDrips === true);
       fireflies.setVisible(targetLevel.fireflies === true);
 
-      gameState.revealAround(result.playerCol, result.playerRow, result.playerFacing, targetLevel.grid);
+      gameState.revealAround(result.playerCol, result.playerRow, result.playerFacing, activeGrid());
     });
   }
 
@@ -859,6 +1078,18 @@ async function init(): Promise<void> {
     dungeon.playerStart.facing,
   );
 
+  // --- Helpers ---
+
+  /** Get the active layer's grid (follows gameState.activeLayerIndex). */
+  function activeGrid(): string[] {
+    return ls.layerGrids[gameState.activeLayerIndex] ?? ls.level.grid;
+  }
+
+  /** Prefix a doorKey-format string with the active layer index for mesh lookup. */
+  function lk(key: string): string {
+    return `${gameState.activeLayerIndex}:${key}`;
+  }
+
   // --- Callbacks ---
 
   let lastPlayerCol = dungeon.playerStart.col;
@@ -885,12 +1116,12 @@ async function init(): Promise<void> {
         blockedDoors.delete(key);
         const door = gameState.getDoor(entry.col, entry.row);
         if (door) door.state = 'closed';
-        updateDoorMesh(ls.doorMeshes.panelMap, entry.col, entry.row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(entry.col, entry.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Still blocked — bounce animation and retry
         entry.timer = DOOR_RETRY_INTERVAL;
         const dk = doorKey(entry.col, entry.row);
-        ls.doorAnimator.bounce(dk);
+        ls.doorAnimator.bounce(lk(dk));
       }
     }
   }
@@ -915,18 +1146,18 @@ async function init(): Promise<void> {
       if (doorAtPlayer && doorAtPlayer.state === 'closed') {
         doorAtPlayer.state = 'open';
         const dk = doorKey(col, row);
-        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
       }
 
       // Reveal explored cells on move
-      gameState.revealAround(col, row, ls.player.getState().facing, ls.level.grid);
+      gameState.revealAround(col, row, ls.player.getState().facing, activeGrid());
 
       // Key pickup
       const pickedUpKeyId = gameState.pickupKeyAt(col, row);
       if (pickedUpKeyId) {
         console.log(`Picked up key: ${pickedUpKeyId}`);
-        hideKeyMesh(ls.keyMeshes.meshMap, col, row);
+        hideKeyMesh(ls.keyMeshes.meshMap, lk(doorKey(col, row)));
       }
 
       // Equipment pickup
@@ -935,12 +1166,12 @@ async function init(): Promise<void> {
         hud.showMessage(equipResult.denied);
       } else if (equipResult.item) {
         hud.showMessage(`Equipped: ${equipResult.item.name}`);
-        hideItemMesh(ls.itemMeshes.meshMap, ls.itemMeshes.group, col, row);
+        hideItemMesh(ls.itemMeshes.meshMap, ls.itemMeshes.group, lk(doorKey(col, row)));
         // Show mesh for next remaining equipment at this cell
         const remainingEquip = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
           .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type !== 'consumable'; });
         if (remainingEquip) {
-          addSingleItemMesh(remainingEquip, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+          addSingleItemMesh(remainingEquip, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
         }
       }
 
@@ -948,19 +1179,19 @@ async function init(): Promise<void> {
       const pickedUpConsumable = gameState.pickupConsumableAt(col, row);
       if (pickedUpConsumable) {
         console.log(`Picked up: ${pickedUpConsumable.name}`);
-        hideConsumableMesh(ls.consumableMeshes.meshMap, ls.consumableMeshes.group, col, row);
+        hideConsumableMesh(ls.consumableMeshes.meshMap, ls.consumableMeshes.group, lk(doorKey(col, row)));
         // Show mesh for next remaining consumable at this cell
         const remainingCons = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
           .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type === 'consumable'; });
         if (remainingCons) {
-          addSingleConsumableMesh(remainingCons, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+          addSingleConsumableMesh(remainingCons, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
         }
       }
 
       // Trigger / tripwire activation
       gameState.activateTrigger(col, row);
       if (gameState.activateTripwire(col, row)) {
-        hideTripwire(ls.tripwireMeshes.meshMap, col, row);
+        hideTripwire(ls.tripwireMeshes.meshMap, lk(doorKey(col, row)));
       }
 
       // Pressure plate activation
@@ -968,7 +1199,7 @@ async function init(): Promise<void> {
       if (plateTargets) {
         const plate = gameState.plates.get(doorKey(col, row));
         if (plate?.activated) {
-          pressPlate(ls.plateMeshes.meshMap, col, row);
+          pressPlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
         }
       }
 
@@ -979,18 +1210,21 @@ async function init(): Promise<void> {
 
       // Stair detection — entity-based lookup
       if (gameState.getStair(col, row)) {
-        const stair = ls.level.entities.find(
-          (e) => e.type === 'stairs' && e.col === col && e.row === row,
-        );
-        if (stair) {
-          triggerLevelTransition(stair);
+        const stairInstance = gameState.getStair(col, row)!;
+        if (stairInstance.id) {
+          // Find the full Entity object from the active layer's entities
+          const allEntities = getAllLevelEntities(ls.level);
+          const stairEntity = allEntities.find(e => e.id === stairInstance.id);
+          if (stairEntity) {
+            triggerLevelTransition(stairEntity);
+          }
         }
       }
     });
 
     ls.player.setOnTurn(() => {
       const s = ls.player.getState();
-      gameState.revealAround(s.col, s.row, s.facing, ls.level.grid);
+      gameState.revealAround(s.col, s.row, s.facing, activeGrid());
     });
 
     // Signal-driven door state changes → animate door mesh
@@ -999,7 +1233,7 @@ async function init(): Promise<void> {
       if (open) {
         // Opening — clear any blocked retry and open normally
         blockedDoors.delete(dk);
-        updateDoorMesh(ls.doorMeshes.panelMap, col, row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Closing — check if cell is occupied
         const occupant = isDoorCellOccupied(col, row);
@@ -1008,10 +1242,10 @@ async function init(): Promise<void> {
           const door = gameState.getDoor(col, row);
           if (door) door.state = 'open';
           blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
-          ls.doorAnimator.bounce(dk);
+          ls.doorAnimator.bounce(lk(dk));
         } else {
           blockedDoors.delete(dk);
-          updateDoorMesh(ls.doorMeshes.panelMap, col, row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+          updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         }
       }
     };
@@ -1019,21 +1253,21 @@ async function init(): Promise<void> {
     // Timed source deactivation → animate lever reset
     gameState.onLeverReset = (col, row) => {
       const leverKey = doorKey(col, row);
-      ls.leverAnimator.setState(leverKey, 'up');
+      ls.leverAnimator.setState(lk(leverKey), 'up');
     };
 
     // Plate reset (momentary step-off or timed expiry) → animate plate release
     gameState.onPlateReset = (col, row) => {
-      releasePlate(ls.plateMeshes.meshMap, col, row);
+      releasePlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
     };
 
     // Secret wall detection — walking into a wall cell with a secret wall entity
     ls.player.setOnMoveBlocked((col, row) => {
       const sw = gameState.getSecretWall(col, row);
       if (sw && !sw.opened) {
-        const result = gameState.openSecretWall(col, row, ls.level.grid);
+        const result = gameState.openSecretWall(col, row, activeGrid());
         if (result.opened) {
-          const entry = ls.wallEntityMeshes.meshMap.get(doorKey(col, row));
+          const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(col, row)));
           if (entry) {
             // Persistent (illusionary): keep wall visible, just make cell walkable
             if (!result.persistent) {
@@ -1051,9 +1285,9 @@ async function init(): Promise<void> {
     // Signal-driven chest state changes → animate chest mesh
     gameState.onChestSignalChanged = (col, row, open) => {
       if (open) {
-        openChestMesh(ls.chestMeshes.meshMap, col, row);
+        openChestMesh(ls.chestMeshes.meshMap, lk(doorKey(col, row)));
       } else {
-        closeChestMesh(ls.chestMeshes.meshMap, col, row);
+        closeChestMesh(ls.chestMeshes.meshMap, lk(doorKey(col, row)));
       }
     };
 
@@ -1086,13 +1320,13 @@ async function init(): Promise<void> {
           if (projectile.statusEffect) {
             applyEffect(enemy.statusEffects, projectile.statusEffect as StatusEffectType, 6);
           }
-          enemyDamageFlash(ls.enemyMeshes.meshMap, col, row);
-          ls.enemyAnimator.triggerHit(key);
+          enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(col, row)));
+          ls.enemyAnimator.triggerHit(lk(key));
           damageNumbers.spawn(col, row, projectile.damage);
           if (enemy.hp <= 0) {
             handleEnemyKill(key, col, row, enemy);
           } else {
-            ls.healthBarManager.update(key, enemy.hp, enemy.maxHp);
+            ls.healthBarManager.update(lk(key), enemy.hp, enemy.maxHp);
           }
         }
       }
@@ -1120,13 +1354,16 @@ async function init(): Promise<void> {
       // --- Midpoint: swap level ---
       teardownLevelScene(ls, scene);
 
-      // Find target stair across all dungeon levels
+      // Find target stair across all dungeon levels (search all layers)
       let targetLevel: DungeonLevel | undefined;
       let targetStair: Entity | undefined;
+      let targetLayerIndex = 0;
       for (const level of dungeon.levels) {
-        targetStair = level.entities.find(e => e.type === 'stairs' && e.id === targetStairId);
+        const allEntities = getAllLevelEntities(level);
+        targetStair = allEntities.find(e => e.type === 'stairs' && e.id === targetStairId);
         if (targetStair) {
           targetLevel = level;
+          targetLayerIndex = findEntityLayerIndex(level, targetStairId);
           break;
         }
       }
@@ -1137,8 +1374,9 @@ async function init(): Promise<void> {
       if (snapshot) {
         gameState.loadLevelState(snapshot);
       } else {
-        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevelId);
+        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevelId, targetLevel.layers);
       }
+      gameState.activeLayerIndex = targetLayerIndex;
 
       // Compute spawn position: one cell in front of target stair, facing away from stairs
       const targetFacing = targetStair.facing as Facing;
@@ -1155,11 +1393,11 @@ async function init(): Promise<void> {
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(targetLevel.dustMotes !== false);
-      waterDrips.setLevel(targetLevel.grid, targetLevel.charDefs);
+      waterDrips.setLevel(activeGrid(), targetLevel.charDefs);
       waterDrips.setVisible(targetLevel.waterDrips === true);
       fireflies.setVisible(targetLevel.fireflies === true);
 
-      gameState.revealAround(spawnCol, spawnRow, targetFacing, targetLevel.grid);
+      gameState.revealAround(spawnCol, spawnRow, targetFacing, activeGrid());
     });
   }
 
@@ -1167,13 +1405,13 @@ async function init(): Promise<void> {
   wireCallbacks();
   sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
   dustMotes.setVisible(ls.level.dustMotes !== false);
-  waterDrips.setLevel(ls.level.grid, ls.level.charDefs);
+  waterDrips.setLevel(activeGrid(), ls.level.charDefs);
   waterDrips.setVisible(ls.level.waterDrips === true);
   fireflies.setVisible(ls.level.fireflies === true);
 
   // Reveal initial position
   const ps = ls.player.getState();
-  gameState.revealAround(ps.col, ps.row, ps.facing, ls.level.grid);
+  gameState.revealAround(ps.col, ps.row, ps.facing, activeGrid());
 
   // --- Character creation + GPU warmup (concurrent) ---
   // Show character creation FIRST so the browser can paint it,
@@ -1239,9 +1477,9 @@ async function init(): Promise<void> {
               const updatedEntity = gameState.entityRegistry.getItem(action.instanceId);
               if (updatedEntity) {
                 if (def.type === 'consumable') {
-                  addSingleConsumableMesh(updatedEntity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                  addSingleConsumableMesh(updatedEntity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
                 } else {
-                  addSingleItemMesh(updatedEntity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                  addSingleItemMesh(updatedEntity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
                 }
               }
             }
@@ -1311,56 +1549,58 @@ async function init(): Promise<void> {
       case 'KeyE': ls.player.turnRight(); break;
       case 'Space':
         {
-          const result = interact(ls.player.getState(), ls.level.grid, gameState);
+          const result = interact(ls.player.getState(), activeGrid(), gameState);
           if (result.type === 'nothing' && result.message) {
             hud.showMessage(result.message);
           }
           if (result.type === 'door_opened') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+            updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(facing.col, facing.row)), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_closed') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, facing.col, facing.row, false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+            updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(facing.col, facing.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_blocked') {
             const facing = getFacingCell(ls.player.getState());
             const bk = doorKey(facing.col, facing.row);
-            ls.doorAnimator.bounce(bk);
+            ls.doorAnimator.bounce(lk(bk));
           }
           if (result.type === 'lever_activated' && result.targets) {
             for (const t of result.targets) {
               const targetPos = gameState.resolveEntityPosition(t);
               if (targetPos) {
-                updateDoorMesh(ls.doorMeshes.panelMap, targetPos.col, targetPos.row, gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator, ls.doorMeshes.boundaryLights);
+                updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(targetPos.col, targetPos.row)), gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator, ls.doorMeshes.boundaryLights);
               }
             }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);
-            if (lever) ls.leverAnimator.setState(leverKey, lever.state);
+            if (lever) ls.leverAnimator.setState(lk(leverKey), lever.state);
           }
           if (result.type === 'sconce_taken') {
             const ps = ls.player.getState();
-            extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, ps.col, ps.row);
+            extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, lk(doorKey(ps.col, ps.row)));
           }
           if (result.type === 'block_pushed' && result.targetCol !== undefined && result.targetRow !== undefined) {
             const facing = getFacingCell(ls.player.getState());
-            animateBlockPush(ls.blockMeshes.meshMap, facing.col, facing.row, result.targetCol, result.targetRow);
+            const fromBlockKey = lk(doorKey(facing.col, facing.row));
+            const toBlockKey = lk(doorKey(result.targetCol, result.targetRow));
+            animateBlockPush(ls.blockMeshes.meshMap, fromBlockKey, facing.col, facing.row, toBlockKey, result.targetCol, result.targetRow);
             // Pressure plate at destination already activated by gameState.pushBlock()
             // Just animate the visual press
             const destPlate = gameState.plates.get(doorKey(result.targetCol, result.targetRow));
             if (destPlate?.activated) {
-              pressPlate(ls.plateMeshes.meshMap, result.targetCol, result.targetRow);
+              pressPlate(ls.plateMeshes.meshMap, toBlockKey);
             }
             // Deactivate plate at origin if block was on one
             gameState.deactivatePressurePlate(facing.col, facing.row);
             const originPlate = gameState.plates.get(doorKey(facing.col, facing.row));
             if (originPlate && !originPlate.activated) {
-              releasePlate(ls.plateMeshes.meshMap, facing.col, facing.row);
+              releasePlate(ls.plateMeshes.meshMap, fromBlockKey);
             }
           }
           if (result.type === 'chest_opened' && result.targetCol !== undefined && result.targetRow !== undefined) {
-            openChestMesh(ls.chestMeshes.meshMap, result.targetCol, result.targetRow);
+            openChestMesh(ls.chestMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
             // Roll loot from chest drops
             const chest = gameState.getChest(result.targetCol, result.targetRow);
             if (chest?.drops) {
@@ -1369,14 +1609,14 @@ async function init(): Promise<void> {
               for (const drop of lootResult.items) {
                 const entity = gameState.entityRegistry.createItem(
                   drop.itemId, drop.quality,
-                  { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                  { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
                   drop.modifiers,
                 );
                 const itemDef = itemDatabase.getItem(drop.itemId);
                 if (itemDef && itemDef.type === 'consumable') {
-                  addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                  addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
                 } else if (itemDef) {
-                  addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                  addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
                 }
               }
             }
@@ -1393,13 +1633,13 @@ async function init(): Promise<void> {
           if (result.type === 'fountain_used' && result.message) {
             hud.showMessage(result.message);
             if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              markFountainUsed(ls.fountainMeshes.meshMap, result.targetCol, result.targetRow);
+              markFountainUsed(ls.fountainMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
             }
           }
           if (result.type === 'altar_activated' && result.message) {
             hud.showMessage(result.message);
             if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              markAltarUsed(ls.altarMeshes.meshMap, result.targetCol, result.targetRow);
+              markAltarUsed(ls.altarMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
             }
           }
           if (result.type === 'npc_interacted' && result.message) {
@@ -1431,8 +1671,8 @@ async function init(): Promise<void> {
           for (const result of results) {
             if (result.type === 'hit' || result.type === 'kill') {
               if (result.targetCol !== undefined && result.targetRow !== undefined) {
-                enemyDamageFlash(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
-                ls.enemyAnimator.triggerHit(doorKey(result.targetCol, result.targetRow));
+                enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
+                ls.enemyAnimator.triggerHit(lk(doorKey(result.targetCol, result.targetRow)));
                 if (result.damage !== undefined) {
                   damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
                 }
@@ -1440,14 +1680,14 @@ async function init(): Promise<void> {
               if (result.type === 'hit' && result.targetCol !== undefined && result.targetRow !== undefined) {
                 const hitEnemy = gameState.getEnemy(result.targetCol, result.targetRow);
                 if (hitEnemy) {
-                  ls.healthBarManager.update(doorKey(result.targetCol, result.targetRow), hitEnemy.hp, hitEnemy.maxHp);
+                  ls.healthBarManager.update(lk(doorKey(result.targetCol, result.targetRow)), hitEnemy.hp, hitEnemy.maxHp);
                 }
               }
               if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined && result.enemyType) {
                 // Enemy already removed from map by damageEnemy(); use result data for XP/loot
-                const killKey = doorKey(result.targetCol, result.targetRow);
+                const killKey = lk(doorKey(result.targetCol, result.targetRow));
                 ls.healthBarManager.remove(killKey);
-                hideEnemyMesh(ls.enemyMeshes.meshMap, result.targetCol, result.targetRow);
+                hideEnemyMesh(ls.enemyMeshes.meshMap, killKey);
                 ls.enemyAnimator.remove(killKey);
                 const enemyDef = enemyDatabase.getEnemy(result.enemyType);
                 if (enemyDef) {
@@ -1459,25 +1699,25 @@ async function init(): Promise<void> {
                 for (const drop of lootResult.items) {
                   const entity = gameState.entityRegistry.createItem(
                     drop.itemId, drop.quality,
-                    { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                    { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
                     drop.modifiers,
                   );
                   const itemDef = itemDatabase.getItem(drop.itemId);
                   if (itemDef && itemDef.type === 'consumable') {
-                    addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                    addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
                   } else if (itemDef) {
-                    addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                    addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
                   }
                 }
               }
             }
             if (result.type === 'wall_hit' && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
               // Apply damage to breakable wall and handle destruction
-              const wallResult = gameState.damageBreakableWall(result.targetCol, result.targetRow, result.damage, ls.level.grid);
+              const wallResult = gameState.damageBreakableWall(result.targetCol, result.targetRow, result.damage, activeGrid());
               damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
               if (wallResult.destroyed) {
                 // Hide wall faces, show floor/ceiling
-                const entry = ls.wallEntityMeshes.meshMap.get(doorKey(result.targetCol, result.targetRow));
+                const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(result.targetCol, result.targetRow)));
                 if (entry) {
                   entry.wallGroup.visible = false;
                   entry.floorCeilGroup.visible = true;
@@ -1489,14 +1729,14 @@ async function init(): Promise<void> {
                   for (const drop of lootResult.items) {
                     const entity = gameState.entityRegistry.createItem(
                       drop.itemId, drop.quality,
-                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
                       drop.modifiers,
                     );
                     const itemDef = itemDatabase.getItem(drop.itemId);
                     if (itemDef && itemDef.type === 'consumable') {
-                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
                     } else if (itemDef) {
-                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
                     }
                   }
                 }
@@ -1505,7 +1745,7 @@ async function init(): Promise<void> {
             if ((result.type === 'barrel_hit' || result.type === 'barrel_destroy') && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
               damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
               if (result.type === 'barrel_destroy') {
-                const barrelKey = doorKey(result.targetCol, result.targetRow);
+                const barrelKey = lk(doorKey(result.targetCol, result.targetRow));
                 const barrelMesh = ls.barrelMeshes.meshMap.get(barrelKey);
                 if (barrelMesh) {
                   ls.barrelMeshes.group.remove(barrelMesh);
@@ -1518,14 +1758,14 @@ async function init(): Promise<void> {
                   for (const drop of lootResult.items) {
                     const entity = gameState.entityRegistry.createItem(
                       drop.itemId, drop.quality,
-                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow },
+                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
                       drop.modifiers,
                     );
                     const itemDef = itemDatabase.getItem(drop.itemId);
                     if (itemDef && itemDef.type === 'consumable') {
-                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap);
+                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
                     } else if (itemDef) {
-                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap);
+                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
                     }
                   }
                 }
@@ -1564,17 +1804,49 @@ async function init(): Promise<void> {
         // Open save/load overlay when no other overlay is active
         saveLoadOverlay.show('save');
         break;
-      case 'Backquote':
+      case 'KeyM':
         debugFullbright = !debugFullbright;
         if (debugFullbright) {
           scene.add(debugLight);
           scene.fog = null;
+          debugLayerIndex = gameState.activeLayerIndex;
         } else {
           scene.remove(debugLight);
           const cfg = getEnvironmentConfig();
           scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
+          // Return to the player's starting layer when exiting debug mode
+          const homeLayer = resolveLayerCoord(ls.level, dungeon.playerStart.layerIndex ?? 0);
+          debugLayerIndex = homeLayer;
+          gameState.activeLayerIndex = homeLayer;
+          ls.player.targetYOffset = homeLayer * LAYER_HEIGHT;
+          ls.player.switchGrid(ls.layerGrids[homeLayer], buildWalkableSet(ls.level.charDefs), gameState.stairs);
         }
         console.log(`Debug fullbright: ${debugFullbright ? 'ON' : 'OFF'}`);
+        break;
+      case 'KeyY':
+        // Debug fly up a layer
+        if (debugFullbright && ls.layerGrids.length > 1) {
+          const maxLayer = ls.layerGrids.length - 1;
+          if (debugLayerIndex < maxLayer) {
+            debugLayerIndex++;
+            gameState.activeLayerIndex = debugLayerIndex;
+            ls.player.targetYOffset = debugLayerIndex * LAYER_HEIGHT;
+            ls.player.switchGrid(ls.layerGrids[debugLayerIndex], buildWalkableSet(ls.level.charDefs), gameState.stairs);
+            console.log(`Debug fly: layer ${debugLayerIndex}`);
+          }
+        }
+        break;
+      case 'KeyH':
+        // Debug fly down a layer
+        if (debugFullbright && ls.layerGrids.length > 1) {
+          if (debugLayerIndex > 0) {
+            debugLayerIndex--;
+            gameState.activeLayerIndex = debugLayerIndex;
+            ls.player.targetYOffset = debugLayerIndex * LAYER_HEIGHT;
+            ls.player.switchGrid(ls.layerGrids[debugLayerIndex], buildWalkableSet(ls.level.charDefs), gameState.stairs);
+            console.log(`Debug fly: layer ${debugLayerIndex}`);
+          }
+        }
         break;
     }
   });
@@ -1646,10 +1918,18 @@ async function init(): Promise<void> {
     // --- Everything below pauses when an overlay is open ---
     if (!anyOverlayOpen) {
       gameState.signalManager.tick(delta);
-      gameState.tickTrapLaunchers();
+      // Tick trap launchers on all layers
+      {
+        const saved = gameState.activeLayerIndex;
+        for (let li = 0; li < gameState.layers.length; li++) {
+          gameState.activeLayerIndex = li;
+          gameState.tickTrapLaunchers();
+        }
+        gameState.activeLayerIndex = saved;
+      }
       projectileManager.update(
         delta,
-        (col, row) => ls.walkable.has(ls.level.grid[row]?.[col]),
+        (col, row) => ls.walkable.has(activeGrid()[row]?.[col]),
         gameState.isDoorOpen.bind(gameState),
         lastPlayerCol, lastPlayerRow,
         gameState.isEnemyAt.bind(gameState),
@@ -1722,49 +2002,58 @@ async function init(): Promise<void> {
       playerDamageFlashTimer = Math.max(0, playerDamageFlashTimer - delta);
     }
 
-    // Real-time enemy AI tick — paused when overlays are open
+    // Real-time enemy AI tick — all layers, paused when overlays are open
     if (!transition.isActive && !anyOverlayOpen) {
       const ps = ls.player.getState();
-      const actions = updateEnemies(
-        gameState, ps.col, ps.row, ls.level.grid, ls.walkable,
-        gameState.isDoorOpen.bind(gameState), delta,
-      );
-      for (const action of actions) {
-        if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
-          const newKey = doorKey(action.toCol, action.toRow);
-          updateEnemyMeshPosition(ls.enemyMeshes.meshMap, action.enemyKey, action.toCol, action.toRow);
-          ls.enemyAnimator.moveTo(action.enemyKey, action.toCol, action.toRow, newKey);
-          ls.healthBarManager.rekey(action.enemyKey, newKey);
-        } else if (action.type === 'attack') {
-          const enemy = gameState.enemies.get(action.enemyKey);
-          if (enemy) {
-            enemyAttackPlayer(gameState, enemy.atk);
-            playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
-            ls.enemyAnimator.triggerLunge(action.enemyKey, ps.col, ps.row);
-            const onHitBehavior = enemyDatabase.getBehavior(enemy.type, 'onHit');
-            if (onHitBehavior && Math.random() < (onHitBehavior.params.chance as number)) {
-              applyEffect(gameState.playerStatusEffects, onHitBehavior.params.statusEffect as StatusEffectType, onHitBehavior.params.duration as number);
+      const savedLayer = gameState.activeLayerIndex;
+      for (let li = 0; li < gameState.layers.length; li++) {
+        gameState.activeLayerIndex = li;
+        const layerGrid = ls.layerGrids[li] ?? activeGrid();
+        const actions = updateEnemies(
+          gameState, ps.col, ps.row, layerGrid, ls.walkable,
+          gameState.isDoorOpen.bind(gameState), delta,
+        );
+        for (const action of actions) {
+          if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
+            const newKey = doorKey(action.toCol, action.toRow);
+            updateEnemyMeshPosition(ls.enemyMeshes.meshMap, lk(action.enemyKey), lk(newKey));
+            ls.enemyAnimator.moveTo(lk(action.enemyKey), action.toCol, action.toRow, lk(newKey));
+            ls.healthBarManager.rekey(lk(action.enemyKey), lk(newKey));
+          } else if (action.type === 'attack') {
+            // Only attack if enemy is on the player's layer
+            if (li === savedLayer) {
+              const enemy = gameState.enemies.get(action.enemyKey);
+              if (enemy) {
+                enemyAttackPlayer(gameState, enemy.atk);
+                playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+                ls.enemyAnimator.triggerLunge(lk(action.enemyKey), ps.col, ps.row);
+                const onHitBehavior = enemyDatabase.getBehavior(enemy.type, 'onHit');
+                if (onHitBehavior && Math.random() < (onHitBehavior.params.chance as number)) {
+                  applyEffect(gameState.playerStatusEffects, onHitBehavior.params.statusEffect as StatusEffectType, onHitBehavior.params.duration as number);
+                }
+              }
             }
-          }
-        } else if (action.type === 'regen') {
-          const enemy = gameState.enemies.get(action.enemyKey);
-          if (enemy) {
-            ls.healthBarManager.update(action.enemyKey, enemy.hp, enemy.maxHp);
-          }
-        } else if (action.type === 'status_damage') {
-          const enemy = gameState.enemies.get(action.enemyKey);
-          if (enemy) {
-            enemyDamageFlash(ls.enemyMeshes.meshMap, action.fromCol, action.fromRow);
-            ls.healthBarManager.update(action.enemyKey, enemy.hp, enemy.maxHp);
-          }
-        } else if (action.type === 'status_kill') {
-          const enemy = gameState.enemies.get(action.enemyKey);
-          if (enemy) {
-            enemyDamageFlash(ls.enemyMeshes.meshMap, action.fromCol, action.fromRow);
-            handleEnemyKill(action.enemyKey, action.fromCol, action.fromRow, enemy);
+          } else if (action.type === 'regen') {
+            const enemy = gameState.enemies.get(action.enemyKey);
+            if (enemy) {
+              ls.healthBarManager.update(lk(action.enemyKey), enemy.hp, enemy.maxHp);
+            }
+          } else if (action.type === 'status_damage') {
+            const enemy = gameState.enemies.get(action.enemyKey);
+            if (enemy) {
+              enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(action.fromCol, action.fromRow)));
+              ls.healthBarManager.update(lk(action.enemyKey), enemy.hp, enemy.maxHp);
+            }
+          } else if (action.type === 'status_kill') {
+            const enemy = gameState.enemies.get(action.enemyKey);
+            if (enemy) {
+              enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(action.fromCol, action.fromRow)));
+              handleEnemyKill(action.enemyKey, action.fromCol, action.fromRow, enemy);
+            }
           }
         }
       }
+      gameState.activeLayerIndex = savedLayer;
 
       // Death — show save/load overlay if saves exist, else restart
       if (gameState.hp <= 0) {
@@ -1806,7 +2095,7 @@ async function init(): Promise<void> {
     levelUpNotification.update(delta);
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
-    hud.draw(gameState, ls.player.getState(), ls.level.grid, delta, damageFlashAlpha, swordSwing, levelUpNotification);
+    hud.draw(gameState, ls.player.getState(), activeGrid(), delta, damageFlashAlpha, swordSwing, levelUpNotification);
 
     // Multi-pass environment rendering: each zone gets its own fog/background
     if (!ls.multiZone) {
@@ -1818,10 +2107,12 @@ async function init(): Promise<void> {
         const zoneLayer = i + 1;
         camera.layers.disableAll();
         camera.layers.enable(zoneLayer);
-        const cfg = getEnvironmentConfig(ls.zones[i]);
-        scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
-        scene.background = i === 0 ? new THREE.Color(cfg.fogColor) : null;
-        ambient.color.setHex(cfg.ambientColor);
+        if (!debugFullbright) {
+          const cfg = getEnvironmentConfig(ls.zones[i]);
+          scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
+          scene.background = i === 0 ? new THREE.Color(cfg.fogColor) : null;
+          ambient.color.setHex(cfg.ambientColor);
+        }
         renderer.render(scene, camera);
       }
       renderer.autoClear = true;

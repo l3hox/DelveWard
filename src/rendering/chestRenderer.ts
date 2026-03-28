@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
-import { doorKey, type GameState } from '../core/gameState';
+import type { GameState } from '../core/gameState';
 import type { Facing } from '../core/grid';
 
 const FACING_ROT: Record<Facing, number> = {
@@ -114,10 +114,8 @@ export function buildChestMeshes(gameState: GameState): ChestMeshes {
 
 export function openChestMesh(
   meshMap: Map<string, THREE.Group>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const chestGroup = meshMap.get(key);
   if (!chestGroup) return;
 
@@ -145,10 +143,8 @@ export function openChestMesh(
 
 export function closeChestMesh(
   meshMap: Map<string, THREE.Group>,
-  col: number,
-  row: number,
+  key: string,
 ): void {
-  const key = doorKey(col, row);
   const chestGroup = meshMap.get(key);
   if (!chestGroup) return;
 

@@ -94,11 +94,13 @@ export class EnemyHealthBarManager {
   }
 
   updatePositions(meshMap: Map<string, THREE.Mesh>): void {
+    const worldPos = new THREE.Vector3();
     for (const [key, entry] of this.entries) {
       const mesh = meshMap.get(key);
       if (!mesh) continue;
-      const barY = entry.spriteHeight + BAR_Y_OFFSET;
-      entry.sprite.position.set(mesh.position.x, barY, mesh.position.z);
+      mesh.getWorldPosition(worldPos);
+      const barY = worldPos.y + entry.spriteHeight * 0.5 + BAR_Y_OFFSET;
+      entry.sprite.position.set(worldPos.x, barY, worldPos.z);
     }
   }
 
