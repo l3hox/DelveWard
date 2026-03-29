@@ -4,6 +4,14 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-29 — Light Performance + Editor ID Fix
+
+**Light optimization**: All point lights now use `decay=2` (physically correct inverse-square falloff) with tightened `distance` caps. Per-frame distance culling disables lights beyond ~7 cells from camera via `light.visible=false`. Player torch/fill lights are exempt. Analysis of future optimization paths documented in ADR-M4-10 — recommended next step is hybrid vertex color baking (static lights baked, only 2-3 dynamic lights in shader), but distance culling is sufficient for M4 scope.
+
+**Editor ID fix**: Entity ID generation (`generateEntityId`, `generateKeyId`) now searches all layers via `getAllLevelEntities()`, preventing duplicate IDs when entities exist on different layers of the same level.
+
+---
+
 ## 2026-03-28 — M4 Phase B + B Editor: Layer System + Hollow Areas
 
 **Architecture — All layers active**: Initially had active/non-active layer distinction (active layer = full mesh tracking + interaction, non-active = visual only). Removed during implementation — all layers are now fully tracked with shared meshMaps using `"layerIndex:col,row"` prefixed keys (`meshKey()`, `layerDoorKey()`, `lk()` helpers). Enemies tick on all layers, trap launchers fire on all layers. Attacks restricted to player's layer. Future dormancy optimization deferred.
