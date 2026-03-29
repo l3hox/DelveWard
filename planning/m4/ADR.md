@@ -307,3 +307,43 @@ Layers are stored in an array ordered by Y position (lowest first). When inserti
 - Editor and game both use the same resolution function
 - Stair cross-level references resolved via entity ID + `findEntityLayerIndex()`, not layer coordinate (entities are unique)
 - The coordinate maps intuitively to floor numbers in the level design
+
+---
+
+## ADR-M4-10 — Light Performance: Distance Culling + Future Optimization Path
+
+**Status:** Accepted
+**Date:** 2026-03-29
+
+### Context
+
+Multi-layer levels multiply the light count (sconces, door lights per layer). Three.js `MeshLambertMaterial` uses forward rendering — the vertex shader loops over ALL `PointLight`s in the scene for every vertex. With `decay=2` and tight `distance`, distant lights early-out cheaply, but the loop overhead grows linearly with total light count.
+
+Current budget: ~24 lights (2 layers). Projected: ~50-60 lights (4-5 dense layers), ~100+ lights (10+ layers).
+
+### Decision
+
+**Phase 1 (now): Distance culling via `light.visible = false`.**
+
+Before each render frame, lights beyond a threshold distance from the camera are disabled. Three.js excludes `visible=false` lights from the shader uniform array.
+
+**Caveat**: changing the visible light count triggers a shader recompile (Three.js bakes `NUM_POINT_LIGHTS` as a `#define`). Acceptable for now — light count changes only when the player moves between areas with different sconce density, which is infrequent. If stutter is observed, mitigate by moving culled lights to `position(0, -10000, 0)` with `intensity=0` instead (same loop cost, no recompile).
+
+### Future optimization paths analyzed (not built yet)
+
+| # | Approach | Effort | Performance | Notes |
+|---|---|---|---|---|
+| 1 | **Vertex color baking** — precompute static light at build time, store in vertex colors | Medium | Great | Sconce changes require local rebuild (~20 meshes) |
+| 2 | **Lightmap textures** — top-down per-layer lightmap, sample in shader | Medium-high | Great | Cell-granularity resolution fine for pixelart |
+| 3 | **Deferred lighting** — screen-space light pass | Very high | Best | Major architectural change, loses Lambert simplicity |
+| 4 | **Light atlas/UBO** — spatial grid texture, shader indexes nearby lights | Medium | Excellent | Data-driven, custom shader required |
+| 5 | **Hybrid vertex colors + dynamic shader lights** — static baked, 2-3 dynamic (torch/fireballs) in shader | Medium-low | Excellent | **Recommended next step** — no custom shader, keeps MeshLambertMaterial with `vertexColors: true`, constant shader light count (no recompile risk) |
+
+**Recommended upgrade path**: Phase 1 (distance culling) → Phase 2 (#5 hybrid vertex colors) when levels exceed ~50 lights. #5 reduces shader lights to a constant 2-3 regardless of sconce count.
+
+### Consequences
+
+- Phase 1: ~10 lines of code, no shader changes, immediate benefit
+- Sufficient for M4 scope (2-5 layers, ~30-60 lights)
+- The `decay=2` + tight `distance` on all lights (already implemented) ensures early-out for the remaining visible lights
+- Revisit when level complexity demands it

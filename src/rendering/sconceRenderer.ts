@@ -6,7 +6,7 @@ import type { Facing } from '../core/grid';
 const SCONCE_HEIGHT = 1.4;
 const TORCH_COLOR = 0xff994d;
 const TORCH_INTENSITY = 2.5;
-const TORCH_DISTANCE = 12;
+const TORCH_DISTANCE = 10;  // ~5 cells radius
 const SCONCE_FLICKER_RANGE = 0.8;
 const SCONCE_FLICKER_SPEED = 0.25;
 
@@ -82,7 +82,7 @@ export function buildSconceMeshes(gameState: GameState): SconceMeshes {
 
     // Point light
     if (sconce.lit) {
-      const light = new THREE.PointLight(TORCH_COLOR, TORCH_INTENSITY, TORCH_DISTANCE);
+      const light = new THREE.PointLight(TORCH_COLOR, TORCH_INTENSITY, TORCH_DISTANCE, 2);
       // Position light slightly in front of sconce (toward room center)
       light.position.set(
         cx + dir.dx * (offsetDist - 0.4),

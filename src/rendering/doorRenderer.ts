@@ -338,7 +338,7 @@ export function buildDoorMeshes(
     // Entrance light at zone boundary doors — bright light visible only in indoor zone
     if (splitZones) {
       const indoorZone = Math.max(splitZones[0], splitZones[1]);
-      const light = new THREE.PointLight(0xffeedd, 3, 12);
+      const light = new THREE.PointLight(0xffeedd, 3, 10, 2);
       light.position.set(cx, WALL_HEIGHT * 0.7, cz);
       light.layers.set(indoorZone);
       light.visible = door.state === 'open';  // initial state; game loop updates per-frame

@@ -90,7 +90,7 @@ export class FireballExplosions {
     points.frustumCulled = false;
     this.group.add(points);
 
-    const light = new THREE.PointLight(0xFF4400, 6, 8);
+    const light = new THREE.PointLight(0xFF4400, 6, 8, 2);
     light.position.set(worldX, PROJECTILE_HEIGHT, worldZ);
     this.group.add(light);
 
@@ -220,7 +220,7 @@ export function createProjectileMesh(type: string): THREE.Mesh {
   const mesh = new THREE.Mesh(geo, mat);
 
   if (type === 'fireball') {
-    const light = new THREE.PointLight(0xFF4400, 3, 6);
+    const light = new THREE.PointLight(0xFF4400, 3, 6, 2);
     mesh.add(light);
   }
 

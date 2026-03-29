@@ -40,11 +40,17 @@ vi.mock('three', () => {
     dispose = vi.fn();
   }
 
+  class Vector3 {
+    x = 0; y = 0; z = 0;
+    set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; }
+  }
+
   return {
     Group,
     Sprite,
     SpriteMaterial,
     CanvasTexture,
+    Vector3,
     NearestFilter: 1006,
   };
 });
@@ -57,6 +63,10 @@ const { EnemyHealthBarManager } = await import('./enemyHealthBar');
 function makeMesh(x = 0, y = 1, z = 0) {
   return {
     position: { x, y, z },
+    getWorldPosition(target: { x: number; y: number; z: number; copy?: (v: { x: number; y: number; z: number }) => void }) {
+      target.x = x; target.y = y; target.z = z;
+      return target;
+    },
   } as unknown as import('three').Mesh;
 }
 
@@ -198,7 +208,7 @@ describe('EnemyHealthBarManager', () => {
       mgr.updatePositions(new Map([['4,3', movedMesh]]));
 
       const entry = mgr.entries.get('4,3')!;
-      const expectedY = spriteHeight + 0.12; // BAR_Y_OFFSET = 0.12
+      const expectedY = 1 + spriteHeight * 0.5 + 0.12; // worldPos.y(1) + spriteHeight*0.5 + BAR_Y_OFFSET(0.12)
       const setFn = entry.sprite.position.set as ReturnType<typeof vi.fn>;
       const lastCall = setFn.mock.calls[setFn.mock.calls.length - 1] as [number, number, number];
       expect(lastCall[0]).toBe(5);

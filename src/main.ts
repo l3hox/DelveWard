@@ -91,6 +91,10 @@ const MAX_FRAME_DELTA = 0.1;
 const PLAYER_DAMAGE_FLASH_DURATION = 0.15;
 const ENEMY_DAMAGE_FLASH_DURATION = 0.12;
 
+// Light culling — disable point lights beyond this distance from camera
+const LIGHT_CULL_DISTANCE = 14; // ~7 cells
+const _lightCullVec = new THREE.Vector3();
+
 // Torch flicker parameters
 const TORCH_OFFSET_Y = 0.3;
 const FLICKER_RANGE = 1.2;
@@ -138,6 +142,8 @@ interface LevelScene {
   zoneMap: Map<string, number>;
   // Multi-layer support
   layerGrids: string[][];
+  // All point lights for distance culling
+  pointLights: THREE.PointLight[];
 }
 
 function buildLevelScene(
@@ -594,6 +600,11 @@ function buildLevelScene(
     zones,
     zoneMap,
     layerGrids: layerDefs.map(ld => ld.grid),
+    pointLights: (() => {
+      const lights: THREE.PointLight[] = [];
+      scene.traverse(child => { if (child instanceof THREE.PointLight) lights.push(child); });
+      return lights;
+    })(),
   };
 }
 
@@ -673,8 +684,8 @@ async function init(): Promise<void> {
   const ambient = new THREE.AmbientLight(0x000000); // color set by applyEnvironment
   scene.add(ambient);
 
-  const torchLight = new THREE.PointLight(0xff994d, 6, 21);
-  const torchFillLight = new THREE.PointLight(0xff994d, 3, 16.5);
+  const torchLight = new THREE.PointLight(0xff994d, 6, 14, 2);      // ~7 cells radius
+  const torchFillLight = new THREE.PointLight(0xff994d, 3, 10, 2);  // ~5 cells radius
   let flickerTarget = 3.5;
   let flickerTimer = 0;
   let hungerDrainAccumulator = 0;
@@ -2096,6 +2107,20 @@ async function init(): Promise<void> {
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
     hud.draw(gameState, ls.player.getState(), activeGrid(), delta, damageFlashAlpha, swordSwing, levelUpNotification);
+
+    // Light distance culling — disable point lights far from camera
+    {
+      const camPos = camera.position;
+      const cullDistSq = LIGHT_CULL_DISTANCE * LIGHT_CULL_DISTANCE;
+      for (const light of ls.pointLights) {
+        if (light === torchLight || light === torchFillLight) continue; // player lights always on
+        light.getWorldPosition(_lightCullVec);
+        const dx = _lightCullVec.x - camPos.x;
+        const dy = _lightCullVec.y - camPos.y;
+        const dz = _lightCullVec.z - camPos.z;
+        light.visible = (dx * dx + dy * dy + dz * dz) < cullDistSq;
+      }
+    }
 
     // Multi-pass environment rendering: each zone gets its own fog/background
     if (!ls.multiZone) {
