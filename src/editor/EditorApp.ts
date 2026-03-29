@@ -1,5 +1,6 @@
 import type { DungeonLevel, CharDef, Entity, Dungeon, LayerDef } from '../core/types';
 import { buildWalkableSet } from '../core/grid';
+import { getAllLevelEntities } from '../level/levelLoader';
 import { UndoManager } from './UndoManager';
 
 export interface Viewport {
@@ -1176,12 +1177,13 @@ export class EditorApp {
     const existing = new Set<string>();
     if (this.dungeon) {
       for (const level of this.dungeon.levels) {
-        for (const e of level.entities) {
+        // Search all layers' entities, not just the working surface
+        for (const e of getAllLevelEntities(level)) {
           if (typeof e.id === 'string' && e.id) existing.add(e.id);
         }
       }
     } else if (this.level) {
-      for (const e of this.level.entities) {
+      for (const e of getAllLevelEntities(this.level)) {
         if (typeof e.id === 'string' && e.id) existing.add(e.id);
       }
     }
@@ -1193,7 +1195,7 @@ export class EditorApp {
   private generateKeyId(): string {
     if (!this.level) return 'key_1';
     const existing = new Set<string>();
-    for (const e of this.level.entities) {
+    for (const e of getAllLevelEntities(this.level)) {
       const kid = (e as Record<string, unknown>).keyId;
       if (typeof kid === 'string' && kid) existing.add(kid);
     }
