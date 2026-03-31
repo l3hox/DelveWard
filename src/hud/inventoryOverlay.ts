@@ -70,9 +70,19 @@ export function subtypeToEquipSlot(subtype: string, gameState: GameState): Equip
   return 'weapon'; // fallback
 }
 
+interface DragState {
+  source: CursorPos;
+  itemId: string;
+  hudX: number;
+  hudY: number;
+  /** Equipment slots this item can go to (empty for consumables). */
+  validEquipSlots: Set<number>;
+}
+
 export class InventoryOverlay {
   private _open = false;
   private cursor: CursorPos = { section: 'equipment', index: 0 };
+  private drag: DragState | null = null;
 
   toggle(): void {
     this._open = !this._open;
@@ -293,6 +303,88 @@ export class InventoryOverlay {
     return null;
   }
 
+  /** Start drag from current mouse position. */
+  handleDragStart(hudX: number, hudY: number, gameState: GameState): void {
+    const pos = this.hitTest(hudX, hudY);
+    if (!pos) return;
+    const entity = _getCursorEntity(pos, gameState);
+    if (!entity) return;
+    const def = itemDatabase.isLoaded() ? itemDatabase.getItem(entity.itemId) : null;
+    if (!def) return;
+
+    // Compute which equip slot indices this item can go to
+    const validEquipSlots = new Set<number>();
+    if (def.type !== 'consumable') {
+      if (pos.section === 'equipment') {
+        // Dragging FROM equipment — can drop to any backpack slot (handled separately)
+      } else {
+        // Dragging FROM backpack — find valid equip slot(s)
+        const target = subtypeToEquipSlot(def.subtype as string, gameState);
+        const idx = EQUIP_SLOTS.indexOf(target);
+        if (idx >= 0) validEquipSlots.add(idx);
+        // Rings can go to either slot
+        if (def.subtype === 'ring') {
+          validEquipSlots.add(EQUIP_SLOTS.indexOf('ring1'));
+          validEquipSlots.add(EQUIP_SLOTS.indexOf('ring2'));
+        }
+      }
+    }
+
+    this.drag = { source: pos, itemId: entity.itemId, hudX, hudY, validEquipSlots };
+  }
+
+  /** Update drag position. */
+  handleDragMove(hudX: number, hudY: number): void {
+    if (this.drag) {
+      this.drag.hudX = hudX;
+      this.drag.hudY = hudY;
+    }
+  }
+
+  /** Complete drag — returns action or null. */
+  handleDragEnd(hudX: number, hudY: number, gameState: GameState): InventoryAction | null {
+    if (!this.drag) return null;
+    const source = this.drag.source;
+    const target = this.hitTest(hudX, hudY);
+    this.drag = null;
+
+    if (!target) return null;
+    // Same slot — no-op
+    if (source.section === target.section && source.index === target.index) return null;
+
+    if (source.section === 'backpack' && target.section === 'equipment') {
+      // Equip from backpack to equipment slot
+      const entity = _getBackpackEntityAt(source.index, gameState);
+      if (!entity) return null;
+      const def = itemDatabase.getItem(entity.itemId);
+      if (!def || def.type === 'consumable') return null;
+      const targetSlot = EQUIP_SLOTS[target.index];
+      // Validate: item must be eligible for this slot
+      const correctSlot = subtypeToEquipSlot(def.subtype as string, gameState);
+      const isRing = def.subtype === 'ring' && (targetSlot === 'ring1' || targetSlot === 'ring2');
+      if (targetSlot !== correctSlot && !isRing) return null;
+      const bpItems = gameState.entityRegistry.getBackpackItems();
+      const pos = bpItems.findIndex(e => e.instanceId === entity.instanceId);
+      if (pos === -1) return null;
+      return { type: 'equip', backpackSlot: pos, equipSlot: targetSlot };
+    }
+
+    if (source.section === 'equipment' && target.section === 'backpack') {
+      // Unequip from equipment to backpack
+      const slot = EQUIP_SLOTS[source.index];
+      const entity = gameState.entityRegistry.getEquipped(slot);
+      if (!entity) return null;
+      const freeSlot = gameState.entityRegistry.nextBackpackSlot();
+      if (freeSlot === null) return null;
+      return { type: 'unequip', equipSlot: slot, backpackSlot: freeSlot };
+    }
+
+    return null;
+  }
+
+  /** Whether a drag is in progress. */
+  isDragging(): boolean { return this.drag !== null; }
+
   private _handleDrop(
     gameState: GameState,
     playerCol: number,
@@ -352,11 +444,20 @@ export class InventoryOverlay {
       const sx = equipStartX + col * (SLOT_SIZE + SLOT_GAP);
       const sy = equipStartY + row * (SLOT_SIZE + SLOT_GAP);
 
-      // Cursor highlight
-      if (this.cursor.section === 'equipment' && this.cursor.index === i) {
+      // Cursor highlight (skip during drag)
+      if (!this.drag && this.cursor.section === 'equipment' && this.cursor.index === i) {
         ctx.fillStyle = 'rgba(232, 200, 74, 0.3)';
         ctx.fillRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
         ctx.strokeStyle = '#e8c84a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
+      }
+
+      // Drag: highlight valid equip drop targets (green) when dragging from backpack
+      if (this.drag && this.drag.source.section === 'backpack' && this.drag.validEquipSlots.has(i)) {
+        ctx.fillStyle = 'rgba(68, 200, 68, 0.25)';
+        ctx.fillRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
+        ctx.strokeStyle = '#44cc44';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
       }
@@ -389,11 +490,20 @@ export class InventoryOverlay {
       const sx = bpStartX + col * (SLOT_SIZE + SLOT_GAP);
       const sy = bpStartY + row * (SLOT_SIZE + SLOT_GAP);
 
-      // Cursor highlight
-      if (this.cursor.section === 'backpack' && this.cursor.index === i) {
+      // Cursor highlight (skip during drag)
+      if (!this.drag && this.cursor.section === 'backpack' && this.cursor.index === i) {
         ctx.fillStyle = 'rgba(232, 200, 74, 0.3)';
         ctx.fillRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
         ctx.strokeStyle = '#e8c84a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
+      }
+
+      // Drag: highlight backpack slots (green) when dragging from equipment
+      if (this.drag && this.drag.source.section === 'equipment') {
+        ctx.fillStyle = 'rgba(68, 200, 68, 0.15)';
+        ctx.fillRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
+        ctx.strokeStyle = 'rgba(68, 200, 68, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
       }
@@ -419,8 +529,8 @@ export class InventoryOverlay {
       }
     }
 
-    // --- Item tooltip ---
-    const hoveredEntity = _getCursorEntity(this.cursor, gameState);
+    // --- Item tooltip (hidden during drag) ---
+    const hoveredEntity = this.drag ? null : _getCursorEntity(this.cursor, gameState);
     if (hoveredEntity) {
       // Compute slot screen position so the tooltip anchors to the right of the cursor cell.
       let slotScreenX: number;
@@ -443,6 +553,13 @@ export class InventoryOverlay {
       const tooltipY = slotScreenY;
 
       drawItemTooltip(ctx, hoveredEntity, gameState, tooltipX, tooltipY);
+    }
+
+    // --- Dragged item icon at cursor ---
+    if (this.drag) {
+      ctx.globalAlpha = 0.8;
+      _drawItemIcon(ctx, this.drag.itemId, this.drag.hudX - SLOT_SIZE / 2, this.drag.hudY - SLOT_SIZE / 2, SLOT_SIZE, '#888');
+      ctx.globalAlpha = 1;
     }
 
     // --- Footer ---

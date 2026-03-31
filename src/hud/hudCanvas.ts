@@ -65,7 +65,39 @@ export class HudOverlay {
     this.canvas.addEventListener('mousemove', (e) => {
       if (!this.inventoryOverlay.isOpen()) return;
       const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
-      this.inventoryOverlay.handleMouseMove(hudX, hudY);
+      if (this.inventoryOverlay.isDragging()) {
+        this.inventoryOverlay.handleDragMove(hudX, hudY);
+      } else {
+        this.inventoryOverlay.handleMouseMove(hudX, hudY);
+      }
+    });
+
+    // Left mousedown — start drag
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (!this.inventoryOverlay.isOpen()) return;
+      if (e.button === 0) {
+        const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+        this.inventoryOverlay.handleDragStart(hudX, hudY, this._gameState!);
+      } else if (e.button === 2) {
+        // Right-click to drop
+        e.preventDefault();
+        const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+        const action = this.inventoryOverlay.handleMouseClick(
+          hudX, hudY, 2,
+          this._gameState!, this._playerCol, this._playerRow,
+        );
+        if (action) this.onInventoryAction?.(action);
+      }
+    });
+
+    // Left mouseup — complete drag
+    this.canvas.addEventListener('mouseup', (e) => {
+      if (!this.inventoryOverlay.isOpen() || e.button !== 0) return;
+      if (this.inventoryOverlay.isDragging()) {
+        const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+        const action = this.inventoryOverlay.handleDragEnd(hudX, hudY, this._gameState!);
+        if (action) this.onInventoryAction?.(action);
+      }
     });
 
     // Double-click to equip/use
@@ -75,18 +107,6 @@ export class HudOverlay {
       const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
       const action = this.inventoryOverlay.handleMouseClick(
         hudX, hudY, 0,
-        this._gameState!, this._playerCol, this._playerRow,
-      );
-      if (action) this.onInventoryAction?.(action);
-    });
-
-    // Right-click to drop
-    this.canvas.addEventListener('mousedown', (e) => {
-      if (!this.inventoryOverlay.isOpen() || e.button !== 2) return;
-      e.preventDefault();
-      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
-      const action = this.inventoryOverlay.handleMouseClick(
-        hudX, hudY, 2,
         this._gameState!, this._playerCol, this._playerRow,
       );
       if (action) this.onInventoryAction?.(action);
