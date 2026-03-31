@@ -103,6 +103,7 @@ export class EditorApp {
   dungeon: Dungeon | null = null;
   activeLevelIndex = 0;
   activeLayerIndex = 0;
+  private lastLayerPerLevel = new Map<number, number>(); // levelIndex → last active layerIndex
   levelCleanSnapshots: string[] = [];
   dirtyLevelIndices = new Set<number>();
   activeTool: EditorTool = 'select';
@@ -213,10 +214,17 @@ export class EditorApp {
       }
     }
 
+    // Remember current layer for the outgoing level
+    this.syncToActiveLayer();
+    this.lastLayerPerLevel.set(this.activeLevelIndex, this.activeLayerIndex);
+
     this.activeLevelIndex = index;
     this.level = this.dungeon.levels[index];
-    this.activeLayerIndex = 0;
-    // If level has layers, sync layer 0 data into the working surface
+    // Restore last active layer for this level (default 0)
+    this.activeLayerIndex = this.lastLayerPerLevel.get(index) ?? 0;
+    if (this.level.layers && this.activeLayerIndex >= this.level.layers.length) {
+      this.activeLayerIndex = 0;
+    }
     if (this.level.layers && this.level.layers.length > 0) {
       this.syncFromActiveLayer();
     }
