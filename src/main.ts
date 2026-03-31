@@ -1853,10 +1853,11 @@ async function init(): Promise<void> {
       case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4':
       case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8':
         {
-          const slotIndex = parseInt(e.code.charAt(5)) - 1;
-          const used = gameState.useConsumable(slotIndex);
-          if (used) {
-            console.log('Used consumable');
+          // Quick-use consumable by slot number (visual grid position)
+          const slotNum = parseInt(e.code.charAt(5)) - 1;
+          const entity = gameState.entityRegistry.getBackpackItemAt(slotNum);
+          if (entity) {
+            gameState.useConsumableFromRegistry(entity.instanceId);
           }
         }
         break;

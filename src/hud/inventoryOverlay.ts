@@ -585,12 +585,11 @@ export class InventoryOverlay {
 // --- Module-level helpers ---
 
 /**
- * Get the backpack entity occupying visual position `index` (0-11),
- * where index maps to the sorted backpack list by slot number.
+ * Get the backpack entity at visual grid position `index` (0-11).
+ * Visual position = slot number directly (items keep their assigned slot).
  */
 function _getBackpackEntityAt(index: number, gameState: GameState) {
-  const items = gameState.entityRegistry.getBackpackItems();
-  return items[index] ?? null;
+  return gameState.entityRegistry.getBackpackItemAt(index) ?? null;
 }
 
 function _getCursorEntity(cursor: CursorPos, gameState: GameState) {
