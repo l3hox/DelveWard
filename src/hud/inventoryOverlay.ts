@@ -229,6 +229,70 @@ export class InventoryOverlay {
     return { type: 'equip', backpackSlot: pos, equipSlot: targetSlot };
   }
 
+  /** Convert HUD coordinates to a slot position, or null if not on any slot. */
+  hitTest(hudX: number, hudY: number): CursorPos | null {
+    const { x, y, w } = INVENTORY_OVERLAY;
+
+    // Equipment grid
+    const equipStartX = x + Math.floor((w - (EQUIP_COLS * (SLOT_SIZE + SLOT_GAP) - SLOT_GAP)) / 2);
+    const equipStartY = y + 44;
+
+    for (let i = 0; i < EQUIP_SLOTS.length; i++) {
+      const col = i % EQUIP_COLS;
+      const row = Math.floor(i / EQUIP_COLS);
+      const sx = equipStartX + col * (SLOT_SIZE + SLOT_GAP);
+      const sy = equipStartY + row * (SLOT_SIZE + SLOT_GAP);
+      if (hudX >= sx && hudX < sx + SLOT_SIZE && hudY >= sy && hudY < sy + SLOT_SIZE) {
+        return { section: 'equipment', index: i };
+      }
+    }
+
+    // Backpack grid
+    const sepY = equipStartY + 2 * (SLOT_SIZE + SLOT_GAP) + 6;
+    const bpStartX = x + Math.floor((w - (BACKPACK_COLS * (SLOT_SIZE + SLOT_GAP) - SLOT_GAP)) / 2);
+    const bpStartY = sepY + 10;
+
+    for (let i = 0; i < 12; i++) {
+      const col = i % BACKPACK_COLS;
+      const row = Math.floor(i / BACKPACK_COLS);
+      const sx = bpStartX + col * (SLOT_SIZE + SLOT_GAP);
+      const sy = bpStartY + row * (SLOT_SIZE + SLOT_GAP);
+      if (hudX >= sx && hudX < sx + SLOT_SIZE && hudY >= sy && hudY < sy + SLOT_SIZE) {
+        return { section: 'backpack', index: i };
+      }
+    }
+
+    return null;
+  }
+
+  /** Handle mouse hover — move cursor to hovered slot. */
+  handleMouseMove(hudX: number, hudY: number): void {
+    const pos = this.hitTest(hudX, hudY);
+    if (pos) {
+      this.cursor = pos;
+    }
+  }
+
+  /** Handle mouse click — left = equip/use (Enter), right = drop (D). Returns action. */
+  handleMouseClick(
+    hudX: number,
+    hudY: number,
+    button: number,
+    gameState: GameState,
+    playerCol: number,
+    playerRow: number,
+  ): InventoryAction | null {
+    const pos = this.hitTest(hudX, hudY);
+    if (!pos) return null;
+    this.cursor = pos;
+    if (button === 0) {
+      return this._handleEnter(gameState);
+    } else if (button === 2) {
+      return this._handleDrop(gameState, playerCol, playerRow);
+    }
+    return null;
+  }
+
   private _handleDrop(
     gameState: GameState,
     playerCol: number,
@@ -382,7 +446,7 @@ export class InventoryOverlay {
     }
 
     // --- Footer ---
-    const footer = 'I CLOSE  ENTER EQUIP  D DROP';
+    const footer = 'I CLOSE  DBLCLICK EQUIP  RCLICK DROP';
     const footerW = measurePixelText(footer, 2);
     drawPixelText(
       ctx,

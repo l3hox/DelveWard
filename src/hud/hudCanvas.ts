@@ -11,6 +11,7 @@ import { drawXpBar } from './xpBar';
 import { drawPixelText, measurePixelText } from './hudFont';
 import { StatsPanel } from './statsPanel';
 import { InventoryOverlay } from './inventoryOverlay';
+import type { InventoryAction } from './inventoryOverlay';
 import { AttributePanel } from './attributePanel';
 import type { LevelUpNotification } from './levelUpNotification';
 import type { GameState } from '../core/gameState';
@@ -28,6 +29,16 @@ export class HudOverlay {
   private statsPanel = new StatsPanel();
   private inventoryOverlay = new InventoryOverlay();
   private attributePanel = new AttributePanel();
+  private _gameState: GameState | null = null;
+  private _playerCol = 0;
+  private _playerRow = 0;
+
+  onInventoryAction: ((action: InventoryAction) => void) | null = null;
+
+  setPlayerPosition(col: number, row: number): void {
+    this._playerCol = col;
+    this._playerRow = row;
+  }
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -49,6 +60,51 @@ export class HudOverlay {
 
   attach(parent: HTMLElement = document.body): void {
     parent.appendChild(this.canvas);
+
+    // Mouse support for inventory overlay
+    this.canvas.addEventListener('mousemove', (e) => {
+      if (!this.inventoryOverlay.isOpen()) return;
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      this.inventoryOverlay.handleMouseMove(hudX, hudY);
+    });
+
+    // Double-click to equip/use
+    this.canvas.addEventListener('dblclick', (e) => {
+      if (!this.inventoryOverlay.isOpen()) return;
+      e.preventDefault();
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      const action = this.inventoryOverlay.handleMouseClick(
+        hudX, hudY, 0,
+        this._gameState!, this._playerCol, this._playerRow,
+      );
+      if (action) this.onInventoryAction?.(action);
+    });
+
+    // Right-click to drop
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (!this.inventoryOverlay.isOpen() || e.button !== 2) return;
+      e.preventDefault();
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      const action = this.inventoryOverlay.handleMouseClick(
+        hudX, hudY, 2,
+        this._gameState!, this._playerCol, this._playerRow,
+      );
+      if (action) this.onInventoryAction?.(action);
+    });
+
+    this.canvas.addEventListener('contextmenu', (e) => {
+      if (this.inventoryOverlay.isOpen()) e.preventDefault();
+    });
+  }
+
+  private _screenToHud(screenX: number, screenY: number): { hudX: number; hudY: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = HUD_WIDTH / rect.width;
+    const scaleY = HUD_HEIGHT / rect.height;
+    return {
+      hudX: (screenX - rect.left) * scaleX,
+      hudY: (screenY - rect.top) * scaleY,
+    };
   }
 
   /** Expose the underlying canvas element for overlays that share the HUD surface. */
@@ -83,6 +139,7 @@ export class HudOverlay {
     swordSwing?: SwordSwingAnimator,
     levelUpNotification?: LevelUpNotification,
   ): void {
+    this._gameState = gameState;
     this.time += delta;
     this.ctx.clearRect(0, 0, HUD_WIDTH, HUD_HEIGHT);
 
@@ -169,6 +226,7 @@ export class HudOverlay {
     if (this.inventoryOverlay.isOpen()) {
       this.inventoryOverlay.draw(this.ctx, gameState);
     }
+    this.canvas.style.pointerEvents = this.inventoryOverlay.isOpen() ? 'auto' : 'none';
 
     // Attribute panel overlay
     if (this.attributePanel.isOpen()) {

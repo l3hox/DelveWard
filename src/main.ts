@@ -766,6 +766,9 @@ async function init(): Promise<void> {
   // --- HUD + Transition ---
   const hud = new HudOverlay();
   hud.attach();
+  hud.onInventoryAction = (action) => {
+    processInventoryAction(action);
+  };
 
   const transition = new TransitionOverlay();
   transition.attach();
@@ -2179,7 +2182,9 @@ async function init(): Promise<void> {
     levelUpNotification.update(delta);
 
     const damageFlashAlpha = playerDamageFlashTimer / PLAYER_DAMAGE_FLASH_DURATION;
-    hud.draw(gameState, ls.player.getState(), activeGrid(), delta, damageFlashAlpha, swordSwing, levelUpNotification);
+    const _ps = ls.player.getState();
+    hud.setPlayerPosition(_ps.col, _ps.row);
+    hud.draw(gameState, _ps, activeGrid(), delta, damageFlashAlpha, swordSwing, levelUpNotification);
 
     // Light distance culling — disable point lights far from camera
     {
