@@ -379,6 +379,8 @@ export class Toolbar {
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.checked = defaultOn;
+    // Sync app state to match checkbox initial value (palette may be rebuilt)
+    this.onViewToggle?.(flag, defaultOn);
     input.addEventListener('change', () => {
       this.onViewToggle?.(flag, input.checked);
     });
