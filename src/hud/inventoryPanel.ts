@@ -7,6 +7,7 @@ import type { GameState } from '../core/gameState';
 import type { EquipSlot } from '../core/gameState';
 import { getItemImage } from '../rendering/itemSprites';
 import { drawItemTooltip } from './itemTooltip';
+import { getPaperdollIcon } from './paperdollIcons';
 import type { InventoryAction } from './inventoryOverlay';
 import { subtypeToEquipSlot } from './inventoryOverlay';
 
@@ -333,6 +334,14 @@ export function drawInventoryPanel(
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
       _drawItemIcon(ctx, entity.itemId, sx, equipY1, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
+    } else {
+      const icon = getPaperdollIcon(slot);
+      if (icon) {
+        ctx.globalAlpha = 0.3;
+        const pad = 3;
+        ctx.drawImage(icon, sx + pad, equipY1 + pad, SLOT_SIZE - pad * 2, SLOT_SIZE - pad * 2);
+        ctx.globalAlpha = 1;
+      }
     }
   }
 
@@ -376,6 +385,14 @@ export function drawInventoryPanel(
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
       _drawItemIcon(ctx, entity.itemId, sx, equipY2, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
+    } else {
+      const icon = getPaperdollIcon(slot);
+      if (icon) {
+        ctx.globalAlpha = 0.3;
+        const pad = 3;
+        ctx.drawImage(icon, sx + pad, equipY2 + pad, SLOT_SIZE - pad * 2, SLOT_SIZE - pad * 2);
+        ctx.globalAlpha = 1;
+      }
     }
   }
 

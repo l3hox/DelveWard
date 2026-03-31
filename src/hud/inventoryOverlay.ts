@@ -6,6 +6,7 @@ import type { GameState } from '../core/gameState';
 import type { EquipSlot } from '../core/entities';
 import { drawItemTooltip } from './itemTooltip';
 import { getItemImage } from '../rendering/itemSprites';
+import { getPaperdollIcon } from './paperdollIcons';
 
 type InventorySection = 'equipment' | 'backpack';
 
@@ -475,6 +476,15 @@ export class InventoryOverlay {
       const entity = gameState.entityRegistry.getEquipped(slot);
       if (entity) {
         _drawItemIcon(ctx, entity.itemId, sx, sy, SLOT_SIZE, EQUIP_COLORS[slot] ?? '#888');
+      } else {
+        // Paperdoll icon for empty slot
+        const icon = getPaperdollIcon(slot);
+        if (icon) {
+          ctx.globalAlpha = 0.3;
+          const pad = 4;
+          ctx.drawImage(icon, sx + pad, sy + pad, SLOT_SIZE - pad * 2, SLOT_SIZE - pad * 2);
+          ctx.globalAlpha = 1;
+        }
       }
     }
 
