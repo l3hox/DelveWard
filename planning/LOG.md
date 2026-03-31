@@ -4,13 +4,25 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
-## 2026-03-31 — Forest Renderer: PNG Sprites + Instanced Rendering
+## 2026-03-31 — Multi-Layer Polish, Billboard Items, Editor Improvements
 
-**Sprites**: Replaced 4 procedural canvas tree generators (pine/oak/birch/bush) with PNG sprite loading from `public/sprites/props/`. Fixed sizes per variant (2.1-3.0 world units). Border vegetation pass disabled — will be reintroduced once smaller bush/tree sprites are provided.
+**Billboard items**: Keys, items, and consumables switched from flat ground-plane meshes to upright billboard sprites using `createNeutralLitMaterial`. Face camera each frame. Multiple items at same cell spread with seeded random offsets. Dropped items get `layers.enableAll()` for multi-zone visibility. `hideItemMesh`/`hideConsumableMesh` use `removeFromParent()` for correct removal from layer sub-groups.
 
-**Instanced rendering**: Switched from individual `THREE.Mesh` per tree to `THREE.InstancedMesh` (one per variant, 4 draw calls total). Scales to 1000s of trees. Billboard rotation update uses pre-allocated math objects (zero GC per frame). Billboard shader updated with `#ifdef USE_INSTANCING` to correctly transform instance positions for both vertex placement and light distance calculation.
+**Damage numbers**: `spawn()` accepts Y offset for correct positioning on non-zero layers. Sprites get `layers.enableAll()` for multi-zone visibility.
 
-**Editor ID fix (hardened)**: `generateEntityId` and `generateKeyId` now search both the working surface (`level.entities`) AND all layers (`level.layers[].entities`) via a `collectAllEntityIds()` helper, covering edge cases where references diverge after undo/redo.
+**Stair fixes**: Step UV scaling via `fixStepUVs()` — textures proportional to CELL_SIZE. E/W facing rotation swapped (was reversed). Removed unused `resolveStairTextures` (replaced by shared `resolveTextures` with charDef support).
+
+**Open-air layers**: `ceiling: false` only applies to topmost layer. Lower layers always render ceilings. Open-air layers skip boundary walls at grid edges (OOB neighbors treated as non-solid).
+
+**Gameplay**: Torch fuel drain skipped in outdoor/mist zones (per-cell check via `resolveEnvironmentAtCell`). Sconce ember particles refresh after torch pickup. Player blocked from stepping over holes (will be replaced by falling later). Enemy pathfinding avoids holes; `fly` flag on EnemyDef exempts flying enemies (giant_bat).
+
+**Stair validation**: Cross-level stair validation warns instead of throwing — levels with broken stair wiring load successfully for editing.
+
+**Debug mode**: Noclip movement (walk through walls, bounds only). Auto-kill enemy on attack. Layer flying (Y/H keys).
+
+**Editor**: Flood fill tool with undo support. Layer-below preview uses engine hollow logic with checkerboard watermark (on by default). Error links navigate to correct level+layer. Layer-aware entity highlighting (hover shows orange on target layer). Level ID rename updates `playerStart.levelId`. View toggle state synced on palette rebuild.
+
+**Forest renderer**: PNG sprites replacing procedural textures. InstancedMesh (4 draw calls). Billboard shader `USE_INSTANCING`. Border pass disabled. Forest zone tagging fixed for multi-zone levels.
 
 ---
 
