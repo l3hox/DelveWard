@@ -365,7 +365,7 @@ export class Toolbar {
     // View toggles
     this.addViewToggle(this.entityPalette, 'Floor / Ceiling', 'showCeiling', false);
     this.addViewToggle(this.entityPalette, 'Item Preview', 'showItemPreview', true);
-    this.addViewToggle(this.entityPalette, 'Layer Below', 'showLayerBelow', false);
+    this.addViewToggle(this.entityPalette, 'Layer Below', 'showLayerBelow', true);
   }
 
   private addViewToggle(

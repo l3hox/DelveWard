@@ -503,40 +503,7 @@ export class GridCanvas {
       const even = (col + row) % 2 === 0;
       ctx.fillStyle = even ? '#1a1a1a' : '#222';
       ctx.fillRect(px, py, tw, th);
-
-      // Show layers below through void cells
-      if (app.showLayerBelow && app.level?.layers) {
-        const layers = app.level.layers;
-        let depth = 0;
-        for (let li = app.activeLayerIndex - 1; li >= 0; li--) {
-          depth++;
-          const belowGrid = layers[li].grid;
-          if (row >= belowGrid.length || col >= belowGrid[0].length) break;
-          const belowChar = belowGrid[row][col];
-          if (belowChar === ' ') continue; // still void, go deeper
-
-          // Found a non-void cell — draw it greyed
-          const belowDef = app.charDefMap.get(belowChar);
-          const belowSolid = belowChar === '#' || (belowDef !== undefined && belowDef.solid);
-          const belowAreas = layers[li].areas ?? app.level.areas;
-          const belowDefaults = layers[li].defaults ?? app.level.defaults;
-
-          if (belowSolid) {
-            const { wall } = resolveTextures(col, row, belowChar, belowDefaults, app.charDefMap, belowAreas);
-            const texImage = getWallTexture(wall as WallTextureName).image as HTMLCanvasElement;
-            ctx.drawImage(texImage, px, py, tw, th);
-          } else {
-            const { floor } = resolveTextures(col, row, belowChar, belowDefaults, app.charDefMap, belowAreas);
-            const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
-            ctx.drawImage(texImage, px, py, tw, th);
-          }
-          // Grey overlay — darker for deeper layers
-          const alpha = Math.min(0.85, 0.4 + depth * 0.15);
-          ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-          ctx.fillRect(px, py, tw, th);
-          break;
-        }
-      }
+      this.drawLayerBelowPreview(col, row, px, py, tw, th);
       return;
     }
 
@@ -569,8 +536,60 @@ export class GridCanvas {
       const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
       ctx.drawImage(texImage, px, py, tw, th);
     }
+
+    // Show layer below for cells with auto-detected open bottom (same as engine hollow logic)
+    if (!isSolid) {
+      this.drawLayerBelowPreview(col, row, px, py, tw, th);
+    }
   }
 
+  /** Draw greyed preview of layers below through cells with no floor (void or auto-detected hollow). */
+  private drawLayerBelowPreview(col: number, row: number, px: number, py: number, tw: number, th: number): void {
+    const { ctx, app } = this;
+    if (!app.showLayerBelow || !app.level?.layers) return;
+
+    const layers = app.level.layers;
+    const activeIdx = app.activeLayerIndex;
+
+    // Check if the layer below has a non-wall cell (auto-detect open bottom, same as engine)
+    const belowGrid = layers[activeIdx - 1]?.grid;
+    if (!belowGrid) return;
+    if (row >= belowGrid.length || col >= belowGrid[0].length) return;
+    const belowChar = belowGrid[row][col];
+    const belowDef = app.charDefMap.get(belowChar);
+    const belowIsSolidWall = belowChar === '#' || (belowDef !== undefined && belowDef.solid && !belowDef.seeThrough);
+    if (belowIsSolidWall) return; // solid wall below → floor is kept, nothing to show
+
+    // Walk downward to find the first non-void renderable content
+    let depth = 0;
+    for (let li = activeIdx - 1; li >= 0; li--) {
+      depth++;
+      const layerGrid = layers[li].grid;
+      if (row >= layerGrid.length || col >= layerGrid[0].length) break;
+      const ch = layerGrid[row][col];
+      if (ch === ' ') continue; // void — go deeper
+
+      // Found content — draw it greyed
+      const chDef = app.charDefMap.get(ch);
+      const chSolid = ch === '#' || (chDef !== undefined && chDef.solid);
+      const layerAreas = layers[li].areas ?? app.level.areas;
+      const layerDefaults = layers[li].defaults ?? app.level.defaults;
+
+      if (chSolid) {
+        const { wall } = resolveTextures(col, row, ch, layerDefaults, app.charDefMap, layerAreas);
+        const texImage = getWallTexture(wall as WallTextureName).image as HTMLCanvasElement;
+        ctx.drawImage(texImage, px, py, tw, th);
+      } else {
+        const { floor } = resolveTextures(col, row, ch, layerDefaults, app.charDefMap, layerAreas);
+        const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
+        ctx.drawImage(texImage, px, py, tw, th);
+      }
+      const alpha = Math.min(0.85, 0.4 + depth * 0.15);
+      ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+      ctx.fillRect(px, py, tw, th);
+      break;
+    }
+  }
 
   private drawGridLines(
     firstCol: number,
