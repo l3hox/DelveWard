@@ -584,9 +584,16 @@ export class GridCanvas {
         const texImage = getFloorTexture(floor as FloorTextureName).image as HTMLCanvasElement;
         ctx.drawImage(texImage, px, py, tw, th);
       }
-      const alpha = Math.min(0.85, 0.4 + depth * 0.15);
-      ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-      ctx.fillRect(px, py, tw, th);
+      // Checkerboard watermark — alternating dark/light squares over the preview
+      const alpha = Math.min(0.85, 0.35 + depth * 0.15);
+      const checkSize = Math.max(2, Math.floor(tw / 4));
+      for (let cy = 0; cy < th; cy += checkSize) {
+        for (let cx = 0; cx < tw; cx += checkSize) {
+          const even = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
+          ctx.fillStyle = even ? `rgba(0, 0, 0, ${alpha})` : `rgba(0, 0, 0, ${alpha * 0.5})`;
+          ctx.fillRect(px + cx, py + cy, Math.min(checkSize, tw - cx), Math.min(checkSize, th - cy));
+        }
+      }
       break;
     }
   }
