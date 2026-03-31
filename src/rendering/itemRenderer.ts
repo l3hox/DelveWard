@@ -68,6 +68,8 @@ export function addSingleItemMesh(
 
   // For first item, use the standard map key. Additional items use suffixed keys.
   const storeKey = itemIndex === 0 ? mapKey : `${mapKey}#${itemIndex}`;
+  // Enable all rendering layers so dynamically added items are visible in all zone passes
+  mesh.layers.enableAll();
   group.add(mesh);
   meshMap.set(storeKey, mesh);
 }
@@ -121,10 +123,12 @@ export function hideItemMesh(
   group: THREE.Group,
   key: string,
 ): void {
-  const mesh = meshMap.get(key);
-  if (mesh) {
-    group.remove(mesh);
-    meshMap.delete(key);
+  // Remove the primary mesh and any multi-item spread entries (key#1, key#2, ...)
+  for (const [k, mesh] of [...meshMap]) {
+    if (k === key || k.startsWith(key + '#')) {
+      group.remove(mesh);
+      meshMap.delete(k);
+    }
   }
 }
 

@@ -62,6 +62,7 @@ export function addSingleConsumableMesh(
   mesh.position.set(cx + dx, ITEM_HEIGHT + yOffset, cz + dz);
 
   const storeKey = itemIndex === 0 ? mapKey : `${mapKey}#${itemIndex}`;
+  mesh.layers.enableAll();
   group.add(mesh);
   meshMap.set(storeKey, mesh);
 }
@@ -114,10 +115,12 @@ export function hideConsumableMesh(
   group: THREE.Group,
   key: string,
 ): void {
-  const mesh = meshMap.get(key);
-  if (mesh) {
-    group.remove(mesh);
-    meshMap.delete(key);
+  // Remove the primary mesh and any multi-item spread entries (key#1, key#2, ...)
+  for (const [k, mesh] of [...meshMap]) {
+    if (k === key || k.startsWith(key + '#')) {
+      group.remove(mesh);
+      meshMap.delete(k);
+    }
   }
 }
 
