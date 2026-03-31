@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL_SIZE } from './dungeon';
+import { CELL_SIZE, LAYER_HEIGHT } from './dungeon';
 import { doorKey, type GameState } from '../core/gameState';
 import { itemDatabase } from '../core/itemDatabase';
 import type { ItemEntity } from '../core/entities';
@@ -62,8 +62,9 @@ export function addSingleItemMesh(
   }
 
   const { dx, dz } = itemOffset(col, row, itemIndex);
+  const yOffset = (layerIndex ?? 0) * LAYER_HEIGHT;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE), mat);
-  mesh.position.set(cx + dx, ITEM_HEIGHT, cz + dz);
+  mesh.position.set(cx + dx, ITEM_HEIGHT + yOffset, cz + dz);
 
   // For first item, use the standard map key. Additional items use suffixed keys.
   const storeKey = itemIndex === 0 ? mapKey : `${mapKey}#${itemIndex}`;
