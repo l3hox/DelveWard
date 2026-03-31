@@ -831,10 +831,12 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
         }
 
         if (!targetStair || !targetLevel) {
-          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" does not match any stair entity on another level`);
+          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" does not match any stair entity on another level — stair will not function`);
+          continue;
         }
         if (targetStair.type !== 'stairs') {
-          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" is not a stairs entity`);
+          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" is not a stairs entity — stair will not function`);
+          continue;
         }
 
         // Validate spawn cell using the target stair's layer grid
@@ -847,7 +849,8 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
         const spawnRow = targetStair.row + dr;
 
         if (spawnRow < 0 || spawnRow >= targetGrid.length || spawnCol < 0 || spawnCol >= targetGrid[0].length) {
-          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is out of bounds on level "${targetLevel.id}"`);
+          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is out of bounds on level "${targetLevel.id}" — stair will not function`);
+          continue;
         }
 
         const walkableChars = new Set(WALKABLE_CELLS);
@@ -857,7 +860,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
           }
         }
         if (!walkableChars.has(targetGrid[spawnRow][spawnCol])) {
-          throw new Error(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is not walkable on level "${targetLevel.id}" layer ${targetLayerIndex}`);
+          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" spawn position (${spawnCol},${spawnRow}) is not walkable on level "${targetLevel.id}" layer ${targetLayerIndex} — stair will not function`);
         }
       }
     }

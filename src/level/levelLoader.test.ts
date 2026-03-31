@@ -753,7 +753,8 @@ describe('validateDungeon', () => {
     }), 'test')).toThrow('must have a non-empty string "id"');
   });
 
-  it('rejects stair whose target ID is not found on any other level', () => {
+  it('warns (not throws) for stair whose target ID is not found on any other level', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateDungeon(validDungeon({
       levels: [
         validDungeonLevel('level1', {
@@ -763,10 +764,13 @@ describe('validateDungeon', () => {
         }),
         validDungeonLevel('level2'),
       ],
-    }), 'test')).toThrow('target "nonexistent_stair" does not match any stair entity on another level');
+    }), 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('target "nonexistent_stair" does not match any stair entity on another level'));
+    spy.mockRestore();
   });
 
-  it('rejects stair whose target entity is not a stairs type', () => {
+  it('warns (not throws) for stair whose target entity is not a stairs type', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateDungeon(validDungeon({
       levels: [
         validDungeonLevel('level1', {
@@ -780,14 +784,13 @@ describe('validateDungeon', () => {
           ],
         }),
       ],
-    }), 'test')).toThrow('target "some_door" is not a stairs entity');
+    }), 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('target "some_door" is not a stairs entity'));
+    spy.mockRestore();
   });
 
-  it('rejects stair whose spawn position is out of bounds', () => {
-    // Target stair on level2 is at col:1, row:1 (walkable), facing N → spawn would be col:1, row:0
-    // level2 uses a grid where row:0 is the only row, so row:-1 would be out of bounds.
-    // Use a grid where the stair sits at the top walkable row and faces N so spawn goes negative.
-    // Grid: ['#.#', '#.#', '###'] — stair at col:1, row:0, but row:0 is '.' here
+  it('warns (not throws) for stair whose spawn position is out of bounds', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateDungeon({
       name: 'Test Dungeon',
       playerStart: { levelId: 'level1', col: 1, row: 1, facing: 'S' },
@@ -803,18 +806,19 @@ describe('validateDungeon', () => {
         {
           id: 'level2',
           name: 'Level level2',
-          // stair at col:1, row:0 (walkable), facing N → spawn col:1, row:-1 (out of bounds)
           grid: ['.....', '#####'],
           entities: [
             { col: 1, row: 0, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
           ],
         },
       ],
-    }, 'test')).toThrow('spawn position (1,-1) is out of bounds on level "level2"');
+    }, 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('spawn position (1,-1) is out of bounds on level "level2"'));
+    spy.mockRestore();
   });
 
-  it('rejects stair whose spawn position is not walkable', () => {
-    // Target stair is at col:1, row:1, facing N → spawn would be col:1, row:0 which is '#'
+  it('warns (not throws) for stair whose spawn position is not walkable', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateDungeon(validDungeon({
       levels: [
         validDungeonLevel('level1', {
@@ -828,7 +832,9 @@ describe('validateDungeon', () => {
           ],
         }),
       ],
-    }), 'test')).toThrow('spawn position (1,0) is not walkable on level "level2"');
+    }), 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('spawn position (1,0) is not walkable on level "level2"'));
+    spy.mockRestore();
   });
 
   it('accepts stairs with valid cross-references', () => {
