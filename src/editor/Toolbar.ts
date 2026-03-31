@@ -48,7 +48,7 @@ export class Toolbar {
   onEntityTypeSelect: ((type: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
-  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview', value: boolean) => void) | null = null;
+  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'floodFill', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
   onSave: (() => void) | null = null;
   onSaveAs: (() => void) | null = null;
@@ -94,7 +94,7 @@ export class Toolbar {
     this.onNewDungeon = cb;
   }
 
-  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview', value: boolean) => void): void {
+  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'floodFill', value: boolean) => void): void {
     this.onViewToggle = cb;
   }
 
@@ -234,6 +234,10 @@ export class Toolbar {
     // Void button (plain text, special case)
     this.addVoidBtn();
 
+    // Flood fill toggle
+    this.palette.appendChild(this.makePaletteSep());
+    this.addViewToggle(this.palette, 'Flood Fill', 'floodFill', false);
+
     // Re-enable palettes now that a level is loaded
     this.palette.classList.remove('dimmed');
     this.entityPalette.classList.remove('dimmed');
@@ -366,7 +370,7 @@ export class Toolbar {
   private addViewToggle(
     parent: HTMLElement,
     label: string,
-    flag: 'showCeiling' | 'showItemPreview',
+    flag: 'showCeiling' | 'showItemPreview' | 'floodFill',
     defaultOn: boolean
   ): void {
     const wrapper = document.createElement('label');

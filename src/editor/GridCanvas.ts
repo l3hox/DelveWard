@@ -218,8 +218,12 @@ export class GridCanvas {
           const screenY = e.clientY - rect.top;
           const { col, row } = this.screenToGrid(screenX, screenY);
           const char = this.app.selectedChar;
-          this.app.paintCell(col, row, char);
-          this.isPainting = true;
+          if (this.app.floodFill) {
+            this.app.floodFillCell(col, row, char);
+          } else {
+            this.app.paintCell(col, row, char);
+            this.isPainting = true;
+          }
           this.dirty = true;
         } else if (tool === 'select') {
           const rect = canvas.getBoundingClientRect();

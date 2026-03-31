@@ -121,6 +121,7 @@ export class EditorApp {
   sourcePath: string | null = null;
   showCeiling = false;
   showItemPreview = true;
+  floodFill = false;
   selectedEnemyType = 'rat';
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
@@ -767,6 +768,32 @@ export class EditorApp {
 
     grid[row] = grid[row].substring(0, col) + char + grid[row].substring(col + 1);
     return true;
+  }
+
+  floodFillCell(col: number, row: number, char: string): boolean {
+    if (!this.level) return false;
+    const grid = this.level.grid;
+    if (row < 0 || row >= grid.length) return false;
+    if (col < 0 || col >= grid[row].length) return false;
+    const target = grid[row][col];
+    if (target === char) return false;
+
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const stack: [number, number][] = [[col, row]];
+    const visited = new Set<string>();
+
+    while (stack.length > 0) {
+      const [c, r] = stack.pop()!;
+      const key = `${c},${r}`;
+      if (visited.has(key)) continue;
+      if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+      if (grid[r][c] !== target) continue;
+      visited.add(key);
+      grid[r] = grid[r].substring(0, c) + char + grid[r].substring(c + 1);
+      stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
+    }
+    return visited.size > 0;
   }
 
   getEntitiesAt(col: number, row: number): Entity[] {
