@@ -1219,6 +1219,7 @@ async function init(): Promise<void> {
       gameState.activateTrigger(col, row);
       if (gameState.activateTripwire(col, row)) {
         hideTripwire(ls.tripwireMeshes.meshMap, lk(doorKey(col, row)));
+        hud.showMessage('Oops! A tripwire!');
       }
 
       // Pressure plate activation
