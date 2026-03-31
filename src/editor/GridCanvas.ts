@@ -220,6 +220,7 @@ export class GridCanvas {
           const char = this.app.selectedChar;
           if (this.app.floodFill) {
             this.app.floodFillCell(col, row, char);
+            this.onAfterPaint?.(); // commit undo batch immediately (no drag)
           } else {
             this.app.paintCell(col, row, char);
             this.isPainting = true;
