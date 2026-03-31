@@ -6,7 +6,17 @@ import { drawHungerBar } from './hungerBar';
 import { drawStatusIcons } from './statusEffectIcons';
 import { hasEffect } from '../core/statusEffects';
 import { drawMinimap } from './minimapRenderer';
-import { drawInventoryPanel } from './inventoryPanel';
+import {
+  drawInventoryPanel,
+  panelHitTest,
+  panelHandleMouseMove,
+  panelHandleDragStart,
+  panelHandleDragEnd,
+  panelHandleDblClick,
+  panelHandleRightClick,
+  panelIsDragging,
+  panelClearHover,
+} from './inventoryPanel';
 import { drawXpBar } from './xpBar';
 import { drawPixelText, measurePixelText } from './hudFont';
 import { StatsPanel } from './statsPanel';
@@ -114,6 +124,64 @@ export class HudOverlay {
 
     this.canvas.addEventListener('contextmenu', (e) => {
       if (this.inventoryOverlay.isOpen()) e.preventDefault();
+    });
+
+    // Window-level listeners for the mini inventory panel.
+    // The HUD canvas keeps pointer-events:none so the 3D view is unaffected.
+    // We only call preventDefault when the hit test confirms the event lands on
+    // the panel, leaving all other events unblocked for the renderer below.
+
+    window.addEventListener('mousemove', (e) => {
+      if (this.inventoryOverlay.isOpen()) return;
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      if (panelIsDragging()) {
+        panelHandleMouseMove(hudX, hudY);
+      } else {
+        const hit = panelHitTest(hudX, hudY);
+        if (hit) {
+          panelHandleMouseMove(hudX, hudY);
+        } else {
+          panelClearHover();
+        }
+      }
+    });
+
+    window.addEventListener('mousedown', (e) => {
+      if (this.inventoryOverlay.isOpen()) return;
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      if (e.button === 0 && panelHitTest(hudX, hudY)) {
+        panelHandleDragStart(hudX, hudY, this._gameState!);
+      } else if (e.button === 2 && panelHitTest(hudX, hudY)) {
+        e.preventDefault();
+        const action = panelHandleRightClick(
+          hudX, hudY, this._gameState!, this._playerCol, this._playerRow,
+        );
+        if (action) this.onInventoryAction?.(action);
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (this.inventoryOverlay.isOpen()) return;
+      if (e.button === 0 && panelIsDragging()) {
+        const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+        const action = panelHandleDragEnd(hudX, hudY, this._gameState!);
+        if (action) this.onInventoryAction?.(action);
+      }
+    });
+
+    window.addEventListener('dblclick', (e) => {
+      if (this.inventoryOverlay.isOpen()) return;
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      if (panelHitTest(hudX, hudY)) {
+        const action = panelHandleDblClick(hudX, hudY, this._gameState!);
+        if (action) this.onInventoryAction?.(action);
+      }
+    });
+
+    window.addEventListener('contextmenu', (e) => {
+      if (this.inventoryOverlay.isOpen()) return;
+      const { hudX, hudY } = this._screenToHud(e.clientX, e.clientY);
+      if (panelHitTest(hudX, hudY)) e.preventDefault();
     });
   }
 
