@@ -1551,6 +1551,9 @@ async function init(): Promise<void> {
           }
         }
         break;
+      case 'swap':
+        gameState.entityRegistry.swapBackpackSlots(action.indexA, action.indexB);
+        break;
       case 'message':
         hud.showMessage(action.text);
         break;

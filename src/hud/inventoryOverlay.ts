@@ -19,6 +19,7 @@ export type InventoryAction =
   | { type: 'unequip'; equipSlot: EquipSlot; backpackSlot: number }
   | { type: 'use'; backpackSlot: number }
   | { type: 'drop'; instanceId: string; col: number; row: number }
+  | { type: 'swap'; indexA: number; indexB: number }
   | { type: 'message'; text: string };
 
 // Equipment slots in the canonical 2-row-of-5 layout used throughout the HUD.
@@ -379,6 +380,11 @@ export class InventoryOverlay {
       return { type: 'unequip', equipSlot: slot, backpackSlot: freeSlot };
     }
 
+    if (source.section === 'backpack' && target.section === 'backpack') {
+      // Rearrange within backpack
+      return { type: 'swap', indexA: source.index, indexB: target.index };
+    }
+
     return null;
   }
 
@@ -499,8 +505,8 @@ export class InventoryOverlay {
         ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
       }
 
-      // Drag: highlight backpack slots (green) when dragging from equipment
-      if (this.drag && this.drag.source.section === 'equipment') {
+      // Drag: highlight backpack slots when dragging from equipment or rearranging within backpack
+      if (this.drag && (this.drag.source.section === 'equipment' || this.drag.source.section === 'backpack') && !(this.drag.source.section === 'backpack' && this.drag.source.index === i)) {
         ctx.fillStyle = 'rgba(68, 200, 68, 0.15)';
         ctx.fillRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
         ctx.strokeStyle = 'rgba(68, 200, 68, 0.4)';

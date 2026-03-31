@@ -132,6 +132,35 @@ export class EntityRegistry {
     return undefined;
   }
 
+  // Swap two backpack items by their visual indices (positions in sorted order).
+  swapBackpackSlots(indexA: number, indexB: number): void {
+    const sorted = this.getBackpackItems();
+    const entityA = sorted[indexA];
+    const entityB = sorted[indexB];
+    if (!entityA && !entityB) return;
+    if (entityA && entityB) {
+      // Swap their slot numbers
+      const slotA = (entityA.location as { kind: 'backpack'; slot: number }).slot;
+      const slotB = (entityB.location as { kind: 'backpack'; slot: number }).slot;
+      entityA.location = { kind: 'backpack', slot: slotB };
+      entityB.location = { kind: 'backpack', slot: slotA };
+    } else if (entityA && !entityB) {
+      // Move A to B's position — find an unused slot at or near indexB
+      const occupiedSlots = new Set<number>();
+      for (const e of this.items.values()) {
+        if (e.location.kind === 'backpack') occupiedSlots.add(e.location.slot);
+      }
+      // Use indexB as the target slot if free, else find nearest free
+      let targetSlot = indexB;
+      if (occupiedSlots.has(targetSlot)) {
+        for (let i = 0; i < BACKPACK_MAX_SLOTS; i++) {
+          if (!occupiedSlots.has(i)) { targetSlot = i; break; }
+        }
+      }
+      entityA.location = { kind: 'backpack', slot: targetSlot };
+    }
+  }
+
   // First free backpack slot index in range [0, BACKPACK_MAX_SLOTS).
   // Returns null when the backpack is full.
   nextBackpackSlot(): number | null {
