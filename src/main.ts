@@ -1693,6 +1693,13 @@ async function init(): Promise<void> {
         break;
       case 'KeyF':
         {
+          // Debug mode: set facing enemy HP to 1 for instant kill
+          if (debugFullbright) {
+            const ps = ls.player.getState();
+            const facing = getFacingCell(ps);
+            const enemy = gameState.getEnemy(facing.col, facing.row);
+            if (enemy) enemy.hp = 1;
+          }
           const results = playerAttack(ls.player.getState(), gameState);
           if (results[0]?.type !== 'cooldown') {
             swordSwing.trigger();
