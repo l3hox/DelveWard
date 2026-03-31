@@ -117,6 +117,17 @@ export function drawInventoryPanel(
           fallbackColor = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
         }
         _drawItemIcon(ctx, entity.itemId, sx, slotY, SLOT_SIZE, fallbackColor);
+
+        // Quick-use number indicator for consumables (slots 1-8)
+        if (def?.type === 'consumable' && slotIndex < 8) {
+          const numStr = String(slotIndex + 1);
+          const nx = sx + SLOT_SIZE - 7;
+          const ny = slotY + 1;
+          // Dark background pill
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(nx - 1, ny, 8, 7);
+          drawPixelText(ctx, numStr, nx, ny, '#ffcc44', 1);
+        }
       }
     }
   }
