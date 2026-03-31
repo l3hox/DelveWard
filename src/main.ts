@@ -1345,6 +1345,7 @@ async function init(): Promise<void> {
         fireballExplosions.spawn(
           projectile.col * CELL_SIZE,
           projectile.row * CELL_SIZE,
+          gameState.activeLayerIndex * LAYER_HEIGHT,
         );
       }
     });

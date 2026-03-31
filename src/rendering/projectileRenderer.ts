@@ -53,9 +53,10 @@ export class FireballExplosions {
     return this.group;
   }
 
-  spawn(worldX: number, worldZ: number): void {
+  spawn(worldX: number, worldZ: number, yOffset = 0): void {
     const particles: ExplosionParticle[] = [];
     const positions = new Float32Array(EXPLOSION_PARTICLE_COUNT * 3);
+    const baseY = PROJECTILE_HEIGHT + yOffset;
 
     for (let i = 0; i < EXPLOSION_PARTICLE_COUNT; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -68,7 +69,7 @@ export class FireballExplosions {
         age: 0,
       });
       positions[i * 3] = worldX;
-      positions[i * 3 + 1] = PROJECTILE_HEIGHT;
+      positions[i * 3 + 1] = baseY;
       positions[i * 3 + 2] = worldZ;
     }
 
@@ -91,7 +92,7 @@ export class FireballExplosions {
     this.group.add(points);
 
     const light = new THREE.PointLight(0xFF4400, 6, 8, 2);
-    light.position.set(worldX, PROJECTILE_HEIGHT, worldZ);
+    light.position.set(worldX, baseY, worldZ);
     this.group.add(light);
 
     this.active.push({ particles, positions, geometry, points, age: 0, light });
