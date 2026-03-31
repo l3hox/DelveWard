@@ -286,7 +286,9 @@ function buildLevelScene(
     const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
     const ldDefaults = ld.defaults ?? level.defaults;
     const ldAreas = ld.areas ?? level.areas;
-    const ldCeiling = (ld.ceiling ?? level.ceiling) !== false;
+    // No-ceiling only applies to the topmost layer; lower layers always render ceilings
+    const isTopLayer = li === layerDefs.length - 1;
+    const ldCeiling = isTopLayer ? (ld.ceiling ?? level.ceiling) !== false : true;
     const ldWalkable = buildWalkableSet(level.charDefs);
 
     const ldStairPositions = new Set(gameState.stairs.keys());
