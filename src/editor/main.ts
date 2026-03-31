@@ -1,4 +1,5 @@
 import { EditorApp, type EditorTool } from './EditorApp';
+import { getAllLevelEntities } from '../level/levelLoader';
 import { GridCanvas } from './GridCanvas';
 import { Toolbar } from './Toolbar';
 import { Inspector } from './Inspector';
@@ -754,6 +755,46 @@ function selectEntity(entity: import('../core/types').Entity): void {
   gridCanvas.markDirty();
 }
 
+/** Navigate to the correct level + layer for an entity, then select it. */
+function navigateToEntity(entity: import('../core/types').Entity): void {
+  // In dungeon mode, find which level contains this entity
+  if (app.dungeon) {
+    for (let li = 0; li < app.dungeon.levels.length; li++) {
+      const level = app.dungeon.levels[li];
+      const allEntities = getAllLevelEntities(level);
+      if (allEntities.includes(entity)) {
+        if (li !== app.activeLevelIndex) {
+          app.switchToLevel(li);
+        }
+        // Find which layer the entity is on
+        if (level.layers) {
+          for (let lai = 0; lai < level.layers.length; lai++) {
+            if (level.layers[lai].entities.includes(entity)) {
+              if (lai !== app.activeLayerIndex) {
+                app.switchToLayer(lai);
+              }
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+  } else if (app.level?.layers) {
+    // Single-level mode with layers — find which layer
+    for (let lai = 0; lai < app.level.layers.length; lai++) {
+      if (app.level.layers[lai].entities.includes(entity)) {
+        if (lai !== app.activeLayerIndex) {
+          app.switchToLayer(lai);
+        }
+        break;
+      }
+    }
+  }
+  selectEntity(entity);
+  refreshAllUI();
+}
+
 function renderErrorSpan(err: import('./EditorApp').ValidationError): HTMLSpanElement {
   const span = document.createElement('span');
   span.textContent = err.message;
@@ -765,7 +806,7 @@ function renderErrorSpan(err: import('./EditorApp').ValidationError): HTMLSpanEl
     if (ent.id) link.title = ent.id;
     link.addEventListener('click', (e) => {
       e.stopPropagation();
-      selectEntity(ent);
+      navigateToEntity(ent);
     });
     span.appendChild(document.createTextNode(' '));
     span.appendChild(link);
