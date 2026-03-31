@@ -74,49 +74,12 @@ function applyDepthFade(geo: THREE.BufferGeometry, meshZ: number): void {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
-/**
- * Resolve which floor and wall textures to use for a stair cell.
- * Layers: hard-coded defaults → level.defaults → level.areas (last match wins).
- * Intentionally omits charDefs — stair cells are built-in chars, not custom ones.
- */
-function resolveStairTextures(
-  col: number,
-  row: number,
-  defaults?: TextureSet,
-  areas?: TextureArea[],
-): { wall: WallTextureName; floor: FloorTextureName; ceiling: CeilingTextureName } {
-  let wall: string = 'stone';
-  let floor: string = 'stone_tile';
-  let ceiling: string = 'dark_rock';
-
-  if (defaults) {
-    if (defaults.wallTexture) wall = defaults.wallTexture;
-    if (defaults.floorTexture) floor = defaults.floorTexture;
-    if (defaults.ceilingTexture) ceiling = defaults.ceilingTexture;
-  }
-
-  if (areas) {
-    for (const area of areas) {
-      if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
-        if (area.wallTexture) wall = area.wallTexture;
-        if (area.floorTexture) floor = area.floorTexture;
-        if (area.ceilingTexture) ceiling = area.ceilingTexture;
-      }
-    }
-  }
-
-  return {
-    wall: wall as WallTextureName,
-    floor: floor as FloorTextureName,
-    ceiling: ceiling as CeilingTextureName,
-  };
-}
 
 const FACING_ROTATION: Record<Facing, number> = {
-  S: 0,           // canonical: approach from south (walk north into stairs)
-  W: Math.PI / 2,
+  S: 0,            // canonical: approach from south (walk north into stairs)
+  E: Math.PI / 2,  // rotate 90° CCW to face east approach
   N: Math.PI,
-  E: -Math.PI / 2,
+  W: -Math.PI / 2, // rotate 90° CW to face west approach
 };
 
 /**
@@ -170,22 +133,44 @@ function buildStairGroup(
   const group = new THREE.Group();
   const isDown = direction === 'down';
 
+  // Fix UVs on a step BoxGeometry so textures scale proportionally to CELL_SIZE.
+  // BoxGeometry face order: +x(0-3), -x(4-7), +y(8-11), -y(12-15), +z(16-19), -z(20-23)
+  function fixStepUVs(geo: THREE.BoxGeometry, w: number, h: number, d: number): void {
+    const uv = geo.getAttribute('uv');
+    const sw = w / CELL_SIZE;
+    const sh = h / CELL_SIZE;
+    const sd = d / CELL_SIZE;
+    // ±x (side faces): U across depth, V across height
+    for (const s of [0, 4]) {
+      for (let j = 0; j < 4; j++) { uv.setX(s + j, uv.getX(s + j) * sd); uv.setY(s + j, uv.getY(s + j) * sh); }
+    }
+    // ±y (top/bottom faces): U across width, V across depth
+    for (const s of [8, 12]) {
+      for (let j = 0; j < 4; j++) { uv.setX(s + j, uv.getX(s + j) * sw); uv.setY(s + j, uv.getY(s + j) * sd); }
+    }
+    // ±z (front/back faces): U across width, V across height
+    for (const s of [16, 20]) {
+      for (let j = 0; j < 4; j++) { uv.setX(s + j, uv.getX(s + j) * sw); uv.setY(s + j, uv.getY(s + j) * sh); }
+    }
+    uv.needsUpdate = true;
+  }
+
   // Floor steps — each step is a thin slab at the correct Y for its tread
   for (let i = 0; i < STEP_COUNT; i++) {
     const z = CELL_SIZE / 2 - STEP_DEPTH / 2 - i * STEP_DEPTH;
 
     if (isDown) {
-      // Descending: step 0 top at Y=0, step 1 top at Y=-0.25, etc.
       const topY = -i * STEP_HEIGHT;
       const geo = new THREE.BoxGeometry(STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
+      fixStepUVs(geo, STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
       applyDepthFade(geo, z);
       const mesh = new THREE.Mesh(geo, stepMaterial);
       mesh.position.set(0, topY - STEP_HEIGHT / 2, z);
       group.add(mesh);
     } else {
-      // Ascending: step 0 top at Y=0.25, step 1 top at Y=0.50, etc.
       const stepHeight = (i + 1) * STEP_HEIGHT;
       const geo = new THREE.BoxGeometry(STEP_WIDTH, stepHeight, STEP_DEPTH);
+      fixStepUVs(geo, STEP_WIDTH, stepHeight, STEP_DEPTH);
       applyDepthFade(geo, z);
       const mesh = new THREE.Mesh(geo, stepMaterial);
       mesh.position.set(0, stepHeight / 2, z);
@@ -199,14 +184,13 @@ function buildStairGroup(
     let bottomY = WALL_HEIGHT;
 
     if (isDown) {
-      // Ceiling descends with the floor: step 0 bottom at WALL_HEIGHT, each next lower
       bottomY -= i * STEP_HEIGHT;
     } else {
-      // Ceiling descends with the floor: step 0 bottom at WALL_HEIGHT, each next higher
       bottomY += i * STEP_HEIGHT;
     }
 
     const geo = new THREE.BoxGeometry(STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
+    fixStepUVs(geo, STEP_WIDTH, STEP_HEIGHT, STEP_DEPTH);
     applyDepthFade(geo, z);
     const mesh = new THREE.Mesh(geo, ceilingMaterial);
     mesh.position.set(0, bottomY + STEP_HEIGHT / 2, z);
