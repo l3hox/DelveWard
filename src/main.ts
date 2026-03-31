@@ -514,7 +514,11 @@ function buildLevelScene(
       // Groups without per-cell zone keys — show in all zones
       ldStairMeshes.group.traverse(child => { child.layers.enableAll(); });
       ldTrapLauncherMeshes.group.traverse(child => { child.layers.enableAll(); });
-      ldForestMeshes.group.traverse(child => { child.layers.enableAll(); });
+      // Tag forest instances to the zone matching the level's default environment
+      // (forest cells are in the outdoor/forest zone, not dungeon)
+      const levelEnv = level.environment ?? 'dungeon';
+      const forestZone = zones.indexOf(levelEnv) + 1 || 1; // 1-based zone index
+      ldForestMeshes.group.traverse(child => { child.layers.set(forestZone); });
       for (const [, light] of ldSconceMeshes.lightMap) light.layers.enableAll();
     }
   }
