@@ -1842,6 +1842,7 @@ async function init(): Promise<void> {
         break;
       case 'KeyM':
         debugFullbright = !debugFullbright;
+        ls.player.debugNoClip = debugFullbright;
         if (debugFullbright) {
           scene.add(debugLight);
           scene.fog = null;

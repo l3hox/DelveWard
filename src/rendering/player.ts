@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
-import { PlayerState, Facing, FACING_ANGLE, FACING_DELTA } from '../core/grid';
+import { PlayerState, Facing, FACING_ANGLE, FACING_DELTA, TURN_LEFT, TURN_RIGHT } from '../core/grid';
 import { doorKey, type StairInstance } from '../core/gameState';
 
 const TWEEN_SPEED = 20;
@@ -31,8 +31,9 @@ export class Player {
   private commandQueue: Array<() => void> = [];
 
   public slowMultiplier = 1;
-  public yOffset = 0;         // additional Y offset (used for debug layer flying)
+  public yOffset = 0;         // additional Y offset (used for layer positioning)
   public targetYOffset = 0;   // target Y offset (lerped in update)
+  public debugNoClip = false;  // bypass walkability + blocked checks (bounds only)
 
   private stairs?: Map<string, StairInstance>;
 
@@ -110,21 +111,34 @@ export class Player {
     this.onTurnCallback = callback;
   }
 
+  /** Debug noclip move: only check grid bounds, skip walkability/blocked. */
+  private debugMove(dc: number, dr: number): boolean {
+    const nc = this.state.col + dc;
+    const nr = this.state.row + dr;
+    if (nr < 0 || nr >= this.grid.length || nc < 0 || nc >= this.grid[0].length) return false;
+    this.state.col = nc;
+    this.state.row = nr;
+    return true;
+  }
+
   moveForward(): void {
     if (this.isAnimating()) { this.enqueue(() => this.moveForward()); return; }
-    if (this.state.moveForward(this.grid)) {
+    const [dc, dr] = FACING_DELTA[this.state.facing];
+    const moved = this.debugNoClip ? this.debugMove(dc, dr) : this.state.moveForward(this.grid);
+    if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
-    } else {
-      const [dc, dr] = FACING_DELTA[this.state.facing];
+    } else if (!this.debugNoClip) {
       this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr);
     }
   }
 
   moveBack(): void {
     if (this.isAnimating()) { this.enqueue(() => this.moveBack()); return; }
-    if (this.state.moveBack(this.grid)) {
+    const [dc, dr] = FACING_DELTA[this.state.facing];
+    const moved = this.debugNoClip ? this.debugMove(-dc, -dr) : this.state.moveBack(this.grid);
+    if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
@@ -133,7 +147,9 @@ export class Player {
 
   strafeLeft(): void {
     if (this.isAnimating()) { this.enqueue(() => this.strafeLeft()); return; }
-    if (this.state.strafeLeft(this.grid)) {
+    const [dc, dr] = FACING_DELTA[TURN_LEFT[this.state.facing]];
+    const moved = this.debugNoClip ? this.debugMove(dc, dr) : this.state.strafeLeft(this.grid);
+    if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
@@ -142,7 +158,9 @@ export class Player {
 
   strafeRight(): void {
     if (this.isAnimating()) { this.enqueue(() => this.strafeRight()); return; }
-    if (this.state.strafeRight(this.grid)) {
+    const [dc, dr] = FACING_DELTA[TURN_RIGHT[this.state.facing]];
+    const moved = this.debugNoClip ? this.debugMove(dc, dr) : this.state.strafeRight(this.grid);
+    if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.onMoveCallback?.(this.state.col, this.state.row);
