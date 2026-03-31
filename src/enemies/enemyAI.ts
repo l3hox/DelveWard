@@ -35,6 +35,7 @@ export function updateEnemies(
   walkable: Set<string>,
   isDoorOpen: (col: number, row: number) => boolean,
   delta: number,
+  isHole?: (col: number, row: number) => boolean,
 ): EnemyAction[] {
   const actions: EnemyAction[] = [];
 
@@ -125,11 +126,15 @@ export function updateEnemies(
       continue;
     }
 
+    // Check if this enemy type can fly over holes
+    const canFly = enemyDatabase.getEnemy(enemy.type)?.fly === true;
+
     // --- Flee movement ---
     if (enemy.aiState === 'flee') {
       const isPassable = (col: number, row: number) =>
         !occupied.has(doorKey(col, row)) &&
-        isWalkable(grid, col, row, walkable, isDoorOpen);
+        isWalkable(grid, col, row, walkable, isDoorOpen) &&
+        (canFly || !isHole?.(col, row));
 
       // Find the adjacent walkable cell that maximises distance from player
       let bestCell: { col: number; row: number } | null = null;
@@ -177,7 +182,8 @@ export function updateEnemies(
         if (occupied.has(doorKey(col, row)) && !(col === enemy.col && row === enemy.row)) {
           return false;
         }
-        return isWalkable(grid, col, row, walkable, isDoorOpen);
+        return isWalkable(grid, col, row, walkable, isDoorOpen) &&
+          (canFly || !isHole?.(col, row));
       };
 
       const path = findPath(
@@ -195,7 +201,8 @@ export function updateEnemies(
         if (erraticBehavior && Math.random() < (erraticBehavior.params.chance as number)) {
           const isPassableForErratic = (col: number, row: number) =>
             !occupied.has(doorKey(col, row)) &&
-            isWalkable(grid, col, row, walkable, isDoorOpen);
+            isWalkable(grid, col, row, walkable, isDoorOpen) &&
+            (canFly || !isHole?.(col, row));
 
           const candidates: { col: number; row: number }[] = [];
           for (const [dc, dr] of CARDINAL_DIRS) {

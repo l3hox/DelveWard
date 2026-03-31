@@ -21,6 +21,7 @@ export interface EnemyDef {
   aggroRange: number;
   moveInterval: number;
   blocksMovement: boolean;
+  fly?: boolean;           // can move over cells with no floor (holes)
   xp: number;
   sprite: EnemySpriteData;
   behaviors: EnemyBehavior[];

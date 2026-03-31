@@ -2024,9 +2024,19 @@ async function init(): Promise<void> {
       for (let li = 0; li < gameState.layers.length; li++) {
         gameState.activeLayerIndex = li;
         const layerGrid = ls.layerGrids[li] ?? activeGrid();
+        // Hole check: cell has no floor if the layer below has a non-wall cell
+        const belowGrid = ls.layerGrids[li - 1];
+        const charDefMap = new Map<string, import('./core/types').CharDef>();
+        if (ls.level.charDefs) for (const def of ls.level.charDefs) charDefMap.set(def.char, def);
+        const isHole = belowGrid ? (col: number, row: number) => {
+          if (row < 0 || row >= belowGrid.length || col < 0 || col >= belowGrid[0].length) return true;
+          const ch = belowGrid[row][col];
+          const def = charDefMap.get(ch);
+          return !(ch === '#' || (def !== undefined && def.solid && !def.seeThrough));
+        } : undefined;
         const actions = updateEnemies(
           gameState, ps.col, ps.row, layerGrid, ls.walkable,
-          gameState.isDoorOpen.bind(gameState), delta,
+          gameState.isDoorOpen.bind(gameState), delta, isHole,
         );
         for (const action of actions) {
           if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {

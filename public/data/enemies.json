@@ -62,6 +62,7 @@
       "aggroRange": 5,
       "moveInterval": 0.4,
       "blocksMovement": true,
+      "fly": true,
       "xp": 8,
       "sprite": { "path": "/sprites/giant_bat.png", "size": 1.4, "yOffset": 1.0 },
       "behaviors": [
