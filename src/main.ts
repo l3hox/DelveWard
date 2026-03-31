@@ -1406,6 +1406,8 @@ async function init(): Promise<void> {
 
   function triggerLevelTransition(stairEntity: Entity): void {
     const targetStairId = stairEntity.target as string;
+    // Preserve the player's current facing across the transition
+    const playerFacingBeforeTransition = ls.player.getState().facing;
 
     // Save current level state
     blockedDoors.clear();
@@ -1454,7 +1456,7 @@ async function init(): Promise<void> {
 
       currentLevelId = targetLevelId;
       applyEnvironment(targetLevel.environment, scene, ambient);
-      ls = buildLevelScene(targetLevel, gameState, camera, scene, spawnCol, spawnRow, targetFacing);
+      ls = buildLevelScene(targetLevel, gameState, camera, scene, spawnCol, spawnRow, playerFacingBeforeTransition);
       wireCallbacks();
       sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
       dustMotes.setVisible(targetLevel.dustMotes !== false);
