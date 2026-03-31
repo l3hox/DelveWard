@@ -1211,9 +1211,12 @@ async function init(): Promise<void> {
         }
       }
 
-      // Torch fuel drain (mist environments have ambient light — no torch needed)
-      if ((ls.level.environment ?? 'dungeon') !== 'mist') {
-        gameState.drainTorchFuel(1);
+      // Torch fuel drain — skip in bright environments (outdoor, mist)
+      {
+        const playerEnv = resolveEnvironmentAtCell(col, row, ls.level.environment ?? 'dungeon', ls.level.areas);
+        if (playerEnv !== 'outdoor' && playerEnv !== 'mist') {
+          gameState.drainTorchFuel(1);
+        }
       }
 
       // Stair detection — entity-based lookup
@@ -1588,6 +1591,7 @@ async function init(): Promise<void> {
           if (result.type === 'sconce_taken') {
             const ps = ls.player.getState();
             extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, lk(doorKey(ps.col, ps.row)));
+            sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
           }
           if (result.type === 'block_pushed' && result.targetCol !== undefined && result.targetRow !== undefined) {
             const facing = getFacingCell(ls.player.getState());

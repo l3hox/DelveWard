@@ -303,30 +303,37 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         group.add(wall);
       };
 
+      // When ceiling is false (open-air layer), skip boundary walls at grid edges.
+      // OOB neighbors are treated as non-solid so no walls are generated at the perimeter.
+      const solidCheck = (c: number, r: number) => {
+        if (!ceiling && (r < 0 || r >= rows || c < 0 || c >= cols)) return false;
+        return isSolid(grid, c, r, renderable);
+      };
+
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;
-      if (!isStair && !skipN && isSolid(grid, col, row - 1, renderable)) {
+      if (!isStair && !skipN && solidCheck(col, row - 1)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
         addWall(wallMat, 0, cx, cz - CELL_SIZE / 2, 'along-x');
       }
 
       // South wall (faces north, runs along X axis)
       const skipS = wallEntityCells?.has(doorKey(col, row + 1)) ?? false;
-      if (!isStair && !skipS && isSolid(grid, col, row + 1, renderable)) {
+      if (!isStair && !skipS && solidCheck(col, row + 1)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
         addWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, 'along-x');
       }
 
       // East wall (faces west, runs along Z axis)
       const skipE = wallEntityCells?.has(doorKey(col + 1, row)) ?? false;
-      if (!isStair && !skipE && isSolid(grid, col + 1, row, renderable)) {
+      if (!isStair && !skipE && solidCheck(col + 1, row)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
         addWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, 'along-z');
       }
 
       // West wall (faces east, runs along Z axis)
       const skipW = wallEntityCells?.has(doorKey(col - 1, row)) ?? false;
-      if (!isStair && !skipW && isSolid(grid, col - 1, row, renderable)) {
+      if (!isStair && !skipW && solidCheck(col - 1, row)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
         addWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, 'along-z');
       }
