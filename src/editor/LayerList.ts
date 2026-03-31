@@ -4,6 +4,8 @@ export class LayerList {
   private container: HTMLElement;
   private app: EditorApp;
 
+  hoverHighlightLayerIndex: number | null = null;
+
   onLayerSwitch: ((index: number) => void) | null = null;
   onAddLayerAbove: (() => void) | null = null;
   onAddLayerBelow: (() => void) | null = null;
@@ -54,6 +56,7 @@ export class LayerList {
       const entry = document.createElement('div');
       entry.className = 'level-entry';
       if (i === this.app.activeLayerIndex) entry.classList.add('active');
+      if (i === this.hoverHighlightLayerIndex && i !== this.app.activeLayerIndex) entry.classList.add('hover-highlight');
 
       const name = document.createElement('span');
       name.className = 'level-entry-name';

@@ -156,7 +156,7 @@ function updateStairHighlight(): void {
     const targetId = sel.target as string;
     for (let i = 0; i < app.dungeon.levels.length; i++) {
       if (i === app.activeLevelIndex) continue;
-      if (app.dungeon.levels[i].entities.some(e => e.id === targetId)) {
+      if (getAllLevelEntities(app.dungeon.levels[i]).some(e => e.id === targetId)) {
         hlIndex = i;
         break;
       }
@@ -704,35 +704,75 @@ gridCanvas.setBeforePickCompleteCallback(() => {
   markDirty();
 });
 
-// Reference click → select that entity
+// Helper: find which level index and layer index an entity is on
+function findEntityLocation(entity: import('../core/types').Entity): { levelIndex: number; layerIndex: number } | null {
+  if (app.dungeon) {
+    for (let li = 0; li < app.dungeon.levels.length; li++) {
+      const level = app.dungeon.levels[li];
+      if (level.layers) {
+        for (let lai = 0; lai < level.layers.length; lai++) {
+          if (level.layers[lai].entities.includes(entity)) return { levelIndex: li, layerIndex: lai };
+        }
+      }
+      if (level.entities.includes(entity)) return { levelIndex: li, layerIndex: 0 };
+    }
+  } else if (app.level?.layers) {
+    for (let lai = 0; lai < app.level.layers.length; lai++) {
+      if (app.level.layers[lai].entities.includes(entity)) return { levelIndex: 0, layerIndex: lai };
+    }
+  }
+  return null;
+}
+
+// Reference click → navigate to entity's level+layer and select it
 inspector.setRefClickedCallback((entity) => {
-  app.selectedEntity = entity;
+  navigateToEntity(entity);
   app.highlightedEntity = null;
-  inspector.refresh();
-  gridCanvas.markDirty();
+  levelList.hoverHighlightLevelIndex = null;
+  layerList.hoverHighlightLayerIndex = null;
+  levelList.refresh();
+  layerList.refresh();
 });
 
 inspector.setRefHoveredCallback((entity) => {
   app.highlightedEntity = entity;
-  // If entity is on a different level, highlight that level in the list
-  if (entity && app.dungeon) {
-    const idx = app.dungeon.levels.findIndex(l => l.entities.includes(entity));
-    levelList.hoverHighlightLevelIndex = idx >= 0 && idx !== app.activeLevelIndex ? idx : null;
-  } else {
-    levelList.hoverHighlightLevelIndex = null;
+  levelList.hoverHighlightLevelIndex = null;
+  layerList.hoverHighlightLayerIndex = null;
+  if (entity) {
+    const loc = findEntityLocation(entity);
+    if (loc) {
+      if (loc.levelIndex !== app.activeLevelIndex) {
+        levelList.hoverHighlightLevelIndex = loc.levelIndex;
+      }
+      if (loc.layerIndex !== app.activeLayerIndex) {
+        layerList.hoverHighlightLayerIndex = loc.layerIndex;
+      }
+    }
   }
   levelList.refresh();
+  layerList.refresh();
   gridCanvas.markDirty();
 });
 
-// Stair "go to" — switch to target level and select target stair
+// Stair "go to" — switch to target level+layer and select target stair
 inspector.setStairGoToCallback((targetId) => {
   if (!app.dungeon) return;
   for (let i = 0; i < app.dungeon.levels.length; i++) {
-    const targetStair = app.dungeon.levels[i].entities.find(e => e.id === targetId);
+    const level = app.dungeon.levels[i];
+    const allEntities = getAllLevelEntities(level);
+    const targetStair = allEntities.find(e => e.id === targetId);
     if (targetStair) {
       if (app.level && app.undo.hasPending) app.undo.commitBatch(app.level);
       app.switchToLevel(i);
+      // Find layer
+      if (level.layers) {
+        for (let lai = 0; lai < level.layers.length; lai++) {
+          if (level.layers[lai].entities.includes(targetStair)) {
+            app.switchToLayer(lai);
+            break;
+          }
+        }
+      }
       app.selectedEntity = targetStair;
       refreshAllUI();
       return;
