@@ -470,7 +470,7 @@ export class InventoryOverlay {
         ctx.strokeRect(sx - 1, sy - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
       }
 
-      _drawSlot(ctx, sx, sy, SLOT_SIZE, EQUIP_LABELS[i]);
+      _drawSlot(ctx, sx, sy, SLOT_SIZE);
 
       const slot = EQUIP_SLOTS[i];
       const entity = gameState.entityRegistry.getEquipped(slot);

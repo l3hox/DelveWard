@@ -329,7 +329,7 @@ export function drawInventoryPanel(
       ctx.strokeRect(sx - 1, equipY1 - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
     }
 
-    drawSlot(ctx, sx, equipY1, label);
+    drawSlot(ctx, sx, equipY1);
 
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
@@ -380,7 +380,7 @@ export function drawInventoryPanel(
       ctx.strokeRect(sx - 1, equipY2 - 1, SLOT_SIZE + 2, SLOT_SIZE + 2);
     }
 
-    drawSlot(ctx, sx, equipY2, label);
+    drawSlot(ctx, sx, equipY2);
 
     const entity = gameState.entityRegistry.getEquipped(slot);
     if (entity) {
