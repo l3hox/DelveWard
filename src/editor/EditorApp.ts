@@ -122,6 +122,7 @@ export class EditorApp {
   sourcePath: string | null = null;
   showCeiling = false;
   showItemPreview = true;
+  showLayerBelow = false;
   floodFill = false;
   selectedEnemyType = 'rat';
   selectedEquipmentId = 'sword_iron';

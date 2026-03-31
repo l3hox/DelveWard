@@ -48,7 +48,7 @@ export class Toolbar {
   onEntityTypeSelect: ((type: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
-  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'floodFill', value: boolean) => void) | null = null;
+  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
   onSave: (() => void) | null = null;
   onSaveAs: (() => void) | null = null;
@@ -94,7 +94,7 @@ export class Toolbar {
     this.onNewDungeon = cb;
   }
 
-  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'floodFill', value: boolean) => void): void {
+  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill', value: boolean) => void): void {
     this.onViewToggle = cb;
   }
 
@@ -365,12 +365,13 @@ export class Toolbar {
     // View toggles
     this.addViewToggle(this.entityPalette, 'Floor / Ceiling', 'showCeiling', false);
     this.addViewToggle(this.entityPalette, 'Item Preview', 'showItemPreview', true);
+    this.addViewToggle(this.entityPalette, 'Layer Below', 'showLayerBelow', false);
   }
 
   private addViewToggle(
     parent: HTMLElement,
     label: string,
-    flag: 'showCeiling' | 'showItemPreview' | 'floodFill',
+    flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill',
     defaultOn: boolean
   ): void {
     const wrapper = document.createElement('label');
