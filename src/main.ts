@@ -1414,9 +1414,6 @@ async function init(): Promise<void> {
     projectileManager.clear();
     levelSnapshots.set(currentLevelId, gameState.saveLevelState());
 
-    // Auto-save on every stair transition
-    saveGame(AUTOSAVE_KEY);
-
     transition.startTransition(() => {
       // --- Midpoint: swap level ---
       teardownLevelScene(ls, scene);
@@ -1465,6 +1462,9 @@ async function init(): Promise<void> {
       fireflies.setVisible(targetLevel.fireflies === true);
 
       gameState.revealAround(spawnCol, spawnRow, targetFacing, activeGrid());
+
+      // Auto-save after arriving at destination (so loading puts player here, not on the stair)
+      saveGame(AUTOSAVE_KEY);
     });
   }
 
