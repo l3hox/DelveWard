@@ -13,40 +13,44 @@ export class SignOverlay {
       align-items: center;
       justify-content: center;
       z-index: 500;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.6);
     `;
 
-    const parchment = document.createElement('div');
-    parchment.style.cssText = `
-      background: #d4c5a0;
-      border: 4px solid #5a3e1b;
-      border-radius: 4px;
-      padding: 24px 32px;
-      max-width: 400px;
-      min-width: 200px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 0 20px rgba(90,62,27,0.15);
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      color: #3a2a0a;
-      line-height: 1.6;
+    const panel = document.createElement('div');
+    panel.style.cssText = `
+      background: #1a1208;
+      border: 2px solid #8a6a2a;
+      padding: 20px 28px;
+      max-width: 420px;
+      min-width: 180px;
+      box-shadow: 0 0 24px rgba(0,0,0,0.8), inset 0 0 12px rgba(138,106,42,0.1);
+      font-family: monospace;
+      font-size: 13px;
+      color: #ddc8a0;
+      line-height: 1.7;
       text-align: center;
       image-rendering: pixelated;
+      letter-spacing: 0.5px;
     `;
 
     this.textEl = document.createElement('div');
-    parchment.appendChild(this.textEl);
+    this.textEl.style.cssText = `
+      white-space: pre-wrap;
+      text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+    `;
+    panel.appendChild(this.textEl);
 
     const hint = document.createElement('div');
     hint.style.cssText = `
-      margin-top: 16px;
-      font-size: 11px;
-      color: #7a6a4a;
+      margin-top: 14px;
+      font-size: 10px;
+      color: #665830;
       font-style: italic;
     `;
     hint.textContent = 'Press any key to close';
-    parchment.appendChild(hint);
+    panel.appendChild(hint);
 
-    this.container.appendChild(parchment);
+    this.container.appendChild(panel);
 
     // Click to dismiss
     this.container.addEventListener('click', () => this.hide());
