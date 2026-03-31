@@ -120,13 +120,13 @@ export function buildItemMeshes(
 
 export function hideItemMesh(
   meshMap: Map<string, THREE.Mesh>,
-  group: THREE.Group,
+  _group: THREE.Group,
   key: string,
 ): void {
   // Remove the primary mesh and any multi-item spread entries (key#1, key#2, ...)
   for (const [k, mesh] of [...meshMap]) {
     if (k === key || k.startsWith(key + '#')) {
-      group.remove(mesh);
+      mesh.removeFromParent();
       meshMap.delete(k);
     }
   }
