@@ -18,14 +18,15 @@ export class DamageNumberManager {
     return this.group;
   }
 
-  spawn(col: number, row: number, damage: number): void {
+  spawn(col: number, row: number, damage: number, yOffset = 0): void {
     const tex = this.renderNumberTexture(damage);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
     const sprite = new THREE.Sprite(mat);
+    sprite.layers.enableAll(); // visible in all zone passes
 
     const cx = col * CELL_SIZE + CELL_SIZE / 2;
     const cz = row * CELL_SIZE + CELL_SIZE / 2;
-    sprite.position.set(cx, 1.4, cz);
+    sprite.position.set(cx, 1.4 + yOffset, cz);
     sprite.scale.set(NUMBER_SIZE, NUMBER_SIZE, 1);
 
     this.group.add(sprite);

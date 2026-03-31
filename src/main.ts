@@ -1349,7 +1349,7 @@ async function init(): Promise<void> {
           }
           enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(col, row)));
           ls.enemyAnimator.triggerHit(lk(key));
-          damageNumbers.spawn(col, row, projectile.damage);
+          damageNumbers.spawn(col, row, projectile.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
           if (enemy.hp <= 0) {
             handleEnemyKill(key, col, row, enemy);
           } else {
@@ -1710,7 +1710,7 @@ async function init(): Promise<void> {
                 enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
                 ls.enemyAnimator.triggerHit(lk(doorKey(result.targetCol, result.targetRow)));
                 if (result.damage !== undefined) {
-                  damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+                  damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
                 }
               }
               if (result.type === 'hit' && result.targetCol !== undefined && result.targetRow !== undefined) {
@@ -1750,7 +1750,7 @@ async function init(): Promise<void> {
             if (result.type === 'wall_hit' && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
               // Apply damage to breakable wall and handle destruction
               const wallResult = gameState.damageBreakableWall(result.targetCol, result.targetRow, result.damage, activeGrid());
-              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
               if (wallResult.destroyed) {
                 // Hide wall faces, show floor/ceiling
                 const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(result.targetCol, result.targetRow)));
@@ -1779,7 +1779,7 @@ async function init(): Promise<void> {
               }
             }
             if ((result.type === 'barrel_hit' || result.type === 'barrel_destroy') && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
-              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage);
+              damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
               if (result.type === 'barrel_destroy') {
                 const barrelKey = lk(doorKey(result.targetCol, result.targetRow));
                 const barrelMesh = ls.barrelMeshes.meshMap.get(barrelKey);
