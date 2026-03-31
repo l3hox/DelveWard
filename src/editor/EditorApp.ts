@@ -1,6 +1,6 @@
 import type { DungeonLevel, CharDef, Entity, Dungeon, LayerDef } from '../core/types';
 import { buildWalkableSet } from '../core/grid';
-import { getAllLevelEntities } from '../level/levelLoader';
+import { getAllLevelEntities, findEntityLayerIndex } from '../level/levelLoader';
 import { UndoManager } from './UndoManager';
 
 export interface Viewport {
@@ -630,16 +630,33 @@ export class EditorApp {
       }
     }
 
-    // Entity on non-walkable cell
-    for (const e of level.entities) {
-      if (e.row < 0 || e.row >= level.grid.length ||
-          e.col < 0 || e.col >= (level.grid[e.row]?.length ?? 0)) {
-        errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`, entity: e });
-        continue;
+    // Entity on non-walkable cell — check each layer's entities against its own grid
+    if (level.layers) {
+      for (let li = 0; li < level.layers.length; li++) {
+        const layerGrid = level.layers[li].grid;
+        for (const e of level.layers[li].entities) {
+          if (e.row < 0 || e.row >= layerGrid.length ||
+              e.col < 0 || e.col >= (layerGrid[e.row]?.length ?? 0)) {
+            errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds on layer ${level.layers[li].id ?? li}`, entity: e });
+            continue;
+          }
+          const ch = layerGrid[e.row][e.col];
+          if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
+            errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}' on layer ${level.layers[li].id ?? li}`, entity: e });
+          }
+        }
       }
-      const ch = level.grid[e.row][e.col];
-      if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
-        errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
+    } else {
+      for (const e of level.entities) {
+        if (e.row < 0 || e.row >= level.grid.length ||
+            e.col < 0 || e.col >= (level.grid[e.row]?.length ?? 0)) {
+          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`, entity: e });
+          continue;
+        }
+        const ch = level.grid[e.row][e.col];
+        if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
+          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
+        }
       }
     }
 
@@ -651,20 +668,25 @@ export class EditorApp {
     }
 
     // Cross-level stair validation (dungeon mode only)
+    // Searches all layers on both source and target levels.
     if (this.dungeon) {
-      for (const e of level.entities) {
+      const allSourceEntities = getAllLevelEntities(level);
+      for (const e of allSourceEntities) {
         if (e.type !== 'stairs') continue;
         const targetId = e.target as string;
         if (!targetId) continue;
 
-        // Find target stair on another level
+        // Find target stair on another level (search all layers)
         let targetStair: Entity | undefined;
         let targetLevel: DungeonLevel | undefined;
+        let targetLayerIdx = 0;
         for (const otherLevel of this.dungeon.levels) {
           if (otherLevel === level) continue;
-          targetStair = otherLevel.entities.find(oe => oe.id === targetId);
+          const otherEntities = getAllLevelEntities(otherLevel);
+          targetStair = otherEntities.find(oe => oe.id === targetId);
           if (targetStair) {
             targetLevel = otherLevel;
+            targetLayerIdx = findEntityLayerIndex(otherLevel, targetId);
             break;
           }
         }
@@ -678,7 +700,8 @@ export class EditorApp {
           continue;
         }
 
-        // Validate spawn cell (one step in target stair's facing direction)
+        // Validate spawn cell using the target stair's layer grid
+        const targetGrid = targetLevel.layers?.[targetLayerIdx]?.grid ?? targetLevel.grid;
         const FACING_OFFSETS: Record<string, [number, number]> = {
           N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
         };
@@ -687,11 +710,11 @@ export class EditorApp {
         const spawnCol = targetStair.col + dc;
         const spawnRow = targetStair.row + dr;
 
-        if (spawnRow < 0 || spawnRow >= targetLevel.grid.length || spawnCol < 0 || spawnCol >= (targetLevel.grid[spawnRow]?.length ?? 0)) {
+        if (spawnRow < 0 || spawnRow >= targetGrid.length || spawnCol < 0 || spawnCol >= (targetGrid[spawnRow]?.length ?? 0)) {
           errors.push({ message: `Stairs '${e.id ?? '?'}' spawn position (${spawnCol},${spawnRow}) is out of bounds on level '${targetLevel.id}'`, entity: e });
         } else {
           const targetWalkable = buildWalkableSet(targetLevel.charDefs);
-          const targetChar = targetLevel.grid[spawnRow][spawnCol];
+          const targetChar = targetGrid[spawnRow][spawnCol];
           if (!targetWalkable.has(targetChar)) {
             errors.push({ message: `Stairs '${e.id ?? '?'}' spawn position (${spawnCol},${spawnRow}) is on non-walkable cell '${targetChar}' on level '${targetLevel.id}'`, entity: e });
           }
