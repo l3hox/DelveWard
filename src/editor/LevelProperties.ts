@@ -61,7 +61,12 @@ export class LevelProperties {
         this.onChanged?.();
       });
       this.addTextField(body, 'id', level.id ?? '', (val) => {
+        const oldId = level.id;
         level.id = val || undefined;
+        // Update dungeon playerStart.levelId if it referenced the old id
+        if (this.app.dungeon && oldId && this.app.dungeon.playerStart.levelId === oldId) {
+          this.app.dungeon.playerStart.levelId = level.id ?? '';
+        }
         this.onChanged?.();
       });
     });
