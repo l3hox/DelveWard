@@ -1949,11 +1949,11 @@ export class GameState {
   /**
    * Unequip an item from equipment slot to first free backpack slot.
    */
-  unequipToBackpack(equipSlot: EquipSlot): { success: boolean; reason?: string } {
+  unequipToBackpack(equipSlot: EquipSlot, targetSlot?: number): { success: boolean; reason?: string } {
     const entity = this.entityRegistry.getEquipped(equipSlot);
     if (!entity) return { success: false };
 
-    const slot = this.entityRegistry.nextBackpackSlot();
+    const slot = targetSlot ?? this.entityRegistry.nextBackpackSlot();
     if (slot === null) return { success: false, reason: 'Backpack is full' };
 
     this.entityRegistry.moveItem(entity.instanceId, { kind: 'backpack', slot });

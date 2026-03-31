@@ -1522,7 +1522,7 @@ async function init(): Promise<void> {
         gameState.equipFromBackpack(action.backpackSlot);
         break;
       case 'unequip':
-        gameState.unequipToBackpack(action.equipSlot);
+        gameState.unequipToBackpack(action.equipSlot, action.backpackSlot);
         break;
       case 'use':
         {

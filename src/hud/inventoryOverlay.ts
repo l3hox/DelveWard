@@ -371,13 +371,14 @@ export class InventoryOverlay {
     }
 
     if (source.section === 'equipment' && target.section === 'backpack') {
-      // Unequip from equipment to backpack
+      // Unequip from equipment to the specific target backpack slot
       const slot = EQUIP_SLOTS[source.index];
       const entity = gameState.entityRegistry.getEquipped(slot);
       if (!entity) return null;
-      const freeSlot = gameState.entityRegistry.nextBackpackSlot();
-      if (freeSlot === null) return null;
-      return { type: 'unequip', equipSlot: slot, backpackSlot: freeSlot };
+      // Target slot must be empty
+      const existing = gameState.entityRegistry.getBackpackItemAt(target.index);
+      if (existing) return null;
+      return { type: 'unequip', equipSlot: slot, backpackSlot: target.index };
     }
 
     if (source.section === 'backpack' && target.section === 'backpack') {
