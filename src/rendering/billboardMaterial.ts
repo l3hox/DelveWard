@@ -42,7 +42,7 @@ export function createNeutralLitMaterial(map: THREE.Texture): THREE.ShaderMateri
 
       void main() {
         vec4 texColor = texture2D(map, vUv);
-        if (texColor.a < 0.1) discard;
+        if (texColor.a < 0.5) discard;
 
         // Accumulate light intensity (luminance only, no color).
         // Billboard uses object center for lighting — no NdotL, no per-vertex variation.
@@ -70,7 +70,7 @@ export function createNeutralLitMaterial(map: THREE.Texture): THREE.ShaderMateri
     `,
     lights: true,
     fog: true,
-    transparent: true,
+    transparent: false,  // hard cutoff, no alpha blending — avoids cross-zone edge artifacts
     side: THREE.DoubleSide,
     depthWrite: true,
   });
