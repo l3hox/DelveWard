@@ -10,6 +10,29 @@
     {
       "id": "level_1",
       "name": "The Upper Crypts",
+      "environment": "outdoor",
+      "skybox": "daylight",
+      "dustMotes": false,
+      "waterDrips": false,
+      "charDefs": [
+        {
+          "char": "F",
+          "solid": true,
+          "wallTexture": "forest"
+        },
+        {
+          "char": "T",
+          "solid": true,
+          "seeThrough": true,
+          "wallTexture": "forest",
+          "floorTexture": "grass"
+        },
+        {
+          "char": "'",
+          "solid": false,
+          "floorTexture": "grass"
+        }
+      ],
       "grid": [
         "FFFFFFFFFFFFFFFFF",
         "F''''T'T'TT'T'TTF",
@@ -29,11 +52,6 @@
         "#############.###",
         "#################"
       ],
-      "playerStart": {
-        "col": 1,
-        "row": 1,
-        "facing": "S"
-      },
       "entities": [
         {
           "type": "npc",
@@ -211,43 +229,13 @@
           "type": "equipment",
           "id": "equipment_1",
           "itemId": "amulet_gregor"
-        },
-        {
-          "col": 11,
-          "row": 2,
-          "type": "npc",
-          "id": "npc_3",
-          "npcId": "nameless_girl"
         }
       ],
-      "environment": "outdoor",
-      "skybox": "daylight",
-      "dustMotes": false,
-      "waterDrips": false,
       "defaults": {
         "wallTexture": "stone",
         "floorTexture": "stone_tile",
         "ceilingTexture": "dark_rock"
       },
-      "charDefs": [
-        {
-          "char": "F",
-          "solid": true,
-          "wallTexture": "forest"
-        },
-        {
-          "char": "T",
-          "solid": true,
-          "seeThrough": true,
-          "wallTexture": "forest",
-          "floorTexture": "grass"
-        },
-        {
-          "char": "'",
-          "solid": false,
-          "floorTexture": "grass"
-        }
-      ],
       "areas": [
         {
           "fromCol": 0,
@@ -264,6 +252,22 @@
     {
       "id": "level_2",
       "name": "The Dark Warrens",
+      "dustMotes": false,
+      "waterDrips": true,
+      "charDefs": [
+        {
+          "char": "s",
+          "solid": false,
+          "wallTexture": "stone",
+          "floorTexture": "dirt"
+        },
+        {
+          "char": "c",
+          "solid": false,
+          "wallTexture": "brick",
+          "floorTexture": "cobblestone"
+        }
+      ],
       "grid": [
         "###################",
         "#ssssssss#........#",
@@ -285,11 +289,6 @@
         "#cccccccc#...#....#",
         "###################"
       ],
-      "playerStart": {
-        "col": 13,
-        "row": 2,
-        "facing": "S"
-      },
       "entities": [
         {
           "id": "stairs_2",
@@ -522,31 +521,25 @@
           "itemId": "antidote"
         }
       ],
-      "dustMotes": false,
-      "waterDrips": true,
       "defaults": {
         "wallTexture": "mossy",
         "floorTexture": "dirt",
         "ceilingTexture": "dark_rock"
-      },
-      "charDefs": [
-        {
-          "char": "s",
-          "solid": false,
-          "wallTexture": "stone",
-          "floorTexture": "dirt"
-        },
-        {
-          "char": "c",
-          "solid": false,
-          "wallTexture": "brick",
-          "floorTexture": "cobblestone"
-        }
-      ]
+      }
     },
     {
       "id": "level_3",
       "name": "The Troll's Domain",
+      "dustMotes": false,
+      "waterDrips": false,
+      "charDefs": [
+        {
+          "char": "m",
+          "solid": false,
+          "wallTexture": "mossy",
+          "floorTexture": "dirt"
+        }
+      ],
       "grid": [
         "#####################",
         "#####################",
@@ -569,11 +562,6 @@
         "#####################",
         "#####################"
       ],
-      "playerStart": {
-        "col": 2,
-        "row": 3,
-        "facing": "S"
-      },
       "entities": [
         {
           "id": "stairs_4",
@@ -806,21 +794,11 @@
           "enemyType": "orc"
         }
       ],
-      "dustMotes": false,
-      "waterDrips": false,
       "defaults": {
         "wallTexture": "brick",
         "floorTexture": "cobblestone",
         "ceilingTexture": "dark_rock"
-      },
-      "charDefs": [
-        {
-          "char": "m",
-          "solid": false,
-          "wallTexture": "mossy",
-          "floorTexture": "dirt"
-        }
-      ]
+      }
     }
   ]
 }
