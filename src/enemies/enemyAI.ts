@@ -133,6 +133,7 @@ export function updateEnemies(
     if (enemy.aiState === 'flee') {
       const isPassable = (col: number, row: number) =>
         !occupied.has(doorKey(col, row)) &&
+        !gameState.isBlockAt(col, row) &&
         isWalkable(grid, col, row, walkable, isDoorOpen) &&
         (canFly || !isHole?.(col, row));
 
@@ -182,7 +183,8 @@ export function updateEnemies(
         if (occupied.has(doorKey(col, row)) && !(col === enemy.col && row === enemy.row)) {
           return false;
         }
-        return isWalkable(grid, col, row, walkable, isDoorOpen) &&
+        return !gameState.isBlockAt(col, row) &&
+          isWalkable(grid, col, row, walkable, isDoorOpen) &&
           (canFly || !isHole?.(col, row));
       };
 
@@ -201,6 +203,7 @@ export function updateEnemies(
         if (erraticBehavior && Math.random() < (erraticBehavior.params.chance as number)) {
           const isPassableForErratic = (col: number, row: number) =>
             !occupied.has(doorKey(col, row)) &&
+            !gameState.isBlockAt(col, row) &&
             isWalkable(grid, col, row, walkable, isDoorOpen) &&
             (canFly || !isHole?.(col, row));
 
