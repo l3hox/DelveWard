@@ -4,16 +4,32 @@ import { doorKey, type GameState } from '../core/gameState';
 import { itemDatabase } from '../core/itemDatabase';
 import type { ItemEntity } from '../core/entities';
 import { getItemTexture } from './itemSprites';
+import { createNeutralLitMaterial } from './billboardMaterial';
 
-const ITEM_SIZE = 0.3;
-const ITEM_HEIGHT = 0.15;
+const ITEM_SIZE = 0.35;
+const ITEM_HEIGHT = ITEM_SIZE / 2 + 0.02;
+const SPREAD_RADIUS = 0.3;
 
-function createConsumableMaterial(icon: string): THREE.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial({
-    map: getItemTexture(icon),
-    transparent: true,
-    side: THREE.DoubleSide,
-  });
+function mulberry32(seed: number) {
+  return function (): number {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createConsumableBillboardMaterial(icon: string): THREE.ShaderMaterial {
+  return createNeutralLitMaterial(getItemTexture(icon));
+}
+
+function itemOffset(col: number, row: number, index: number): { dx: number; dz: number } {
+  if (index === 0) return { dx: 0, dz: 0 };
+  const rng = mulberry32(col * 7919 + row * 6271 + index * 3037);
+  const angle = rng() * Math.PI * 2;
+  const dist = SPREAD_RADIUS * (0.4 + rng() * 0.6);
+  return { dx: Math.cos(angle) * dist, dz: Math.sin(angle) * dist };
 }
 
 export function addSingleConsumableMesh(
@@ -25,27 +41,28 @@ export function addSingleConsumableMesh(
   const def = itemDatabase.getItem(entity.itemId);
   if (!def || def.type !== 'consumable') return;
 
-  const mat = createConsumableMaterial(def.icon);
+  const mat = createConsumableBillboardMaterial(def.icon);
 
   const loc = entity.location;
-  // Caller guarantees this is a world item.
   const col = (loc as { kind: 'world'; levelId: string; col: number; row: number }).col;
   const row = (loc as { kind: 'world'; levelId: string; col: number; row: number }).row;
   const cx = col * CELL_SIZE + CELL_SIZE / 2;
   const cz = row * CELL_SIZE + CELL_SIZE / 2;
 
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE), mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(cx, ITEM_HEIGHT, cz);
-
-  // Keep first mesh at this cell — matches pickup order (first item picked up first)
   const mapKey = layerIndex !== undefined ? `${layerIndex}:${doorKey(col, row)}` : doorKey(col, row);
-  if (meshMap.has(mapKey)) {
-    return;
+
+  let itemIndex = 0;
+  for (const key of meshMap.keys()) {
+    if (key === mapKey || key.endsWith(':' + doorKey(col, row))) itemIndex++;
   }
 
+  const { dx, dz } = itemOffset(col, row, itemIndex);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE), mat);
+  mesh.position.set(cx + dx, ITEM_HEIGHT, cz + dz);
+
+  const storeKey = itemIndex === 0 ? mapKey : `${mapKey}#${itemIndex}`;
   group.add(mesh);
-  meshMap.set(mapKey, mesh);
+  meshMap.set(storeKey, mesh);
 }
 
 export function buildConsumableMeshes(
@@ -53,30 +70,39 @@ export function buildConsumableMeshes(
 ): { group: THREE.Group; meshMap: Map<string, THREE.Mesh> } {
   const group = new THREE.Group();
   const meshMap = new Map<string, THREE.Mesh>();
-  const geo = new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE);
 
   const groundEntities = gameState.entityRegistry.getAllGroundItemsForLevel(gameState.currentLevelId, gameState.activeLayerIndex);
 
+  const byCell = new Map<string, ItemEntity[]>();
   for (const entity of groundEntities) {
     const def = itemDatabase.getItem(entity.itemId);
     if (!def || def.type !== 'consumable') continue;
-
-    const mat = createConsumableMaterial(def.icon);
-
     const loc = entity.location;
     if (loc.kind !== 'world') continue;
-    const col = loc.col;
-    const row = loc.row;
-    const mapKey = doorKey(col, row);
-    const cx = col * CELL_SIZE + CELL_SIZE / 2;
-    const cz = row * CELL_SIZE + CELL_SIZE / 2;
+    const key = doorKey(loc.col, loc.row);
+    let arr = byCell.get(key);
+    if (!arr) { arr = []; byCell.set(key, arr); }
+    arr.push(entity);
+  }
 
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(cx, ITEM_HEIGHT, cz);
+  for (const [key, entities] of byCell) {
+    const loc = entities[0].location as { kind: 'world'; col: number; row: number };
+    const cx = loc.col * CELL_SIZE + CELL_SIZE / 2;
+    const cz = loc.row * CELL_SIZE + CELL_SIZE / 2;
 
-    group.add(mesh);
-    meshMap.set(mapKey, mesh);
+    for (let i = 0; i < entities.length; i++) {
+      const def = itemDatabase.getItem(entities[i].itemId);
+      if (!def) continue;
+
+      const mat = createConsumableBillboardMaterial(def.icon);
+      const { dx, dz } = itemOffset(loc.col, loc.row, i);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ITEM_SIZE, ITEM_SIZE), mat);
+      mesh.position.set(cx + dx, ITEM_HEIGHT, cz + dz);
+
+      group.add(mesh);
+      const storeKey = i === 0 ? key : `${key}#${i}`;
+      meshMap.set(storeKey, mesh);
+    }
   }
 
   return { group, meshMap };
@@ -91,5 +117,12 @@ export function hideConsumableMesh(
   if (mesh) {
     group.remove(mesh);
     meshMap.delete(key);
+  }
+}
+
+export function updateConsumableBillboards(meshMap: Map<string, THREE.Mesh>, camera: THREE.Camera): void {
+  const facing = camera.rotation.y;
+  for (const mesh of meshMap.values()) {
+    mesh.rotation.y = facing;
   }
 }

@@ -16,8 +16,8 @@ import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rend
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildForestMeshes, updateForestBillboards, type ForestMeshes } from './rendering/forestRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
-import { buildItemMeshes, hideItemMesh, addSingleItemMesh } from './rendering/itemRenderer';
-import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh } from './rendering/consumableRenderer';
+import { buildItemMeshes, hideItemMesh, addSingleItemMesh, updateItemBillboards } from './rendering/itemRenderer';
+import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh, updateConsumableBillboards } from './rendering/consumableRenderer';
 import { preloadItemSprites } from './rendering/itemSprites';
 import { loadLootTables, rollLoot } from './core/lootTable';
 import { EnemyAnimator } from './rendering/enemyAnimator';
@@ -1919,6 +1919,8 @@ async function init(): Promise<void> {
     updateEnemyBillboards(ls.enemyMeshes.meshMap, camera);
     updateNpcBillboards(ls.npcMeshes.meshMap, camera);
     updateForestBillboards(ls.forestMeshes, camera);
+    updateItemBillboards(ls.itemMeshes.meshMap, camera);
+    updateConsumableBillboards(ls.consumableMeshes.meshMap, camera);
 
     // Sync health bar positions (enemies animate with hit shake and lunge)
     ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
