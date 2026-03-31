@@ -121,12 +121,12 @@ export function drawInventoryPanel(
         // Quick-use number indicator for consumables (slots 1-8)
         if (def?.type === 'consumable' && slotIndex < 8) {
           const numStr = String(slotIndex + 1);
-          const nx = sx + SLOT_SIZE - 9;
+          const nx = sx + SLOT_SIZE - 8;
           const ny = slotY + 1;
           // Dark background pill
           ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(nx - 1, ny, 8, 7);
-          drawPixelText(ctx, numStr, nx, ny, '#ffcc44', 1);
+          ctx.fillRect(nx, ny, 6, 7);
+          drawPixelText(ctx, numStr, nx + 1, ny, '#ffcc44', 1);
         }
       }
     }
