@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildDungeon, CELL_SIZE, LAYER_HEIGHT } from './rendering/dungeon';
 import { Player } from './rendering/player';
 import { loadDungeon, getAllLevelEntities, findEntityLayerIndex, resolveLayerCoord } from './level/levelLoader';
-import { buildWalkableSet, getFacingCell, FACING_DELTA } from './core/grid';
+import { buildWalkableSet, getFacingCell, FACING_DELTA, isWalkable } from './core/grid';
 import { GameState, doorKey, meshKey, layerDoorKey } from './core/gameState';
 import { ProjectileManager } from './core/projectileManager';
 import type { TrapLauncherInstance } from './core/gameState';
@@ -1290,20 +1290,54 @@ async function init(): Promise<void> {
 
     // Secret wall detection — walking into a wall cell with a secret wall entity
     ls.player.setOnMoveBlocked((col, row) => {
+      // Secret wall — walk through
       const sw = gameState.getSecretWall(col, row);
       if (sw && !sw.opened) {
         const result = gameState.openSecretWall(col, row, activeGrid());
         if (result.opened) {
           const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(col, row)));
           if (entry) {
-            // Persistent (illusionary): keep wall visible, just make cell walkable
             if (!result.persistent) {
               entry.wallGroup.visible = false;
             }
             entry.floorCeilGroup.visible = true;
           }
           hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
-          // Re-attempt the move now that the cell is walkable
+          ls.player.moveForward();
+          return;
+        }
+      }
+
+      // Block push — walk into pushable block
+      const block = gameState.getBlock(col, row);
+      if (block) {
+        const ps = ls.player.getState();
+        const [dc, dr] = FACING_DELTA[ps.facing];
+        const destCol = col + dc;
+        const destRow = row + dr;
+        if (
+          isWalkable(activeGrid(), destCol, destRow, ls.walkable, gameState.isDoorOpen.bind(gameState)) &&
+          !gameState.isBlockedByEnemy(destCol, destRow) &&
+          !gameState.isBlockAt(destCol, destRow) &&
+          !gameState.isBarrelAt(destCol, destRow)
+        ) {
+          gameState.pushBlock(col, row, destCol, destRow);
+          const fromBlockKey = lk(doorKey(col, row));
+          const toBlockKey = lk(doorKey(destCol, destRow));
+          animateBlockPush(ls.blockMeshes.meshMap, fromBlockKey, col, row, toBlockKey, destCol, destRow);
+          // Pressure plate at destination
+          const destPlate = gameState.plates.get(doorKey(destCol, destRow));
+          if (destPlate) {
+            gameState.activatePressurePlate(destCol, destRow);
+            pressPlate(ls.plateMeshes.meshMap, lk(doorKey(destCol, destRow)));
+          }
+          // Release plate at source
+          const srcPlate = gameState.plates.get(doorKey(col, row));
+          if (srcPlate && srcPlate.activated) {
+            gameState.deactivatePressurePlate(col, row);
+            releasePlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
+          }
+          // Re-attempt the move now that the block cell is free
           ls.player.moveForward();
         }
       }
