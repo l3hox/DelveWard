@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './dungeon';
 import type { GameState } from '../core/gameState';
+import { createNeutralLitMaterial } from './billboardMaterial';
 
 const KEY_SIZE = 0.4;
-const KEY_HEIGHT = 0.15; // just above the floor
+const KEY_HEIGHT = KEY_SIZE / 2 + 0.02; // center of billboard just above ground
 
 function generateKeyTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -50,12 +51,7 @@ export function buildKeyMeshes(gameState: GameState): KeyMeshes {
 
   const keyGeo = new THREE.PlaneGeometry(KEY_SIZE, KEY_SIZE);
   const keyTex = generateKeyTexture();
-  // Lambert so keys are affected by torch/ambient lighting
-  const keyMat = new THREE.MeshLambertMaterial({
-    map: keyTex,
-    transparent: true,
-    side: THREE.DoubleSide,
-  });
+  const keyMat = createNeutralLitMaterial(keyTex);
 
   for (const [mapKey, keyInstance] of gameState.keys) {
     if (keyInstance.pickedUp) continue;
@@ -64,7 +60,6 @@ export function buildKeyMeshes(gameState: GameState): KeyMeshes {
     const cz = keyInstance.row * CELL_SIZE + CELL_SIZE / 2;
 
     const mesh = new THREE.Mesh(keyGeo, keyMat);
-    mesh.rotation.x = -Math.PI / 2; // flat on floor
     mesh.position.set(cx, KEY_HEIGHT, cz);
 
     group.add(mesh);
@@ -80,6 +75,14 @@ export function hideKeyMesh(
 ): void {
   const mesh = meshMap.get(key);
   if (mesh) {
-    mesh.visible = false;
+    mesh.removeFromParent();
+    meshMap.delete(key);
+  }
+}
+
+export function updateKeyBillboards(meshMap: Map<string, THREE.Mesh>, camera: THREE.Camera): void {
+  const facing = camera.rotation.y;
+  for (const mesh of meshMap.values()) {
+    mesh.rotation.y = facing;
   }
 }

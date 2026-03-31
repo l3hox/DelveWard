@@ -8,7 +8,7 @@ import { ProjectileManager } from './core/projectileManager';
 import type { TrapLauncherInstance } from './core/gameState';
 import { interact } from './level/interaction';
 import { buildDoorMeshes, updateDoorMesh, type DoorMeshes, type DoorOrientation } from './rendering/doorRenderer';
-import { buildKeyMeshes, hideKeyMesh } from './rendering/keyRenderer';
+import { buildKeyMeshes, hideKeyMesh, updateKeyBillboards } from './rendering/keyRenderer';
 import { buildPlateMeshes, pressPlate, releasePlate } from './rendering/plateRenderer';
 import { buildTripwireMeshes, hideTripwire } from './rendering/tripwireRenderer';
 import { buildLeverMeshes } from './rendering/leverRenderer';
@@ -1933,6 +1933,7 @@ async function init(): Promise<void> {
     updateForestBillboards(ls.forestMeshes, camera);
     updateItemBillboards(ls.itemMeshes.meshMap, camera);
     updateConsumableBillboards(ls.consumableMeshes.meshMap, camera);
+    updateKeyBillboards(ls.keyMeshes.meshMap, camera);
 
     // Sync health bar positions (enemies animate with hit shake and lunge)
     ls.healthBarManager.updatePositions(ls.enemyMeshes.meshMap);
