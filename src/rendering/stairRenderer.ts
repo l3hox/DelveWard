@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT } from './dungeon';
 import { getFloorTexture, getWallTexture, getCeilingTexture } from './textures';
-import type { TextureSet, TextureArea } from '../core/types';
+import type { TextureSet, TextureArea, CharDef } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
 import type { Facing } from '../core/grid';
 import { doorKey, type StairInstance } from '../core/gameState';
+import { resolveTextures } from '../core/textureResolver';
 
 const STEP_COUNT = 4;
 const STEP_HEIGHT = 0.25;
@@ -285,12 +286,21 @@ export function buildStairMeshes(
   stairs: Map<string, StairInstance>,
   defaults?: TextureSet,
   areas?: TextureArea[],
+  grid?: string[],
+  charDefs?: CharDef[],
 ): StairMeshes {
   const group = new THREE.Group();
 
+  // Build charDef lookup for resolveTextures
+  const charDefMap = new Map<string, CharDef>();
+  if (charDefs) {
+    for (const def of charDefs) charDefMap.set(def.char, def);
+  }
+
   for (const [, stair] of stairs) {
     const { col, row, direction, facing } = stair;
-    const tex = resolveStairTextures(col, row, defaults, areas);
+    const char = grid?.[row]?.[col] ?? '.';
+    const tex = resolveTextures(col, row, char, defaults, charDefMap, areas);
     const stepMat = getStairStepMaterial(tex.floor);
     const sideMat = getStairSideMaterial(tex.wall);
     const ceilMat = getStairCeilingMaterial(tex.ceiling);

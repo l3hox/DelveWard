@@ -379,7 +379,7 @@ function buildLevelScene(
     mergeMap(sharedSconceLightMap, ldSconceMeshes.lightMap, li);
 
     // Stair meshes
-    const ldStairMeshes = buildStairMeshes(gameState.stairs, ldDefaults, ldAreas);
+    const ldStairMeshes = buildStairMeshes(gameState.stairs, ldDefaults, ldAreas, ld.grid, level.charDefs);
     ldStairMeshes.group.position.y = yOffset;
     sharedStairGroup.add(ldStairMeshes.group);
 
