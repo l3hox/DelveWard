@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-31 — Inventory Mouse/Drag-and-Drop, Billboard Items, Editor Improvements
+
+**Inventory mouse support**: Canvas pointer-events toggled when overlay open. Mouse hover moves cursor (shows tooltip). Double-click equips/uses. Right-click drops. HUD coordinate conversion via `getBoundingClientRect()`.
+
+**Drag-and-drop**: Left-click drag between backpack↔equipment. Valid equip slots highlight green during drag (subtype-aware: helm→head, sword→weapon, rings→ring1/ring2). Equipment→backpack drag places item at the specific target slot. Backpack→backpack drag swaps/moves items. `swapBackpackSlots()` works by slot number.
+
+**Direct slot model**: Visual grid position = slot number. Items stay where placed — dragging to slot 7 keeps it there even if earlier slots are empty. `_getBackpackEntityAt` uses `getBackpackItemAt(slot)` instead of sorted index. Keyboard quick-use (1-8) targets by slot number. Slot number indicators (1-8) shown on all backpack slots: gold for consumables, grey for others/empty.
+
+**Sign/bookshelf overlay**: Restyled from parchment to dark dungeon panel with pixelated monospace font.
+
+**Block push on walk**: Blocks pushed by walking into them (no interact key). Pressure plate handling at source/destination.
+
+---
+
 ## 2026-03-31 — Multi-Layer Polish, Billboard Items, Editor Improvements
 
 **Billboard items**: Keys, items, and consumables switched from flat ground-plane meshes to upright billboard sprites using `createNeutralLitMaterial`. Face camera each frame. Multiple items at same cell spread with seeded random offsets. Dropped items get `layers.enableAll()` for multi-zone visibility. `hideItemMesh`/`hideConsumableMesh` use `removeFromParent()` for correct removal from layer sub-groups.
