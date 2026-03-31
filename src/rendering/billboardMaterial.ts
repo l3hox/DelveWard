@@ -16,10 +16,15 @@ export function createNeutralLitMaterial(map: THREE.Texture): THREE.ShaderMateri
       #include <fog_pars_vertex>
       void main() {
         vUv = uv;
-        // Compute object center in VIEW space (same space as Three.js light positions)
-        // so lighting is consistent regardless of camera rotation.
-        vViewCenter = (viewMatrix * vec4(modelMatrix[3].xyz, 1.0)).xyz;
-        vec4 mvPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+        // Compute world matrix — includes instanceMatrix for InstancedMesh
+        #ifdef USE_INSTANCING
+          mat4 worldMatrix = modelMatrix * instanceMatrix;
+        #else
+          mat4 worldMatrix = modelMatrix;
+        #endif
+        // Object center in VIEW space (same space as Three.js light positions)
+        vViewCenter = (viewMatrix * vec4(worldMatrix[3].xyz, 1.0)).xyz;
+        vec4 mvPosition = viewMatrix * worldMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }

@@ -211,7 +211,7 @@ function buildLevelScene(
 
   const sharedForestGroup = new THREE.Group();
   scene.add(sharedForestGroup);
-  const sharedForestBillboards: THREE.Mesh[] = [];
+  const sharedForestInstances: THREE.InstancedMesh[] = [];
 
   const sharedTrapLauncherGroup = new THREE.Group();
   scene.add(sharedTrapLauncherGroup);
@@ -383,11 +383,13 @@ function buildLevelScene(
     ldStairMeshes.group.position.y = yOffset;
     sharedStairGroup.add(ldStairMeshes.group);
 
-    // Forest meshes
+    // Forest meshes — only build if this layer's grid contains forest chars
     const ldForestMeshes = buildForestMeshes(ld.grid, level.charDefs);
-    ldForestMeshes.group.position.y = yOffset;
-    sharedForestGroup.add(ldForestMeshes.group);
-    for (const b of ldForestMeshes.billboards) sharedForestBillboards.push(b);
+    if (ldForestMeshes.instances.length > 0) {
+      ldForestMeshes.group.position.y = yOffset;
+      sharedForestGroup.add(ldForestMeshes.group);
+      for (const inst of ldForestMeshes.instances) sharedForestInstances.push(inst);
+    }
 
     // Trap launcher meshes
     const ldTrapLauncherMeshes = buildTrapLauncherMeshes(gameState);
@@ -510,13 +512,7 @@ function buildLevelScene(
       // Groups without per-cell zone keys — show in all zones
       ldStairMeshes.group.traverse(child => { child.layers.enableAll(); });
       ldTrapLauncherMeshes.group.traverse(child => { child.layers.enableAll(); });
-      for (const billboard of ldForestMeshes.billboards) {
-        const col = Math.floor(billboard.position.x / CELL_SIZE);
-        const row = Math.floor(billboard.position.z / CELL_SIZE);
-        const zone = ldZoneMap.get(doorKey(col, row));
-        if (zone !== undefined) billboard.layers.set(zone);
-        else billboard.layers.enableAll();
-      }
+      ldForestMeshes.group.traverse(child => { child.layers.enableAll(); });
       for (const [, light] of ldSconceMeshes.lightMap) light.layers.enableAll();
     }
   }
@@ -577,7 +573,7 @@ function buildLevelScene(
     leverAnimator,
     sconceMeshes: { group: sharedSconceGroup, meshMap: sharedSconceMeshMap, lightMap: sharedSconceLightMap },
     stairMeshes: { group: sharedStairGroup },
-    forestMeshes: { group: sharedForestGroup, billboards: sharedForestBillboards },
+    forestMeshes: { group: sharedForestGroup, instances: sharedForestInstances },
     trapLauncherMeshes: { group: sharedTrapLauncherGroup },
     projectileMeshes,
     wallEntityMeshes: { group: sharedWallEntityGroup, meshMap: sharedWallEntityMeshMap },
@@ -725,7 +721,8 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1-layered.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/ruins.json');  
+//  const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1-layered.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];

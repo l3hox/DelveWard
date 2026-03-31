@@ -4,6 +4,16 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-03-31 — Forest Renderer: PNG Sprites + Instanced Rendering
+
+**Sprites**: Replaced 4 procedural canvas tree generators (pine/oak/birch/bush) with PNG sprite loading from `public/sprites/props/`. Fixed sizes per variant (2.1-3.0 world units). Border vegetation pass disabled — will be reintroduced once smaller bush/tree sprites are provided.
+
+**Instanced rendering**: Switched from individual `THREE.Mesh` per tree to `THREE.InstancedMesh` (one per variant, 4 draw calls total). Scales to 1000s of trees. Billboard rotation update uses pre-allocated math objects (zero GC per frame). Billboard shader updated with `#ifdef USE_INSTANCING` to correctly transform instance positions for both vertex placement and light distance calculation.
+
+**Editor ID fix (hardened)**: `generateEntityId` and `generateKeyId` now search both the working surface (`level.entities`) AND all layers (`level.layers[].entities`) via a `collectAllEntityIds()` helper, covering edge cases where references diverge after undo/redo.
+
+---
+
 ## 2026-03-29 — Light Performance + Editor ID Fix
 
 **Light optimization**: All point lights now use `decay=2` (physically correct inverse-square falloff) with tightened `distance` caps. Per-frame distance culling disables lights beyond ~7 cells from camera via `light.visible=false`. Player torch/fill lights are exempt. Analysis of future optimization paths documented in ADR-M4-10 — recommended next step is hybrid vertex color baking (static lights baked, only 2-3 dynamic lights in shader), but distance culling is sufficient for M4 scope.

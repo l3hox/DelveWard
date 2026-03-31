@@ -1173,20 +1173,34 @@ export class EditorApp {
     return null;
   }
 
-  private generateEntityId(type: string): string {
+  /** Collect all entity IDs across all layers and the working surface. */
+  private collectAllEntityIds(): Set<string> {
     const existing = new Set<string>();
+    const addFrom = (entities: Entity[]) => {
+      for (const e of entities) {
+        if (typeof e.id === 'string' && e.id) existing.add(e.id);
+      }
+    };
     if (this.dungeon) {
       for (const level of this.dungeon.levels) {
-        // Search all layers' entities, not just the working surface
-        for (const e of getAllLevelEntities(level)) {
-          if (typeof e.id === 'string' && e.id) existing.add(e.id);
+        // Working surface (may differ from layer ref after undo)
+        addFrom(level.entities);
+        // All layers
+        if (level.layers) {
+          for (const layer of level.layers) addFrom(layer.entities);
         }
       }
     } else if (this.level) {
-      for (const e of getAllLevelEntities(this.level)) {
-        if (typeof e.id === 'string' && e.id) existing.add(e.id);
+      addFrom(this.level.entities);
+      if (this.level.layers) {
+        for (const layer of this.level.layers) addFrom(layer.entities);
       }
     }
+    return existing;
+  }
+
+  private generateEntityId(type: string): string {
+    const existing = this.collectAllEntityIds();
     let n = 1;
     while (existing.has(`${type}_${n}`)) n++;
     return `${type}_${n}`;
@@ -1195,7 +1209,13 @@ export class EditorApp {
   private generateKeyId(): string {
     if (!this.level) return 'key_1';
     const existing = new Set<string>();
-    for (const e of getAllLevelEntities(this.level)) {
+    // Collect keyIds from all entities across all layers + working surface
+    const allEntities: Entity[] = [];
+    allEntities.push(...this.level.entities);
+    if (this.level.layers) {
+      for (const layer of this.level.layers) allEntities.push(...layer.entities);
+    }
+    for (const e of allEntities) {
       const kid = (e as Record<string, unknown>).keyId;
       if (typeof kid === 'string' && kid) existing.add(kid);
     }
