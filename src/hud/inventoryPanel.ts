@@ -99,7 +99,6 @@ export function drawInventoryPanel(
 
   // Backpack: 12 slots, 4 columns x 3 rows
   const backpackY = equipY2 + SLOT_SIZE + SLOT_GAP + 4;
-  const backpackItems = gameState.entityRegistry.getBackpackItems();
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 4; col++) {
@@ -108,26 +107,27 @@ export function drawInventoryPanel(
       const slotY = backpackY + row * (SLOT_SIZE + SLOT_GAP);
       drawSlot(ctx, sx, slotY);
 
-      // Find item in this backpack slot position (by sorted order).
-      if (slotIndex < backpackItems.length) {
-        const entity = backpackItems[slotIndex];
+      const entity = gameState.entityRegistry.getBackpackItemAt(slotIndex);
+      if (entity) {
         let fallbackColor = '#888';
         const def = itemDatabase.getItem(entity.itemId);
         if (def?.type === 'consumable') {
           fallbackColor = CONSUMABLE_COLORS[def.subtype as string] ?? '#888';
         }
         _drawItemIcon(ctx, entity.itemId, sx, slotY, SLOT_SIZE, fallbackColor);
+      }
 
-        // Quick-use number indicator for consumables (slots 1-8)
-        if (def?.type === 'consumable' && slotIndex < 8) {
-          const numStr = String(slotIndex + 1);
-          const nx = sx + SLOT_SIZE - 8;
-          const ny = slotY + 1;
-          // Dark background pill
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(nx, ny, 6, 7);
-          drawPixelText(ctx, numStr, nx + 1, ny, '#ffcc44', 1);
-        }
+      // Slot number indicator (1-8): gold for consumables, grey for others/empty
+      if (slotIndex < 8) {
+        const numStr = String(slotIndex + 1);
+        const nx = sx + SLOT_SIZE - 8;
+        const ny = slotY + 1;
+        const entity2 = gameState.entityRegistry.getBackpackItemAt(slotIndex);
+        const def2 = entity2 ? itemDatabase.getItem(entity2.itemId) : null;
+        const isConsumable = def2?.type === 'consumable';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(nx, ny, 6, 7);
+        drawPixelText(ctx, numStr, nx + 1, ny, isConsumable ? '#ffcc44' : '#666666', 1);
       }
     }
   }
