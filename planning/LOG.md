@@ -4,6 +4,18 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-02 — HUD Panel Mouse, Paperdoll Icons, Polish
+
+**HUD mini panel mouse support**: Window-level mouse listeners route hover/drag/click to the in-game inventory panel without blocking 3D view pointer events. Same interactions as overlay: hover tooltips, double-click equip/use, right-click drop, drag-and-drop with eligible-slot highlighting. Hit testing converts screen coords → HUD coords → panel slot.
+
+**Paperdoll icons**: PNG slot icons (`right_hand`, `left_hand`, `head`, `torso`, `hands`, `legs`, `feet`, `ring`, `amulet`) at 30% opacity in empty equip slots. Replaces letter labels (W/H/C/L/G/S/F/R/A) in both overlay and panel. Loaded via `getPaperdollIcon()` with lazy image caching.
+
+**Billboard alpha fix**: Set `transparent: false` on billboard material. Alpha discard threshold raised 0.1→0.5. Eliminates edge artifacts when sprites render against a different zone's background in multi-pass rendering.
+
+**Stair polish**: Autosave moved to after arriving at destination (loading puts player on landing cell, not back on stair). Player facing preserved across transitions.
+
+---
+
 ## 2026-03-31 — Inventory Mouse/Drag-and-Drop, Billboard Items, Editor Improvements
 
 **Inventory mouse support**: Canvas pointer-events toggled when overlay open. Mouse hover moves cursor (shows tooltip). Double-click equips/uses. Right-click drops. HUD coordinate conversion via `getBoundingClientRect()`.

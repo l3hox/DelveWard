@@ -4,6 +4,48 @@ Detailed checklist of everything that's been built. For session-by-session notes
 
 ---
 
+## M4 — The Vertical World (in progress)
+
+- [x] **Phase 0: Foundation** — LayerState refactor, entity Maps into `layers[]` with getter/setter delegation
+- [x] **Phase A: Outdoor Environment** — `outdoor` preset, skybox variants, environment areas, dynamic fog blending
+- [x] **Phase A2: Multi-Pass Rendering** — Three.js `Object3D.layers` bitmask per zone, boundary door splitting, billboard depthWrite
+- [x] **Phase B: Layer System + Hollow Areas**:
+  - `LayerDef` on `DungeonLevel`, `openBottom`/`openTop` with auto-detect from adjacent layers
+  - Layer IDs as stable numeric coordinates (0, 1, -1...)
+  - `MultiLayerSnapshot` save/load, cross-layer signals, `entityById` with `layerIndex`
+  - All layers fully active: shared meshMaps with `"layerIndex:col,row"` prefixed keys, shared animators
+  - Enemy AI + trap launchers tick all layers, attacks player-layer only
+  - `LAYER_HEIGHT = WALL_HEIGHT` (flush stacking), auto-detect hollow ceilings/floors
+  - Doors slide sideways when layer above has open ceiling, no-ceiling only on topmost layer
+  - Open-air layers skip boundary walls
+- [x] **Phase B Editor**:
+  - Layer list panel (reversed order), Add Above/Below, Remove, Convert to Layers
+  - Working-surface sync for per-layer editing, layer-below preview with checkerboard watermark
+  - openBottom/openTop checkboxes, playerStart with layer coordinate, flood fill tool
+  - Error links navigate to correct level+layer, layer-aware entity highlighting
+  - Entity ID generation searches all layers, level ID rename updates references
+- [x] **Polish — Rendering**:
+  - Forest: PNG sprites + InstancedMesh (4 draw calls), billboard shader USE_INSTANCING
+  - Items/keys/consumables: upright billboard sprites, multi-item seeded spread
+  - Billboard alpha: `transparent:false`, discard 0.5, no cross-zone artifacts
+  - Light: decay=2, tight distance, per-frame distance culling
+  - Damage numbers: layer Y offset + zone visibility
+  - Stair: UV scaling, E/W swap, charDef texture support
+- [x] **Polish — Gameplay**:
+  - Torch fuel skipped in outdoor/mist, sconce embers refresh on pickup
+  - Enemy pathfinding avoids holes (fly flag for bats), enemies blocked by blocks
+  - Player blocked from stepping over holes, blocks pushed by walking into them
+  - Stair autosave at destination, player facing preserved across transitions
+  - Debug: noclip, auto-kill, layer flying (M/Y/H)
+- [x] **Polish — UI**:
+  - Inventory overlay: mouse hover, dblclick, right-click drop, drag-and-drop equip/unequip/rearrange
+  - HUD mini panel: same mouse interactions via window-level listeners
+  - Direct slot model (visual position = slot number), slot indicators 1-8
+  - Paperdoll PNG icons for empty equip slots, sign overlay dark theme
+  - Stair validation warns (not throws), tripwire popup message
+
+---
+
 ## M3 — The Living World
 
 - [x] **Phase A: NPC Foundation**:
