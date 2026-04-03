@@ -480,6 +480,48 @@ export class Inspector {
         }, { step: '1', min: '1' });
         this.addDropsEditor(entity);
         break;
+
+      case 'thin_wall': {
+        this.addDropdownField('wall', (entity.wall as string) ?? 'S', ['S', 'E'], (val) => {
+          entity.wall = val;
+          this.onEntityChanged?.();
+        });
+        const solidWrapper = document.createElement('div');
+        solidWrapper.className = 'inspector-field';
+        const solidLbl = document.createElement('label');
+        solidLbl.style.display = 'flex';
+        solidLbl.style.alignItems = 'center';
+        solidLbl.style.gap = '4px';
+        const solidCb = document.createElement('input');
+        solidCb.type = 'checkbox';
+        solidCb.checked = (entity.solid as boolean) ?? true;
+        solidCb.addEventListener('change', () => {
+          this.onBeforeDiscreteChange?.();
+          entity.solid = solidCb.checked;
+          this.onEntityChanged?.();
+        });
+        solidLbl.appendChild(solidCb);
+        const solidText = document.createElement('span');
+        solidText.textContent = 'solid';
+        solidLbl.appendChild(solidText);
+        solidWrapper.appendChild(solidLbl);
+        this.container.appendChild(solidWrapper);
+        this.addDropdownField('height', (entity.height as string) ?? 'full', ['full', 'half'], (val) => {
+          entity.height = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('texture', (entity.texture as string) ?? 'stone_thin',
+          ['stone_thin', 'iron_fence', 'wood_fence', 'railing'], (val) => {
+          entity.texture = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('textureBack', (entity.textureBack as string) ?? '',
+          ['', 'stone_thin', 'iron_fence', 'wood_fence', 'railing'], (val) => {
+          entity.textureBack = val || undefined;
+          this.onEntityChanged?.();
+        });
+        break;
+      }
     }
   }
 

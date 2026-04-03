@@ -96,6 +96,7 @@ export class ProjectileManager {
     playerRow: number,
     isEnemyAt?: (col: number, row: number) => boolean,
     isBlockAt?: (col: number, row: number) => boolean,
+    isSolidEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
   ): void {
     const toRemove: string[] = [];
 
@@ -118,7 +119,21 @@ export class ProjectileManager {
       let hit = false;
       let distanceToHit = moveDist; // default: full move
 
+      let prevCell: [number, number] | null = null;
       for (const [cellCol, cellRow, distAtEntry] of cells) {
+        // Check thin wall on the edge between previous and current cell.
+        if (prevCell && isSolidEdgeBlocked?.(prevCell[0], prevCell[1], cellCol, cellRow)) {
+          const fraction = distAtEntry / moveDist;
+          projectile.col = startCol + dcol * moveDist * fraction;
+          projectile.row = startRow + drow * moveDist * fraction;
+          projectile.traveled += distAtEntry;
+          this.onHit?.(projectile, cellCol, cellRow, 'wall');
+          toRemove.push(projectile.id);
+          hit = true;
+          break;
+        }
+        prevCell = [cellCol, cellRow];
+
         const hitType = this.checkCellCollision(
           cellCol, cellRow,
           isWalkable, isDoorOpen,

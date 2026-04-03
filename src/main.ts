@@ -56,6 +56,7 @@ import { buildFountainMeshes, markFountainUsed } from './rendering/fountainRende
 import { buildBookshelfMeshes } from './rendering/bookshelfRenderer';
 import { buildAltarMeshes, markAltarUsed } from './rendering/altarRenderer';
 import { buildBarrelMeshes } from './rendering/barrelRenderer';
+import { buildThinWallMeshes } from './rendering/thinWallRenderer';
 import { SignOverlay } from './hud/signOverlay';
 import { DialogOverlay } from './hud/dialogOverlay';
 import { npcDatabase } from './npcs/npcDatabase';
@@ -133,6 +134,7 @@ interface LevelScene {
   bookshelfMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   altarMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   barrelMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  thinWallMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -247,6 +249,10 @@ function buildLevelScene(
   const sharedBarrelGroup = new THREE.Group();
   scene.add(sharedBarrelGroup);
   const sharedBarrelMeshMap = new Map<string, THREE.Group>();
+
+  const sharedThinWallGroup = new THREE.Group();
+  scene.add(sharedThinWallGroup);
+  const sharedThinWallMeshMap = new Map<string, THREE.Group>();
 
   const sharedNpcGroup = new THREE.Group();
   scene.add(sharedNpcGroup);
@@ -449,6 +455,12 @@ function buildLevelScene(
     sharedBarrelGroup.add(ldBarrelMeshes.group);
     mergeMap(sharedBarrelMeshMap, ldBarrelMeshes.meshMap, li);
 
+    // Thin wall meshes
+    const ldThinWallMeshes = buildThinWallMeshes(gameState);
+    ldThinWallMeshes.group.position.y = yOffset;
+    sharedThinWallGroup.add(ldThinWallMeshes.group);
+    mergeMap(sharedThinWallMeshMap, ldThinWallMeshes.meshMap, li);
+
     // NPC meshes
     const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
     ldNpcMeshes.group.position.y = yOffset;
@@ -507,6 +519,11 @@ function buildLevelScene(
       for (const [key, mesh] of ldBookshelfMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldAltarMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldBarrelMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldThinWallMeshes.meshMap) {
+        // Thin wall keys are "col,row:S" or "col,row:E" — strip the direction suffix for zone lookup
+        const cellKey = key.split(':')[0];
+        tagByKey(mesh, cellKey);
+      }
       for (const [key, entry] of ldWallEntityMeshes.meshMap) {
         tagByKey(entry.wallGroup, key);
         tagByKey(entry.floorCeilGroup, key);
@@ -567,6 +584,7 @@ function buildLevelScene(
       return false;
     },
     gameState.stairs,
+    (fromCol: number, fromRow: number, toCol: number, toRow: number) => gameState.isEdgeBlocked(fromCol, fromRow, toCol, toRow),
   );
   player.yOffset = activeLayerIdx * LAYER_HEIGHT;
   player.targetYOffset = player.yOffset;
@@ -600,6 +618,7 @@ function buildLevelScene(
     bookshelfMeshes: { group: sharedBookshelfGroup, meshMap: sharedBookshelfMeshMap },
     altarMeshes: { group: sharedAltarGroup, meshMap: sharedAltarMeshMap },
     barrelMeshes: { group: sharedBarrelGroup, meshMap: sharedBarrelMeshMap },
+    thinWallMeshes: { group: sharedThinWallGroup, meshMap: sharedThinWallMeshMap },
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
     enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,
@@ -641,6 +660,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.bookshelfMeshes.group,
     ls.altarMeshes.group,
     ls.barrelMeshes.group,
+    ls.thinWallMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
@@ -1323,7 +1343,8 @@ async function init(): Promise<void> {
           isWalkable(activeGrid(), destCol, destRow, ls.walkable, gameState.isDoorOpen.bind(gameState)) &&
           !gameState.isBlockedByEnemy(destCol, destRow) &&
           !gameState.isBlockAt(destCol, destRow) &&
-          !gameState.isBarrelAt(destCol, destRow)
+          !gameState.isBarrelAt(destCol, destRow) &&
+          !gameState.isEdgeBlocked(col, row, destCol, destRow)
         ) {
           gameState.pushBlock(col, row, destCol, destRow);
           const fromBlockKey = lk(doorKey(col, row));
@@ -2018,6 +2039,7 @@ async function init(): Promise<void> {
         lastPlayerCol, lastPlayerRow,
         gameState.isEnemyAt.bind(gameState),
         gameState.isBlockAt.bind(gameState),
+        gameState.isSolidEdgeBlocked.bind(gameState),
       );
       tickBlockedDoors(delta);
 
@@ -2106,6 +2128,7 @@ async function init(): Promise<void> {
         const actions = updateEnemies(
           gameState, ps.col, ps.row, layerGrid, ls.walkable,
           gameState.isDoorOpen.bind(gameState), delta, isHole,
+          gameState.isEdgeBlocked.bind(gameState),
         );
         for (const action of actions) {
           if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {

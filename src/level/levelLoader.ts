@@ -314,6 +314,13 @@ function validateEntity(
       if (e.hp !== undefined && (typeof e.hp !== 'number' || (e.hp as number) <= 0)) return `${pfx} barrel hp must be a positive number`;
       break;
     }
+    case 'thin_wall': {
+      const w = checkWalkable('thin_wall'); if (w) return w;
+      if (e.wall !== 'S' && e.wall !== 'E') return `${pfx} thin_wall wall must be 'S' or 'E', got '${e.wall}'`;
+      if (e.height !== undefined && e.height !== 'full' && e.height !== 'half') return `${pfx} thin_wall height must be 'full' or 'half', got '${e.height}'`;
+      if (e.solid !== undefined && typeof e.solid !== 'boolean') return `${pfx} thin_wall solid must be boolean`;
+      break;
+    }
   }
 
   return null;

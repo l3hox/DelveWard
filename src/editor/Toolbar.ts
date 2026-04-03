@@ -22,7 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel',
+  'fountain', 'bookshelf', 'altar', 'barrel', 'thin_wall',
 ] as const;
 
 export class Toolbar {
@@ -926,6 +926,16 @@ export class Toolbar {
         ctx.lineWidth = Math.max(1, r * 0.12);
         ctx.beginPath();
         ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case 'thin_wall': {
+        // Draw a thick horizontal line (representing a wall on a cell edge)
+        ctx.strokeStyle = '#8B4513';  // brick brown
+        ctx.lineWidth = Math.max(2, r * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.8, cy + r * 0.6);
+        ctx.lineTo(cx + r * 0.8, cy + r * 0.6);
         ctx.stroke();
         break;
       }

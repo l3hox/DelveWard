@@ -26,6 +26,7 @@ export function findPath(
   toCol: number,
   toRow: number,
   isPassable: (col: number, row: number) => boolean,
+  isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
 ): PathCell[] | null {
   if (fromCol === toCol && fromRow === toRow) return [];
 
@@ -47,6 +48,7 @@ export function findPath(
       const nc = c + dc;
       const nr = r + dr;
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+      if (isEdgeBlocked?.(c, r, nc, nr)) continue;
 
       const nk = key(nc, nr);
       if (visited.has(nk)) continue;

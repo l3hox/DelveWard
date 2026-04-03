@@ -73,8 +73,8 @@ Dungeon
 | A2 | Multi-Pass Environment Rendering | A | Pending |
 | B | Layer System + Hollow Areas | 0 | Pending |
 | B Editor | Editor: Layer management + hollow areas | B | Pending |
-| C | Thin Walls | 0 | Pending |
-| C Editor | Editor: Thin wall painting | C | Pending |
+| C | Thin Walls | 0 | **Done** |
+| C Editor | Editor: Thin wall painting | C | Basic done, UX polish pending |
 | D | Decorative Props | 0 | Pending |
 | D Editor | Editor: Prop palette + placement | D | Pending |
 | E | Pit Traps | B | Pending |
@@ -282,25 +282,26 @@ interface DungeonLevel {
 
 ## Phase C — Thin Walls
 
-Edge-based walls between two walkable cells. Enables fences, railings, room dividers, village buildings. Entity-based — fits existing patterns.
+Edge-based walls between two walkable cells. Enables fences, railings, room dividers, village buildings. Entity-based with canonical edge ownership — one entity per edge, no duplicates.
 
 **Current state:** Walls are full cells (`#`). No concept of a wall on just one edge of a walkable cell.
 
+**Key design decision (ADR-M4-06):** Only `wall: 'S'` and `wall: 'E'` are valid. The entity always lives on the cell to the **north** (for S edges) or **west** (for E edges) of the wall line. This means each grid edge maps to exactly one possible entity — no dedup, no ambiguity.
+
 ### Game
-28. **ThinWallInstance**: `{ id?, col, row, wall: Facing, solid: boolean, texture?: string, height?: 'full' | 'half' }`
-29. **Thin wall rendering**: `PlaneGeometry` at cell edge. Full-height = floor to ceiling. Half-height = waist-high (fences, railings) — player can see over but not walk through.
-30. **Movement blocking**: Player/enemy movement check extended — can't cross an edge with a thin wall on either side. Lookup uses active layer's thin wall Map.
-31. **Reciprocal check**: A thin wall at (5,3) wall='N' also blocks movement from (5,2) going south. The check must work from both sides.
-32. **Pathfinding**: Enemy AI pathfinding (`pathfinding.ts`) must respect thin walls. The walkability callback needs thin wall awareness — a cell is reachable but not from all directions. BFS neighbor expansion must check thin wall edges.
-33. **Projectile interaction**: `solid: true` blocks projectiles. `solid: false` (half-height fences) — projectiles pass over.
-34. **Thin wall textures**: 3-4 built-in options (stone_half, iron_fence, wood_fence, railing). Procedural canvas textures.
-35. **Level loader validation**: thin_wall entity with valid wall direction, walkable cell.
+28. **ThinWallInstance**: `{ id?, col, row, wall: 'S' | 'E', solid: boolean, height: 'full' | 'half', texture: string, textureBack?: string }`
+29. **Thin wall rendering**: `PlaneGeometry` at cell edge, double-sided. Front face (`texture`) faces north/west, back face (`textureBack`, defaults to `texture`) faces south/east. Full-height = floor to ceiling. Half-height = waist-high (fences, railings) — player can see over but not walk through.
+30. **Movement blocking**: Player/enemy movement check extended — can't cross an edge with a thin wall. Canonical lookup: moving south from (col, row) checks thin walls at (col, row) for `wall:'S'`. Moving north from (col, row) checks thin walls at (col, row-1) for `wall:'S'`. Same pattern for E/W. Always one entity to check per edge.
+31. **Pathfinding**: Enemy AI pathfinding (`pathfinding.ts`) must respect thin walls. BFS neighbor expansion checks canonical thin wall edges before allowing movement to adjacent cell.
+32. **Projectile interaction**: `solid: true` blocks projectiles. `solid: false` (half-height fences) — projectiles pass over.
+33. **Thin wall textures**: 3-4 built-in options (stone_half, iron_fence, wood_fence, railing). Procedural canvas textures.
+34. **Level loader validation**: thin_wall entity with valid wall direction (`'S'` or `'E'` only), walkable cell.
 
 ### Editor
-36. **Thin wall entity in palette**: New entity type with wall direction auto-detect (from adjacent walls)
-37. **Inspector fields**: wall direction dropdown, solid checkbox, height dropdown (full/half), texture dropdown
-38. **Grid icon**: Line on cell edge — position varies by wall direction, like bookshelf icon
-39. **Drag-to-paint for thin walls** (stretch): Paint a line of thin walls along a cell edge by dragging. Enables quick building perimeters for city buildings.
+35. **Thin wall entity in palette**: New entity type. Clicking near a cell edge auto-resolves to the canonical cell+direction (e.g., clicking the north edge of (5,3) places entity at (5,2) with `wall:'S'`).
+36. **Inspector fields**: wall direction dropdown (S/E only), solid checkbox, height dropdown (full/half), texture dropdown, textureBack dropdown (optional)
+37. **Grid icon**: Line on cell edge — south edge or east edge of the owning cell
+38. **Drag-to-paint for thin walls** (stretch): Paint a line of thin walls along cell edges by dragging. Enables quick building perimeters for city buildings.
 
 ---
 

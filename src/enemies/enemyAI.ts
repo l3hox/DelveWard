@@ -36,6 +36,7 @@ export function updateEnemies(
   isDoorOpen: (col: number, row: number) => boolean,
   delta: number,
   isHole?: (col: number, row: number) => boolean,
+  isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
 ): EnemyAction[] {
   const actions: EnemyAction[] = [];
 
@@ -143,6 +144,7 @@ export function updateEnemies(
       for (const [dc, dr] of CARDINAL_DIRS) {
         const nc = enemy.col + dc;
         const nr = enemy.row + dr;
+        if (isEdgeBlocked?.(enemy.col, enemy.row, nc, nr)) continue;
         if (!isPassable(nc, nr)) continue;
         const d = manhattanDistance(nc, nr, playerCol, playerRow);
         if (d > bestDist) {
@@ -193,6 +195,7 @@ export function updateEnemies(
         enemy.col, enemy.row,
         playerCol, playerRow,
         isPassable,
+        isEdgeBlocked,
       );
 
       if (path && path.length > 1) {
@@ -211,6 +214,7 @@ export function updateEnemies(
           for (const [dc, dr] of CARDINAL_DIRS) {
             const nc = enemy.col + dc;
             const nr = enemy.row + dr;
+            if (isEdgeBlocked?.(enemy.col, enemy.row, nc, nr)) continue;
             if (isPassableForErratic(nc, nr)) {
               candidates.push({ col: nc, row: nr });
             }

@@ -58,6 +58,7 @@ export class PlayerState {
   private walkable: Set<string>;
   private isDoorOpen?: (col: number, row: number) => boolean;
   private isBlocked?: (col: number, row: number) => boolean;
+  private isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean;
 
   constructor(
     col: number,
@@ -66,6 +67,7 @@ export class PlayerState {
     walkable?: Set<string>,
     isDoorOpen?: (col: number, row: number) => boolean,
     isBlocked?: (col: number, row: number) => boolean,
+    isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
   ) {
     this.col = col;
     this.row = row;
@@ -73,6 +75,7 @@ export class PlayerState {
     this.walkable = walkable ?? WALKABLE_CELLS;
     this.isDoorOpen = isDoorOpen;
     this.isBlocked = isBlocked;
+    this.isEdgeBlocked = isEdgeBlocked;
   }
 
   setWalkable(walkable: Set<string>): void {
@@ -84,6 +87,7 @@ export class PlayerState {
     const nc = this.col + dc;
     const nr = this.row + dr;
     if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
+    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -94,6 +98,7 @@ export class PlayerState {
     const nc = this.col - dc;
     const nr = this.row - dr;
     if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
+    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -104,6 +109,7 @@ export class PlayerState {
     const nc = this.col + dc;
     const nr = this.row + dr;
     if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
+    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -114,6 +120,7 @@ export class PlayerState {
     const nc = this.col + dc;
     const nr = this.row + dr;
     if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
+    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;

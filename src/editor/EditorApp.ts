@@ -41,6 +41,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   bookshelf:      { wall: 'N', text: '' },
   altar:          { buffType: 'atk', buffAmount: 5, buffDuration: 60 },
   barrel:         { hp: 10 },
+  thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
 
 export interface ValidationError {
@@ -963,6 +964,11 @@ export class EditorApp {
     // Wall entities: must be on solid (non-walkable) cell
     if (type === 'breakable_wall' || type === 'secret_wall') {
       return !this.walkableSet.has(char) && char !== ' ';
+    }
+    if (type === 'thin_wall') {
+      if (!this.walkableSet.has(char)) return false;
+      const wall = (ENTITY_DEFAULTS.thin_wall.wall as string);
+      return !this.getEntitiesAt(col, row).some(e => e.type === 'thin_wall' && (e.wall as string) === wall);
     }
     // All others require a walkable cell
     return this.walkableSet.has(char);

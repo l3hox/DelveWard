@@ -187,9 +187,9 @@ With multiple layers simulated simultaneously, the question is which game system
 
 ---
 
-## ADR-M4-06 — Thin Walls: Entity-Based Edge Walls
+## ADR-M4-06 — Thin Walls: Canonical Edge Entities
 
-**Status:** Accepted
+**Status:** Accepted (revised 2026-04-02)
 **Date:** 2026-03-27
 
 ### Context
@@ -198,23 +198,51 @@ M4 adds thin walls — walls on the edge between two walkable cells (fences, rai
 
 ### Decision
 
-**Entity-based.** A `thin_wall` entity placed on a walkable cell with a `wall: Facing` field indicating which edge has the wall. Same pattern as levers, signs, and sconces.
+**Entity-based with canonical edge ownership.** Each grid edge has exactly one possible owner cell and direction — no duplicates, no ambiguity.
 
-- `ThinWallInstance`: `{ id?, col, row, wall: Facing, solid: boolean, texture: string, height: 'full' | 'half' }`
-- Blocks movement through that edge (reciprocal — blocks from both sides)
-- Pathfinding must respect thin wall edges (BFS neighbor expansion checks edge)
-- `solid: true` also blocks projectiles; `solid: false` (half-height) allows projectiles over
+**Convention:** Only `wall: 'S'` and `wall: 'E'` are valid directions. The entity always lives on the cell that is **north** (for S edges) or **west** (for E edges) of the physical wall line.
+
+```typescript
+ThinWallInstance: {
+  id?: string;
+  col: number;
+  row: number;
+  wall: 'S' | 'E';            // canonical — only two directions allowed
+  solid: boolean;              // true = blocks projectiles; false = half-height, pass over
+  height: 'full' | 'half';    // full = floor-to-ceiling; half = waist-high
+  texture: string;             // north/west-facing side
+  textureBack?: string;        // south/east-facing side (defaults to texture if omitted)
+}
+```
+
+**Why canonical edges:**
+- **One entity per edge** — no dedup logic, no "which side owns it?" questions
+- **Deterministic lookup**: wall between (5,2) and (5,3)? Check `thinWalls` at (5,2) for `wall:'S'`. One place to look, always.
+- **Two-sided textures**: exterior/interior building walls (e.g., stone outside, wood inside) with a single entity
+- **Editor simplicity**: clicking any edge resolves to exactly one canonical cell+direction. No risk of placing conflicting walls from both sides.
+- **Reciprocal blocking is a read, not a search**: checking movement from (5,3) northward looks up (5,2).S — always one entity to check.
+
+**Rendering:** `PlaneGeometry` at cell edge, double-sided. Front face uses `texture`, back face uses `textureBack` (or `texture` if not set). Full-height = floor to ceiling. Half-height = waist-high (fences, railings) — player can see over but not walk through.
+
+**Movement blocking:** Blocks from both sides. The check from either adjacent cell resolves to the same canonical entity.
+
+**Pathfinding:** Enemy AI BFS neighbor expansion checks thin wall edges. A cell is reachable but not from all directions.
+
+**Projectiles:** `solid: true` blocks projectiles. `solid: false` (half-height) allows projectiles to pass over.
 
 ### Alternatives Rejected
 
-**Grid edge data structure:** Rejected. A new `edges` field on the level JSON (per-cell-edge wall definitions) would be more compact for city-scale content but introduces a parallel data model that doesn't fit the existing entity system. Entity-based is consistent with how all other interactive/structural elements work, and editor support follows established patterns. For large cities, drag-to-paint thin walls mitigates the entity count concern.
+1. **Four-direction `wall: Facing`:** Allows N/S/E/W. Risk of duplicate/conflicting entities on the same edge from both sides. Requires dedup in engine and editor. Rejected for unnecessary complexity.
+
+2. **Grid edge data structure:** A new `edges` field on the level JSON would be more compact for city-scale content but introduces a parallel data model outside the entity system. Rejected — entity-based is consistent with all other structural elements.
 
 ### Consequences
 
 - Follows existing entity patterns — editor palette, inspector, grid icon all standard
 - Pathfinding needs extension (check edges, not just cell walkability)
 - A 10×10 building perimeter = ~40 thin wall entities — manageable with editor drag-to-paint
-- No new data structure or parallel storage system
+- No duplicate edge risk — the data model prevents it structurally
+- Two-sided textures enable building exteriors without extra entities
 
 ---
 

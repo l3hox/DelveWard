@@ -218,6 +218,17 @@ export interface BarrelInstance {
   drops?: DropsOverride;
 }
 
+export interface ThinWallInstance {
+  id?: string;
+  col: number;
+  row: number;
+  wall: 'S' | 'E';
+  solid: boolean;
+  height: 'full' | 'half';
+  texture: string;
+  textureBack?: string;
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -231,6 +242,10 @@ export function doorKey(col: number, row: number): string {
 export function parseDoorKey(key: string): [number, number] {
   const [col, row] = key.split(',').map(Number);
   return [col, row];
+}
+
+export function thinWallKey(col: number, row: number, wall: 'S' | 'E'): string {
+  return `${col},${row}:${wall}`;
 }
 
 /** Layer-prefixed mesh key: "layerIndex:col,row". Used by renderers to track meshes across layers. */
@@ -289,6 +304,7 @@ export interface LevelSnapshot {
   bookshelves: Map<string, BookshelfInstance>;
   altars: Map<string, AltarInstance>;
   barrels: Map<string, BarrelInstance>;
+  thinWalls: Map<string, ThinWallInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -325,6 +341,7 @@ export interface LayerState {
   bookshelves: Map<string, BookshelfInstance>;
   altars: Map<string, AltarInstance>;
   barrels: Map<string, BarrelInstance>;
+  thinWalls: Map<string, ThinWallInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -338,6 +355,7 @@ export function createEmptyLayerState(): LayerState {
     secretWalls: new Map(), blocks: new Map(), chests: new Map(),
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
+    thinWalls: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -394,6 +412,8 @@ export class GameState {
   set altars(v) { this.activeLayer.altars = v; }
   get barrels() { return this.activeLayer.barrels; }
   set barrels(v) { this.activeLayer.barrels = v; }
+  get thinWalls() { return this.activeLayer.thinWalls; }
+  set thinWalls(v) { this.activeLayer.thinWalls = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -698,6 +718,18 @@ export class GameState {
           maxHp: hp,
           drops: e.drops as DropsOverride | undefined,
         });
+      } else if (e.type === 'thin_wall') {
+        const wall = (e.wall as 'S' | 'E') ?? 'S';
+        this.thinWalls.set(thinWallKey(e.col, e.row, wall), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          wall,
+          solid: (e.solid as boolean) ?? true,
+          height: (e.height as 'full' | 'half') ?? 'full',
+          texture: (e.texture as string) ?? 'stone_thin',
+          textureBack: e.textureBack as string | undefined,
+        });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (enemyDatabase.getEnemy(enemyType)) {
@@ -954,12 +986,35 @@ export class GameState {
       for (const bs of this.bookshelves.values()) register(bs, 'bookshelf', li);
       for (const a of this.altars.values()) register(a, 'altar', li);
       for (const b of this.barrels.values()) register(b, 'barrel', li);
+      for (const tw of this.thinWalls.values()) register(tw, 'thin_wall', li);
     }
     this.activeLayerIndex = savedIndex;
   }
 
   resolveEntityPosition(id: string): { col: number; row: number; layerIndex: number } | undefined {
     return this.entityById.get(id);
+  }
+
+  /** Resolve a movement between adjacent cells to the canonical thin wall on that edge. */
+  getThinWallBetween(fromCol: number, fromRow: number, toCol: number, toRow: number): ThinWallInstance | undefined {
+    const dc = toCol - fromCol;
+    const dr = toRow - fromRow;
+    if (dc === 0 && dr === 1) return this.thinWalls.get(thinWallKey(fromCol, fromRow, 'S'));
+    if (dc === 0 && dr === -1) return this.thinWalls.get(thinWallKey(toCol, toRow, 'S'));
+    if (dc === 1 && dr === 0) return this.thinWalls.get(thinWallKey(fromCol, fromRow, 'E'));
+    if (dc === -1 && dr === 0) return this.thinWalls.get(thinWallKey(toCol, toRow, 'E'));
+    return undefined;
+  }
+
+  /** Check if movement between adjacent cells is blocked by a thin wall. */
+  isEdgeBlocked(fromCol: number, fromRow: number, toCol: number, toRow: number): boolean {
+    return this.getThinWallBetween(fromCol, fromRow, toCol, toRow) !== undefined;
+  }
+
+  /** Check if movement is blocked by a solid thin wall (for projectiles). */
+  isSolidEdgeBlocked(fromCol: number, fromRow: number, toCol: number, toRow: number): boolean {
+    const tw = this.getThinWallBetween(fromCol, fromRow, toCol, toRow);
+    return tw !== undefined && tw.solid;
   }
 
   private _snapshotActiveLayer(includeGlobal = false): LevelSnapshot {
@@ -1047,6 +1102,10 @@ export class GameState {
     for (const [k, v] of this.barrels) {
       barrels.set(k, { ...v });
     }
+    const thinWalls = new Map<string, ThinWallInstance>();
+    for (const [k, v] of this.thinWalls) {
+      thinWalls.set(k, { ...v });
+    }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1055,7 +1114,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1164,6 +1223,12 @@ export class GameState {
     if (snapshot.barrels) {
       for (const [k, v] of snapshot.barrels) {
         this.barrels.set(k, { ...v });
+      }
+    }
+    this.thinWalls = new Map<string, ThinWallInstance>();
+    if (snapshot.thinWalls) {
+      for (const [k, v] of snapshot.thinWalls) {
+        this.thinWalls.set(k, { ...v });
       }
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);

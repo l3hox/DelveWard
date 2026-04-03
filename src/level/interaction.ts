@@ -75,7 +75,8 @@ export function interact(
       isWalkable(grid, destCol, destRow, undefined, gameState.isDoorOpen.bind(gameState)) &&
       !gameState.isBlockedByEnemy(destCol, destRow) &&
       !gameState.isBlockAt(destCol, destRow) &&
-      !(destCol === playerState.col && destRow === playerState.row)
+      !(destCol === playerState.col && destRow === playerState.row) &&
+      !gameState.isEdgeBlocked(col, row, destCol, destRow)
     ) {
       gameState.pushBlock(col, row, destCol, destRow);
       return { type: 'block_pushed', targetCol: destCol, targetRow: destRow };

@@ -517,6 +517,157 @@ export function getCeilingTexture(name: CeilingTextureName = 'dark_rock'): THREE
 }
 
 // ---------------------------------------------------------------------------
+// Thin wall texture generators
+// ---------------------------------------------------------------------------
+
+export const THIN_WALL_TEXTURE_NAMES = ['stone_thin', 'iron_fence', 'wood_fence', 'railing'] as const;
+export type ThinWallTextureName = typeof THIN_WALL_TEXTURE_NAMES[number];
+
+const THIN_SIZE = 128;
+
+function makeThinCanvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const canvas = document.createElement('canvas');
+  canvas.width = THIN_SIZE;
+  canvas.height = THIN_SIZE;
+  return [canvas, canvas.getContext('2d')!];
+}
+
+function generateThinWallTexture(name: string): THREE.CanvasTexture {
+  const [canvas, ctx] = makeThinCanvas();
+  const S = THIN_SIZE;
+
+  if (name === 'stone_thin') {
+    // Gray stone blocks — horizontal mortar rows, staggered vertical mortar
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const r = vary(112, 12);
+        const g = vary(112, 10);
+        const b = vary(112, 10);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    // Occasional lighter stone patches
+    for (let i = 0; i < 12; i++) {
+      const px = Math.floor(Math.random() * S);
+      const py = Math.floor(Math.random() * S);
+      const v = vary(150, 10);
+      ctx.fillStyle = `rgba(${v},${v},${v},0.3)`;
+      ctx.fillRect(px, py, 8 + Math.floor(Math.random() * 10), 6 + Math.floor(Math.random() * 6));
+    }
+    // Mortar rows
+    const mortarRows = [0, 26, 52, 78, 104];
+    ctx.fillStyle = 'rgba(80, 80, 80, 0.75)';
+    for (const my of mortarRows) {
+      ctx.fillRect(0, my, S, 2);
+    }
+    // Staggered vertical mortar
+    for (let band = 0; band < mortarRows.length; band++) {
+      const offset = band % 2 === 0 ? 0 : 32;
+      const top = mortarRows[band];
+      const bottom = band < mortarRows.length - 1 ? mortarRows[band + 1] : S;
+      for (let vx = offset; vx < S; vx += 64) {
+        ctx.fillRect(vx, top, 2, bottom - top);
+      }
+    }
+
+  } else if (name === 'iron_fence') {
+    // Transparent background with opaque vertical bars — see-through gaps
+    ctx.clearRect(0, 0, S, S);
+    // 4 vertical bars, evenly spaced
+    const barXs = [20, 46, 72, 98];
+    const barW = 8;
+    for (const bx of barXs) {
+      ctx.fillStyle = '#555555';
+      ctx.fillRect(bx, 0, barW, S);
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(bx, 0, 2, S);
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(bx + barW - 2, 0, 2, S);
+    }
+    // 2 horizontal crossbars
+    const crossYs = [32, 96];
+    for (const cy of crossYs) {
+      ctx.fillStyle = '#4a4a4a';
+      ctx.fillRect(0, cy, S, 8);
+      ctx.fillStyle = '#5a5a5a';
+      ctx.fillRect(0, cy, S, 2);
+    }
+
+  } else if (name === 'wood_fence') {
+    // Transparent background with opaque wooden planks — see-through gaps
+    ctx.clearRect(0, 0, S, S);
+    const plankXs = [4, 34, 64, 94];
+    const plankW = 26;
+    for (const px of plankXs) {
+      // Per-pixel wood grain base
+      for (let y = 0; y < S; y++) {
+        for (let x = px; x < px + plankW; x++) {
+          const r = vary(107, 10);
+          const g = vary(68, 8);
+          const b = vary(35, 6);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+      // Subtle horizontal grain lines
+      ctx.fillStyle = 'rgba(80, 50, 24, 0.25)';
+      for (let gy = 6; gy < S; gy += 8 + Math.floor(Math.random() * 4)) {
+        ctx.fillRect(px, gy, plankW, 1);
+      }
+      // Dark plank outlines
+      ctx.fillStyle = '#503318';
+      ctx.fillRect(px, 0, 2, S);
+      ctx.fillRect(px + plankW - 2, 0, 2, S);
+    }
+
+  } else if (name === 'railing') {
+    // Transparent background with opaque bars — see-through gaps
+    ctx.clearRect(0, 0, S, S);
+    // Upper bar (~25% height) and lower bar (~75% height)
+    const barYs = [28, 90];
+    const barH = 10;
+    for (const by of barYs) {
+      ctx.fillStyle = '#505050';
+      ctx.fillRect(0, by, S, barH);
+      // Top highlight
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(0, by, S, 2);
+      // Bottom shadow
+      ctx.fillStyle = '#383838';
+      ctx.fillRect(0, by + barH - 2, S, 2);
+    }
+    // Thin vertical supports, spaced evenly
+    const supportXs = [16, 48, 80, 112];
+    for (const sx of supportXs) {
+      ctx.fillStyle = '#484848';
+      ctx.fillRect(sx, 0, 4, S);
+    }
+
+  } else {
+    // Fallback: solid gray
+    ctx.fillStyle = '#888888';
+    ctx.fillRect(0, 0, S, S);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const thinWallTextureCache = new Map<string, THREE.CanvasTexture>();
+
+export function getThinWallTexture(name: string): THREE.CanvasTexture {
+  const cached = thinWallTextureCache.get(name);
+  if (cached) return cached;
+  const tex = generateThinWallTexture(name);
+  thinWallTextureCache.set(name, tex);
+  return tex;
+}
+
+// ---------------------------------------------------------------------------
 // Door texture generators (standalone, not in registries)
 // ---------------------------------------------------------------------------
 

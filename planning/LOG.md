@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-03 — M4 Phase C: Thin Walls
+
+**Thin walls**: New `thin_wall` entity type — edge-based walls between walkable cells. Canonical edge ownership: only `'S'` and `'E'` directions allowed, entity lives on the north/west cell of the edge. One entity per grid edge, no duplicates possible structurally. ADR-M4-06 revised to reflect this design (was four-direction).
+
+**Data model**: `ThinWallInstance` with `wall: 'S'|'E'`, `solid`, `height: 'full'|'half'`, `texture`, `textureBack?`. Composite map key `"col,row:S"` via `thinWallKey()`. `getThinWallBetween()` resolves any movement direction to the canonical edge.
+
+**Movement blocking approach**: Chose to check at each movement site *outside* `isWalkable()` — zero changes to the core walkability function. New `isEdgeBlocked` optional callback on `PlayerState`, enemy AI (flee/chase/erratic + BFS), `ProjectileManager` (consecutive cell boundary check), and block push. Only `solid: true` walls block projectiles.
+
+**Rendering**: `PlaneGeometry` at cell edges with `MeshLambertMaterial` + `alphaTest: 0.5`. Textures use real alpha channel for see-through (iron_fence, wood_fence, railing have transparent gaps; stone_thin is fully opaque). Two-sided textures (front/back) supported for building exteriors.
+
+**Editor**: Basic support — palette entry, grid icon (line on S/E edge, dashed for half-height), inspector fields. Edge-click auto-resolution and drag-to-paint deferred for UX polish session.
+
+---
+
 ## 2026-04-02 — HUD Panel Mouse, Paperdoll Icons, Polish
 
 **HUD mini panel mouse support**: Window-level mouse listeners route hover/drag/click to the in-game inventory panel without blocking 3D view pointer events. Same interactions as overlay: hover tooltips, double-click equip/use, right-click drop, drag-and-drop with eligible-slot highlighting. Hit testing converts screen coords → HUD coords → panel slot.
