@@ -236,7 +236,10 @@ toolbar.setEntityTypeSelectCallback((type) => {
 });
 
 toolbar.onThinWallToolSelect = (texture) => {
-  app.selectedThinWallTexture = texture;
+  if (texture !== '__erase__') {
+    app.selectedThinWallTexture = texture;
+    app.thinWallEraseOnly = false;
+  }
   app.activeTool = 'thin_wall';
   gridCanvas.updateCursor();
 };

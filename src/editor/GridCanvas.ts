@@ -1661,24 +1661,59 @@ export class GridCanvas {
   ): Array<{ col: number; row: number; wall: 'S' | 'E' }> {
     const edges: Array<{ col: number; row: number; wall: 'S' | 'E' }> = [];
 
-    // Use the wall type from the start edge for consistency
-    const wall = start.wall;
+    // Determine if this is a rectangle drag (spans both axes) or a single line
+    const dCol = Math.abs(end.col - start.col);
+    const dRow = Math.abs(end.row - start.row);
 
-    if (wall === 'S') {
-      // Draw horizontal line of S-edges along a row boundary
-      const row = start.row;
+    if (dCol > 0 && dRow > 0) {
+      // Rectangle drag — draw perimeter thin walls around the enclosed area.
+      // The rectangle is defined by the edges, so we compute the bounding cell range.
+      // For S-edges: the row is the row of the cell owning the south edge
+      // For E-edges: the col is the col of the cell owning the east edge
       const minCol = Math.min(start.col, end.col);
       const maxCol = Math.max(start.col, end.col);
-      for (let c = minCol; c <= maxCol; c++) {
-        edges.push({ col: c, row, wall: 'S' });
-      }
-    } else {
-      // Draw vertical line of E-edges along a column boundary
-      const col = start.col;
       const minRow = Math.min(start.row, end.row);
       const maxRow = Math.max(start.row, end.row);
+
+      // Top side: S-edges along the top row boundary (row = minRow - 1 if we want north edge)
+      // Actually: use the canonical form. North boundary = S-edge of row above.
+      // Top boundary: S-edges at row (minRow - 1) for cols minCol..maxCol
+      if (minRow - 1 >= 0) {
+        for (let c = minCol; c <= maxCol; c++) {
+          edges.push({ col: c, row: minRow - 1, wall: 'S' });
+        }
+      }
+      // Bottom boundary: S-edges at row maxRow for cols minCol..maxCol
+      for (let c = minCol; c <= maxCol; c++) {
+        edges.push({ col: c, row: maxRow, wall: 'S' });
+      }
+      // Left boundary: E-edges at col (minCol - 1) for rows minRow..maxRow
+      if (minCol - 1 >= 0) {
+        for (let r = minRow; r <= maxRow; r++) {
+          edges.push({ col: minCol - 1, row: r, wall: 'E' });
+        }
+      }
+      // Right boundary: E-edges at col maxCol for rows minRow..maxRow
       for (let r = minRow; r <= maxRow; r++) {
-        edges.push({ col, row: r, wall: 'E' });
+        edges.push({ col: maxCol, row: r, wall: 'E' });
+      }
+    } else {
+      // Single axis drag — line of edges
+      const wall = start.wall;
+      if (wall === 'S') {
+        const row = start.row;
+        const minC = Math.min(start.col, end.col);
+        const maxC = Math.max(start.col, end.col);
+        for (let c = minC; c <= maxC; c++) {
+          edges.push({ col: c, row, wall: 'S' });
+        }
+      } else {
+        const col = start.col;
+        const minR = Math.min(start.row, end.row);
+        const maxR = Math.max(start.row, end.row);
+        for (let r = minR; r <= maxR; r++) {
+          edges.push({ col, row: r, wall: 'E' });
+        }
       }
     }
 

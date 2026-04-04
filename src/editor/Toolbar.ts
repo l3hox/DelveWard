@@ -30,6 +30,9 @@ export class Toolbar {
   private charBtns: Map<string, HTMLButtonElement> = new Map();
   private entityBtns: Map<string, HTMLButtonElement> = new Map();
   private thinWallBtns: Map<string, HTMLButtonElement> = new Map();
+  private thinWallEraseBtn: HTMLButtonElement | null = null;
+  private thinWallEraseActive = false;
+  private lastThinWallTexture = 'stone_thin';
   private exportBtn!: HTMLButtonElement;
   private saveBtn!: HTMLButtonElement;
   private saveAsBtn!: HTMLButtonElement;
@@ -161,6 +164,8 @@ export class Toolbar {
     this.palette.innerHTML = '';
     this.charBtns.clear();
     this.thinWallBtns.clear();
+    this.thinWallEraseBtn = null;
+    this.thinWallEraseActive = false;
     this.selectedChar = '.';
 
     const defWall = (defaults?.wallTexture ?? 'stone') as WallTextureName;
@@ -256,19 +261,40 @@ export class Toolbar {
     }
     this.palette.appendChild(thinWallGroup);
 
-    // Erase thin walls checkbox
-    const eraseLabel = document.createElement('label');
-    eraseLabel.className = 'view-toggle';
-    const eraseCheckbox = document.createElement('input');
-    eraseCheckbox.type = 'checkbox';
-    eraseCheckbox.addEventListener('change', () => {
-      this.onViewToggle?.('thinWallEraseOnly', eraseCheckbox.checked);
+    // Erase thin walls toggle button (eraser icon)
+    const eraseBtn = document.createElement('button');
+    eraseBtn.className = 'char-swatch-btn';
+    eraseBtn.title = 'Erase thin walls';
+    const eraseCanvas = document.createElement('canvas');
+    const eSize = 28;
+    eraseCanvas.width = eSize;
+    eraseCanvas.height = eSize;
+    const eCtx = eraseCanvas.getContext('2d')!;
+    // Draw eraser icon: rectangle with X
+    eCtx.fillStyle = '#333';
+    eCtx.fillRect(0, 0, eSize, eSize);
+    eCtx.fillStyle = '#cc6666';
+    eCtx.fillRect(4, 6, 20, 16);
+    eCtx.strokeStyle = '#fff';
+    eCtx.lineWidth = 2;
+    eCtx.beginPath();
+    eCtx.moveTo(8, 10); eCtx.lineTo(20, 18);
+    eCtx.moveTo(20, 10); eCtx.lineTo(8, 18);
+    eCtx.stroke();
+    eraseBtn.appendChild(eraseCanvas);
+    eraseBtn.addEventListener('click', () => {
+      const newState = !this.thinWallEraseActive;
+      this.thinWallEraseActive = newState;
+      eraseBtn.classList.toggle('selected', newState);
+      this.onViewToggle?.('thinWallEraseOnly', newState);
+      if (newState) {
+        // Deselect texture swatches when entering erase mode
+        for (const b of this.thinWallBtns.values()) b.classList.remove('selected');
+      }
+      this.onThinWallToolSelect?.(newState ? '__erase__' : this.lastThinWallTexture);
     });
-    eraseLabel.appendChild(eraseCheckbox);
-    const eraseText = document.createElement('span');
-    eraseText.textContent = 'Erase Walls';
-    eraseLabel.appendChild(eraseText);
-    this.palette.appendChild(eraseLabel);
+    this.thinWallEraseBtn = eraseBtn;
+    thinWallGroup.appendChild(eraseBtn);
 
     // Flood fill toggle
     this.palette.appendChild(this.makePaletteSep());
@@ -1111,12 +1137,17 @@ export class Toolbar {
     parent.appendChild(btn);
   }
 
-  private selectThinWallBtn(btn: HTMLButtonElement, _texName: string): void {
+  private selectThinWallBtn(btn: HTMLButtonElement, texName: string): void {
     // Deselect all other button types
     for (const b of this.charBtns.values()) b.classList.remove('selected');
     for (const b of this.entityBtns.values()) b.classList.remove('selected');
     for (const b of this.thinWallBtns.values()) b.classList.remove('selected');
     btn.classList.add('selected');
+
+    // Deselect erase button and exit erase mode
+    this.thinWallEraseActive = false;
+    this.thinWallEraseBtn?.classList.remove('selected');
+    this.lastThinWallTexture = texName;
 
     // Also deselect the select tool button
     const selectBtn = this.toolBtns.get('select');
