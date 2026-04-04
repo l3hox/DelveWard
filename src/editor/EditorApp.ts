@@ -129,6 +129,7 @@ export class EditorApp {
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
   selectedThinWallTexture = 'stone_thin';
+  selectedThinWallTextureBack: string | null = null;  // null = same as exterior
   thinWallEraseOnly = false;
   undo = new UndoManager();
   onLevelRestored: (() => void) | null = null;
@@ -1323,7 +1324,7 @@ export class EditorApp {
     return { col: edgeCol, row: edgeRow, wall };
   }
 
-  addThinWallOnEdge(col: number, row: number, wall: 'S' | 'E'): Entity | null {
+  addThinWallOnEdge(col: number, row: number, wall: 'S' | 'E', textureOverride?: string, textureBackOverride?: string): Entity | null {
     if (!this.level) return null;
     const grid = this.level.grid;
     if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) return null;
@@ -1341,7 +1342,9 @@ export class EditorApp {
       wall,
       solid: true,
       height: 'full',
-      texture: this.selectedThinWallTexture,
+      texture: textureOverride ?? this.selectedThinWallTexture,
+      ...(textureBackOverride ? { textureBack: textureBackOverride } :
+          this.selectedThinWallTextureBack ? { textureBack: this.selectedThinWallTextureBack } : {}),
     };
 
     this.level.entities.push(entity);

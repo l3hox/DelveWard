@@ -373,8 +373,44 @@ export class GridCanvas {
         }
         if (this.isThinWallDrawing) {
           if (!this.app.thinWallEraseOnly && this.thinWallDrawEdges.length > 0) {
-            for (const edge of this.thinWallDrawEdges) {
-              this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall);
+            const ext = this.app.selectedThinWallTexture;
+            const int = this.app.selectedThinWallTextureBack;
+
+            const hasS = this.thinWallDrawEdges.some(e => e.wall === 'S');
+            const hasE = this.thinWallDrawEdges.some(e => e.wall === 'E');
+            const isRect = hasS && hasE;
+
+            if (isRect && int) {
+              // Rectangle with dual textures — assign exterior/interior per edge side.
+              const sEdges = this.thinWallDrawEdges.filter(e => e.wall === 'S');
+              const eEdges = this.thinWallDrawEdges.filter(e => e.wall === 'E');
+              const topRow = Math.min(...sEdges.map(e => e.row));
+              const leftCol = Math.min(...eEdges.map(e => e.col));
+
+              for (const edge of this.thinWallDrawEdges) {
+                if (edge.wall === 'S') {
+                  if (edge.row === topRow) {
+                    // Top edge: north face = exterior, south face = interior
+                    this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall, ext, int);
+                  } else {
+                    // Bottom edge: north face = interior, south face = exterior
+                    this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall, int, ext);
+                  }
+                } else {
+                  if (edge.col === leftCol) {
+                    // Left edge: west face = exterior, east face = interior
+                    this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall, ext, int);
+                  } else {
+                    // Right edge: west face = interior, east face = exterior
+                    this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall, int, ext);
+                  }
+                }
+              }
+            } else {
+              // Single line or no interior texture — simple placement
+              for (const edge of this.thinWallDrawEdges) {
+                this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall);
+              }
             }
             this.onAfterPaint?.();
           }

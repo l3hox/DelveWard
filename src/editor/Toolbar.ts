@@ -30,6 +30,7 @@ export class Toolbar {
   private charBtns: Map<string, HTMLButtonElement> = new Map();
   private entityBtns: Map<string, HTMLButtonElement> = new Map();
   private thinWallBtns: Map<string, HTMLButtonElement> = new Map();
+  private thinWallBackBtns: Map<string, HTMLButtonElement> = new Map();
   private thinWallEraseBtn: HTMLButtonElement | null = null;
   private thinWallEraseActive = false;
   private lastThinWallTexture = 'stone_thin';
@@ -51,6 +52,7 @@ export class Toolbar {
   onExport: (() => void) | null = null;
   onEntityTypeSelect: ((type: string) => void) | null = null;
   onThinWallToolSelect: ((texture: string) => void) | null = null;
+  onThinWallBackSelect: ((texture: string | null) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
   onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void) | null = null;
@@ -164,6 +166,7 @@ export class Toolbar {
     this.palette.innerHTML = '';
     this.charBtns.clear();
     this.thinWallBtns.clear();
+    this.thinWallBackBtns.clear();
     this.thinWallEraseBtn = null;
     this.thinWallEraseActive = false;
     this.selectedChar = '.';
@@ -254,12 +257,51 @@ export class Toolbar {
     thinWallLabel.textContent = 'Thin Walls';
     this.palette.appendChild(thinWallLabel);
 
-    const thinWallGroup = document.createElement('div');
-    thinWallGroup.className = 'palette-group';
+    // Exterior texture row
+    const extGroup = document.createElement('div');
+    extGroup.className = 'palette-group';
     for (const texName of THIN_WALL_TEXTURE_NAMES) {
-      this.addThinWallBtn(thinWallGroup, texName);
+      this.addThinWallBtn(extGroup, texName);
     }
-    this.palette.appendChild(thinWallGroup);
+    this.palette.appendChild(extGroup);
+
+    // Interior texture row (label + "same" button + texture buttons)
+    const intLabel = document.createElement('span');
+    intLabel.className = 'palette-label';
+    intLabel.textContent = 'Interior';
+    this.palette.appendChild(intLabel);
+
+    const intGroup = document.createElement('div');
+    intGroup.className = 'palette-group';
+
+    // "Same" button — no interior override
+    const sameBtn = document.createElement('button');
+    sameBtn.className = 'char-swatch-btn selected';  // selected by default
+    sameBtn.title = 'Interior: same as exterior';
+    const sameCanvas = document.createElement('canvas');
+    sameCanvas.width = 28;
+    sameCanvas.height = 28;
+    const sameCtx = sameCanvas.getContext('2d')!;
+    sameCtx.fillStyle = '#333';
+    sameCtx.fillRect(0, 0, 28, 28);
+    sameCtx.fillStyle = '#888';
+    sameCtx.font = '10px monospace';
+    sameCtx.textAlign = 'center';
+    sameCtx.textBaseline = 'middle';
+    sameCtx.fillText('=', 14, 14);
+    sameBtn.appendChild(sameCanvas);
+    sameBtn.addEventListener('click', () => {
+      for (const b of this.thinWallBackBtns.values()) b.classList.remove('selected');
+      sameBtn.classList.add('selected');
+      this.onThinWallBackSelect?.(null);
+    });
+    this.thinWallBackBtns.set('__same__', sameBtn);
+    intGroup.appendChild(sameBtn);
+
+    for (const texName of THIN_WALL_TEXTURE_NAMES) {
+      this.addThinWallBackBtn(intGroup, texName);
+    }
+    this.palette.appendChild(intGroup);
 
     // Erase thin walls toggle button (eraser icon)
     const eraseBtn = document.createElement('button');
@@ -270,7 +312,6 @@ export class Toolbar {
     eraseCanvas.width = eSize;
     eraseCanvas.height = eSize;
     const eCtx = eraseCanvas.getContext('2d')!;
-    // Draw eraser icon: rectangle with X
     eCtx.fillStyle = '#333';
     eCtx.fillRect(0, 0, eSize, eSize);
     eCtx.fillStyle = '#cc6666';
@@ -288,13 +329,12 @@ export class Toolbar {
       eraseBtn.classList.toggle('selected', newState);
       this.onViewToggle?.('thinWallEraseOnly', newState);
       if (newState) {
-        // Deselect texture swatches when entering erase mode
         for (const b of this.thinWallBtns.values()) b.classList.remove('selected');
       }
       this.onThinWallToolSelect?.(newState ? '__erase__' : this.lastThinWallTexture);
     });
     this.thinWallEraseBtn = eraseBtn;
-    thinWallGroup.appendChild(eraseBtn);
+    extGroup.appendChild(eraseBtn);
 
     // Flood fill toggle
     this.palette.appendChild(this.makePaletteSep());
@@ -1134,6 +1174,32 @@ export class Toolbar {
     });
 
     this.thinWallBtns.set(texName, btn);
+    parent.appendChild(btn);
+  }
+
+  private addThinWallBackBtn(parent: HTMLElement, texName: string): void {
+    const btn = document.createElement('button');
+    btn.className = 'char-swatch-btn';
+    btn.title = `Interior: ${texName}`;
+
+    const size = 28;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const tex = getThinWallTexture(texName);
+    const src = tex.image as HTMLCanvasElement;
+    ctx.drawImage(src, 0, 0, size, size);
+
+    btn.appendChild(canvas);
+    btn.addEventListener('click', () => {
+      for (const b of this.thinWallBackBtns.values()) b.classList.remove('selected');
+      btn.classList.add('selected');
+      this.onThinWallBackSelect?.(texName);
+    });
+
+    this.thinWallBackBtns.set(texName, btn);
     parent.appendChild(btn);
   }
 

@@ -244,6 +244,10 @@ toolbar.onThinWallToolSelect = (texture) => {
   gridCanvas.updateCursor();
 };
 
+toolbar.onThinWallBackSelect = (texture) => {
+  app.selectedThinWallTextureBack = texture;
+};
+
 toolbar.setItemIdChangeCallback((type, itemId) => {
   if (type === 'equipment') {
     app.selectedEquipmentId = itemId;
