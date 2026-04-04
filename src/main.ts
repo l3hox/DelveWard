@@ -345,8 +345,9 @@ function buildLevelScene(
         ldRampOpenCells.set(doorKey(topCol, topRow), {
           wallDir: OPPOSITE[ramp.facing],
           skipCeiling: false,
-          skipFloor: true,
-          keepHalf: ramp.facing,  // keep the half away from the ramp entrance
+          skipFloor: false,
+          keepHalf: ramp.facing,
+          floorKeepHalf: ramp.facing,  // keep floor on the far half, open where ramp comes through
         });
       }
       gameState.activeLayerIndex = savedIdx;

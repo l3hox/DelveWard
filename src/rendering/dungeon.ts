@@ -99,9 +99,10 @@ export interface RampCellInfo {
   wallDir: import('../core/grid').Facing;  // wall direction to suppress entirely
   skipCeiling: boolean;
   skipFloor: boolean;
-  /** For perpendicular walls: keep only the half in this direction, remove the other half.
-   *  E.g., for a S-facing ramp top cell, keepHalf='S' keeps the south half of E/W walls. */
+  /** For perpendicular walls: keep only the half in this direction, remove the other half. */
   keepHalf?: import('../core/grid').Facing;
+  /** For floor: keep only this half, remove the other. If set, overrides skipFloor. */
+  floorKeepHalf?: import('../core/grid').Facing;
 }
 
 /**
@@ -192,8 +193,26 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       const rampInfo = rampOpenCells?.get(doorKey(col, row));
+      const rampFloorHalf = rampInfo?.floorKeepHalf;
       if (!isStair && !isOpenBottom && !rampInfo?.skipFloor) {
-        if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
+        if (rampFloorHalf) {
+          // Ramp: render only one half of the floor
+          if (rampFloorHalf === 'N' || rampFloorHalf === 'S') {
+            const half = new THREE.Mesh(halfTileNS, cellFloorMat);
+            half.rotation.x = -Math.PI / 2;
+            const oz = rampFloorHalf === 'S' ? CELL_SIZE / 4 : -CELL_SIZE / 4;
+            half.position.set(cx, 0, cz + oz);
+            if (zoneLayer !== undefined) half.layers.set(zoneLayer);
+            group.add(half);
+          } else {
+            const half = new THREE.Mesh(halfTileEW, cellFloorMat);
+            half.rotation.x = -Math.PI / 2;
+            const ox = rampFloorHalf === 'E' ? CELL_SIZE / 4 : -CELL_SIZE / 4;
+            half.position.set(cx + ox, 0, cz);
+            if (zoneLayer !== undefined) half.layers.set(zoneLayer);
+            group.add(half);
+          }
+        } else if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           // Boundary cell: split floor into two halves, each tagged to its zone
           if (splitAxis === 'NS') {
             const floorN = new THREE.Mesh(halfTileNS, cellFloorMat);
@@ -202,7 +221,6 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
             const floorS = new THREE.Mesh(halfTileNS, cellFloorMat);
             floorS.rotation.x = -Math.PI / 2;
             floorS.position.set(cx, 0, cz + CELL_SIZE / 4);
-            // North half gets whichever zone is to the north
             const zN = envZoneMap!.get(doorKey(col, row - 1));
             floorN.layers.set(zN !== undefined && zN !== zoneLayer ? zN : zoneLayer);
             floorS.layers.set(zN !== undefined && zN !== zoneLayer ? zoneLayer : neighborZone);
