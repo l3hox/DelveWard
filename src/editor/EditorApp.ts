@@ -139,8 +139,10 @@ export class EditorApp {
 
   loadLevel(level: DungeonLevel): void {
     this.level = level;
-    this.activeLayerIndex = 0;
-    // If level has layers, sync layer 0 data into the working surface
+    // Open the layer where playerStart is (default layer 0)
+    const psLayer = level.playerStart?.layerIndex ?? 0;
+    this.activeLayerIndex = this.resolveLayerIndex(psLayer);
+    // If level has layers, sync active layer data into the working surface
     if (level.layers && level.layers.length > 0) {
       this.syncFromActiveLayer();
     }
@@ -204,7 +206,21 @@ export class EditorApp {
     this.levelCleanSnapshots = dungeon.levels.map(level => JSON.stringify(level));
     this.dirtyLevelIndices = new Set();
     this.undo.init();
-    this.switchToLevel(0);
+    // Open the level and layer where playerStart is
+    const ps = dungeon.playerStart;
+    let startLevelIndex = 0;
+    if (ps.levelId) {
+      const idx = dungeon.levels.findIndex(l => l.id === ps.levelId);
+      if (idx >= 0) startLevelIndex = idx;
+    }
+    // Pre-seed the layer for the start level so switchToLevel opens the right layer
+    const startLevel = dungeon.levels[startLevelIndex];
+    if (startLevel.layers && startLevel.layers.length > 0 && ps.layerIndex !== undefined) {
+      const id = String(ps.layerIndex);
+      const layerIdx = startLevel.layers.findIndex(l => l.id === id);
+      if (layerIdx >= 0) this.lastLayerPerLevel.set(startLevelIndex, layerIdx);
+    }
+    this.switchToLevel(startLevelIndex);
   }
 
   switchToLevel(index: number): void {
