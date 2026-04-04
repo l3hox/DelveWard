@@ -199,17 +199,19 @@ function buildTopCellSideWalls(
     const sn: number[] = [];
 
     if (side < 0) {
+      // Left wall: normal -X, CCW from -X view
+      pushQuad(sv, su, sn,
+        [x, 0, zFar], [x, WALL_HEIGHT, zFar],
+        [x, WALL_HEIGHT, zNear], [x, 0, zNear],
+        [uD, 0], [uD, vH], [0, vH], [0, 0],
+        nx, 0, 0,
+      );
+    } else {
+      // Right wall: normal +X, CCW from +X view
       pushQuad(sv, su, sn,
         [x, 0, zNear], [x, WALL_HEIGHT, zNear],
         [x, WALL_HEIGHT, zFar], [x, 0, zFar],
         [0, 0], [0, vH], [uD, vH], [uD, 0],
-        nx, 0, 0,
-      );
-    } else {
-      pushQuad(sv, su, sn,
-        [x, 0, zNear], [x, 0, zFar],
-        [x, WALL_HEIGHT, zFar], [x, WALL_HEIGHT, zNear],
-        [0, 0], [uD, 0], [uD, vH], [0, vH],
         nx, 0, 0,
       );
     }
