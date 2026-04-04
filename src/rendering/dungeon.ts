@@ -96,9 +96,12 @@ function resolveWallMat(
 }
 
 export interface RampCellInfo {
-  wallDir: import('../core/grid').Facing;  // wall direction to suppress
+  wallDir: import('../core/grid').Facing;  // wall direction to suppress entirely
   skipCeiling: boolean;
   skipFloor: boolean;
+  /** For perpendicular walls: keep only the half in this direction, remove the other half.
+   *  E.g., for a S-facing ramp top cell, keepHalf='S' keeps the south half of E/W walls. */
+  keepHalf?: import('../core/grid').Facing;
 }
 
 export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>): THREE.Group {
@@ -317,35 +320,75 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         return isSolid(grid, c, r, renderable);
       };
 
-      // Ramp facing at this cell — skip the wall in the ramp direction
+      // Ramp facing at this cell — skip the wall in the ramp direction,
+      // and for perpendicular walls keep only the half away from the ramp entrance.
       const rampDir = rampInfo?.wallDir;
+      const rampKeep = rampInfo?.keepHalf;
+
+      // Helper: add a half-wall (only one half of a wall along its length)
+      const addHalfWall = (
+        wallMat: THREE.Material, rotY: number,
+        wx: number, wz: number,
+        keepDir: 'N' | 'S' | 'E' | 'W',
+        wallAxis: 'along-z' | 'along-x',
+      ) => {
+        const half = new THREE.Mesh(halfWallGeo, wallMat);
+        half.rotation.y = rotY;
+        if (wallAxis === 'along-z') {
+          // Wall runs along Z (E/W wall): keep N or S half
+          const oz = keepDir === 'S' ? CELL_SIZE / 4 : -CELL_SIZE / 4;
+          half.position.set(wx, WALL_HEIGHT / 2, wz + oz);
+        } else {
+          // Wall runs along X (N/S wall): keep E or W half
+          const ox = keepDir === 'E' ? CELL_SIZE / 4 : -CELL_SIZE / 4;
+          half.position.set(wx + ox, WALL_HEIGHT / 2, wz);
+        }
+        if (zoneLayer !== undefined) half.layers.set(zoneLayer);
+        group.add(half);
+      };
 
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;
       if (!isStair && !skipN && rampDir !== 'N' && solidCheck(col, row - 1)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
-        addWall(wallMat, 0, cx, cz - CELL_SIZE / 2, 'along-x');
+        if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
+          addHalfWall(wallMat, 0, cx, cz - CELL_SIZE / 2, rampKeep, 'along-x');
+        } else {
+          addWall(wallMat, 0, cx, cz - CELL_SIZE / 2, 'along-x');
+        }
       }
 
       // South wall (faces north, runs along X axis)
       const skipS = wallEntityCells?.has(doorKey(col, row + 1)) ?? false;
       if (!isStair && !skipS && rampDir !== 'S' && solidCheck(col, row + 1)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
-        addWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, 'along-x');
+        if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
+          addHalfWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, rampKeep, 'along-x');
+        } else {
+          addWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, 'along-x');
+        }
       }
 
       // East wall (faces west, runs along Z axis)
       const skipE = wallEntityCells?.has(doorKey(col + 1, row)) ?? false;
       if (!isStair && !skipE && rampDir !== 'E' && solidCheck(col + 1, row)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
-        addWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, 'along-z');
+        if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
+          addHalfWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, rampKeep, 'along-z');
+        } else {
+          addWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, 'along-z');
+        }
       }
 
       // West wall (faces east, runs along Z axis)
       const skipW = wallEntityCells?.has(doorKey(col - 1, row)) ?? false;
       if (!isStair && !skipW && rampDir !== 'W' && solidCheck(col - 1, row)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
-        addWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, 'along-z');
+        if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
+          addHalfWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, rampKeep, 'along-z');
+        } else {
+          addWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, 'along-z');
+        }
       }
     }
   }

@@ -336,6 +336,7 @@ function buildLevelScene(
           wallDir: OPPOSITE[ramp.facing],
           skipCeiling: false,
           skipFloor: true,
+          keepHalf: ramp.facing,  // keep the half away from the ramp entrance
         });
       }
       gameState.activeLayerIndex = savedIdx;
