@@ -171,6 +171,60 @@ function buildTriangularSide(
 }
 
 // ---------------------------------------------------------------------------
+// Side wall extensions for the far half of the top cell
+// ---------------------------------------------------------------------------
+
+/**
+ * The ramp geometry spans from center of bottom cell to center of top cell.
+ * The far half of the top cell (beyond the ramp end) has no geometry from the
+ * dungeon builder (it's a # wall cell). Add full-height side walls covering
+ * that gap: from Z = -CELL_SIZE/2 to Z = -CELL_SIZE in canonical orientation.
+ */
+function buildTopCellSideWalls(
+  material: THREE.MeshLambertMaterial,
+): THREE.Group {
+  const group = new THREE.Group();
+  const half = CELL_SIZE / 2;
+  const zNear = -half;         // where the ramp geometry ends
+  const zFar = -CELL_SIZE;     // far edge of the top cell
+
+  const uD = half / CELL_SIZE; // UV depth for half a cell
+  const vH = WALL_HEIGHT / WALL_HEIGHT; // 1.0
+
+  for (const side of [-1, 1]) {
+    const x = half * side;
+    const nx = side;
+    const sv: number[] = [];
+    const su: number[] = [];
+    const sn: number[] = [];
+
+    if (side < 0) {
+      pushQuad(sv, su, sn,
+        [x, 0, zNear], [x, WALL_HEIGHT, zNear],
+        [x, WALL_HEIGHT, zFar], [x, 0, zFar],
+        [0, 0], [0, vH], [uD, vH], [uD, 0],
+        nx, 0, 0,
+      );
+    } else {
+      pushQuad(sv, su, sn,
+        [x, 0, zNear], [x, 0, zFar],
+        [x, WALL_HEIGHT, zFar], [x, WALL_HEIGHT, zNear],
+        [0, 0], [uD, 0], [uD, vH], [0, vH],
+        nx, 0, 0,
+      );
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
+    group.add(new THREE.Mesh(geo, material));
+  }
+
+  return group;
+}
+
+// ---------------------------------------------------------------------------
 // Ramp geometry (style: 'ramp') — smooth slope
 // ---------------------------------------------------------------------------
 
@@ -212,6 +266,9 @@ function buildSmoothRamp(
   // Triangular side fills
   group.add(buildTriangularSide(-half, sideMaterial));
   group.add(buildTriangularSide(half, sideMaterial));
+
+  // Side walls for the far half of the top cell (beyond ramp geometry)
+  group.add(buildTopCellSideWalls(sideMaterial));
 
   return group;
 }
@@ -348,6 +405,9 @@ function buildStairedRamp(
     sideGeo.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
     group.add(new THREE.Mesh(sideGeo, sideMaterial));
   }
+
+  // Side walls for the far half of the top cell (beyond ramp geometry)
+  group.add(buildTopCellSideWalls(sideMaterial));
 
   return group;
 }
