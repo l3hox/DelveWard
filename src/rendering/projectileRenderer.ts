@@ -89,10 +89,12 @@ export class FireballExplosions {
 
     const points = new THREE.Points(geometry, material);
     points.frustumCulled = false;
+    points.layers.enableAll();
     this.group.add(points);
 
     const light = new THREE.PointLight(0xFF4400, 6, 8, 2);
     light.position.set(worldX, baseY, worldZ);
+    light.layers.enableAll();
     this.group.add(light);
 
     this.active.push({ particles, positions, geometry, points, age: 0, light });
@@ -264,6 +266,7 @@ export function updateProjectileMeshes(
   for (const projectile of projectiles) {
     if (!meshMap.has(projectile.id)) {
       const mesh = createProjectileMesh(projectile.projectileType);
+      mesh.layers.enableAll();
       group.add(mesh);
       meshMap.set(projectile.id, mesh);
     }

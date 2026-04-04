@@ -554,6 +554,7 @@ export class WaterDrips {
     this.drips.push(drip);
 
     const sprite = new THREE.Sprite(this.dropMaterial.clone());
+    sprite.layers.enableAll();
     sprite.position.set(dx, WALL_HEIGHT - 0.02, dz);
     sprite.scale.set(0.02, 0.04, 1);
     this.group.add(sprite);
@@ -566,6 +567,7 @@ export class WaterDrips {
     // Since we remove in order, we rebuild splash array each time
     for (let r = 0; r < SPLASH_RING_COUNT; r++) {
       const sprite = new THREE.Sprite(this.splashMaterial.clone());
+      sprite.layers.enableAll();
       sprite.position.set(x, 0.02, z);
       sprite.scale.set(0.03, 0.01, 1);
       this.group.add(sprite);

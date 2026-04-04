@@ -885,17 +885,22 @@ async function init(): Promise<void> {
   scene.add(damageNumbers.getGroup());
   const swordSwing = new SwordSwingAnimator();
 
-  // Particle effects
+  // Particle effects — enableAll so they render in all zone passes
   const dustMotes = new DustMotes();
   scene.add(dustMotes.getObject());
+  dustMotes.getObject().traverse(c => { c.layers.enableAll(); });
   const sconceEmbers = new SconceEmbers();
   scene.add(sconceEmbers.getObject());
+  sconceEmbers.getObject().traverse(c => { c.layers.enableAll(); });
   const waterDrips = new WaterDrips();
   scene.add(waterDrips.getObject());
+  waterDrips.getObject().traverse(c => { c.layers.enableAll(); });
   const fireflies = new Fireflies();
   scene.add(fireflies.getObject());
+  fireflies.getObject().traverse(c => { c.layers.enableAll(); });
   const fireballExplosions = new FireballExplosions();
   scene.add(fireballExplosions.getObject());
+  fireballExplosions.getObject().traverse(c => { c.layers.enableAll(); });
 
   function enemyDamageFlash(
     meshMap: Map<string, THREE.Mesh>,
