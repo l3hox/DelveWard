@@ -179,35 +179,37 @@ function buildSmoothRamp(
   sideMaterial: THREE.MeshLambertMaterial,
 ): THREE.Group {
   const group = new THREE.Group();
+  const half = CELL_SIZE / 2;
 
-  // Slope surface — a PlaneGeometry tilted to the ramp angle.
-  // PlaneGeometry default normal is +Z; rotating around X by -slopeAngle tilts the
-  // top edge upward so it reaches Y=LAYER_HEIGHT at Z=-CELL_SIZE/2.
-  const slopeGeo = new THREE.PlaneGeometry(CELL_SIZE, SLOPE_LENGTH);
-
-  // Scale UVs so the texture tiles roughly 1:1 across the surface area.
-  {
-    const uv = slopeGeo.getAttribute('uv');
-    const uScale = CELL_SIZE / CELL_SIZE;          // 1.0 — full width
-    const vScale = SLOPE_LENGTH / CELL_SIZE;       // ~1.6 — proportional to length
-    for (let i = 0; i < uv.count; i++) {
-      uv.setX(i, uv.getX(i) * uScale);
-      uv.setY(i, uv.getY(i) * vScale);
-    }
-    uv.needsUpdate = true;
-  }
-
-  slopeGeo.rotateX(-SLOPE_ANGLE);
-
-  // After rotation the plane's center lands at Y=LAYER_HEIGHT/2, Z=0, which is
-  // exactly the midpoint between the bottom edge (Y=0, Z=+half) and top edge
-  // (Y=LAYER_HEIGHT, Z=-half).
+  // Slope surface — a quad with exact vertex positions matching the side triangles.
+  // Bottom edge at (±half, 0, +half), top edge at (±half, LAYER_HEIGHT, -half).
+  const vScale = SLOPE_LENGTH / CELL_SIZE;
+  const slopeVerts = new Float32Array([
+    // Triangle 1: bottom-left, bottom-right, top-right
+    -half, 0, half,   half, 0, half,   half, LAYER_HEIGHT, -half,
+    // Triangle 2: bottom-left, top-right, top-left
+    -half, 0, half,   half, LAYER_HEIGHT, -half,   -half, LAYER_HEIGHT, -half,
+  ]);
+  const slopeUVs = new Float32Array([
+    0, 0,  1, 0,  1, vScale,
+    0, 0,  1, vScale,  0, vScale,
+  ]);
+  // Normal: cross product of (right-left) x (top-bottom) edges
+  const nx = 0;
+  const ny = CELL_SIZE / SLOPE_LENGTH;
+  const nz = LAYER_HEIGHT / SLOPE_LENGTH;
+  const slopeNorms = new Float32Array([
+    nx, ny, nz,  nx, ny, nz,  nx, ny, nz,
+    nx, ny, nz,  nx, ny, nz,  nx, ny, nz,
+  ]);
+  const slopeGeo = new THREE.BufferGeometry();
+  slopeGeo.setAttribute('position', new THREE.BufferAttribute(slopeVerts, 3));
+  slopeGeo.setAttribute('uv', new THREE.BufferAttribute(slopeUVs, 2));
+  slopeGeo.setAttribute('normal', new THREE.BufferAttribute(slopeNorms, 3));
   const slope = new THREE.Mesh(slopeGeo, slopeMaterial);
-  slope.position.set(0, LAYER_HEIGHT / 2, 0);
   group.add(slope);
 
   // Triangular side fills
-  const half = CELL_SIZE / 2;
   group.add(buildTriangularSide(-half, sideMaterial));
   group.add(buildTriangularSide(half, sideMaterial));
 
