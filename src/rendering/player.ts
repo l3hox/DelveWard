@@ -48,11 +48,12 @@ export class Player {
     isBlocked?: (col: number, row: number) => boolean,
     stairs?: Map<string, StairInstance>,
     isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
+    isRampAccessible?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
   ) {
     this.camera = camera;
     this.grid = grid;
     this.stairs = stairs;
-    this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen, isBlocked, isEdgeBlocked);
+    this.state = new PlayerState(startCol, startRow, facing, walkable, isDoorOpen, isBlocked, isEdgeBlocked, isRampAccessible);
 
     const worldPos = this.gridToWorld(startCol, startRow);
     this.currentPos = worldPos.clone();

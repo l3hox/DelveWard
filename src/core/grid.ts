@@ -59,6 +59,7 @@ export class PlayerState {
   private isDoorOpen?: (col: number, row: number) => boolean;
   private isBlocked?: (col: number, row: number) => boolean;
   private isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean;
+  private isRampAccessible?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean;
 
   constructor(
     col: number,
@@ -68,6 +69,7 @@ export class PlayerState {
     isDoorOpen?: (col: number, row: number) => boolean,
     isBlocked?: (col: number, row: number) => boolean,
     isEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
+    isRampAccessible?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
   ) {
     this.col = col;
     this.row = row;
@@ -76,18 +78,25 @@ export class PlayerState {
     this.isDoorOpen = isDoorOpen;
     this.isBlocked = isBlocked;
     this.isEdgeBlocked = isEdgeBlocked;
+    this.isRampAccessible = isRampAccessible;
   }
 
   setWalkable(walkable: Set<string>): void {
     this.walkable = walkable;
   }
 
+  private canMoveTo(grid: string[], nc: number, nr: number): boolean {
+    const walkable = isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked);
+    if (!walkable && !this.isRampAccessible?.(this.col, this.row, nc, nr)) return false;
+    if (walkable && this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
+    return true;
+  }
+
   moveForward(grid: string[]): boolean {
     const [dc, dr] = FACING_DELTA[this.facing];
     const nc = this.col + dc;
     const nr = this.row + dr;
-    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
-    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
+    if (!this.canMoveTo(grid, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -97,8 +106,7 @@ export class PlayerState {
     const [dc, dr] = FACING_DELTA[this.facing];
     const nc = this.col - dc;
     const nr = this.row - dr;
-    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
-    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
+    if (!this.canMoveTo(grid, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -108,8 +116,7 @@ export class PlayerState {
     const [dc, dr] = FACING_DELTA[TURN_LEFT[this.facing]];
     const nc = this.col + dc;
     const nr = this.row + dr;
-    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
-    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
+    if (!this.canMoveTo(grid, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;
@@ -119,8 +126,7 @@ export class PlayerState {
     const [dc, dr] = FACING_DELTA[TURN_RIGHT[this.facing]];
     const nc = this.col + dc;
     const nr = this.row + dr;
-    if (!isWalkable(grid, nc, nr, this.walkable, this.isDoorOpen, this.isBlocked)) return false;
-    if (this.isEdgeBlocked?.(this.col, this.row, nc, nr)) return false;
+    if (!this.canMoveTo(grid, nc, nr)) return false;
     this.col = nc;
     this.row = nr;
     return true;

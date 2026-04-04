@@ -598,6 +598,33 @@ function buildLevelScene(
     },
     gameState.stairs,
     (fromCol: number, fromRow: number, toCol: number, toRow: number) => gameState.isEdgeBlocked(fromCol, fromRow, toCol, toRow),
+    (fromCol: number, fromRow: number, toCol: number, toRow: number) => {
+      const dc = toCol - fromCol;
+      const dr = toRow - fromRow;
+      // Going UP: source cell has a ramp, movement matches ramp facing
+      const rampAtSrc = gameState.ramps.get(doorKey(fromCol, fromRow));
+      if (rampAtSrc) {
+        const [rdx, rdy] = FACING_DELTA[rampAtSrc.facing];
+        if (dc === rdx && dr === rdy) return true;
+      }
+      // Going DOWN: check if there's a ramp on the layer below whose top cell is the source
+      if (gameState.activeLayerIndex > 0) {
+        const savedIdx = gameState.activeLayerIndex;
+        gameState.activeLayerIndex = savedIdx - 1;
+        // The ramp's top cell = (ramp.col + facing_dx, ramp.row + facing_dy)
+        // We're moving FROM that top cell, so check ramps whose top cell matches fromCol,fromRow
+        for (const ramp of gameState.ramps.values()) {
+          const [rdx, rdy] = FACING_DELTA[ramp.facing];
+          if (ramp.col + rdx === fromCol && ramp.row + rdy === fromRow &&
+              dc === -rdx && dr === -rdy) {
+            gameState.activeLayerIndex = savedIdx;
+            return true;
+          }
+        }
+        gameState.activeLayerIndex = savedIdx;
+      }
+      return false;
+    },
   );
   player.yOffset = activeLayerIdx * LAYER_HEIGHT;
   player.targetYOffset = player.yOffset;
