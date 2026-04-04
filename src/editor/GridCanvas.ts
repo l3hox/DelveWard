@@ -1294,6 +1294,52 @@ export class GridCanvas {
         break;
       }
 
+      case 'ramp': {
+        const rFacing = (entity.facing as string) || 'N';
+        const rThick = Math.max(2, Math.min(tw, th) * 0.06);
+        ctx.strokeStyle = '#aa8844';
+        ctx.lineWidth = rThick;
+        ctx.beginPath();
+
+        // Draw slope line from low side to high side based on facing
+        // Facing = direction from bottom to top
+        const margin = Math.min(tw, th) * 0.15;
+        let x1: number, y1: number, x2: number, y2: number;
+        if (rFacing === 'N') {
+          // Bottom at south (py+th), top at north (py)
+          x1 = cx; y1 = py + th - margin;
+          x2 = cx; y2 = py + margin;
+        } else if (rFacing === 'S') {
+          x1 = cx; y1 = py + margin;
+          x2 = cx; y2 = py + th - margin;
+        } else if (rFacing === 'E') {
+          x1 = px + margin; y1 = cy;
+          x2 = px + tw - margin; y2 = cy;
+        } else { // W
+          x1 = px + tw - margin; y1 = cy;
+          x2 = px + margin; y2 = cy;
+        }
+
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // Arrow head at the top (high) end
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const ux = dx / len;
+        const uy = dy / len;
+        const arrowLen = Math.min(tw, th) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - ux * arrowLen + uy * arrowLen * 0.5, y2 - uy * arrowLen - ux * arrowLen * 0.5);
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - ux * arrowLen - uy * arrowLen * 0.5, y2 - uy * arrowLen + ux * arrowLen * 0.5);
+        ctx.stroke();
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);

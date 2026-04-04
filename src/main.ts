@@ -57,6 +57,7 @@ import { buildBookshelfMeshes } from './rendering/bookshelfRenderer';
 import { buildAltarMeshes, markAltarUsed } from './rendering/altarRenderer';
 import { buildBarrelMeshes } from './rendering/barrelRenderer';
 import { buildThinWallMeshes } from './rendering/thinWallRenderer';
+import { buildRampMeshes } from './rendering/rampRenderer';
 import { SignOverlay } from './hud/signOverlay';
 import { DialogOverlay } from './hud/dialogOverlay';
 import { npcDatabase } from './npcs/npcDatabase';
@@ -135,6 +136,7 @@ interface LevelScene {
   altarMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   barrelMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   thinWallMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -253,6 +255,10 @@ function buildLevelScene(
   const sharedThinWallGroup = new THREE.Group();
   scene.add(sharedThinWallGroup);
   const sharedThinWallMeshMap = new Map<string, THREE.Group>();
+
+  const sharedRampGroup = new THREE.Group();
+  scene.add(sharedRampGroup);
+  const sharedRampMeshMap = new Map<string, THREE.Group>();
 
   const sharedNpcGroup = new THREE.Group();
   scene.add(sharedNpcGroup);
@@ -461,6 +467,12 @@ function buildLevelScene(
     sharedThinWallGroup.add(ldThinWallMeshes.group);
     mergeMap(sharedThinWallMeshMap, ldThinWallMeshes.meshMap, li);
 
+    // Ramp meshes
+    const ldRampMeshes = buildRampMeshes(gameState);
+    ldRampMeshes.group.position.y = yOffset;
+    sharedRampGroup.add(ldRampMeshes.group);
+    mergeMap(sharedRampMeshMap, ldRampMeshes.meshMap, li);
+
     // NPC meshes
     const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
     ldNpcMeshes.group.position.y = yOffset;
@@ -519,6 +531,7 @@ function buildLevelScene(
       for (const [key, mesh] of ldBookshelfMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldAltarMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldBarrelMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldRampMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldThinWallMeshes.meshMap) {
         // Thin wall keys are "col,row:S" or "col,row:E" — strip the direction suffix for zone lookup
         const cellKey = key.split(':')[0];
@@ -619,6 +632,7 @@ function buildLevelScene(
     altarMeshes: { group: sharedAltarGroup, meshMap: sharedAltarMeshMap },
     barrelMeshes: { group: sharedBarrelGroup, meshMap: sharedBarrelMeshMap },
     thinWallMeshes: { group: sharedThinWallGroup, meshMap: sharedThinWallMeshMap },
+    rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
     enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,
@@ -661,6 +675,7 @@ function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.altarMeshes.group,
     ls.barrelMeshes.group,
     ls.thinWallMeshes.group,
+    ls.rampMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
@@ -1261,6 +1276,45 @@ async function init(): Promise<void> {
         const playerEnv = resolveEnvironmentAtCell(col, row, ls.level.environment ?? 'dungeon', ls.level.areas);
         if (playerEnv !== 'outdoor' && playerEnv !== 'mist') {
           gameState.drainTorchFuel(1);
+        }
+      }
+
+      // Ramp detection — check if movement crosses a layer boundary via ramp
+      if (col !== prevCol || row !== prevRow) {
+        const dc = col - prevCol;
+        const dr = row - prevRow;
+        // Check ramp at source cell (going UP)
+        const rampAtSrc = gameState.ramps.get(doorKey(prevCol, prevRow));
+        if (rampAtSrc) {
+          const [rdx, rdy] = FACING_DELTA[rampAtSrc.facing];
+          if (dc === rdx && dr === rdy && gameState.activeLayerIndex + 1 < ls.layerGrids.length) {
+            const destLayer = gameState.activeLayerIndex + 1;
+            gameState.activeLayerIndex = destLayer;
+            debugLayerIndex = destLayer;
+            ls.player.targetYOffset = destLayer * LAYER_HEIGHT;
+            ls.player.switchGrid(ls.layerGrids[destLayer], buildWalkableSet(ls.level.charDefs), gameState.stairs);
+          }
+        }
+        // Check ramp at source cell on layer above (going DOWN) — the ramp entity is on the lower layer
+        // and we're on the top cell (one layer up), moving opposite to facing
+        if (gameState.activeLayerIndex > 0) {
+          const lowerLayer = gameState.activeLayerIndex - 1;
+          const savedIdx = gameState.activeLayerIndex;
+          gameState.activeLayerIndex = lowerLayer;
+          const rampBelow = gameState.ramps.get(doorKey(col, row));
+          gameState.activeLayerIndex = savedIdx;
+          if (rampBelow) {
+            const [rdx, rdy] = FACING_DELTA[rampBelow.facing];
+            // The top cell of the ramp is at (rampBelow.col + rdx, rampBelow.row + rdy)
+            // We're moving FROM the top cell in the opposite direction
+            if (prevCol === rampBelow.col + rdx && prevRow === rampBelow.row + rdy &&
+                dc === -rdx && dr === -rdy) {
+              gameState.activeLayerIndex = lowerLayer;
+              debugLayerIndex = lowerLayer;
+              ls.player.targetYOffset = lowerLayer * LAYER_HEIGHT;
+              ls.player.switchGrid(ls.layerGrids[lowerLayer], buildWalkableSet(ls.level.charDefs), gameState.stairs);
+            }
+          }
         }
       }
 

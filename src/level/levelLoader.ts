@@ -321,6 +321,16 @@ function validateEntity(
       if (e.solid !== undefined && typeof e.solid !== 'boolean') return `${pfx} thin_wall solid must be boolean`;
       break;
     }
+    case 'ramp': {
+      const w = checkWalkable('ramp'); if (w) return w;
+      if (e.facing !== undefined && !['N', 'S', 'E', 'W'].includes(e.facing as string)) {
+        return `${pfx} ramp facing must be N, S, E, or W`;
+      }
+      if (e.style !== undefined && e.style !== 'ramp' && e.style !== 'stairs') {
+        return `${pfx} ramp style must be 'ramp' or 'stairs'`;
+      }
+      break;
+    }
   }
 
   return null;

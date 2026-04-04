@@ -22,7 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel',
+  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp',
 ] as const;
 
 export class Toolbar {
@@ -1020,6 +1020,23 @@ export class Toolbar {
         ctx.lineWidth = Math.max(1, r * 0.12);
         ctx.beginPath();
         ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case 'ramp': {
+        ctx.strokeStyle = '#aa8844';
+        ctx.lineWidth = Math.max(2, r * 0.15);
+        ctx.beginPath();
+        // Diagonal line from bottom-left to top-right
+        ctx.moveTo(cx - r * 0.6, cy + r * 0.6);
+        ctx.lineTo(cx + r * 0.6, cy - r * 0.6);
+        ctx.stroke();
+        // Small arrow head at top
+        ctx.beginPath();
+        ctx.moveTo(cx + r * 0.6, cy - r * 0.6);
+        ctx.lineTo(cx + r * 0.2, cy - r * 0.5);
+        ctx.moveTo(cx + r * 0.6, cy - r * 0.6);
+        ctx.lineTo(cx + r * 0.5, cy - r * 0.2);
         ctx.stroke();
         break;
       }

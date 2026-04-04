@@ -481,6 +481,17 @@ export class Inspector {
         this.addDropsEditor(entity);
         break;
 
+      case 'ramp':
+        this.addDropdownField('facing', (entity.facing as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+          entity.facing = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('style', (entity.style as string) ?? 'ramp', ['ramp', 'stairs'], (val) => {
+          entity.style = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
       case 'thin_wall': {
         this.addDropdownField('wall', (entity.wall as string) ?? 'S', ['S', 'E'], (val) => {
           entity.wall = val;

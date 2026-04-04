@@ -21,6 +21,7 @@ import type {
   AltarInstance,
   BarrelInstance,
   ThinWallInstance,
+  RampInstance,
   TempBuff,
 } from './gameState';
 import type { ItemEntity } from './entities';
@@ -57,6 +58,7 @@ interface SerializedLevelSnapshot {
   altars?: Record<string, AltarInstance>;
   barrels?: Record<string, BarrelInstance>;
   thinWalls?: Record<string, ThinWallInstance>;
+  ramps?: Record<string, RampInstance>;
   destroyedWalls: string[];
   exploredCells: string[];
   registrySnapshot: ItemEntity[];
@@ -156,6 +158,7 @@ export function serializeLevelSnapshot(snapshot: LevelSnapshot): SerializedLevel
     altars: mapToRecord(snapshot.altars),
     barrels: mapToRecord(snapshot.barrels),
     thinWalls: mapToRecord(snapshot.thinWalls),
+    ramps: mapToRecord(snapshot.ramps),
     destroyedWalls: setToArray(snapshot.destroyedWalls),
     exploredCells: setToArray(snapshot.exploredCells),
     registrySnapshot: snapshot.registrySnapshot,
@@ -187,6 +190,7 @@ export function deserializeLevelSnapshot(data: SerializedLevelSnapshot): LevelSn
     altars: recordToMap(data.altars ?? {}),
     barrels: recordToMap(data.barrels ?? {}),
     thinWalls: recordToMap(data.thinWalls ?? {}),
+    ramps: recordToMap(data.ramps ?? {}),
     destroyedWalls: arrayToSet(data.destroyedWalls),
     exploredCells: arrayToSet(data.exploredCells),
     registrySnapshot: data.registrySnapshot,

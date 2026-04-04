@@ -229,6 +229,14 @@ export interface ThinWallInstance {
   textureBack?: string;
 }
 
+export interface RampInstance {
+  id?: string;
+  col: number;
+  row: number;
+  facing: Facing;              // direction from bottom to top (N/S/E/W)
+  style: 'ramp' | 'stairs';   // visual style
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -305,6 +313,7 @@ export interface LevelSnapshot {
   altars: Map<string, AltarInstance>;
   barrels: Map<string, BarrelInstance>;
   thinWalls: Map<string, ThinWallInstance>;
+  ramps: Map<string, RampInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -342,6 +351,7 @@ export interface LayerState {
   altars: Map<string, AltarInstance>;
   barrels: Map<string, BarrelInstance>;
   thinWalls: Map<string, ThinWallInstance>;
+  ramps: Map<string, RampInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -355,7 +365,7 @@ export function createEmptyLayerState(): LayerState {
     secretWalls: new Map(), blocks: new Map(), chests: new Map(),
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
-    thinWalls: new Map(),
+    thinWalls: new Map(), ramps: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -414,6 +424,8 @@ export class GameState {
   set barrels(v) { this.activeLayer.barrels = v; }
   get thinWalls() { return this.activeLayer.thinWalls; }
   set thinWalls(v) { this.activeLayer.thinWalls = v; }
+  get ramps() { return this.activeLayer.ramps; }
+  set ramps(v) { this.activeLayer.ramps = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -730,6 +742,14 @@ export class GameState {
           texture: (e.texture as string) ?? 'stone_thin',
           textureBack: e.textureBack as string | undefined,
         });
+      } else if (e.type === 'ramp') {
+        this.ramps.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          facing: (e.facing as Facing) ?? 'N',
+          style: (e.style as 'ramp' | 'stairs') ?? 'ramp',
+        });
       } else if (e.type === 'enemy') {
         const enemyType = e.enemyType as string;
         if (enemyDatabase.getEnemy(enemyType)) {
@@ -987,6 +1007,7 @@ export class GameState {
       for (const a of this.altars.values()) register(a, 'altar', li);
       for (const b of this.barrels.values()) register(b, 'barrel', li);
       for (const tw of this.thinWalls.values()) register(tw, 'thin_wall', li);
+      for (const r of this.ramps.values()) register(r, 'ramp', li);
     }
     this.activeLayerIndex = savedIndex;
   }
@@ -1106,6 +1127,10 @@ export class GameState {
     for (const [k, v] of this.thinWalls) {
       thinWalls.set(k, { ...v });
     }
+    const ramps = new Map<string, RampInstance>();
+    for (const [k, v] of this.ramps) {
+      ramps.set(k, { ...v });
+    }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1114,7 +1139,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, thinWalls, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1229,6 +1254,12 @@ export class GameState {
     if (snapshot.thinWalls) {
       for (const [k, v] of snapshot.thinWalls) {
         this.thinWalls.set(k, { ...v });
+      }
+    }
+    this.ramps = new Map<string, RampInstance>();
+    if (snapshot.ramps) {
+      for (const [k, v] of snapshot.ramps) {
+        this.ramps.set(k, { ...v });
       }
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);

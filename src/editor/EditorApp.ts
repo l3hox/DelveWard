@@ -41,6 +41,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   bookshelf:      { wall: 'N', text: '' },
   altar:          { buffType: 'atk', buffAmount: 5, buffDuration: 60 },
   barrel:         { hp: 10 },
+  ramp:           { facing: 'N', style: 'ramp' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
 
