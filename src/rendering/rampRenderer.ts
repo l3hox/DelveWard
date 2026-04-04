@@ -218,44 +218,165 @@ function buildSmoothRamp(
 // Stairs geometry (style: 'stairs') — stepped
 // ---------------------------------------------------------------------------
 
+/**
+ * Push a quad (two triangles) into the vertex/uv/normal arrays.
+ * Vertices in CCW winding order when viewed from the front.
+ */
+function pushQuad(
+  verts: number[], uvs: number[], normals: number[],
+  a: [number, number, number], b: [number, number, number],
+  c: [number, number, number], d: [number, number, number],
+  uva: [number, number], uvb: [number, number],
+  uvc: [number, number], uvd: [number, number],
+  nx: number, ny: number, nz: number,
+): void {
+  // Triangle 1: a, b, c
+  verts.push(...a, ...b, ...c);
+  uvs.push(...uva, ...uvb, ...uvc);
+  normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+  // Triangle 2: a, c, d
+  verts.push(...a, ...c, ...d);
+  uvs.push(...uva, ...uvc, ...uvd);
+  normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+}
+
 function buildStairedRamp(
   stepMaterial: THREE.MeshLambertMaterial,
   sideMaterial: THREE.MeshLambertMaterial,
 ): THREE.Group {
   const group = new THREE.Group();
-
-  // Stepped side fills — thin boxes on each side forming a staircase silhouette.
-  // Built FIRST so we can size the step boxes to fit between them.
   const half = CELL_SIZE / 2;
-  const sideThickness = 0.05;
+
+  // Build steps as a single BufferGeometry from face quads — no boxes.
+  // Only visible faces: treads (top), risers (front face of each step), and bottom.
+  const verts: number[] = [];
+  const uvArr: number[] = [];
+  const norms: number[] = [];
 
   for (let i = 0; i < RAMP_STEP_COUNT; i++) {
-    const stepHeight = RAMP_STEP_HEIGHT * (i + 1);
-    const stepDepth = RAMP_STEP_DEPTH;
-    const z = CELL_SIZE / 2 - stepDepth / 2 - i * stepDepth;
+    const y0 = RAMP_STEP_HEIGHT * i;       // bottom of this step's riser
+    const y1 = RAMP_STEP_HEIGHT * (i + 1); // top of this step (tread level)
+    const zFront = CELL_SIZE / 2 - i * RAMP_STEP_DEPTH;          // front edge (approach side)
+    const zBack = CELL_SIZE / 2 - (i + 1) * RAMP_STEP_DEPTH;     // back edge
 
-    for (const x of [-half + sideThickness / 2, half - sideThickness / 2]) {
-      const geo = new THREE.BoxGeometry(sideThickness, stepHeight, stepDepth);
-      scaleBoxUVs(geo, sideThickness, stepHeight, stepDepth);
-      const mesh = new THREE.Mesh(geo, sideMaterial);
-      mesh.position.set(x, stepHeight / 2, z);
-      group.add(mesh);
-    }
+    const uW = CELL_SIZE / CELL_SIZE;         // 1.0
+    const uD = RAMP_STEP_DEPTH / CELL_SIZE;
+    const uH = RAMP_STEP_HEIGHT / WALL_HEIGHT;
+
+    // Tread (top face) — horizontal, normal +Y
+    pushQuad(verts, uvArr, norms,
+      [-half, y1, zFront], [half, y1, zFront],
+      [half, y1, zBack], [-half, y1, zBack],
+      [0, 0], [uW, 0], [uW, uD], [0, uD],
+      0, 1, 0,
+    );
+
+    // Riser (front face) — vertical, normal +Z (faces the approach direction)
+    pushQuad(verts, uvArr, norms,
+      [-half, y0, zFront], [half, y0, zFront],
+      [half, y1, zFront], [-half, y1, zFront],
+      [0, 0], [uW, 0], [uW, uH], [0, uH],
+      0, 0, 1,
+    );
   }
 
-  // Step boxes — narrowed to fit between the side fills (avoids Z-fighting).
-  const stepWidth = CELL_SIZE - sideThickness * 2;
-  for (let i = 0; i < RAMP_STEP_COUNT; i++) {
-    const stepHeight = RAMP_STEP_HEIGHT * (i + 1);
-    const stepDepth = RAMP_STEP_DEPTH;
-    const z = CELL_SIZE / 2 - stepDepth / 2 - i * stepDepth;
+  // Bottom face — the underside visible from below (normal -Y)
+  // A single quad at Y=0 spanning the full footprint
+  pushQuad(verts, uvArr, norms,
+    [-half, 0, half], [half, 0, half],
+    [half, 0, -half], [-half, 0, -half],
+    [0, 0], [1, 0], [1, 1], [0, 1],
+    0, -1, 0,
+  );
 
-    const geo = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
-    scaleBoxUVs(geo, stepWidth, stepHeight, stepDepth);
+  // Back wall — the vertical face at the top of the last step (normal -Z)
+  pushQuad(verts, uvArr, norms,
+    [half, 0, -half], [-half, 0, -half],
+    [-half, LAYER_HEIGHT, -half], [half, LAYER_HEIGHT, -half],
+    [0, 0], [1, 0], [1, LAYER_HEIGHT / WALL_HEIGHT], [0, LAYER_HEIGHT / WALL_HEIGHT],
+    0, 0, -1,
+  );
 
-    const mesh = new THREE.Mesh(geo, stepMaterial);
-    mesh.position.set(0, stepHeight / 2, z);
-    group.add(mesh);
+  const stepGeo = new THREE.BufferGeometry();
+  stepGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  stepGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+  stepGeo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
+  group.add(new THREE.Mesh(stepGeo, stepMaterial));
+
+  // Side profiles — stepped silhouette on left and right, built as face quads.
+  for (const side of [-1, 1]) {
+    const x = half * side;
+    const nx = side; // outward normal
+    const sv: number[] = [];
+    const su: number[] = [];
+    const sn: number[] = [];
+
+    for (let i = 0; i < RAMP_STEP_COUNT; i++) {
+      const y0 = RAMP_STEP_HEIGHT * i;
+      const y1 = RAMP_STEP_HEIGHT * (i + 1);
+      const zFront = CELL_SIZE / 2 - i * RAMP_STEP_DEPTH;
+      const zBack = CELL_SIZE / 2 - (i + 1) * RAMP_STEP_DEPTH;
+
+      const uF = (CELL_SIZE / 2 - zFront + CELL_SIZE / 2) / CELL_SIZE; // 0..1 along depth
+      const uB = (CELL_SIZE / 2 - zBack + CELL_SIZE / 2) / CELL_SIZE;
+      const vBot = y0 / WALL_HEIGHT;
+      const vTop = y1 / WALL_HEIGHT;
+
+      // Riser face (vertical strip at each step front)
+      // Winding depends on side: left (x<0) needs opposite winding from right (x>0)
+      if (side < 0) {
+        pushQuad(sv, su, sn,
+          [x, y0, zFront], [x, y1, zFront],
+          [x, y1, zBack], [x, y0, zBack],
+          [uF, vBot], [uF, vTop], [uB, vTop], [uB, vBot],
+          nx, 0, 0,
+        );
+      } else {
+        pushQuad(sv, su, sn,
+          [x, y0, zFront], [x, y0, zBack],
+          [x, y1, zBack], [x, y1, zFront],
+          [uF, vBot], [uB, vBot], [uB, vTop], [uF, vTop],
+          nx, 0, 0,
+        );
+      }
+    }
+
+    // Bottom rectangle: floor to first step front, full depth
+    const vH0 = 0;
+    if (side < 0) {
+      pushQuad(sv, su, sn,
+        [x, 0, half], [x, 0, -half],
+        [x, 0, -half], [x, 0, half],
+        [0, vH0], [1, vH0], [1, vH0], [0, vH0],
+        nx, 0, 0,
+      );
+    }
+
+    // Back wall strip at the far end (from floor to LAYER_HEIGHT)
+    {
+      const vTop = LAYER_HEIGHT / WALL_HEIGHT;
+      if (side < 0) {
+        pushQuad(sv, su, sn,
+          [x, 0, -half], [x, LAYER_HEIGHT, -half],
+          [x, LAYER_HEIGHT, -half], [x, 0, -half],
+          [1, 0], [1, vTop], [1, vTop], [1, 0],
+          nx, 0, 0,
+        );
+      } else {
+        pushQuad(sv, su, sn,
+          [x, 0, -half], [x, 0, -half],
+          [x, LAYER_HEIGHT, -half], [x, LAYER_HEIGHT, -half],
+          [1, 0], [1, 0], [1, vTop], [1, vTop],
+          nx, 0, 0,
+        );
+      }
+    }
+
+    const sideGeo = new THREE.BufferGeometry();
+    sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+    sideGeo.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
+    sideGeo.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
+    group.add(new THREE.Mesh(sideGeo, sideMaterial));
   }
 
   return group;
