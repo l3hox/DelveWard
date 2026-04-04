@@ -352,6 +352,27 @@ function buildLevelScene(
       gameState.activeLayerIndex = savedIdx;
     }
 
+    // Per-wall half-wall overrides: walkable cells adjacent to ramp top cells
+    // need their walls TOWARD the top cell halved (keep only the half away from ramp entrance).
+    const ldRampHalfWalls = new Map<string, import('./core/grid').Facing>();
+    for (const ramp of gameState.ramps.values()) {
+      const [dx, dz] = FACING_DELTA[ramp.facing];
+      const topCol = ramp.col + dx;
+      const topRow = ramp.row + dz;
+      // Perpendicular directions to the ramp facing
+      if (ramp.facing === 'N' || ramp.facing === 'S') {
+        // E/W cells adjacent to top cell draw walls toward it
+        // Cell to the east: its WEST wall faces the top cell
+        ldRampHalfWalls.set(`${doorKey(topCol + 1, topRow)}:W`, ramp.facing);
+        // Cell to the west: its EAST wall faces the top cell
+        ldRampHalfWalls.set(`${doorKey(topCol - 1, topRow)}:E`, ramp.facing);
+      } else {
+        // N/S cells adjacent to top cell draw walls toward it
+        ldRampHalfWalls.set(`${doorKey(topCol, topRow + 1)}:N`, ramp.facing);
+        ldRampHalfWalls.set(`${doorKey(topCol, topRow - 1)}:S`, ramp.facing);
+      }
+    }
+
     // Dungeon geometry
     const ldAboveGrid = layerDefs[li + 1]?.grid;
     const ldBelowGrid = layerDefs[li - 1]?.grid;
@@ -363,6 +384,7 @@ function buildLevelScene(
       (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
       ldAboveGrid, ldBelowGrid,
       ldRampOpenCells,
+      ldRampHalfWalls,
     );
     ldDungeonGroup.position.y = yOffset;
     allDungeonGroup.add(ldDungeonGroup);
@@ -839,7 +861,7 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/ruins.json');  
+  const dungeon: Dungeon = await loadDungeon('/levels/test_ramps.json');  
 // const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1-layered.json');
 //  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
   const startLevelId = dungeon.playerStart.levelId;

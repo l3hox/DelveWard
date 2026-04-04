@@ -104,7 +104,13 @@ export interface RampCellInfo {
   keepHalf?: import('../core/grid').Facing;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>): THREE.Group {
+/**
+ * Map of "col,row:dir" → which half to keep for a specific wall face.
+ * Used when a walkable cell's wall toward a ramp top cell needs to be halved.
+ */
+export type RampHalfWallMap = Map<string, import('../core/grid').Facing>;
+
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -347,11 +353,20 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         group.add(half);
       };
 
+      // Check per-wall half-wall overrides from rampHalfWalls (for walls facing ramp top cells)
+      const cellKey = doorKey(col, row);
+      const halfN = rampHalfWalls?.get(`${cellKey}:N`);
+      const halfS = rampHalfWalls?.get(`${cellKey}:S`);
+      const halfE = rampHalfWalls?.get(`${cellKey}:E`);
+      const halfW = rampHalfWalls?.get(`${cellKey}:W`);
+
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;
       if (!isStair && !skipN && rampDir !== 'N' && solidCheck(col, row - 1)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
-        if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
+        if (halfN) {
+          addHalfWall(wallMat, 0, cx, cz - CELL_SIZE / 2, halfN, 'along-x');
+        } else if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
           addHalfWall(wallMat, 0, cx, cz - CELL_SIZE / 2, rampKeep, 'along-x');
         } else {
           addWall(wallMat, 0, cx, cz - CELL_SIZE / 2, 'along-x');
@@ -362,7 +377,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const skipS = wallEntityCells?.has(doorKey(col, row + 1)) ?? false;
       if (!isStair && !skipS && rampDir !== 'S' && solidCheck(col, row + 1)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
-        if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
+        if (halfS) {
+          addHalfWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, halfS, 'along-x');
+        } else if (rampKeep && (rampKeep === 'E' || rampKeep === 'W')) {
           addHalfWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, rampKeep, 'along-x');
         } else {
           addWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, 'along-x');
@@ -373,7 +390,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const skipE = wallEntityCells?.has(doorKey(col + 1, row)) ?? false;
       if (!isStair && !skipE && rampDir !== 'E' && solidCheck(col + 1, row)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
-        if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
+        if (halfE) {
+          addHalfWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, halfE, 'along-z');
+        } else if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
           addHalfWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, rampKeep, 'along-z');
         } else {
           addWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, 'along-z');
@@ -384,7 +403,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       const skipW = wallEntityCells?.has(doorKey(col - 1, row)) ?? false;
       if (!isStair && !skipW && rampDir !== 'W' && solidCheck(col - 1, row)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
-        if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
+        if (halfW) {
+          addHalfWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, halfW, 'along-z');
+        } else if (rampKeep && (rampKeep === 'N' || rampKeep === 'S')) {
           addHalfWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, rampKeep, 'along-z');
         } else {
           addWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, 'along-z');
