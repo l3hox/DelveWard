@@ -224,27 +224,10 @@ function buildStairedRamp(
 ): THREE.Group {
   const group = new THREE.Group();
 
-  // Each step is a box where the height grows cumulatively from the floor,
-  // matching the stairRenderer.ts "up" pattern: each step is a full column.
-  for (let i = 0; i < RAMP_STEP_COUNT; i++) {
-    const stepHeight = RAMP_STEP_HEIGHT * (i + 1);
-    const stepDepth = RAMP_STEP_DEPTH;
-
-    // Z position: start at +CELL_SIZE/2 (front/south), move back by one step each iteration
-    const z = CELL_SIZE / 2 - stepDepth / 2 - i * stepDepth;
-
-    const geo = new THREE.BoxGeometry(CELL_SIZE, stepHeight, stepDepth);
-    scaleBoxUVs(geo, CELL_SIZE, stepHeight, stepDepth);
-
-    const mesh = new THREE.Mesh(geo, stepMaterial);
-    mesh.position.set(0, stepHeight / 2, z);
-    group.add(mesh);
-  }
-
-  // Stepped side fills — a series of thin boxes forming a staircase silhouette
-  // on each side, matching the step profile so there are no gaps.
+  // Stepped side fills — thin boxes on each side forming a staircase silhouette.
+  // Built FIRST so we can size the step boxes to fit between them.
   const half = CELL_SIZE / 2;
-  const sideThickness = 0.05; // thin enough to be invisible from inside the ramp
+  const sideThickness = 0.05;
 
   for (let i = 0; i < RAMP_STEP_COUNT; i++) {
     const stepHeight = RAMP_STEP_HEIGHT * (i + 1);
@@ -258,6 +241,21 @@ function buildStairedRamp(
       mesh.position.set(x, stepHeight / 2, z);
       group.add(mesh);
     }
+  }
+
+  // Step boxes — narrowed to fit between the side fills (avoids Z-fighting).
+  const stepWidth = CELL_SIZE - sideThickness * 2;
+  for (let i = 0; i < RAMP_STEP_COUNT; i++) {
+    const stepHeight = RAMP_STEP_HEIGHT * (i + 1);
+    const stepDepth = RAMP_STEP_DEPTH;
+    const z = CELL_SIZE / 2 - stepDepth / 2 - i * stepDepth;
+
+    const geo = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+    scaleBoxUVs(geo, stepWidth, stepHeight, stepDepth);
+
+    const mesh = new THREE.Mesh(geo, stepMaterial);
+    mesh.position.set(0, stepHeight / 2, z);
+    group.add(mesh);
   }
 
   return group;
