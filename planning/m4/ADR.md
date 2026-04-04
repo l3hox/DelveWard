@@ -136,20 +136,28 @@ M4 needs mixed environments within a single level — e.g., bright outdoor court
 - `scene.fog`, ambient light, and background lerp smoothly toward the target zone's config
 - Limitation: `THREE.Fog` is scene-wide, so the entire view uses the player's current zone. Looking back out from a dungeon entrance, the outdoor area appears dark-fogged.
 
-**Phase A2 upgrade path:** Stencil-masked multi-pass rendering — each zone renders in a separate pass with its own fog. Produces visually correct transitions at zone boundaries. Falls back to dynamic blending if too complex.
+**Phase A2 implementation:** Replaced dynamic blending with multi-pass rendering using Three.js `Object3D.layers` bitmask. Each environment zone is assigned a layer index (1-based). Meshes are tagged at build time via `child.layers.set(zoneIndex)`. The render loop does one pass per zone: sets camera layer mask + zone fog/ambient, renders, preserves depth buffer between passes. Result: looking out a dungeon door shows bright sky; looking in shows dark corridors.
+
+**Key implementation details:**
+- Boundary door cells: floor, ceiling, walls, and door frames physically split into half-meshes — outdoor half tagged to outdoor zone, indoor half to dungeon zone
+- Door panels split into half-depth groups for correct per-zone fog
+- Billboard `depthWrite` enabled (alpha discard in shader) prevents cross-zone overdraw
+- Single-zone levels skip multi-pass (zero overhead)
 
 ### Alternatives Rejected
 
-**Per-material fog via custom shaders:** Rejected for M4. Would give true per-zone fog but requires rewriting all materials to use custom fog calculations. Significant shader work. Noted as future evolution.
+**Stencil-masked multi-pass:** Originally proposed in the plan. Rejected during implementation — Three.js `Object3D.layers` bitmask achieves the same per-zone rendering without stencil buffer management. Layers are simpler, avoid material stencil properties, and work with the existing render pipeline.
 
-**No mixing — one environment per level:** Rejected. The "outdoor courtyard with dungeon entrance" scenario is the core visual moment of M4. A workaround using separate levels connected by stairs would lose cross-visibility.
+**Per-material fog via custom shaders:** Rejected for M4. Would give true per-zone fog but requires rewriting all materials. Noted as future evolution.
+
+**No mixing — one environment per level:** Rejected. The "outdoor courtyard with dungeon entrance" scenario is the core visual moment of M4.
 
 ### Consequences
 
-- Dynamic blending is simple to implement (lerp fog params per frame)
-- The visual compromise (scene-wide fog) is acceptable for first-person grid view
-- Environment area data model supports future shader upgrades without changes
-- Phase A2 multi-pass rendering can eliminate the compromise if warranted
+- Multi-pass rendering produces visually correct zone transitions
+- Two render passes instead of one — acceptable, each renders ~half geometry
+- Mesh zone tagging at build time is straightforward (cell → area → zone lookup)
+- Entity meshes, lights, and dynamically added objects must be tagged or `enableAll()`
 
 ---
 
@@ -229,6 +237,16 @@ ThinWallInstance: {
 **Pathfinding:** Enemy AI BFS neighbor expansion checks thin wall edges. A cell is reachable but not from all directions.
 
 **Projectiles:** `solid: true` blocks projectiles. `solid: false` (half-height) allows projectiles to pass over.
+
+**Edge blocking architecture (added 2026-04-03):** Movement checks happen **outside `isWalkable()`** via a separate `isEdgeBlocked` callback. This keeps the core `isWalkable(grid, col, row, ...)` function completely unchanged (cell-based, no direction parameter). The edge check is injected at 5 specific sites:
+
+1. `PlayerState` — optional `isEdgeBlocked?(fromCol, fromRow, toCol, toRow)` callback, checked after `isWalkable()` in each of moveForward/moveBack/strafeLeft/strafeRight
+2. `pathfinding.ts findPath()` — optional `isEdgeBlocked` parameter, checked in BFS neighbor expansion
+3. `enemyAI.ts` — flee/chase/erratic loops add `!isEdgeBlocked?.(...)` alongside existing passability checks
+4. `ProjectileManager.update()` — tracks `prevCell`, checks `isSolidEdgeBlocked` at cell boundary crossings
+5. `main.ts` / `interaction.ts` — block push conditions add `!gameState.isEdgeBlocked(...)`
+
+**Why outside `isWalkable()`:** The function is a pure cell-based predicate used in dozens of places. Changing its signature to accept direction info would touch `PlayerState`, `Player`, every `isPassable` lambda in enemyAI, `findPath()`, and `ProjectileManager` — massive blast radius. The per-site approach adds 1-3 lines at each of 5 well-defined locations.
 
 ### Alternatives Rejected
 
@@ -375,3 +393,80 @@ Before each render frame, lights beyond a threshold distance from the camera are
 - Sufficient for M4 scope (2-5 layers, ~30-60 lights)
 - The `decay=2` + tight `distance` on all lights (already implemented) ensures early-out for the remaining visible lights
 - Revisit when level complexity demands it
+
+---
+
+## ADR-M4-11 — Billboard Sprite Rendering and Alpha Handling
+
+**Status:** Accepted
+**Date:** 2026-03-31
+
+### Context
+
+Multiple entity types need visible 3D representation in the world: items on the ground, consumables, keys, enemies, NPCs, and forest trees. The question is how to render these (flat floor planes, billboard sprites, or 3D geometry) and how to handle alpha transparency in the multi-pass zone rendering system.
+
+### Decision
+
+**Upright billboard sprites with alpha-test discard.**
+
+- Items, consumables, and keys rendered as upright `PlaneGeometry` sprites facing the camera (billboard). Uses `createNeutralLitMaterial()` — a `MeshLambertMaterial` with the sprite texture, positioned at cell center with seeded random offsets for multi-item spread.
+- Enemies and NPCs use the same billboard approach with larger sprites and per-type textures.
+- Forest trees use `InstancedMesh` (one per variant, 4 draw calls total regardless of tree count). Billboard shader updated with `#ifdef USE_INSTANCING` to support instance transforms.
+
+**Alpha handling:** `transparent: false` with `alphaTest: 0.5`. Transparent pixels are discarded at the fragment level (not blended). This prevents cross-zone alpha artifacts in multi-pass rendering — without it, semi-transparent sprite edges blend against the wrong zone's background color.
+
+**Thin wall textures** (iron_fence, wood_fence, railing) use real alpha channel with `alphaTest: 0.5` for see-through gaps between bars/planks.
+
+### Alternatives Rejected
+
+1. **`transparent: true` (alpha blending):** Produces visual artifacts in multi-pass rendering. A sprite rendered in the dungeon zone pass that overlaps an outdoor zone pixel blends against the dungeon background color, creating dark halos. `alphaTest` discards instead of blending.
+
+2. **Flat ground-plane sprites:** Items lying flat on the floor (rotation.x = -Math.PI/2) are invisible from a distance. Upright billboards are visible across the room.
+
+3. **3D geometry for items:** Adds complexity, draw calls, and doesn't match the pixelart aesthetic. Billboard sprites are consistent with the enemy/NPC rendering approach.
+
+### Consequences
+
+- All sprite entities share the same rendering pattern (billboard + alphaTest)
+- `alphaTest: 0.5` means no smooth alpha gradients — pixels are either fully opaque or fully discarded. Acceptable for pixelart.
+- InstancedMesh optimization reduces forest from 100s of draw calls to 4
+- New dynamically spawned sprites (dropped items, damage numbers) must call `layers.enableAll()` for multi-zone visibility
+
+---
+
+## ADR-M4-12 — Inventory Direct Slot Model
+
+**Status:** Accepted
+**Date:** 2026-03-31
+
+### Context
+
+The inventory/backpack system needs a model for how items are positioned in the grid UI. Two approaches: auto-packed (items always fill from slot 0 upward, no gaps) or direct-slot (items stay at their assigned slot, gaps allowed).
+
+### Decision
+
+**Direct slot model — visual grid position equals slot number.**
+
+- Each backpack item has an assigned `slot` number (0-7). The visual position in the inventory grid matches this slot number.
+- Dragging an item to slot 7 keeps it at slot 7, even if slots 0-6 are empty.
+- `swapBackpackSlots()` swaps by slot number, not by sorted index.
+- `getBackpackItemAt(slot)` retrieves by direct slot lookup.
+- Keyboard quick-use (keys 1-8) targets the item at that slot number.
+- Slot indicators (1-8) displayed on all backpack slots — gold for consumables, grey for others.
+
+**Mouse interaction model:**
+- Double-click to equip/use (not single-click — avoids accidental actions)
+- Right-click to drop
+- Drag-and-drop between backpack slots (rearrange), between backpack↔equipment (equip/unequip)
+- Eligible equipment slots highlight green during drag (subtype-aware: helm→head, sword→weapon)
+
+### Alternatives Rejected
+
+**Auto-packed:** Items always fill from slot 0 upward. Simpler data model but breaks player's spatial memory — "my health potion is in slot 3" stops being true when another item is consumed. Also makes keyboard quick-use unreliable.
+
+### Consequences
+
+- Players can organize their backpack intentionally
+- Keyboard quick-use (1-8) is reliable and memorable
+- Drag-and-drop rearranging feels natural (items stay where placed)
+- Slightly more complex than auto-pack (need explicit slot tracking)

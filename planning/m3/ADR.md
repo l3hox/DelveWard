@@ -252,3 +252,34 @@ M3 adds four interactable objects: fountain, bookshelf, altar, barrel. These nee
 **Negative / Risks:**
 - **Geometry is programmer art.** Simple boxes and cylinders won't look as polished as modeled assets. Acceptable for M3 — visual polish can iterate later.
 - **No animation.** Fountains don't flow, barrels don't crumble. Interaction is communicated via HUD messages and state changes. Acceptable for M3 scope.
+
+---
+
+## ADR-M3-07 — Temporary Buffs: Separate System from Status Effects
+
+**Status:** Accepted
+**Date:** 2026-03-25
+
+### Context
+
+M3 Phase F adds altars that grant timed stat buffs (e.g., +5 ATK for 60s). The existing `StatusEffect` system (M2, ADR-M2-04) handles debuffs like poison, slow, and burning — tick-based damage-over-time effects. The question is whether stat buffs should reuse the StatusEffect system or be separate.
+
+### Decision
+
+**Separate `TempBuff` system on GameState, distinct from `StatusEffect`.**
+
+- `TempBuff`: `{ stat: BuffStat; amount: number; remaining: number }` — affects computed stats via `getEffectiveStats()`
+- `StatusEffect`: `{ type: StatusEffectType; duration: number; ... }` — affects HP/behavior per tick
+- `tempBuffs[]` array on GameState, ticked in game loop, same-stat refresh (reapplying resets timer, no stacking)
+- Persisted in save data alongside player state
+
+### Alternatives Rejected
+
+**Reuse StatusEffect:** The StatusEffect system is designed for damage-over-time debuffs with tick callbacks. Adding stat modification to it would require either: (a) a generic "effect function" callback (complex, harder to serialize) or (b) special-casing buff types inside the tick function (messy, two responsibilities). TempBuff is structurally simpler — a flat stat modifier with a countdown.
+
+### Consequences
+
+- Clear separation: StatusEffect = debuffs (poison/slow/burning), TempBuff = stat bonuses
+- `getEffectiveStats()` sums base stats + equipment + TempBuff — single source of truth
+- Same-stat refresh prevents buff stacking exploits
+- Serialization is trivial (plain array of objects)
