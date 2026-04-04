@@ -380,7 +380,7 @@ export class GridCanvas {
             const hasE = this.thinWallDrawEdges.some(e => e.wall === 'E');
             const isRect = hasS && hasE;
 
-            if (isRect && int) {
+            if (isRect && int && int !== ext) {
               // Rectangle with dual textures — assign exterior/interior per edge side.
               const sEdges = this.thinWallDrawEdges.filter(e => e.wall === 'S');
               const eEdges = this.thinWallDrawEdges.filter(e => e.wall === 'E');

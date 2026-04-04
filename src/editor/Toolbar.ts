@@ -52,7 +52,7 @@ export class Toolbar {
   onExport: (() => void) | null = null;
   onEntityTypeSelect: ((type: string) => void) | null = null;
   onThinWallToolSelect: ((texture: string) => void) | null = null;
-  onThinWallBackSelect: ((texture: string | null) => void) | null = null;
+  onThinWallBackSelect: ((texture: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
   onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void) | null = null;
@@ -283,33 +283,12 @@ export class Toolbar {
     intGroup.className = 'palette-group';
     intGroup.style.margin = '0';
 
-    // "Same" button — no interior override
-    const sameBtn = document.createElement('button');
-    sameBtn.className = 'char-swatch-btn selected';  // selected by default
-    sameBtn.title = 'Interior: same as exterior';
-    const sameCanvas = document.createElement('canvas');
-    sameCanvas.width = 28;
-    sameCanvas.height = 28;
-    const sameCtx = sameCanvas.getContext('2d')!;
-    sameCtx.fillStyle = '#333';
-    sameCtx.fillRect(0, 0, 28, 28);
-    sameCtx.fillStyle = '#888';
-    sameCtx.font = '10px monospace';
-    sameCtx.textAlign = 'center';
-    sameCtx.textBaseline = 'middle';
-    sameCtx.fillText('=', 14, 14);
-    sameBtn.appendChild(sameCanvas);
-    sameBtn.addEventListener('click', () => {
-      for (const b of this.thinWallBackBtns.values()) b.classList.remove('selected');
-      sameBtn.classList.add('selected');
-      this.onThinWallBackSelect?.(null);
-    });
-    this.thinWallBackBtns.set('__same__', sameBtn);
-    intGroup.appendChild(sameBtn);
-
     for (const texName of THIN_WALL_TEXTURE_NAMES) {
       this.addThinWallBackBtn(intGroup, texName);
     }
+    // Select first interior button by default (matches exterior default)
+    const firstBackBtn = this.thinWallBackBtns.get(THIN_WALL_TEXTURE_NAMES[0]);
+    if (firstBackBtn) firstBackBtn.classList.add('selected');
     rowsWrapper.appendChild(intGroup);
 
     thinWallContainer.appendChild(rowsWrapper);
