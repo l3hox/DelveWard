@@ -313,32 +313,27 @@ function buildLevelScene(
       ? (multiZone ? zoneMap : undefined)
       : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
 
-    // Ramp cells that need ceiling/wall/floor suppression on this layer.
-    // The ramp spans from the center of the bottom cell to the center of the top cell.
-    // Bottom cell: suppress ceiling (ramp goes up through it) and the wall OPPOSITE
-    //   to facing (the approach/front side where the ramp is at floor level — the wall
-    //   there would clip through the ramp geometry).
-    // Top cell (upper layer): suppress floor (ramp comes up through it) and the wall
-    //   IN the facing direction (the exit/back side where the ramp reaches ceiling level).
+    // Ramp cells that need ceiling/wall/floor suppression on this layer
     const ldRampOpenCells = new Map<string, import('./rendering/dungeon').RampCellInfo>();
-    const OPPOSITE: Record<string, import('./core/grid').Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+    // Bottom cells on this layer: skip ceiling + wall in facing direction
     for (const ramp of gameState.ramps.values()) {
       ldRampOpenCells.set(doorKey(ramp.col, ramp.row), {
-        wallDir: OPPOSITE[ramp.facing],
+        wallDir: ramp.facing,
         skipCeiling: true,
         skipFloor: false,
       });
     }
-    // Top cells from ramps on the layer below
+    // Top cells from ramps on the layer below: skip floor + wall opposite to facing
     if (li > 0) {
       const savedIdx = gameState.activeLayerIndex;
       gameState.activeLayerIndex = li - 1;
+      const OPPOSITE: Record<string, import('./core/grid').Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
       for (const ramp of gameState.ramps.values()) {
         const [dx, dz] = FACING_DELTA[ramp.facing];
         const topCol = ramp.col + dx;
         const topRow = ramp.row + dz;
         ldRampOpenCells.set(doorKey(topCol, topRow), {
-          wallDir: ramp.facing,
+          wallDir: OPPOSITE[ramp.facing],
           skipCeiling: false,
           skipFloor: true,
         });
