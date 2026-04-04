@@ -1813,3 +1813,103 @@ describe('Phase D — Environment Entities', () => {
     expect(gs.getSign(3, 1)?.text).toBe('Clue');
   });
 });
+
+// --- Thin Wall ---
+
+describe('getThinWallBetween', () => {
+  // Thin wall at (3,2,'S') — the south edge of cell (3,2), i.e. between (3,2) and (3,3)
+  // Thin wall at (2,3,'E') — the east edge of cell (2,3), i.e. between (2,3) and (3,3)
+  function makeThinWallState(): GameState {
+    return new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+      { col: 2, row: 3, type: 'thin_wall', wall: 'E', solid: false, height: 'half', texture: 'stone_thin' },
+    ]);
+  }
+
+  it('moving south (3,2)->(3,3) resolves to canonical thin wall at (3,2,S)', () => {
+    const gs = makeThinWallState();
+    const tw = gs.getThinWallBetween(3, 2, 3, 3);
+    expect(tw).toBeDefined();
+    expect(tw!.col).toBe(3);
+    expect(tw!.row).toBe(2);
+    expect(tw!.wall).toBe('S');
+  });
+
+  it('moving north (3,3)->(3,2) resolves to the same canonical thin wall at (3,2,S)', () => {
+    const gs = makeThinWallState();
+    const tw = gs.getThinWallBetween(3, 3, 3, 2);
+    expect(tw).toBeDefined();
+    expect(tw!.col).toBe(3);
+    expect(tw!.row).toBe(2);
+    expect(tw!.wall).toBe('S');
+  });
+
+  it('moving east (2,3)->(3,3) resolves to canonical thin wall at (2,3,E)', () => {
+    const gs = makeThinWallState();
+    const tw = gs.getThinWallBetween(2, 3, 3, 3);
+    expect(tw).toBeDefined();
+    expect(tw!.col).toBe(2);
+    expect(tw!.row).toBe(3);
+    expect(tw!.wall).toBe('E');
+  });
+
+  it('moving west (3,3)->(2,3) resolves to the same canonical thin wall at (2,3,E)', () => {
+    const gs = makeThinWallState();
+    const tw = gs.getThinWallBetween(3, 3, 2, 3);
+    expect(tw).toBeDefined();
+    expect(tw!.col).toBe(2);
+    expect(tw!.row).toBe(3);
+    expect(tw!.wall).toBe('E');
+  });
+
+  it('returns undefined when no thin wall exists on the edge', () => {
+    const gs = makeThinWallState();
+    expect(gs.getThinWallBetween(1, 1, 1, 2)).toBeUndefined();
+  });
+});
+
+describe('isEdgeBlocked', () => {
+  it('returns true when a thin wall exists on the edge', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+    ]);
+    expect(gs.isEdgeBlocked(3, 2, 3, 3)).toBe(true);
+  });
+
+  it('returns true in reverse direction across the same edge', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+    ]);
+    expect(gs.isEdgeBlocked(3, 3, 3, 2)).toBe(true);
+  });
+
+  it('returns false when no thin wall exists on the edge', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+    ]);
+    expect(gs.isEdgeBlocked(1, 1, 1, 2)).toBe(false);
+  });
+});
+
+describe('isSolidEdgeBlocked', () => {
+  it('returns true when the thin wall on the edge is solid', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+    ]);
+    expect(gs.isSolidEdgeBlocked(3, 2, 3, 3)).toBe(true);
+  });
+
+  it('returns false when the thin wall on the edge is not solid', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: false, height: 'half', texture: 'stone_thin' },
+    ]);
+    expect(gs.isSolidEdgeBlocked(3, 2, 3, 3)).toBe(false);
+  });
+
+  it('returns false when no thin wall exists on the edge', () => {
+    const gs = new GameState([
+      { col: 3, row: 2, type: 'thin_wall', wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
+    ]);
+    expect(gs.isSolidEdgeBlocked(1, 1, 1, 2)).toBe(false);
+  });
+});

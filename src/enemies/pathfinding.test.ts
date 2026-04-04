@@ -119,4 +119,45 @@ describe('findPath', () => {
     // Shortest is 4 steps straight across row 1
     expect(path!.length).toBe(4);
   });
+
+  it('routes around a thin wall when isEdgeBlocked blocks the direct path', () => {
+    // Grid layout (5x5, walkable interior):
+    // #####
+    // #...#
+    // #...#
+    // #...#
+    // #####
+    // A thin wall blocks the east edge of (1,1), i.e. movement between (1,1) and (2,1).
+    // Direct path from (1,1) to (3,1) would go through (2,1), but that first step is
+    // blocked by the edge constraint. The BFS must route south first: (1,2)->(2,2)->(3,2)->(3,1).
+    const corridorGrid = [
+      '#####',
+      '#...#',
+      '#...#',
+      '#...#',
+      '#####',
+    ];
+    const corridorPassable = (col: number, row: number): boolean => {
+      if (row < 0 || row >= corridorGrid.length || col < 0 || col >= corridorGrid[0].length)
+        return false;
+      return corridorGrid[row][col] === '.';
+    };
+
+    // Block the east edge of (1,1): movement from (1,1)->(2,1) or (2,1)->(1,1) is forbidden.
+    const isEdgeBlocked = (fromCol: number, fromRow: number, toCol: number, toRow: number): boolean => {
+      return (fromCol === 1 && fromRow === 1 && toCol === 2 && toRow === 1)
+          || (fromCol === 2 && fromRow === 1 && toCol === 1 && toRow === 1);
+    };
+
+    const path = findPath(corridorGrid, 1, 1, 3, 1, corridorPassable, isEdgeBlocked);
+    expect(path).not.toBeNull();
+
+    // The path must not step directly from (1,1) to (2,1) as the first move.
+    const firstStep = path![0];
+    expect(firstStep).not.toEqual({ col: 2, row: 1 });
+
+    // The path must still reach the destination.
+    const lastStep = path![path!.length - 1];
+    expect(lastStep).toEqual({ col: 3, row: 1 });
+  });
 });
