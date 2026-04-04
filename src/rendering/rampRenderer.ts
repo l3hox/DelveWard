@@ -119,111 +119,69 @@ function scaleBoxUVs(
 // ---------------------------------------------------------------------------
 
 /**
- * Build a single triangular side wall at the given X position.
- * Vertices (in canonical orientation, bottom at +Z, top at -Z):
- *   bottom-front: (x, 0,            +CELL_SIZE/2)
- *   bottom-back:  (x, 0,            -CELL_SIZE/2)
- *   top-back:     (x, LAYER_HEIGHT, -CELL_SIZE/2)
+ * Build a single side wall at the given X position, combining:
+ * 1. Triangular fill under the ramp slope (bottom-front to top-back)
+ * 2. Full-height rectangle for the far half of the top cell (beyond ramp end)
  *
- * Normal faces outward along ±X.
+ * In canonical orientation (bottom at +Z, top at -Z):
+ *   Triangle: (x, 0, +half) → (x, 0, -half) → (x, LAYER_HEIGHT, -half)
+ *   Rectangle: (x, 0, -half) → (x, 0, -CELL_SIZE) → (x, H, -CELL_SIZE) → (x, H, -half)
  */
 function buildTriangularSide(
   x: number,
   material: THREE.MeshLambertMaterial,
 ): THREE.Mesh {
   const half = CELL_SIZE / 2;
+  const nx = x < 0 ? -1 : 1;
+  const H = WALL_HEIGHT;
 
-  // Two winding orders depending on which side — ensures normals face outward.
-  // Left side (x < 0): outward normal is -X → winding CCW when viewed from -X
-  // Right side (x > 0): outward normal is +X → winding CCW when viewed from +X
-  const positions = x < 0
-    ? new Float32Array([
-        x, 0, half,           // bottom-front
-        x, LAYER_HEIGHT, -half, // top-back
-        x, 0, -half,          // bottom-back
-      ])
-    : new Float32Array([
-        x, 0, half,           // bottom-front
-        x, 0, -half,          // bottom-back
-        x, LAYER_HEIGHT, -half, // top-back
-      ]);
+  const verts: number[] = [];
+  const uvArr: number[] = [];
+  const norms: number[] = [];
 
-  // UVs: map the three vertices to a right-triangle portion of the texture.
-  // U runs along Z (0 at front, 1 at back), V runs along Y (0 at bottom, 1 at top).
-  const uvs = x < 0
-    ? new Float32Array([
-        0, 0,   // bottom-front
-        1, 1,   // top-back
-        1, 0,   // bottom-back
-      ])
-    : new Float32Array([
-        0, 0,   // bottom-front
-        1, 0,   // bottom-back
-        1, 1,   // top-back
-      ]);
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geo.computeVertexNormals();
-
-  return new THREE.Mesh(geo, material);
-}
-
-// ---------------------------------------------------------------------------
-// Side wall extensions for the far half of the top cell
-// ---------------------------------------------------------------------------
-
-/**
- * The ramp geometry spans from center of bottom cell to center of top cell.
- * The far half of the top cell (beyond the ramp end) has no geometry from the
- * dungeon builder (it's a # wall cell). Add full-height side walls covering
- * that gap: from Z = -CELL_SIZE/2 to Z = -CELL_SIZE in canonical orientation.
- */
-function buildTopCellSideWalls(
-  material: THREE.MeshLambertMaterial,
-): THREE.Group {
-  const group = new THREE.Group();
-  const half = CELL_SIZE / 2;
-  const zNear = -half;         // where the ramp geometry ends
-  const zFar = -CELL_SIZE;     // far edge of the top cell
-
-  const uD = half / CELL_SIZE; // UV depth for half a cell
-  const vH = WALL_HEIGHT / WALL_HEIGHT; // 1.0
-
-  for (const side of [-1, 1]) {
-    const x = half * side;
-    const nx = side;
-    const sv: number[] = [];
-    const su: number[] = [];
-    const sn: number[] = [];
-
-    if (side < 0) {
-      // Left wall: normal -X, CCW from -X view
-      pushQuad(sv, su, sn,
-        [x, 0, zFar], [x, WALL_HEIGHT, zFar],
-        [x, WALL_HEIGHT, zNear], [x, 0, zNear],
-        [uD, 0], [uD, vH], [0, vH], [0, 0],
-        nx, 0, 0,
-      );
-    } else {
-      // Right wall: normal +X, CCW from +X view
-      pushQuad(sv, su, sn,
-        [x, 0, zNear], [x, WALL_HEIGHT, zNear],
-        [x, WALL_HEIGHT, zFar], [x, 0, zFar],
-        [0, 0], [0, vH], [uD, vH], [uD, 0],
-        nx, 0, 0,
-      );
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
-    group.add(new THREE.Mesh(geo, material));
+  // Triangle under the slope
+  if (x < 0) {
+    pushQuad(verts, uvArr, norms,
+      [x, 0, half], [x, LAYER_HEIGHT, -half],
+      [x, LAYER_HEIGHT, -half], [x, 0, -half],  // degenerate quad = triangle (c==b)
+      [0, 0], [1, 1], [1, 1], [1, 0],
+      nx, 0, 0,
+    );
+  } else {
+    pushQuad(verts, uvArr, norms,
+      [x, 0, half], [x, 0, -half],
+      [x, LAYER_HEIGHT, -half], [x, LAYER_HEIGHT, -half],  // c==d = triangle
+      [0, 0], [1, 0], [1, 1], [1, 1],
+      nx, 0, 0,
+    );
   }
 
-  return group;
+  // Full-height rectangle for the far half of the top cell
+  const zNear = -half;
+  const zFar = -CELL_SIZE;
+  const uD = half / CELL_SIZE;
+  if (x < 0) {
+    pushQuad(verts, uvArr, norms,
+      [x, 0, zNear], [x, H, zNear],
+      [x, H, zFar], [x, 0, zFar],
+      [0, 0], [0, 1], [uD, 1], [uD, 0],
+      nx, 0, 0,
+    );
+  } else {
+    pushQuad(verts, uvArr, norms,
+      [x, 0, zFar], [x, H, zFar],
+      [x, H, zNear], [x, 0, zNear],
+      [uD, 0], [uD, 1], [0, 1], [0, 0],
+      nx, 0, 0,
+    );
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
+
+  return new THREE.Mesh(geo, material);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,8 +228,6 @@ function buildSmoothRamp(
   group.add(buildTriangularSide(half, sideMaterial));
 
   // Side walls for the far half of the top cell (beyond ramp geometry)
-  group.add(buildTopCellSideWalls(sideMaterial));
-
   return group;
 }
 
@@ -401,6 +357,26 @@ function buildStairedRamp(
       }
     }
 
+    // Full-height wall for the far half of the top cell (beyond ramp end)
+    const zNear = -half;
+    const zFar = -CELL_SIZE;
+    const uD = half / CELL_SIZE;
+    if (side < 0) {
+      pushQuad(sv, su, sn,
+        [x, 0, zNear], [x, WALL_HEIGHT, zNear],
+        [x, WALL_HEIGHT, zFar], [x, 0, zFar],
+        [0, 0], [0, 1], [uD, 1], [uD, 0],
+        nx, 0, 0,
+      );
+    } else {
+      pushQuad(sv, su, sn,
+        [x, 0, zFar], [x, WALL_HEIGHT, zFar],
+        [x, WALL_HEIGHT, zNear], [x, 0, zNear],
+        [uD, 0], [uD, 1], [0, 1], [0, 0],
+        nx, 0, 0,
+      );
+    }
+
     const sideGeo = new THREE.BufferGeometry();
     sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
     sideGeo.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
@@ -409,8 +385,6 @@ function buildStairedRamp(
   }
 
   // Side walls for the far half of the top cell (beyond ramp geometry)
-  group.add(buildTopCellSideWalls(sideMaterial));
-
   return group;
 }
 
