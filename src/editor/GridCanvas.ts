@@ -34,6 +34,10 @@ export class GridCanvas {
   private dirty = true;
   private isPanning = false;
   private isPainting = false;
+  private isThinWallDrawing = false;
+  private thinWallDrawStart: { col: number; row: number; wall: 'S' | 'E' } | null = null;
+  private thinWallDrawEdges: Array<{ col: number; row: number; wall: 'S' | 'E' }> = [];
+  private hoveredEdge: { col: number; row: number; wall: 'S' | 'E' } | null = null;
   private lastPanX = 0;
   private lastPanY = 0;
   private onHoverChange: (() => void) | null = null;
@@ -157,6 +161,25 @@ export class GridCanvas {
         this.app.paintCell(this.app.hover.col, this.app.hover.row, this.app.selectedChar);
       }
 
+      // Thin wall hover tracking and drag drawing
+      if (this.app.activeTool === 'thin_wall') {
+        const { col: fCol, row: fRow, fracX, fracY } = this.screenToGridFrac(screenX, screenY);
+        this.hoveredEdge = this.app.resolveNearestEdge(fCol, fRow, fracX, fracY);
+
+        if (this.isThinWallDrawing) {
+          const edge = this.hoveredEdge;
+          if (this.app.thinWallEraseOnly && edge) {
+            this.onBeforePaint?.();
+            this.app.eraseThinWallOnEdge(edge.col, edge.row, edge.wall);
+            this.onAfterPaint?.();
+          } else if (this.thinWallDrawStart && edge) {
+            this.thinWallDrawEdges = this.computeThinWallLine(this.thinWallDrawStart, edge);
+          }
+        }
+      } else {
+        this.hoveredEdge = null;
+      }
+
       this.onHoverChange?.();
       this.dirty = true;
     });
@@ -230,7 +253,23 @@ export class GridCanvas {
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
-          const { col, row } = this.screenToGrid(screenX, screenY);
+          const { col, row, fracX, fracY } = this.screenToGridFrac(screenX, screenY);
+
+          // Try thin wall edge selection first when click is near a cell edge
+          const nearEdge = fracX < 0.2 || fracX > 0.8 || fracY < 0.2 || fracY > 0.8;
+          if (nearEdge) {
+            const edge = this.app.resolveNearestEdge(col, row, fracX, fracY);
+            if (edge) {
+              const tw = this.app.selectThinWallOnEdge(edge.col, edge.row, edge.wall);
+              if (tw) {
+                this.potentialWireSource = null;
+                this.onSelectionChange?.();
+                this.dirty = true;
+                return;
+              }
+            }
+          }
+
           const entity = this.app.selectEntityAt(col, row);
           if (!entity) this.app.deselectEntity();
           // Record potential wire drag source — try selected entity first,
@@ -265,6 +304,28 @@ export class GridCanvas {
             this.app.statusHint = null;
           }
           this.onSelectionChange?.();
+          this.dirty = true;
+        } else if (tool === 'thin_wall') {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const { col, row, fracX, fracY } = this.screenToGridFrac(screenX, screenY);
+          const edge = this.app.resolveNearestEdge(col, row, fracX, fracY);
+          if (!edge) return;
+
+          if (this.app.thinWallEraseOnly) {
+            // Erase mode: remove thin wall at this edge
+            this.onBeforePaint?.();
+            this.app.eraseThinWallOnEdge(edge.col, edge.row, edge.wall);
+            this.isThinWallDrawing = true;
+            this.onAfterPaint?.();
+          } else {
+            // Draw mode: start line drawing
+            this.onBeforePaint?.();
+            this.thinWallDrawStart = edge;
+            this.thinWallDrawEdges = [edge];
+            this.isThinWallDrawing = true;
+          }
           this.dirty = true;
         }
       }
@@ -310,6 +371,18 @@ export class GridCanvas {
           this.dirty = true;
           return;
         }
+        if (this.isThinWallDrawing) {
+          if (!this.app.thinWallEraseOnly && this.thinWallDrawEdges.length > 0) {
+            for (const edge of this.thinWallDrawEdges) {
+              this.app.addThinWallOnEdge(edge.col, edge.row, edge.wall);
+            }
+            this.onAfterPaint?.();
+          }
+          this.isThinWallDrawing = false;
+          this.thinWallDrawStart = null;
+          this.thinWallDrawEdges = [];
+          this.dirty = true;
+        }
         if (this.isPainting) this.onAfterPaint?.();
         this.isPainting = false;
       }
@@ -319,6 +392,10 @@ export class GridCanvas {
       this.isPanning = false;
       if (this.isPainting) this.onAfterPaint?.();
       this.isPainting = false;
+      this.isThinWallDrawing = false;
+      this.thinWallDrawStart = null;
+      this.thinWallDrawEdges = [];
+      this.hoveredEdge = null;
       this.potentialWireSource = null;
       if (this.app.wireDragState) {
         this.app.wireDragState = null;
@@ -419,6 +496,18 @@ export class GridCanvas {
     return { col, row };
   }
 
+  private screenToGridFrac(screenX: number, screenY: number): { col: number; row: number; fracX: number; fracY: number } {
+    const { offsetX, offsetY, zoom } = this.app.viewport;
+    const tileSize = TILE_SIZE * zoom;
+    const worldX = screenX - offsetX;
+    const worldY = screenY - offsetY;
+    const col = Math.floor(worldX / tileSize);
+    const row = Math.floor(worldY / tileSize);
+    const fracX = (worldX / tileSize) - col;
+    const fracY = (worldY / tileSize) - row;
+    return { col, row, fracX: clamp(fracX, 0, 1), fracY: clamp(fracY, 0, 1) };
+  }
+
   // -------------------------------------------------------------------------
   // Rendering
   // -------------------------------------------------------------------------
@@ -484,6 +573,18 @@ export class GridCanvas {
 
     // Draw wire drag line (active drag-to-wire)
     this.drawWireDragLine(offsetX, offsetY, tileSize);
+
+    // Draw thin wall hover edge highlight
+    if (this.app.activeTool === 'thin_wall' && this.hoveredEdge && !this.isThinWallDrawing) {
+      this.drawEdgeLine(this.hoveredEdge, 'rgba(139, 69, 19, 0.5)', 3, offsetX, offsetY, tileSize);
+    }
+
+    // Draw thin wall line preview during drag
+    if (this.thinWallDrawEdges.length > 0) {
+      for (const edge of this.thinWallDrawEdges) {
+        this.drawEdgeLine(edge, 'rgba(139, 69, 19, 0.7)', 3, offsetX, offsetY, tileSize);
+      }
+    }
   }
 
   private drawCell(
@@ -1482,6 +1583,10 @@ export class GridCanvas {
       return;
     }
     const tool = this.app.activeTool;
+    if (tool === 'thin_wall') {
+      this.canvas.style.cursor = 'crosshair';
+      return;
+    }
     this.canvas.style.cursor = tool === 'paint' || tool === 'entity' ? 'crosshair' : 'default';
   }
 
@@ -1519,6 +1624,65 @@ export class GridCanvas {
     ctx.setLineDash([]);
     this.drawArrowhead(x1, y1, x2, y2, 8);
     ctx.restore();
+  }
+
+  private drawEdgeLine(
+    edge: { col: number; row: number; wall: 'S' | 'E' },
+    color: string,
+    lineWidth: number,
+    offsetX: number,
+    offsetY: number,
+    tileSize: number,
+  ): void {
+    const ctx = this.ctx;
+    const x = offsetX + edge.col * tileSize;
+    const y = offsetY + edge.row * tileSize;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    if (edge.wall === 'S') {
+      // Bottom edge of cell
+      ctx.moveTo(x, y + tileSize);
+      ctx.lineTo(x + tileSize, y + tileSize);
+    } else {
+      // Right edge of cell
+      ctx.moveTo(x + tileSize, y);
+      ctx.lineTo(x + tileSize, y + tileSize);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private computeThinWallLine(
+    start: { col: number; row: number; wall: 'S' | 'E' },
+    end: { col: number; row: number; wall: 'S' | 'E' },
+  ): Array<{ col: number; row: number; wall: 'S' | 'E' }> {
+    const edges: Array<{ col: number; row: number; wall: 'S' | 'E' }> = [];
+
+    // Use the wall type from the start edge for consistency
+    const wall = start.wall;
+
+    if (wall === 'S') {
+      // Draw horizontal line of S-edges along a row boundary
+      const row = start.row;
+      const minCol = Math.min(start.col, end.col);
+      const maxCol = Math.max(start.col, end.col);
+      for (let c = minCol; c <= maxCol; c++) {
+        edges.push({ col: c, row, wall: 'S' });
+      }
+    } else {
+      // Draw vertical line of E-edges along a column boundary
+      const col = start.col;
+      const minRow = Math.min(start.row, end.row);
+      const maxRow = Math.max(start.row, end.row);
+      for (let r = minRow; r <= maxRow; r++) {
+        edges.push({ col, row: r, wall: 'E' });
+      }
+    }
+
+    return edges;
   }
 
   private drawWiringLines(offsetX: number, offsetY: number, tileSize: number): void {

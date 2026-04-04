@@ -15,7 +15,7 @@ export interface HoverInfo {
   char: string;
 }
 
-export type EditorTool = 'select' | 'paint' | 'entity';
+export type EditorTool = 'select' | 'paint' | 'entity' | 'thin_wall';
 
 const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   door:           { state: 'closed', gateMode: 'or' },
@@ -128,6 +128,8 @@ export class EditorApp {
   selectedEnemyType = 'rat';
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
+  selectedThinWallTexture = 'stone_thin';
+  thinWallEraseOnly = false;
   undo = new UndoManager();
   onLevelRestored: (() => void) | null = null;
 
@@ -965,11 +967,6 @@ export class EditorApp {
     if (type === 'breakable_wall' || type === 'secret_wall') {
       return !this.walkableSet.has(char) && char !== ' ';
     }
-    if (type === 'thin_wall') {
-      if (!this.walkableSet.has(char)) return false;
-      const wall = (ENTITY_DEFAULTS.thin_wall.wall as string);
-      return !this.getEntitiesAt(col, row).some(e => e.type === 'thin_wall' && (e.wall as string) === wall);
-    }
     // All others require a walkable cell
     return this.walkableSet.has(char);
   }
@@ -1287,5 +1284,96 @@ export class EditorApp {
     let n = 1;
     while (existing.has(`key_${n}`)) n++;
     return `key_${n}`;
+  }
+
+  resolveNearestEdge(col: number, row: number, fracX: number, fracY: number): { col: number; row: number; wall: 'S' | 'E' } | null {
+    if (!this.level) return null;
+    const grid = this.level.grid;
+
+    // Determine distances to each edge
+    const distN = fracY;           // distance to north edge
+    const distS = 1 - fracY;      // distance to south edge
+    const distW = fracX;           // distance to west edge
+    const distE = 1 - fracX;      // distance to east edge
+
+    // Find closest edge
+    const min = Math.min(distN, distS, distW, distE);
+
+    let edgeCol: number, edgeRow: number;
+    let wall: 'S' | 'E';
+
+    if (min === distS) {
+      // South edge of this cell → canonical: (col, row, 'S')
+      edgeCol = col; edgeRow = row; wall = 'S';
+    } else if (min === distN) {
+      // North edge of this cell → canonical: (col, row-1, 'S')
+      edgeCol = col; edgeRow = row - 1; wall = 'S';
+    } else if (min === distE) {
+      // East edge of this cell → canonical: (col, row, 'E')
+      edgeCol = col; edgeRow = row; wall = 'E';
+    } else {
+      // West edge of this cell → canonical: (col-1, row, 'E')
+      edgeCol = col - 1; edgeRow = row; wall = 'E';
+    }
+
+    // Bounds check: canonical cell must be within grid
+    if (edgeRow < 0 || edgeRow >= grid.length) return null;
+    if (edgeCol < 0 || edgeCol >= grid[0].length) return null;
+
+    return { col: edgeCol, row: edgeRow, wall };
+  }
+
+  addThinWallOnEdge(col: number, row: number, wall: 'S' | 'E'): Entity | null {
+    if (!this.level) return null;
+    const grid = this.level.grid;
+    if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) return null;
+
+    // Check no duplicate thin wall at same edge
+    const existing = this.level.entities.find(
+      e => e.type === 'thin_wall' && e.col === col && e.row === row && (e.wall as string) === wall
+    );
+    if (existing) return null;
+
+    const entity: Entity = {
+      id: this.generateEntityId('thin_wall'),
+      type: 'thin_wall',
+      col, row,
+      wall,
+      solid: true,
+      height: 'full',
+      texture: this.selectedThinWallTexture,
+    };
+
+    this.level.entities.push(entity);
+    this.dirty = true;
+    return entity;
+  }
+
+  eraseThinWallOnEdge(col: number, row: number, wall: 'S' | 'E'): boolean {
+    if (!this.level) return false;
+    const idx = this.level.entities.findIndex(
+      e => e.type === 'thin_wall' && e.col === col && e.row === row && (e.wall as string) === wall
+    );
+    if (idx === -1) return false;
+
+    // If the erased entity was selected, deselect
+    if (this.selectedEntity === this.level.entities[idx]) {
+      this.selectedEntity = null;
+    }
+    this.level.entities.splice(idx, 1);
+    this.dirty = true;
+    return true;
+  }
+
+  selectThinWallOnEdge(col: number, row: number, wall: 'S' | 'E'): Entity | null {
+    if (!this.level) return null;
+    const entity = this.level.entities.find(
+      e => e.type === 'thin_wall' && e.col === col && e.row === row && (e.wall as string) === wall
+    );
+    if (entity) {
+      this.selectedEntity = entity;
+      return entity;
+    }
+    return null;
   }
 }

@@ -235,6 +235,12 @@ toolbar.setEntityTypeSelectCallback((type) => {
   gridCanvas.updateCursor();
 });
 
+toolbar.onThinWallToolSelect = (texture) => {
+  app.selectedThinWallTexture = texture;
+  app.activeTool = 'thin_wall';
+  gridCanvas.updateCursor();
+};
+
 toolbar.setItemIdChangeCallback((type, itemId) => {
   if (type === 'equipment') {
     app.selectedEquipmentId = itemId;
@@ -1243,7 +1249,7 @@ document.addEventListener('keydown', (e) => {
     updateStatusHint();
     return;
   }
-  if (e.key === 'Escape' && app.activeTool === 'entity') {
+  if (e.key === 'Escape' && (app.activeTool === 'entity' || app.activeTool === 'thin_wall')) {
     app.activeTool = 'select';
     toolbar.setActiveTool('select');
     gridCanvas.updateCursor();

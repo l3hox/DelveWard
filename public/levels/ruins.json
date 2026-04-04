@@ -285,7 +285,10 @@
               "row": 27,
               "type": "enemy",
               "id": "enemy_6",
-              "enemyType": "rat"
+              "enemyType": "rat",
+              "drops": {
+                "suppressTable": true
+              }
             },
             {
               "col": 21,
@@ -335,6 +338,28 @@
               "type": "consumable",
               "id": "consumable_1",
               "itemId": "health_potion_small"
+            },
+            {
+              "col": 13,
+              "row": 21,
+              "type": "thin_wall",
+              "id": "thin_wall_1",
+              "wall": "E",
+              "solid": true,
+              "height": "half",
+              "texture": "railing",
+              "textureBack": "railing"
+            },
+            {
+              "col": 13,
+              "row": 21,
+              "type": "thin_wall",
+              "id": "thin_wall_2",
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "railing",
+              "textureBack": "railing"
             }
           ],
           "ceiling": false,
@@ -833,11 +858,11 @@
             "################",
             "################",
             "################",
-            "################",
-            "################",
-            "################",
-            "################",
-            "############.###",
+            "#######....#####",
+            "#######....#####",
+            "#######......###",
+            "#######....#.###",
+            "#######....#.###",
             "############.###",
             "###########...##",
             "###########...##",
@@ -882,6 +907,48 @@
               "direction": "up",
               "facing": "N",
               "target": "stairs_5"
+            },
+            {
+              "col": 11,
+              "row": 8,
+              "type": "door",
+              "id": "door_8",
+              "state": "closed",
+              "gateMode": "or"
+            },
+            {
+              "col": 10,
+              "row": 7,
+              "type": "enemy",
+              "id": "enemy_12",
+              "enemyType": "spider"
+            },
+            {
+              "col": 8,
+              "row": 9,
+              "type": "enemy",
+              "id": "enemy_13",
+              "enemyType": "spider"
+            },
+            {
+              "col": 11,
+              "row": 13,
+              "type": "chest",
+              "id": "chest_2",
+              "state": "closed",
+              "facing": "W",
+              "drops": {
+                "guaranteed": [
+                  {
+                    "itemId": "antidote",
+                    "quality": "common"
+                  },
+                  {
+                    "itemId": "antidote",
+                    "quality": "common"
+                  }
+                ]
+              }
             }
           ],
           "defaults": {

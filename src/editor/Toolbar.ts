@@ -1,7 +1,7 @@
 import type { EditorTool } from './EditorApp';
 import type { CharDef, TextureSet } from '../core/types';
 import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../core/textureNames';
-import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
+import { getWallTexture, getFloorTexture, getCeilingTexture, getThinWallTexture, THIN_WALL_TEXTURE_NAMES } from '../rendering/textures';
 import { getTreeOverlayCanvas } from './treeOverlay';
 import { itemDatabase } from '../core/itemDatabase';
 
@@ -22,13 +22,14 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel', 'thin_wall',
+  'fountain', 'bookshelf', 'altar', 'barrel',
 ] as const;
 
 export class Toolbar {
   private toolBtns: Map<EditorTool, HTMLButtonElement> = new Map();
   private charBtns: Map<string, HTMLButtonElement> = new Map();
   private entityBtns: Map<string, HTMLButtonElement> = new Map();
+  private thinWallBtns: Map<string, HTMLButtonElement> = new Map();
   private exportBtn!: HTMLButtonElement;
   private saveBtn!: HTMLButtonElement;
   private saveAsBtn!: HTMLButtonElement;
@@ -46,9 +47,10 @@ export class Toolbar {
   onCharSelect: ((char: string) => void) | null = null;
   onExport: (() => void) | null = null;
   onEntityTypeSelect: ((type: string) => void) | null = null;
+  onThinWallToolSelect: ((texture: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
-  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill', value: boolean) => void) | null = null;
+  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
   onSave: (() => void) | null = null;
   onSaveAs: (() => void) | null = null;
@@ -94,7 +96,7 @@ export class Toolbar {
     this.onNewDungeon = cb;
   }
 
-  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill', value: boolean) => void): void {
+  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void): void {
     this.onViewToggle = cb;
   }
 
@@ -149,11 +151,16 @@ export class Toolbar {
     for (const [type, btn] of this.entityBtns) {
       btn.classList.toggle('selected', tool === 'entity' && type === this.selectedEntityType);
     }
+    // Deselect thin wall buttons when switching to other tools
+    for (const b of this.thinWallBtns.values()) {
+      b.classList.toggle('selected', false);
+    }
   }
 
   updatePalette(charDefs?: CharDef[], defaults?: TextureSet): void {
     this.palette.innerHTML = '';
     this.charBtns.clear();
+    this.thinWallBtns.clear();
     this.selectedChar = '.';
 
     const defWall = (defaults?.wallTexture ?? 'stone') as WallTextureName;
@@ -233,6 +240,35 @@ export class Toolbar {
 
     // Void button (plain text, special case)
     this.addVoidBtn();
+
+    // --- Thin Walls group ---
+    this.palette.appendChild(this.makePaletteSep());
+
+    const thinWallLabel = document.createElement('span');
+    thinWallLabel.className = 'palette-label';
+    thinWallLabel.textContent = 'Thin Walls';
+    this.palette.appendChild(thinWallLabel);
+
+    const thinWallGroup = document.createElement('div');
+    thinWallGroup.className = 'palette-group';
+    for (const texName of THIN_WALL_TEXTURE_NAMES) {
+      this.addThinWallBtn(thinWallGroup, texName);
+    }
+    this.palette.appendChild(thinWallGroup);
+
+    // Erase thin walls checkbox
+    const eraseLabel = document.createElement('label');
+    eraseLabel.className = 'view-toggle';
+    const eraseCheckbox = document.createElement('input');
+    eraseCheckbox.type = 'checkbox';
+    eraseCheckbox.addEventListener('change', () => {
+      this.onViewToggle?.('thinWallEraseOnly', eraseCheckbox.checked);
+    });
+    eraseLabel.appendChild(eraseCheckbox);
+    const eraseText = document.createElement('span');
+    eraseText.textContent = 'Erase Walls';
+    eraseLabel.appendChild(eraseText);
+    this.palette.appendChild(eraseLabel);
 
     // Flood fill toggle
     this.palette.appendChild(this.makePaletteSep());
@@ -371,7 +407,7 @@ export class Toolbar {
   private addViewToggle(
     parent: HTMLElement,
     label: string,
-    flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill',
+    flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly',
     defaultOn: boolean
   ): void {
     const wrapper = document.createElement('label');
@@ -1047,6 +1083,44 @@ export class Toolbar {
     getSprite(`/sprites/items/${icon}.png`, () => this.redrawEntityBtn(entityType));
     this.redrawEntityBtn(entityType);
     this.onItemIdChange?.(entityType, itemId);
+  }
+
+  private addThinWallBtn(parent: HTMLElement, texName: string): void {
+    const btn = document.createElement('button');
+    btn.className = 'char-swatch-btn';
+    btn.title = `Thin wall: ${texName}`;
+
+    const size = 28;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Draw the thin wall texture preview
+    const tex = getThinWallTexture(texName);
+    const src = tex.image as HTMLCanvasElement;
+    ctx.drawImage(src, 0, 0, size, size);
+
+    btn.appendChild(canvas);
+    btn.addEventListener('click', () => {
+      this.selectThinWallBtn(btn, texName);
+      this.onThinWallToolSelect?.(texName);
+    });
+
+    this.thinWallBtns.set(texName, btn);
+    parent.appendChild(btn);
+  }
+
+  private selectThinWallBtn(btn: HTMLButtonElement, _texName: string): void {
+    // Deselect all other button types
+    for (const b of this.charBtns.values()) b.classList.remove('selected');
+    for (const b of this.entityBtns.values()) b.classList.remove('selected');
+    for (const b of this.thinWallBtns.values()) b.classList.remove('selected');
+    btn.classList.add('selected');
+
+    // Also deselect the select tool button
+    const selectBtn = this.toolBtns.get('select');
+    selectBtn?.classList.remove('selected');
   }
 
   private makeSep(): HTMLSpanElement {
