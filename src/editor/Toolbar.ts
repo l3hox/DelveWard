@@ -257,22 +257,31 @@ export class Toolbar {
     thinWallLabel.textContent = 'Thin Walls';
     this.palette.appendChild(thinWallLabel);
 
+    // Horizontal container: stacked texture rows (left) + eraser (right, centered)
+    const thinWallContainer = document.createElement('div');
+    thinWallContainer.style.display = 'flex';
+    thinWallContainer.style.alignItems = 'center';
+    thinWallContainer.style.gap = '6px';
+
+    // Left side: two stacked rows
+    const rowsWrapper = document.createElement('div');
+    rowsWrapper.style.display = 'flex';
+    rowsWrapper.style.flexDirection = 'column';
+    rowsWrapper.style.gap = '2px';
+
     // Exterior texture row
     const extGroup = document.createElement('div');
     extGroup.className = 'palette-group';
+    extGroup.style.margin = '0';
     for (const texName of THIN_WALL_TEXTURE_NAMES) {
       this.addThinWallBtn(extGroup, texName);
     }
-    this.palette.appendChild(extGroup);
+    rowsWrapper.appendChild(extGroup);
 
-    // Interior texture row (label + "same" button + texture buttons)
-    const intLabel = document.createElement('span');
-    intLabel.className = 'palette-label';
-    intLabel.textContent = 'Interior';
-    this.palette.appendChild(intLabel);
-
+    // Interior texture row ("same" button + texture buttons)
     const intGroup = document.createElement('div');
     intGroup.className = 'palette-group';
+    intGroup.style.margin = '0';
 
     // "Same" button — no interior override
     const sameBtn = document.createElement('button');
@@ -301,9 +310,11 @@ export class Toolbar {
     for (const texName of THIN_WALL_TEXTURE_NAMES) {
       this.addThinWallBackBtn(intGroup, texName);
     }
-    this.palette.appendChild(intGroup);
+    rowsWrapper.appendChild(intGroup);
 
-    // Erase thin walls toggle button (eraser icon)
+    thinWallContainer.appendChild(rowsWrapper);
+
+    // Right side: eraser button, vertically centered between the two rows
     const eraseBtn = document.createElement('button');
     eraseBtn.className = 'char-swatch-btn';
     eraseBtn.title = 'Erase thin walls';
@@ -334,7 +345,9 @@ export class Toolbar {
       this.onThinWallToolSelect?.(newState ? '__erase__' : this.lastThinWallTexture);
     });
     this.thinWallEraseBtn = eraseBtn;
-    extGroup.appendChild(eraseBtn);
+    thinWallContainer.appendChild(eraseBtn);
+
+    this.palette.appendChild(thinWallContainer);
 
     // Flood fill toggle
     this.palette.appendChild(this.makePaletteSep());
