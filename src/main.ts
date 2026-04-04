@@ -316,18 +316,28 @@ function buildLevelScene(
     // Ramp cells that need ceiling/wall/floor suppression on this layer
     const ldRampOpenCells = new Map<string, import('./rendering/dungeon').RampCellInfo>();
     // Bottom cells on this layer: skip ceiling + wall in facing direction
+    const OPPOSITE: Record<string, import('./core/grid').Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
     for (const ramp of gameState.ramps.values()) {
       ldRampOpenCells.set(doorKey(ramp.col, ramp.row), {
         wallDir: ramp.facing,
         skipCeiling: true,
         skipFloor: false,
       });
+      // Top cell (wall) on this same layer: split side walls, keep only the far half
+      const [dx, dz] = FACING_DELTA[ramp.facing];
+      const topCol = ramp.col + dx;
+      const topRow = ramp.row + dz;
+      ldRampOpenCells.set(doorKey(topCol, topRow), {
+        wallDir: OPPOSITE[ramp.facing],
+        skipCeiling: false,
+        skipFloor: false,
+        keepHalf: ramp.facing,
+      });
     }
     // Top cells from ramps on the layer below: skip floor + wall opposite to facing
     if (li > 0) {
       const savedIdx = gameState.activeLayerIndex;
       gameState.activeLayerIndex = li - 1;
-      const OPPOSITE: Record<string, import('./core/grid').Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
       for (const ramp of gameState.ramps.values()) {
         const [dx, dz] = FACING_DELTA[ramp.facing];
         const topCol = ramp.col + dx;
