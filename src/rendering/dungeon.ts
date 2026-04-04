@@ -95,7 +95,13 @@ function resolveWallMat(
   return fallbackMat;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, import('../core/grid').Facing>): THREE.Group {
+export interface RampCellInfo {
+  wallDir: import('../core/grid').Facing;  // wall direction to suppress
+  skipCeiling: boolean;
+  skipFloor: boolean;
+}
+
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -176,7 +182,8 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         else if (zW !== undefined && zW !== zoneLayer) { splitAxis = 'EW'; neighborZone = zW; }
       }
 
-      if (!isStair && !isOpenBottom) {
+      const rampInfo = rampOpenCells?.get(doorKey(col, row));
+      if (!isStair && !isOpenBottom && !rampInfo?.skipFloor) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           // Boundary cell: split floor into two halves, each tagged to its zone
           if (splitAxis === 'NS') {
@@ -215,8 +222,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       }
 
       // Ceiling (skip for stair and ramp bottom cells)
-      const isRampBottom = rampOpenCells?.has(doorKey(col, row)) ?? false;
-      if (ceiling && !isStair && !isRampBottom && !isOpenTop) {
+      if (ceiling && !isStair && !rampInfo?.skipCeiling && !isOpenTop) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           if (splitAxis === 'NS') {
             const ceilN = new THREE.Mesh(halfTileNS, cellCeilMat);
@@ -312,7 +318,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       };
 
       // Ramp facing at this cell — skip the wall in the ramp direction
-      const rampDir = rampOpenCells?.get(doorKey(col, row));
+      const rampDir = rampInfo?.wallDir;
 
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;

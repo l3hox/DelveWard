@@ -4,6 +4,8 @@ import { getFloorTexture, getWallTexture } from './textures';
 import type { WallTextureName, FloorTextureName } from '../core/textureNames';
 import type { Facing } from '../core/grid';
 import type { GameState, RampInstance } from '../core/gameState';
+import type { TextureSet, TextureArea, CharDef } from '../core/types';
+import { resolveTextures } from '../core/textureResolver';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -265,11 +267,20 @@ function buildStairedRamp(
 // Single ramp builder
 // ---------------------------------------------------------------------------
 
-function buildSingleRamp(ramp: RampInstance): THREE.Group {
-  // Default texture names — the ramp has no per-cell texture context in M4,
-  // so we fall back to the same defaults the dungeon uses.
-  const floorTex: FloorTextureName = 'stone_tile';
-  const wallTex: WallTextureName = 'stone';
+function buildSingleRamp(
+  ramp: RampInstance,
+  grid: string[],
+  defaults?: TextureSet,
+  charDefs?: CharDef[],
+  areas?: TextureArea[],
+): THREE.Group {
+  // Resolve textures from the ramp's cell context
+  const charDefMap = new Map<string, CharDef>();
+  if (charDefs) for (const def of charDefs) charDefMap.set(def.char, def);
+  const char = (grid[ramp.row] && grid[ramp.row][ramp.col]) || '.';
+  const resolved = resolveTextures(ramp.col, ramp.row, char, defaults, charDefMap, areas);
+  const floorTex = resolved.floor;
+  const wallTex = resolved.wall;
 
   let rampGroup: THREE.Group;
 
@@ -313,12 +324,18 @@ export interface RampMeshes {
   meshMap: Map<string, THREE.Group>;
 }
 
-export function buildRampMeshes(gameState: GameState): RampMeshes {
+export function buildRampMeshes(
+  gameState: GameState,
+  grid: string[],
+  defaults?: TextureSet,
+  charDefs?: CharDef[],
+  areas?: TextureArea[],
+): RampMeshes {
   const group = new THREE.Group();
   const meshMap = new Map<string, THREE.Group>();
 
   for (const [key, ramp] of gameState.ramps) {
-    const rampGroup = buildSingleRamp(ramp);
+    const rampGroup = buildSingleRamp(ramp, grid, defaults, charDefs, areas);
     group.add(rampGroup);
     meshMap.set(key, rampGroup);
   }

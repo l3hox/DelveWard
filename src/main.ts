@@ -313,10 +313,32 @@ function buildLevelScene(
       ? (multiZone ? zoneMap : undefined)
       : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
 
-    // Ramp cells that need ceiling/wall suppression on this layer
-    const ldRampOpenCells = new Map<string, import('./core/grid').Facing>();
+    // Ramp cells that need ceiling/wall/floor suppression on this layer
+    const ldRampOpenCells = new Map<string, import('./rendering/dungeon').RampCellInfo>();
+    // Bottom cells on this layer: skip ceiling + wall in facing direction
     for (const ramp of gameState.ramps.values()) {
-      ldRampOpenCells.set(doorKey(ramp.col, ramp.row), ramp.facing);
+      ldRampOpenCells.set(doorKey(ramp.col, ramp.row), {
+        wallDir: ramp.facing,
+        skipCeiling: true,
+        skipFloor: false,
+      });
+    }
+    // Top cells from ramps on the layer below: skip floor + wall opposite to facing
+    if (li > 0) {
+      const savedIdx = gameState.activeLayerIndex;
+      gameState.activeLayerIndex = li - 1;
+      const OPPOSITE: Record<string, import('./core/grid').Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+      for (const ramp of gameState.ramps.values()) {
+        const [dx, dz] = FACING_DELTA[ramp.facing];
+        const topCol = ramp.col + dx;
+        const topRow = ramp.row + dz;
+        ldRampOpenCells.set(doorKey(topCol, topRow), {
+          wallDir: OPPOSITE[ramp.facing],
+          skipCeiling: false,
+          skipFloor: true,
+        });
+      }
+      gameState.activeLayerIndex = savedIdx;
     }
 
     // Dungeon geometry
@@ -475,7 +497,7 @@ function buildLevelScene(
     mergeMap(sharedThinWallMeshMap, ldThinWallMeshes.meshMap, li);
 
     // Ramp meshes
-    const ldRampMeshes = buildRampMeshes(gameState);
+    const ldRampMeshes = buildRampMeshes(gameState, ld.grid, ldDefaults, level.charDefs, ldAreas);
     ldRampMeshes.group.position.y = yOffset;
     sharedRampGroup.add(ldRampMeshes.group);
     mergeMap(sharedRampMeshMap, ldRampMeshes.meshMap, li);
