@@ -32,6 +32,14 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - 4 procedural textures: stone_thin, iron_fence, wood_fence, railing (alpha for see-through)
   - Editor: dedicated "Thin Walls" palette section with exterior/interior texture rows, eraser icon, line drawing, rectangle perimeter drawing with exterior/interior texture assignment
   - Editor opens playerStart layer by default
+- [x] **Codebase Refactoring**:
+  - main.ts 2341→1640: extracted levelSceneBuilder.ts (719 lines), lootSpawner.ts
+  - Merged itemRenderer + consumableRenderer → groundItemRenderer.ts
+  - Extracted mulberry32 PRNG to src/core/random.ts (3 files → 1)
+  - Renamed lk() → layerKey() (52 sites), removed dead code
+  - GameState: constructor accepts layers, _parseEntities split into 5 sub-methods
+  - +12 tests for thin wall edge blocking + pathfinding (777 total)
+  - ADR audit: added M4-11, M4-12, M3-07; revised M4-04, M4-06
 - [x] **Ramps: Physical Layer Transitions**:
   - `RampInstance` with `facing` and `style` (ramp/stairs), entity on bottom cell
   - `rampRenderer.ts`: exact-vertex quad geometry for both styles (no boxes)

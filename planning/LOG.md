@@ -4,6 +4,20 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-03 — Codebase Refactoring
+
+**main.ts split**: 2341→1640 lines. Extracted `src/game/levelSceneBuilder.ts` (719 lines — `LevelScene` interface, `buildLevelScene`, `teardownLevelScene`, `mergeMap`). Extracted `src/game/lootSpawner.ts` (loot spawn pattern deduplicated from 5 occurrences).
+
+**Renderer consolidation**: Merged `itemRenderer.ts` + `consumableRenderer.ts` → `groundItemRenderer.ts` with `kind` parameter. Extracted `mulberry32` PRNG from 3 renderer files → `src/core/random.ts`.
+
+**GameState cleanup**: Fixed double-init pattern — constructor now accepts optional `layerDefs` parameter. Split `_parseEntities` (290-line if/else chain) into 5 private sub-methods: `_parseSignalEntity`, `_parseEnvironmentEntity`, `_parseStructureEntity`, `_parseNpcEntity`, `_parseItemEntity`.
+
+**Readability**: Renamed `lk()` → `layerKey()` across 52 call sites. Removed dead code (commented level paths, commented NEIGHBORS block in forestRenderer).
+
+**Test improvements**: 12 new tests for thin wall edge blocking (getThinWallBetween all 4 directions, isEdgeBlocked, isSolidEdgeBlocked) and pathfinding with isEdgeBlocked callback. 777 tests total. Shared test fixtures investigated — mocks are intentionally different per test file, no extraction needed.
+
+---
+
 ## 2026-04-03 — Ramps: Physical Layer Transitions
 
 **Ramps**: New `ramp` entity that physically connects two adjacent layers. The entity lives on the bottom cell (walkable `.`), the top cell is a wall (`#`) on the lower layer. Two styles: smooth angled ramp or stepped stairs. Both built from exact vertex quad geometry (no boxes, no PlaneGeometry rotation).
