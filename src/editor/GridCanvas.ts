@@ -1297,23 +1297,35 @@ export class GridCanvas {
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);
-        ctx.strokeStyle = '#8B4513';
-        ctx.lineWidth = twThick;
-        if ((entity.height as string) === 'half') {
-          ctx.setLineDash([3, 3]);
-        }
+        const halfDash = (entity.height as string) === 'half';
+        // Black outline (1px wider on each side)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = twThick + 2;
+        if (halfDash) ctx.setLineDash([3, 3]);
         ctx.beginPath();
         if (twWall === 'S') {
-          // Bottom edge of cell
           ctx.moveTo(px, py + th);
           ctx.lineTo(px + tw, py + th);
         } else {
-          // Right edge of cell
           ctx.moveTo(px + tw, py);
           ctx.lineTo(px + tw, py + th);
         }
         ctx.stroke();
-        ctx.setLineDash([]);
+        if (halfDash) ctx.setLineDash([]);
+        // Brown fill on top
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = twThick;
+        if (halfDash) ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        if (twWall === 'S') {
+          ctx.moveTo(px, py + th);
+          ctx.lineTo(px + tw, py + th);
+        } else {
+          ctx.moveTo(px + tw, py);
+          ctx.lineTo(px + tw, py + th);
+        }
+        ctx.stroke();
+        if (halfDash) ctx.setLineDash([]);
         break;
       }
 

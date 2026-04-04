@@ -69,13 +69,6 @@ function buildSingleThinWall(tw: ThinWallInstance): THREE.Group {
     wallGroup.add(backMesh);
   }
 
-  // Black outline for visibility against any background
-  const edgesGeo = new THREE.EdgesGeometry(geo);
-  const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
-  const outline = new THREE.LineSegments(edgesGeo, lineMat);
-  outline.position.y = yCenter;
-  wallGroup.add(outline);
-
   // Position and orient the wallGroup at the correct cell edge.
   //
   // PlaneGeometry faces +Z by default (normal points toward +Z).
