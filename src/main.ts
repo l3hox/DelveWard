@@ -16,10 +16,10 @@ import { buildSconceMeshes, extinguishSconce, updateSconceFlicker } from './rend
 import { buildStairMeshes } from './rendering/stairRenderer';
 import { buildForestMeshes, updateForestBillboards, type ForestMeshes } from './rendering/forestRenderer';
 import { buildEnemyMeshes, updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
-import { buildItemMeshes, hideItemMesh, addSingleItemMesh, updateItemBillboards } from './rendering/itemRenderer';
-import { buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh, updateConsumableBillboards } from './rendering/consumableRenderer';
+import { buildItemMeshes, hideItemMesh, addSingleItemMesh, updateItemBillboards, buildConsumableMeshes, hideConsumableMesh, addSingleConsumableMesh, updateConsumableBillboards } from './rendering/groundItemRenderer';
 import { preloadItemSprites } from './rendering/itemSprites';
-import { loadLootTables, rollLoot } from './core/lootTable';
+import { loadLootTables } from './core/lootTable';
+import { spawnLoot } from './game/lootSpawner';
 import { EnemyAnimator } from './rendering/enemyAnimator';
 import { updateEnemies } from './enemies/enemyAI';
 import { enemyDatabase, DEFAULT_SPRITE_SIZE } from './enemies/enemyDatabase';
@@ -862,9 +862,7 @@ async function init(): Promise<void> {
   checkAssets();
 
   // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/test_ramps.json');  
-// const dungeon: Dungeon = await loadDungeon('/levels/dungeon_m1-layered.json');
-//  const dungeon: Dungeon = await loadDungeon('/levels/test_m3.json');
+  const dungeon: Dungeon = await loadDungeon('/levels/test_ramps.json');
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
@@ -1032,21 +1030,7 @@ async function init(): Promise<void> {
       const levelled = gameState.addXp(enemyDef.xp);
       if (levelled) levelUpNotification.trigger(gameState.level);
     }
-    const lootResult = rollLoot(enemy.type, enemy.drops);
-    gameState.gold += lootResult.gold;
-    for (const drop of lootResult.items) {
-      const entity = gameState.entityRegistry.createItem(
-        drop.itemId, drop.quality,
-        { kind: 'world', levelId: gameState.currentLevelId, col, row, layerIndex: gameState.activeLayerIndex },
-        drop.modifiers,
-      );
-      const itemDef = itemDatabase.getItem(drop.itemId);
-      if (itemDef && itemDef.type === 'consumable') {
-        addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
-      } else if (itemDef) {
-        addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
-      }
-    }
+    spawnLoot(enemy.type, enemy.drops, col, row, gameState, ls);
   }
 
   function restartLevel(): void {
@@ -1846,21 +1830,7 @@ async function init(): Promise<void> {
             // Roll loot from chest drops
             const chest = gameState.getChest(result.targetCol, result.targetRow);
             if (chest?.drops) {
-              const lootResult = rollLoot('', chest.drops);
-              gameState.gold += lootResult.gold;
-              for (const drop of lootResult.items) {
-                const entity = gameState.entityRegistry.createItem(
-                  drop.itemId, drop.quality,
-                  { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
-                  drop.modifiers,
-                );
-                const itemDef = itemDatabase.getItem(drop.itemId);
-                if (itemDef && itemDef.type === 'consumable') {
-                  addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
-                } else if (itemDef) {
-                  addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
-                }
-              }
+              spawnLoot('', chest.drops, result.targetCol, result.targetRow, gameState, ls);
             }
           }
           if (result.type === 'chest_locked') {
@@ -1943,21 +1913,7 @@ async function init(): Promise<void> {
                   const levelled = gameState.addXp(enemyDef.xp);
                   if (levelled) levelUpNotification.trigger(gameState.level);
                 }
-                const lootResult = rollLoot(result.enemyType, result.dropsOverride);
-                gameState.gold += lootResult.gold;
-                for (const drop of lootResult.items) {
-                  const entity = gameState.entityRegistry.createItem(
-                    drop.itemId, drop.quality,
-                    { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
-                    drop.modifiers,
-                  );
-                  const itemDef = itemDatabase.getItem(drop.itemId);
-                  if (itemDef && itemDef.type === 'consumable') {
-                    addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
-                  } else if (itemDef) {
-                    addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
-                  }
-                }
+                spawnLoot(result.enemyType, result.dropsOverride, result.targetCol, result.targetRow, gameState, ls);
               }
             }
             if (result.type === 'wall_hit' && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
@@ -1973,21 +1929,7 @@ async function init(): Promise<void> {
                 }
                 // Roll loot from wall drops
                 if (wallResult.drops) {
-                  const lootResult = rollLoot('', wallResult.drops);
-                  gameState.gold += lootResult.gold;
-                  for (const drop of lootResult.items) {
-                    const entity = gameState.entityRegistry.createItem(
-                      drop.itemId, drop.quality,
-                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
-                      drop.modifiers,
-                    );
-                    const itemDef = itemDatabase.getItem(drop.itemId);
-                    if (itemDef && itemDef.type === 'consumable') {
-                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
-                    } else if (itemDef) {
-                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
-                    }
-                  }
+                  spawnLoot('', wallResult.drops, result.targetCol, result.targetRow, gameState, ls);
                 }
               }
             }
@@ -2002,21 +1944,7 @@ async function init(): Promise<void> {
                 }
                 // Roll loot from barrel drops
                 if (result.dropsOverride) {
-                  const lootResult = rollLoot('', result.dropsOverride);
-                  gameState.gold += lootResult.gold;
-                  for (const drop of lootResult.items) {
-                    const entity = gameState.entityRegistry.createItem(
-                      drop.itemId, drop.quality,
-                      { kind: 'world', levelId: gameState.currentLevelId, col: result.targetCol, row: result.targetRow, layerIndex: gameState.activeLayerIndex },
-                      drop.modifiers,
-                    );
-                    const itemDef = itemDatabase.getItem(drop.itemId);
-                    if (itemDef && itemDef.type === 'consumable') {
-                      addSingleConsumableMesh(entity, ls.consumableMeshes.group, ls.consumableMeshes.meshMap, gameState.activeLayerIndex);
-                    } else if (itemDef) {
-                      addSingleItemMesh(entity, gameState, ls.itemMeshes.group, ls.itemMeshes.meshMap, gameState.activeLayerIndex);
-                    }
-                  }
+                  spawnLoot('', result.dropsOverride, result.targetCol, result.targetRow, gameState, ls);
                 }
               }
             }

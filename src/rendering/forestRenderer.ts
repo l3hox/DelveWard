@@ -3,23 +3,12 @@ import { CELL_SIZE } from './dungeon';
 import { buildWalkableSet } from '../core/grid';
 import { createNeutralLitMaterial } from './billboardMaterial';
 import type { CharDef } from '../core/types';
+import { mulberry32 } from '../core/random';
 
 export interface ForestMeshes {
   group: THREE.Group;
   /** InstancedMesh objects (one per variant) — need billboard rotation update each frame. */
   instances: THREE.InstancedMesh[];
-}
-
-// --- Seeded PRNG ---
-
-function mulberry32(seed: number) {
-  return function (): number {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 // --- Sprite-based tree textures loaded from PNGs ---
@@ -53,15 +42,6 @@ function getTreeTextures(): THREE.Texture[] {
 
   return treeTextureCache;
 }
-
-// --- Neighbor face descriptors (kept for future border pass) ---
-
-// const NEIGHBORS: Array<{ dc: number; dr: number; faceIndex: number; axis: 'x' | 'z'; wallSign: number }> = [
-//   { dc: 0,  dr: -1, faceIndex: 0, axis: 'z', wallSign: -1 }, // N
-//   { dc: 0,  dr:  1, faceIndex: 1, axis: 'z', wallSign:  1 }, // S
-//   { dc:  1, dr:  0, faceIndex: 2, axis: 'x', wallSign:  1 }, // E
-//   { dc: -1, dr:  0, faceIndex: 3, axis: 'x', wallSign: -1 }, // W
-// ];
 
 // --- Main build function ---
 
@@ -161,7 +141,6 @@ export function buildForestMeshes(grid: string[], charDefs?: CharDef[]): ForestM
   return { group, instances };
 }
 
-// Reusable objects for billboard rotation updates (zero allocations per frame)
 // Reusable objects for billboard rotation updates (zero allocations per frame)
 const _mat = new THREE.Matrix4();
 const _pos = new THREE.Vector3();
