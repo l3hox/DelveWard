@@ -24,16 +24,25 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - openBottom/openTop checkboxes, playerStart with layer coordinate, flood fill tool
   - Error links navigate to correct level+layer, layer-aware entity highlighting
   - Entity ID generation searches all layers, level ID rename updates references
-- [x] **Phase C + C Editor (basic): Thin Walls**:
+- [x] **Phase C + C Editor: Thin Walls**:
   - `ThinWallInstance` with canonical `'S'`/`'E'` edge ownership, composite `"col,row:S"` keys
   - `getThinWallBetween()` canonical lookup, `isEdgeBlocked()` / `isSolidEdgeBlocked()` on GameState
   - Movement blocking at 5 sites: PlayerState, enemy AI (flee/chase/erratic + BFS), projectiles, block push
   - `thinWallRenderer.ts`: PlaneGeometry at cell edges, MeshLambertMaterial + alphaTest 0.5
-  - DoubleSide single mesh or two-plane front/back for different textures
   - 4 procedural textures: stone_thin, iron_fence, wood_fence, railing (alpha for see-through)
-  - Zone tagging strips direction suffix for correct multi-pass rendering
-  - Editor: palette, grid icon (line on edge, dashed for half), inspector fields
-  - Level loader validation, save/load persistence
+  - Editor: dedicated "Thin Walls" palette section with exterior/interior texture rows, eraser icon, line drawing, rectangle perimeter drawing with exterior/interior texture assignment
+  - Editor opens playerStart layer by default
+- [x] **Ramps: Physical Layer Transitions**:
+  - `RampInstance` with `facing` and `style` (ramp/stairs), entity on bottom cell
+  - `rampRenderer.ts`: exact-vertex quad geometry for both styles (no boxes)
+  - Stairs: treads, risers, full-height side profiles as face quads in single BufferGeometry
+  - Ramp: manual quad slope surface with triangular side fills
+  - `isRampAccessible` callback overrides walkability (walls going up, holes going down)
+  - `canMoveTo()` consolidates walkability + edge blocking + ramp checks in PlayerState
+  - `RampCellInfo` + `RampHalfWallMap` in buildDungeon: ceiling/floor/wall suppression + half-wall splitting for adjacent cells
+  - Cell-resolved textures via resolveTextures()
+  - Editor: palette, directional grid icon, facing/style inspector
+  - Particle fix: all particle systems enableAll() for multi-zone visibility
 - [x] **Polish — Rendering**:
   - Forest: PNG sprites + InstancedMesh (4 draw calls), billboard shader USE_INSTANCING
   - Items/keys/consumables: upright billboard sprites, multi-item seeded spread

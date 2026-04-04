@@ -4,7 +4,19 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
-## 2026-04-03 — M4 Phase C: Thin Walls
+## 2026-04-03 — Ramps: Physical Layer Transitions
+
+**Ramps**: New `ramp` entity that physically connects two adjacent layers. The entity lives on the bottom cell (walkable `.`), the top cell is a wall (`#`) on the lower layer. Two styles: smooth angled ramp or stepped stairs. Both built from exact vertex quad geometry (no boxes, no PlaneGeometry rotation).
+
+**Movement**: `isRampAccessible` callback on `PlayerState` overrides `isWalkable()` when a ramp connects the cells. Going UP walks into a wall cell (normally blocked); going DOWN walks over a hole (normally blocked). Layer switch + camera Y tween triggered in `onMove` callback after successful movement. `canMoveTo()` helper consolidates all movement checks.
+
+**Dungeon geometry integration**: Complex wall/floor/ceiling suppression around ramp cells. `RampCellInfo` in `buildDungeon()` handles bottom cell (skip ceiling, suppress wall in facing direction) and top cell on upper layer (half-floor via `floorKeepHalf`, suppress wall opposite to facing, half side walls via `keepHalf`). `RampHalfWallMap` targets adjacent walkable cells' walls toward the ramp top cell for per-wall half-wall splitting. The top cell is `#` (not processed by dungeon builder), so its visible walls come from adjacent walkable cells.
+
+**Particle fix**: All particle systems (dust motes, sconce embers, water drips, fireflies, fireball explosions) were missing `layers.enableAll()` for multi-zone rendering. Fixed at root objects + dynamically spawned sprites/points.
+
+---
+
+## 2026-04-03 — M4 Phase C: Thin Walls + Editor UX
 
 **Thin walls**: New `thin_wall` entity type — edge-based walls between walkable cells. Canonical edge ownership: only `'S'` and `'E'` directions allowed, entity lives on the north/west cell of the edge. One entity per grid edge, no duplicates possible structurally. ADR-M4-06 revised to reflect this design (was four-direction).
 
@@ -14,7 +26,9 @@ Each entry records what was decided or changed — design decisions, architectur
 
 **Rendering**: `PlaneGeometry` at cell edges with `MeshLambertMaterial` + `alphaTest: 0.5`. Textures use real alpha channel for see-through (iron_fence, wood_fence, railing have transparent gaps; stone_thin is fully opaque). Two-sided textures (front/back) supported for building exteriors.
 
-**Editor**: Basic support — palette entry, grid icon (line on S/E edge, dashed for half-height), inspector fields. Edge-click auto-resolution and drag-to-paint deferred for UX polish session.
+**Editor UX**: Dedicated "Thin Walls" section in char palette (not entity palette). Two stacked texture rows: exterior (top) + interior (bottom) with eraser icon button to the right, vertically centered. Line drawing via drag along cell edges. Rectangle perimeter: drag across both axes encapsulates an area in thin walls with correct exterior/interior texture assignment (top/left edges get exterior on outside, bottom/right edges swap). Editor opens playerStart layer by default when loading levels.
+
+**ADR audit**: Added ADR-M4-11 (billboard rendering + alpha), ADR-M4-12 (inventory direct slot model), ADR-M3-07 (TempBuff vs StatusEffect). Revised ADR-M4-04 (multi-pass rendering detail) and ADR-M4-06 (edge blocking architecture).
 
 ---
 
