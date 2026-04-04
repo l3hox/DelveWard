@@ -17,11 +17,12 @@ const SLOPE_LENGTH = Math.sqrt(CELL_SIZE * CELL_SIZE + LAYER_HEIGHT * LAYER_HEIG
 const SLOPE_ANGLE = Math.atan2(LAYER_HEIGHT, CELL_SIZE);
 
 // Canonical orientation: bottom at +Z (south), top at -Z (north).
+// facing = direction from bottom to top. 'N' = top is north = canonical, no rotation.
 const FACING_ROTATION: Record<Facing, number> = {
-  S: 0,
-  E: Math.PI / 2,
-  N: Math.PI,
-  W: -Math.PI / 2,
+  N: 0,
+  E: -Math.PI / 2,
+  S: Math.PI,
+  W: Math.PI / 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -282,13 +283,23 @@ function buildSingleRamp(ramp: RampInstance): THREE.Group {
     rampGroup = buildSmoothRamp(slopeMat, sideMat);
   }
 
-  // Rotate from canonical (S) to the ramp's actual facing direction
+  // Rotate from canonical to the ramp's actual facing direction
   rampGroup.rotation.y = FACING_ROTATION[ramp.facing];
 
-  // Position at the bottom cell's world center
+  // Position at the midpoint between bottom and top cell centers.
+  // The ramp spans from center of bottom cell to center of top cell,
+  // so shift by half a cell in the facing direction.
   const cx = ramp.col * CELL_SIZE + CELL_SIZE / 2;
   const cz = ramp.row * CELL_SIZE + CELL_SIZE / 2;
-  rampGroup.position.set(cx, 0, cz);
+  // Apply facing offset in world space (before rotation)
+  const facingOffsets: Record<Facing, [number, number]> = {
+    N: [0, -CELL_SIZE / 2],
+    S: [0, CELL_SIZE / 2],
+    E: [CELL_SIZE / 2, 0],
+    W: [-CELL_SIZE / 2, 0],
+  };
+  const [ox, oz] = facingOffsets[ramp.facing];
+  rampGroup.position.set(cx + ox, 0, cz + oz);
 
   return rampGroup;
 }

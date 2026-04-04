@@ -313,6 +313,12 @@ function buildLevelScene(
       ? (multiZone ? zoneMap : undefined)
       : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
 
+    // Ramp cells that need ceiling/wall suppression on this layer
+    const ldRampOpenCells = new Map<string, import('./core/grid').Facing>();
+    for (const ramp of gameState.ramps.values()) {
+      ldRampOpenCells.set(doorKey(ramp.col, ramp.row), ramp.facing);
+    }
+
     // Dungeon geometry
     const ldAboveGrid = layerDefs[li + 1]?.grid;
     const ldBelowGrid = layerDefs[li - 1]?.grid;
@@ -323,6 +329,7 @@ function buildLevelScene(
       ldZoneMap,
       (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
       ldAboveGrid, ldBelowGrid,
+      ldRampOpenCells,
     );
     ldDungeonGroup.position.y = yOffset;
     allDungeonGroup.add(ldDungeonGroup);

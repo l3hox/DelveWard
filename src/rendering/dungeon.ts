@@ -95,7 +95,7 @@ function resolveWallMat(
   return fallbackMat;
 }
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[]): THREE.Group {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, import('../core/grid').Facing>): THREE.Group {
   const group = new THREE.Group();
   const rows = grid.length;
   const cols = grid[0].length;
@@ -214,8 +214,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         }
       }
 
-      // Ceiling (skip for stair cells — stairRenderer provides the geometry)
-      if (ceiling && !isStair && !isOpenTop) {
+      // Ceiling (skip for stair and ramp bottom cells)
+      const isRampBottom = rampOpenCells?.has(doorKey(col, row)) ?? false;
+      if (ceiling && !isStair && !isRampBottom && !isOpenTop) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           if (splitAxis === 'NS') {
             const ceilN = new THREE.Mesh(halfTileNS, cellCeilMat);
@@ -310,30 +311,33 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         return isSolid(grid, c, r, renderable);
       };
 
+      // Ramp facing at this cell — skip the wall in the ramp direction
+      const rampDir = rampOpenCells?.get(doorKey(col, row));
+
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;
-      if (!isStair && !skipN && solidCheck(col, row - 1)) {
+      if (!isStair && !skipN && rampDir !== 'N' && solidCheck(col, row - 1)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
         addWall(wallMat, 0, cx, cz - CELL_SIZE / 2, 'along-x');
       }
 
       // South wall (faces north, runs along X axis)
       const skipS = wallEntityCells?.has(doorKey(col, row + 1)) ?? false;
-      if (!isStair && !skipS && solidCheck(col, row + 1)) {
+      if (!isStair && !skipS && rampDir !== 'S' && solidCheck(col, row + 1)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
         addWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, 'along-x');
       }
 
       // East wall (faces west, runs along Z axis)
       const skipE = wallEntityCells?.has(doorKey(col + 1, row)) ?? false;
-      if (!isStair && !skipE && solidCheck(col + 1, row)) {
+      if (!isStair && !skipE && rampDir !== 'E' && solidCheck(col + 1, row)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
         addWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, 'along-z');
       }
 
       // West wall (faces east, runs along Z axis)
       const skipW = wallEntityCells?.has(doorKey(col - 1, row)) ?? false;
-      if (!isStair && !skipW && solidCheck(col - 1, row)) {
+      if (!isStair && !skipW && rampDir !== 'W' && solidCheck(col - 1, row)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
         addWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, 'along-z');
       }
