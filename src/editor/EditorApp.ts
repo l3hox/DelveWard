@@ -215,8 +215,9 @@ export class EditorApp {
     }
     // Pre-seed the layer for the start level so switchToLevel opens the right layer
     const startLevel = dungeon.levels[startLevelIndex];
-    if (startLevel.layers && startLevel.layers.length > 0 && ps.layerIndex !== undefined) {
-      const id = String(ps.layerIndex);
+    if (startLevel.layers && startLevel.layers.length > 0) {
+      const layerCoord = ps.layerIndex ?? 0;  // default to layer 0 when not specified
+      const id = String(layerCoord);
       const layerIdx = startLevel.layers.findIndex(l => l.id === id);
       if (layerIdx >= 0) this.lastLayerPerLevel.set(startLevelIndex, layerIdx);
     }
