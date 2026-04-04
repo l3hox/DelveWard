@@ -303,70 +303,38 @@ function buildStairedRamp(
   stepGeo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
   group.add(new THREE.Mesh(stepGeo, stepMaterial));
 
-  // Side profiles — stepped silhouette on left and right, built as face quads.
+  // Side profiles — full stepped silhouette on left and right.
+  // Each step's side quad extends from Y=0 (floor) to Y=stepTop, filling the
+  // entire area under the staircase profile.
   for (const side of [-1, 1]) {
     const x = half * side;
-    const nx = side; // outward normal
+    const nx = side;
     const sv: number[] = [];
     const su: number[] = [];
     const sn: number[] = [];
 
     for (let i = 0; i < RAMP_STEP_COUNT; i++) {
-      const y0 = RAMP_STEP_HEIGHT * i;
-      const y1 = RAMP_STEP_HEIGHT * (i + 1);
+      const y1 = RAMP_STEP_HEIGHT * (i + 1);  // top of this step
       const zFront = CELL_SIZE / 2 - i * RAMP_STEP_DEPTH;
       const zBack = CELL_SIZE / 2 - (i + 1) * RAMP_STEP_DEPTH;
 
-      const uF = (CELL_SIZE / 2 - zFront + CELL_SIZE / 2) / CELL_SIZE; // 0..1 along depth
-      const uB = (CELL_SIZE / 2 - zBack + CELL_SIZE / 2) / CELL_SIZE;
-      const vBot = y0 / WALL_HEIGHT;
+      const uF = (half - zFront + half) / CELL_SIZE;
+      const uB = (half - zBack + half) / CELL_SIZE;
       const vTop = y1 / WALL_HEIGHT;
 
-      // Riser face (vertical strip at each step front)
-      // Winding depends on side: left (x<0) needs opposite winding from right (x>0)
+      // Full-height quad from floor to step top
       if (side < 0) {
         pushQuad(sv, su, sn,
-          [x, y0, zFront], [x, y1, zFront],
-          [x, y1, zBack], [x, y0, zBack],
-          [uF, vBot], [uF, vTop], [uB, vTop], [uB, vBot],
+          [x, 0, zFront], [x, y1, zFront],
+          [x, y1, zBack], [x, 0, zBack],
+          [uF, 0], [uF, vTop], [uB, vTop], [uB, 0],
           nx, 0, 0,
         );
       } else {
         pushQuad(sv, su, sn,
-          [x, y0, zFront], [x, y0, zBack],
+          [x, 0, zFront], [x, 0, zBack],
           [x, y1, zBack], [x, y1, zFront],
-          [uF, vBot], [uB, vBot], [uB, vTop], [uF, vTop],
-          nx, 0, 0,
-        );
-      }
-    }
-
-    // Bottom rectangle: floor to first step front, full depth
-    const vH0 = 0;
-    if (side < 0) {
-      pushQuad(sv, su, sn,
-        [x, 0, half], [x, 0, -half],
-        [x, 0, -half], [x, 0, half],
-        [0, vH0], [1, vH0], [1, vH0], [0, vH0],
-        nx, 0, 0,
-      );
-    }
-
-    // Back wall strip at the far end (from floor to LAYER_HEIGHT)
-    {
-      const vTop = LAYER_HEIGHT / WALL_HEIGHT;
-      if (side < 0) {
-        pushQuad(sv, su, sn,
-          [x, 0, -half], [x, LAYER_HEIGHT, -half],
-          [x, LAYER_HEIGHT, -half], [x, 0, -half],
-          [1, 0], [1, vTop], [1, vTop], [1, 0],
-          nx, 0, 0,
-        );
-      } else {
-        pushQuad(sv, su, sn,
-          [x, 0, -half], [x, 0, -half],
-          [x, LAYER_HEIGHT, -half], [x, LAYER_HEIGHT, -half],
-          [1, 0], [1, 0], [1, vTop], [1, vTop],
+          [uF, 0], [uB, 0], [uB, vTop], [uF, vTop],
           nx, 0, 0,
         );
       }
