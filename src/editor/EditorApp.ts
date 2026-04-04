@@ -233,11 +233,10 @@ export class EditorApp {
       } else {
         this.dirtyLevelIndices.delete(this.activeLevelIndex);
       }
+      // Remember current layer for the outgoing level
+      this.syncToActiveLayer();
+      this.lastLayerPerLevel.set(this.activeLevelIndex, this.activeLayerIndex);
     }
-
-    // Remember current layer for the outgoing level
-    this.syncToActiveLayer();
-    this.lastLayerPerLevel.set(this.activeLevelIndex, this.activeLayerIndex);
 
     this.activeLevelIndex = index;
     this.level = this.dungeon.levels[index];
