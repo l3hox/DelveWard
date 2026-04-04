@@ -474,7 +474,7 @@ export class GameState {
   // Active status effects on the player (global, not per-level)
   playerStatusEffects: StatusEffect[];
 
-  constructor(entities: Entity[], grid?: string[], levelId: string = 'default') {
+  constructor(entities: Entity[], grid?: string[], levelId: string = 'default', layerDefs?: LayerDef[]) {
     this.layers = [createEmptyLayerState()];
     this.activeLayerIndex = 0;
 
@@ -512,272 +512,26 @@ export class GameState {
     this.maxHp = 40 + this.vit * 5;
     this.hp = this.maxHp;
 
-    this._parseEntities(entities, grid);
+    if (layerDefs && layerDefs.length > 0) {
+      // Multi-layer: create a fresh LayerState per layer and parse entities into each.
+      this.layers = layerDefs.map(() => createEmptyLayerState());
+      for (let i = 0; i < layerDefs.length; i++) {
+        this.activeLayerIndex = i;
+        this._parseEntities(layerDefs[i].entities, layerDefs[i].grid);
+      }
+      this.activeLayerIndex = 0;
+    } else {
+      this._parseEntities(entities, grid);
+    }
   }
 
   private _parseEntities(entities: Entity[], grid?: string[]): void {
     for (const e of entities) {
-      if (e.type === 'door') {
-        const state = (e.state as DoorState) ?? 'closed';
-        const keyId = e.keyId as string | undefined;
-        this.doors.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          state,
-          keyId,
-          mechanical: false,
-          gateMode: e.gateMode as GateMode | undefined,
-        });
-      } else if (e.type === 'key') {
-        this.keys.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          keyId: e.keyId as string,
-          pickedUp: false,
-        });
-      } else if (e.type === 'lever') {
-        const wall = (e.wall as Facing | undefined) ??
-          autoDetectLeverWall(e.col, e.row, grid);
-        // Support targets[] (new), target (single, M1 compat), and targetDoor (legacy)
-        const targets = (e.targets as string[] | undefined) ??
-          (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
-        this.levers.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          targets,
-          wall,
-          state: 'up',
-          signalMode: e.signalMode as SignalMode | undefined,
-          signalDuration: e.signalDuration as number | undefined,
-          signalDelay: e.signalDelay as number | undefined,
-        });
-      } else if (e.type === 'pressure_plate') {
-        const targets = (e.targets as string[] | undefined) ??
-          (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
-        this.plates.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          targets,
-          activated: false,
-          signalMode: e.signalMode as SignalMode | undefined,
-          signalDuration: e.signalDuration as number | undefined,
-          signalDelay: e.signalDelay as number | undefined,
-        });
-      } else if (e.type === 'trigger') {
-        const targets = (e.targets as string[] | undefined) ?? [];
-        this.triggers.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          targets,
-          signalMode: (e.signalMode as SignalMode) ?? 'momentary',
-          signalDuration: e.signalDuration as number | undefined,
-          signalDelay: e.signalDelay as number | undefined,
-          fired: false,
-        });
-      } else if (e.type === 'tripwire') {
-        const targets = (e.targets as string[] | undefined) ?? [];
-        const orientation = (e.orientation as TripwireOrientation | undefined) ??
-          autoDetectTripwireOrientation(e.col, e.row, grid);
-        this.tripwires.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          targets,
-          signalMode: (e.signalMode as SignalMode) ?? 'one_shot',
-          signalDuration: e.signalDuration as number | undefined,
-          signalDelay: e.signalDelay as number | undefined,
-          visibilityThreshold: (e.visibilityThreshold as number) ?? 8,
-          orientation,
-          triggered: false,
-        });
-      } else if (e.type === 'gate') {
-        const targets = (e.targets as string[] | undefined) ?? [];
-        this.gates.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          gateType: (e.gateType as GateType) ?? 'and',
-          targets,
-          delay: e.delay as number | undefined,
-          interval: e.interval as number | undefined,
-        });
-      } else if (e.type === 'trap_launcher') {
-        this.trapLaunchers.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          facing: (e.facing as Facing) ?? 'S',
-          projectileType: (e.projectileType as string) ?? 'dart',
-          fireMode: (e.fireMode as LauncherFireMode) ?? 'repeat',
-          reloadTime: (e.reloadTime as number) ?? 3,
-          nextFireAt: 0,
-          maxRange: e.maxRange as number | undefined,
-        });
-      } else if (e.type === 'torch_sconce') {
-        const wall = (e.wall as Facing | undefined) ??
-          autoDetectLeverWall(e.col, e.row, grid);
-        this.sconces.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          wall,
-          lit: true,
-        });
-      } else if (e.type === 'stairs') {
-        this.stairs.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          direction: e.direction as 'up' | 'down',
-          facing: e.facing as Facing,
-        });
-      } else if (e.type === 'breakable_wall') {
-        const hp = (e.hp as number) ?? 30;
-        this.breakableWalls.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          hp,
-          maxHp: hp,
-          drops: e.drops as DropsOverride | undefined,
-        });
-      } else if (e.type === 'secret_wall') {
-        this.secretWalls.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          opened: false,
-          persistent: (e.persistent as boolean) ?? false,
-        });
-      } else if (e.type === 'block') {
-        this.blocks.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-        });
-      } else if (e.type === 'chest') {
-        this.chests.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          state: (e.state as ChestState) ?? 'closed',
-          facing: (e.facing as Facing) ?? 'S',
-          keyId: e.keyId as string | undefined,
-          gateMode: e.gateMode as GateMode | undefined,
-          targets: e.targets as string[] | undefined,
-          drops: e.drops as DropsOverride | undefined,
-        });
-      } else if (e.type === 'sign') {
-        const wall = (e.wall as Facing | undefined) ??
-          autoDetectLeverWall(e.col, e.row, grid);
-        this.signs.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          wall,
-          text: (e.text as string) ?? '',
-        });
-      } else if (e.type === 'npc') {
-        const npcId = e.npcId as string;
-        if (npcDatabase.getNpc(npcId)) {
-          this.npcs.set(doorKey(e.col, e.row), {
-            id: e.id as string | undefined,
-            col: e.col,
-            row: e.row,
-            npcId,
-          });
-        }
-      } else if (e.type === 'fountain') {
-        this.fountains.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          state: (e.state as FountainState) ?? 'active',
-          healAmount: (e.healAmount as number) ?? 20,
-        });
-      } else if (e.type === 'bookshelf') {
-        const wall = (e.wall as Facing | undefined) ??
-          autoDetectLeverWall(e.col, e.row, grid);
-        this.bookshelves.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          wall,
-          text: (e.text as string) ?? '',
-        });
-      } else if (e.type === 'altar') {
-        this.altars.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          state: (e.state as AltarState) ?? 'active',
-          buffType: (e.buffType as BuffStat) ?? 'atk',
-          buffAmount: (e.buffAmount as number) ?? 5,
-          buffDuration: (e.buffDuration as number) ?? 60,
-        });
-      } else if (e.type === 'barrel') {
-        const hp = (e.hp as number) ?? 10;
-        this.barrels.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          hp,
-          maxHp: hp,
-          drops: e.drops as DropsOverride | undefined,
-        });
-      } else if (e.type === 'thin_wall') {
-        const wall = (e.wall as 'S' | 'E') ?? 'S';
-        this.thinWalls.set(thinWallKey(e.col, e.row, wall), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          wall,
-          solid: (e.solid as boolean) ?? true,
-          height: (e.height as 'full' | 'half') ?? 'full',
-          texture: (e.texture as string) ?? 'stone_thin',
-          textureBack: e.textureBack as string | undefined,
-        });
-      } else if (e.type === 'ramp') {
-        this.ramps.set(doorKey(e.col, e.row), {
-          id: e.id as string | undefined,
-          col: e.col,
-          row: e.row,
-          facing: (e.facing as Facing) ?? 'N',
-          style: (e.style as 'ramp' | 'stairs') ?? 'ramp',
-        });
-      } else if (e.type === 'enemy') {
-        const enemyType = e.enemyType as string;
-        if (enemyDatabase.getEnemy(enemyType)) {
-          const instance = createEnemyInstance(e.col, e.row, enemyType);
-          if (e.drops) {
-            instance.drops = e.drops as DropsOverride;
-          }
-          this.enemies.set(doorKey(e.col, e.row), instance);
-        }
-      } else if (e.type === 'equipment') {
-        const location: ItemLocation = {
-          kind: 'world',
-          levelId: this.currentLevelId,
-          col: e.col,
-          row: e.row,
-          layerIndex: this.activeLayerIndex,
-        };
-        this.entityRegistry.createItem(e.itemId as string, 'common', location);
-      } else if (e.type === 'consumable') {
-        const location: ItemLocation = {
-          kind: 'world',
-          levelId: this.currentLevelId,
-          col: e.col,
-          row: e.row,
-          layerIndex: this.activeLayerIndex,
-        };
-        this.entityRegistry.createItem(e.itemId as string, 'common', location);
-      }
+      this._parseSignalEntity(e, grid) ||
+      this._parseEnvironmentEntity(e, grid) ||
+      this._parseStructureEntity(e, grid) ||
+      this._parseNpcEntity(e, grid) ||
+      this._parseItemEntity(e);
     }
 
     // Mark doors targeted by signal sources as mechanical (resolve via entityById)
@@ -805,6 +559,332 @@ export class GameState {
     }
 
     this._initSignalManager();
+  }
+
+  // --- Entity parsing sub-methods ---
+
+  /** Signal entities: door, key, lever, pressure_plate, trigger, tripwire, gate. */
+  private _parseSignalEntity(e: Entity, grid?: string[]): boolean {
+    if (e.type === 'door') {
+      const state = (e.state as DoorState) ?? 'closed';
+      const keyId = e.keyId as string | undefined;
+      this.doors.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        state,
+        keyId,
+        mechanical: false,
+        gateMode: e.gateMode as GateMode | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'key') {
+      this.keys.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        keyId: e.keyId as string,
+        pickedUp: false,
+      });
+      return true;
+    }
+    if (e.type === 'lever') {
+      const wall = (e.wall as Facing | undefined) ??
+        autoDetectLeverWall(e.col, e.row, grid);
+      // Support targets[] (new), target (single, M1 compat), and targetDoor (legacy)
+      const targets = (e.targets as string[] | undefined) ??
+        (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
+      this.levers.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        targets,
+        wall,
+        state: 'up',
+        signalMode: e.signalMode as SignalMode | undefined,
+        signalDuration: e.signalDuration as number | undefined,
+        signalDelay: e.signalDelay as number | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'pressure_plate') {
+      const targets = (e.targets as string[] | undefined) ??
+        (e.target ? [e.target as string] : e.targetDoor ? [e.targetDoor as string] : []);
+      this.plates.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        targets,
+        activated: false,
+        signalMode: e.signalMode as SignalMode | undefined,
+        signalDuration: e.signalDuration as number | undefined,
+        signalDelay: e.signalDelay as number | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'trigger') {
+      const targets = (e.targets as string[] | undefined) ?? [];
+      this.triggers.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        targets,
+        signalMode: (e.signalMode as SignalMode) ?? 'momentary',
+        signalDuration: e.signalDuration as number | undefined,
+        signalDelay: e.signalDelay as number | undefined,
+        fired: false,
+      });
+      return true;
+    }
+    if (e.type === 'tripwire') {
+      const targets = (e.targets as string[] | undefined) ?? [];
+      const orientation = (e.orientation as TripwireOrientation | undefined) ??
+        autoDetectTripwireOrientation(e.col, e.row, grid);
+      this.tripwires.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        targets,
+        signalMode: (e.signalMode as SignalMode) ?? 'one_shot',
+        signalDuration: e.signalDuration as number | undefined,
+        signalDelay: e.signalDelay as number | undefined,
+        visibilityThreshold: (e.visibilityThreshold as number) ?? 8,
+        orientation,
+        triggered: false,
+      });
+      return true;
+    }
+    if (e.type === 'gate') {
+      const targets = (e.targets as string[] | undefined) ?? [];
+      this.gates.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        gateType: (e.gateType as GateType) ?? 'and',
+        targets,
+        delay: e.delay as number | undefined,
+        interval: e.interval as number | undefined,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /** Environment entities: torch_sconce, stairs, trap_launcher. */
+  private _parseEnvironmentEntity(e: Entity, grid?: string[]): boolean {
+    if (e.type === 'trap_launcher') {
+      this.trapLaunchers.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        facing: (e.facing as Facing) ?? 'S',
+        projectileType: (e.projectileType as string) ?? 'dart',
+        fireMode: (e.fireMode as LauncherFireMode) ?? 'repeat',
+        reloadTime: (e.reloadTime as number) ?? 3,
+        nextFireAt: 0,
+        maxRange: e.maxRange as number | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'torch_sconce') {
+      const wall = (e.wall as Facing | undefined) ??
+        autoDetectLeverWall(e.col, e.row, grid);
+      this.sconces.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        wall,
+        lit: true,
+      });
+      return true;
+    }
+    if (e.type === 'stairs') {
+      this.stairs.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        direction: e.direction as 'up' | 'down',
+        facing: e.facing as Facing,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /** Structure entities: breakable_wall, secret_wall, block, chest, sign, thin_wall, ramp. */
+  private _parseStructureEntity(e: Entity, grid?: string[]): boolean {
+    if (e.type === 'breakable_wall') {
+      const hp = (e.hp as number) ?? 30;
+      this.breakableWalls.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        hp,
+        maxHp: hp,
+        drops: e.drops as DropsOverride | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'secret_wall') {
+      this.secretWalls.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        opened: false,
+        persistent: (e.persistent as boolean) ?? false,
+      });
+      return true;
+    }
+    if (e.type === 'block') {
+      this.blocks.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+      });
+      return true;
+    }
+    if (e.type === 'chest') {
+      this.chests.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        state: (e.state as ChestState) ?? 'closed',
+        facing: (e.facing as Facing) ?? 'S',
+        keyId: e.keyId as string | undefined,
+        gateMode: e.gateMode as GateMode | undefined,
+        targets: e.targets as string[] | undefined,
+        drops: e.drops as DropsOverride | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'sign') {
+      const wall = (e.wall as Facing | undefined) ??
+        autoDetectLeverWall(e.col, e.row, grid);
+      this.signs.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        wall,
+        text: (e.text as string) ?? '',
+      });
+      return true;
+    }
+    if (e.type === 'thin_wall') {
+      const wall = (e.wall as 'S' | 'E') ?? 'S';
+      this.thinWalls.set(thinWallKey(e.col, e.row, wall), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        wall,
+        solid: (e.solid as boolean) ?? true,
+        height: (e.height as 'full' | 'half') ?? 'full',
+        texture: (e.texture as string) ?? 'stone_thin',
+        textureBack: e.textureBack as string | undefined,
+      });
+      return true;
+    }
+    if (e.type === 'ramp') {
+      this.ramps.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        facing: (e.facing as Facing) ?? 'N',
+        style: (e.style as 'ramp' | 'stairs') ?? 'ramp',
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /** NPC entities: npc, fountain, bookshelf, altar, barrel. */
+  private _parseNpcEntity(e: Entity, grid?: string[]): boolean {
+    if (e.type === 'npc') {
+      const npcId = e.npcId as string;
+      if (npcDatabase.getNpc(npcId)) {
+        this.npcs.set(doorKey(e.col, e.row), {
+          id: e.id as string | undefined,
+          col: e.col,
+          row: e.row,
+          npcId,
+        });
+      }
+      return true;
+    }
+    if (e.type === 'fountain') {
+      this.fountains.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        state: (e.state as FountainState) ?? 'active',
+        healAmount: (e.healAmount as number) ?? 20,
+      });
+      return true;
+    }
+    if (e.type === 'bookshelf') {
+      const wall = (e.wall as Facing | undefined) ??
+        autoDetectLeverWall(e.col, e.row, grid);
+      this.bookshelves.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        wall,
+        text: (e.text as string) ?? '',
+      });
+      return true;
+    }
+    if (e.type === 'altar') {
+      this.altars.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        state: (e.state as AltarState) ?? 'active',
+        buffType: (e.buffType as BuffStat) ?? 'atk',
+        buffAmount: (e.buffAmount as number) ?? 5,
+        buffDuration: (e.buffDuration as number) ?? 60,
+      });
+      return true;
+    }
+    if (e.type === 'barrel') {
+      const hp = (e.hp as number) ?? 10;
+      this.barrels.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        hp,
+        maxHp: hp,
+        drops: e.drops as DropsOverride | undefined,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /** Item/actor entities: equipment, consumable, enemy. */
+  private _parseItemEntity(e: Entity): boolean {
+    if (e.type === 'enemy') {
+      const enemyType = e.enemyType as string;
+      if (enemyDatabase.getEnemy(enemyType)) {
+        const instance = createEnemyInstance(e.col, e.row, enemyType);
+        if (e.drops) {
+          instance.drops = e.drops as DropsOverride;
+        }
+        this.enemies.set(doorKey(e.col, e.row), instance);
+      }
+      return true;
+    }
+    if (e.type === 'equipment' || e.type === 'consumable') {
+      const location: ItemLocation = {
+        kind: 'world',
+        levelId: this.currentLevelId,
+        col: e.col,
+        row: e.row,
+        layerIndex: this.activeLayerIndex,
+      };
+      this.entityRegistry.createItem(e.itemId as string, 'common', location);
+      return true;
+    }
+    return false;
   }
 
   private _initSignalManager(): void {

@@ -178,11 +178,7 @@ async function init(): Promise<void> {
   }
   applyEnvironment(firstLevel.environment, scene, ambient);
 
-  const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name);
-  // Re-init for multi-layer levels (constructor only handles single layer)
-  if (firstLevel.layers) {
-    gameState.loadNewLevel(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name, firstLevel.layers);
-  }
+  const gameState = new GameState(firstLevel.entities, firstLevel.grid, firstLevel.id ?? firstLevel.name, firstLevel.layers);
   // Set starting layer from playerStart
   const startLayerIndex = resolveLayerCoord(firstLevel, dungeon.playerStart.layerIndex ?? 0);
   gameState.activeLayerIndex = startLayerIndex;
@@ -324,9 +320,9 @@ async function init(): Promise<void> {
   }
 
   function handleEnemyKill(key: string, col: number, row: number, enemy: EnemyInstance): void {
-    ls.healthBarManager.remove(lk(key));
-    hideEnemyMesh(ls.enemyMeshes.meshMap, lk(doorKey(col, row)));
-    ls.enemyAnimator.remove(lk(key));
+    ls.healthBarManager.remove(layerKey(key));
+    hideEnemyMesh(ls.enemyMeshes.meshMap, layerKey(doorKey(col, row)));
+    ls.enemyAnimator.remove(layerKey(key));
     gameState.enemies.delete(key);
     const enemyDef = enemyDatabase.getEnemy(enemy.type);
     if (enemyDef) {
@@ -530,7 +526,7 @@ async function init(): Promise<void> {
   }
 
   /** Prefix a doorKey-format string with the active layer index for mesh lookup. */
-  function lk(key: string): string {
+  function layerKey(key: string): string {
     return `${gameState.activeLayerIndex}:${key}`;
   }
 
@@ -560,12 +556,12 @@ async function init(): Promise<void> {
         blockedDoors.delete(key);
         const door = gameState.getDoor(entry.col, entry.row);
         if (door) door.state = 'closed';
-        updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(entry.col, entry.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, layerKey(doorKey(entry.col, entry.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Still blocked — bounce animation and retry
         entry.timer = DOOR_RETRY_INTERVAL;
         const dk = doorKey(entry.col, entry.row);
-        ls.doorAnimator.bounce(lk(dk));
+        ls.doorAnimator.bounce(layerKey(dk));
       }
     }
   }
@@ -590,7 +586,7 @@ async function init(): Promise<void> {
       if (doorAtPlayer && doorAtPlayer.state === 'closed') {
         doorAtPlayer.state = 'open';
         const dk = doorKey(col, row);
-        updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, layerKey(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
       }
 
@@ -601,7 +597,7 @@ async function init(): Promise<void> {
       const pickedUpKeyId = gameState.pickupKeyAt(col, row);
       if (pickedUpKeyId) {
         console.log(`Picked up key: ${pickedUpKeyId}`);
-        hideKeyMesh(ls.keyMeshes.meshMap, lk(doorKey(col, row)));
+        hideKeyMesh(ls.keyMeshes.meshMap, layerKey(doorKey(col, row)));
       }
 
       // Equipment pickup
@@ -610,7 +606,7 @@ async function init(): Promise<void> {
         hud.showMessage(equipResult.denied);
       } else if (equipResult.item) {
         hud.showMessage(`Equipped: ${equipResult.item.name}`);
-        hideItemMesh(ls.itemMeshes.meshMap, ls.itemMeshes.group, lk(doorKey(col, row)));
+        hideItemMesh(ls.itemMeshes.meshMap, ls.itemMeshes.group, layerKey(doorKey(col, row)));
         // Show mesh for next remaining equipment at this cell
         const remainingEquip = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
           .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type !== 'consumable'; });
@@ -623,7 +619,7 @@ async function init(): Promise<void> {
       const pickedUpConsumable = gameState.pickupConsumableAt(col, row);
       if (pickedUpConsumable) {
         console.log(`Picked up: ${pickedUpConsumable.name}`);
-        hideConsumableMesh(ls.consumableMeshes.meshMap, ls.consumableMeshes.group, lk(doorKey(col, row)));
+        hideConsumableMesh(ls.consumableMeshes.meshMap, ls.consumableMeshes.group, layerKey(doorKey(col, row)));
         // Show mesh for next remaining consumable at this cell
         const remainingCons = gameState.entityRegistry.getGroundItems(gameState.currentLevelId, col, row)
           .find(e => { const d = itemDatabase.getItem(e.itemId); return d && d.type === 'consumable'; });
@@ -635,7 +631,7 @@ async function init(): Promise<void> {
       // Trigger / tripwire activation
       gameState.activateTrigger(col, row);
       if (gameState.activateTripwire(col, row)) {
-        hideTripwire(ls.tripwireMeshes.meshMap, lk(doorKey(col, row)));
+        hideTripwire(ls.tripwireMeshes.meshMap, layerKey(doorKey(col, row)));
         hud.showMessage('Oops! A tripwire!');
       }
 
@@ -644,7 +640,7 @@ async function init(): Promise<void> {
       if (plateTargets) {
         const plate = gameState.plates.get(doorKey(col, row));
         if (plate?.activated) {
-          pressPlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
+          pressPlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
         }
       }
 
@@ -720,7 +716,7 @@ async function init(): Promise<void> {
       if (open) {
         // Opening — clear any blocked retry and open normally
         blockedDoors.delete(dk);
-        updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        updateDoorMesh(ls.doorMeshes.panelMap, layerKey(dk), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
       } else {
         // Closing — check if cell is occupied
         const occupant = isDoorCellOccupied(col, row);
@@ -729,10 +725,10 @@ async function init(): Promise<void> {
           const door = gameState.getDoor(col, row);
           if (door) door.state = 'open';
           blockedDoors.set(dk, { col, row, timer: DOOR_RETRY_INTERVAL });
-          ls.doorAnimator.bounce(lk(dk));
+          ls.doorAnimator.bounce(layerKey(dk));
         } else {
           blockedDoors.delete(dk);
-          updateDoorMesh(ls.doorMeshes.panelMap, lk(dk), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+          updateDoorMesh(ls.doorMeshes.panelMap, layerKey(dk), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
         }
       }
     };
@@ -740,12 +736,12 @@ async function init(): Promise<void> {
     // Timed source deactivation → animate lever reset
     gameState.onLeverReset = (col, row) => {
       const leverKey = doorKey(col, row);
-      ls.leverAnimator.setState(lk(leverKey), 'up');
+      ls.leverAnimator.setState(layerKey(leverKey), 'up');
     };
 
     // Plate reset (momentary step-off or timed expiry) → animate plate release
     gameState.onPlateReset = (col, row) => {
-      releasePlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
+      releasePlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
     };
 
     // Secret wall detection — walking into a wall cell with a secret wall entity
@@ -755,7 +751,7 @@ async function init(): Promise<void> {
       if (sw && !sw.opened) {
         const result = gameState.openSecretWall(col, row, activeGrid());
         if (result.opened) {
-          const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(col, row)));
+          const entry = ls.wallEntityMeshes.meshMap.get(layerKey(doorKey(col, row)));
           if (entry) {
             if (!result.persistent) {
               entry.wallGroup.visible = false;
@@ -783,20 +779,20 @@ async function init(): Promise<void> {
           !gameState.isEdgeBlocked(col, row, destCol, destRow)
         ) {
           gameState.pushBlock(col, row, destCol, destRow);
-          const fromBlockKey = lk(doorKey(col, row));
-          const toBlockKey = lk(doorKey(destCol, destRow));
+          const fromBlockKey = layerKey(doorKey(col, row));
+          const toBlockKey = layerKey(doorKey(destCol, destRow));
           animateBlockPush(ls.blockMeshes.meshMap, fromBlockKey, col, row, toBlockKey, destCol, destRow);
           // Pressure plate at destination
           const destPlate = gameState.plates.get(doorKey(destCol, destRow));
           if (destPlate) {
             gameState.activatePressurePlate(destCol, destRow);
-            pressPlate(ls.plateMeshes.meshMap, lk(doorKey(destCol, destRow)));
+            pressPlate(ls.plateMeshes.meshMap, layerKey(doorKey(destCol, destRow)));
           }
           // Release plate at source
           const srcPlate = gameState.plates.get(doorKey(col, row));
           if (srcPlate && srcPlate.activated) {
             gameState.deactivatePressurePlate(col, row);
-            releasePlate(ls.plateMeshes.meshMap, lk(doorKey(col, row)));
+            releasePlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
           }
           // Re-attempt the move now that the block cell is free
           ls.player.moveForward();
@@ -807,9 +803,9 @@ async function init(): Promise<void> {
     // Signal-driven chest state changes → animate chest mesh
     gameState.onChestSignalChanged = (col, row, open) => {
       if (open) {
-        openChestMesh(ls.chestMeshes.meshMap, lk(doorKey(col, row)));
+        openChestMesh(ls.chestMeshes.meshMap, layerKey(doorKey(col, row)));
       } else {
-        closeChestMesh(ls.chestMeshes.meshMap, lk(doorKey(col, row)));
+        closeChestMesh(ls.chestMeshes.meshMap, layerKey(doorKey(col, row)));
       }
     };
 
@@ -842,13 +838,13 @@ async function init(): Promise<void> {
           if (projectile.statusEffect) {
             applyEffect(enemy.statusEffects, projectile.statusEffect as StatusEffectType, 6);
           }
-          enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(col, row)));
-          ls.enemyAnimator.triggerHit(lk(key));
+          enemyDamageFlash(ls.enemyMeshes.meshMap, layerKey(doorKey(col, row)));
+          ls.enemyAnimator.triggerHit(layerKey(key));
           damageNumbers.spawn(col, row, projectile.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
           if (enemy.hp <= 0) {
             handleEnemyKill(key, col, row, enemy);
           } else {
-            ls.healthBarManager.update(lk(key), enemy.hp, enemy.maxHp);
+            ls.healthBarManager.update(layerKey(key), enemy.hp, enemy.maxHp);
           }
         }
       }
@@ -1083,37 +1079,37 @@ async function init(): Promise<void> {
           }
           if (result.type === 'door_opened') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(facing.col, facing.row)), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+            updateDoorMesh(ls.doorMeshes.panelMap, layerKey(doorKey(facing.col, facing.row)), true, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_closed') {
             const facing = getFacingCell(ls.player.getState());
-            updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(facing.col, facing.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+            updateDoorMesh(ls.doorMeshes.panelMap, layerKey(doorKey(facing.col, facing.row)), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
           }
           if (result.type === 'door_blocked') {
             const facing = getFacingCell(ls.player.getState());
             const bk = doorKey(facing.col, facing.row);
-            ls.doorAnimator.bounce(lk(bk));
+            ls.doorAnimator.bounce(layerKey(bk));
           }
           if (result.type === 'lever_activated' && result.targets) {
             for (const t of result.targets) {
               const targetPos = gameState.resolveEntityPosition(t);
               if (targetPos) {
-                updateDoorMesh(ls.doorMeshes.panelMap, lk(doorKey(targetPos.col, targetPos.row)), gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator, ls.doorMeshes.boundaryLights);
+                updateDoorMesh(ls.doorMeshes.panelMap, layerKey(doorKey(targetPos.col, targetPos.row)), gameState.isDoorOpen(targetPos.col, targetPos.row), ls.doorAnimator, ls.doorMeshes.boundaryLights);
               }
             }
             const leverKey = doorKey(ls.player.getState().col, ls.player.getState().row);
             const lever = gameState.levers.get(leverKey);
-            if (lever) ls.leverAnimator.setState(lk(leverKey), lever.state);
+            if (lever) ls.leverAnimator.setState(layerKey(leverKey), lever.state);
           }
           if (result.type === 'sconce_taken') {
             const ps = ls.player.getState();
-            extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, lk(doorKey(ps.col, ps.row)));
+            extinguishSconce(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap, layerKey(doorKey(ps.col, ps.row)));
             sconceEmbers.setSources(ls.sconceMeshes.meshMap, ls.sconceMeshes.lightMap);
           }
           if (result.type === 'block_pushed' && result.targetCol !== undefined && result.targetRow !== undefined) {
             const facing = getFacingCell(ls.player.getState());
-            const fromBlockKey = lk(doorKey(facing.col, facing.row));
-            const toBlockKey = lk(doorKey(result.targetCol, result.targetRow));
+            const fromBlockKey = layerKey(doorKey(facing.col, facing.row));
+            const toBlockKey = layerKey(doorKey(result.targetCol, result.targetRow));
             animateBlockPush(ls.blockMeshes.meshMap, fromBlockKey, facing.col, facing.row, toBlockKey, result.targetCol, result.targetRow);
             // Pressure plate at destination already activated by gameState.pushBlock()
             // Just animate the visual press
@@ -1129,7 +1125,7 @@ async function init(): Promise<void> {
             }
           }
           if (result.type === 'chest_opened' && result.targetCol !== undefined && result.targetRow !== undefined) {
-            openChestMesh(ls.chestMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
+            openChestMesh(ls.chestMeshes.meshMap, layerKey(doorKey(result.targetCol, result.targetRow)));
             // Roll loot from chest drops
             const chest = gameState.getChest(result.targetCol, result.targetRow);
             if (chest?.drops) {
@@ -1148,13 +1144,13 @@ async function init(): Promise<void> {
           if (result.type === 'fountain_used' && result.message) {
             hud.showMessage(result.message);
             if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              markFountainUsed(ls.fountainMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
+              markFountainUsed(ls.fountainMeshes.meshMap, layerKey(doorKey(result.targetCol, result.targetRow)));
             }
           }
           if (result.type === 'altar_activated' && result.message) {
             hud.showMessage(result.message);
             if (result.targetCol !== undefined && result.targetRow !== undefined) {
-              markAltarUsed(ls.altarMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
+              markAltarUsed(ls.altarMeshes.meshMap, layerKey(doorKey(result.targetCol, result.targetRow)));
             }
           }
           if (result.type === 'npc_interacted' && result.message) {
@@ -1193,8 +1189,8 @@ async function init(): Promise<void> {
           for (const result of results) {
             if (result.type === 'hit' || result.type === 'kill') {
               if (result.targetCol !== undefined && result.targetRow !== undefined) {
-                enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(result.targetCol, result.targetRow)));
-                ls.enemyAnimator.triggerHit(lk(doorKey(result.targetCol, result.targetRow)));
+                enemyDamageFlash(ls.enemyMeshes.meshMap, layerKey(doorKey(result.targetCol, result.targetRow)));
+                ls.enemyAnimator.triggerHit(layerKey(doorKey(result.targetCol, result.targetRow)));
                 if (result.damage !== undefined) {
                   damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
                 }
@@ -1202,12 +1198,12 @@ async function init(): Promise<void> {
               if (result.type === 'hit' && result.targetCol !== undefined && result.targetRow !== undefined) {
                 const hitEnemy = gameState.getEnemy(result.targetCol, result.targetRow);
                 if (hitEnemy) {
-                  ls.healthBarManager.update(lk(doorKey(result.targetCol, result.targetRow)), hitEnemy.hp, hitEnemy.maxHp);
+                  ls.healthBarManager.update(layerKey(doorKey(result.targetCol, result.targetRow)), hitEnemy.hp, hitEnemy.maxHp);
                 }
               }
               if (result.type === 'kill' && result.targetCol !== undefined && result.targetRow !== undefined && result.enemyType) {
                 // Enemy already removed from map by damageEnemy(); use result data for XP/loot
-                const killKey = lk(doorKey(result.targetCol, result.targetRow));
+                const killKey = layerKey(doorKey(result.targetCol, result.targetRow));
                 ls.healthBarManager.remove(killKey);
                 hideEnemyMesh(ls.enemyMeshes.meshMap, killKey);
                 ls.enemyAnimator.remove(killKey);
@@ -1225,7 +1221,7 @@ async function init(): Promise<void> {
               damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
               if (wallResult.destroyed) {
                 // Hide wall faces, show floor/ceiling
-                const entry = ls.wallEntityMeshes.meshMap.get(lk(doorKey(result.targetCol, result.targetRow)));
+                const entry = ls.wallEntityMeshes.meshMap.get(layerKey(doorKey(result.targetCol, result.targetRow)));
                 if (entry) {
                   entry.wallGroup.visible = false;
                   entry.floorCeilGroup.visible = true;
@@ -1239,7 +1235,7 @@ async function init(): Promise<void> {
             if ((result.type === 'barrel_hit' || result.type === 'barrel_destroy') && result.targetCol !== undefined && result.targetRow !== undefined && result.damage !== undefined) {
               damageNumbers.spawn(result.targetCol, result.targetRow, result.damage, gameState.activeLayerIndex * LAYER_HEIGHT);
               if (result.type === 'barrel_destroy') {
-                const barrelKey = lk(doorKey(result.targetCol, result.targetRow));
+                const barrelKey = layerKey(doorKey(result.targetCol, result.targetRow));
                 const barrelMesh = ls.barrelMeshes.meshMap.get(barrelKey);
                 if (barrelMesh) {
                   ls.barrelMeshes.group.remove(barrelMesh);
@@ -1513,9 +1509,9 @@ async function init(): Promise<void> {
         for (const action of actions) {
           if (action.type === 'move' && action.toCol !== undefined && action.toRow !== undefined) {
             const newKey = doorKey(action.toCol, action.toRow);
-            updateEnemyMeshPosition(ls.enemyMeshes.meshMap, lk(action.enemyKey), lk(newKey));
-            ls.enemyAnimator.moveTo(lk(action.enemyKey), action.toCol, action.toRow, lk(newKey));
-            ls.healthBarManager.rekey(lk(action.enemyKey), lk(newKey));
+            updateEnemyMeshPosition(ls.enemyMeshes.meshMap, layerKey(action.enemyKey), layerKey(newKey));
+            ls.enemyAnimator.moveTo(layerKey(action.enemyKey), action.toCol, action.toRow, layerKey(newKey));
+            ls.healthBarManager.rekey(layerKey(action.enemyKey), layerKey(newKey));
           } else if (action.type === 'attack') {
             // Only attack if enemy is on the player's layer
             if (li === savedLayer) {
@@ -1523,7 +1519,7 @@ async function init(): Promise<void> {
               if (enemy) {
                 enemyAttackPlayer(gameState, enemy.atk);
                 playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
-                ls.enemyAnimator.triggerLunge(lk(action.enemyKey), ps.col, ps.row);
+                ls.enemyAnimator.triggerLunge(layerKey(action.enemyKey), ps.col, ps.row);
                 const onHitBehavior = enemyDatabase.getBehavior(enemy.type, 'onHit');
                 if (onHitBehavior && Math.random() < (onHitBehavior.params.chance as number)) {
                   applyEffect(gameState.playerStatusEffects, onHitBehavior.params.statusEffect as StatusEffectType, onHitBehavior.params.duration as number);
@@ -1533,18 +1529,18 @@ async function init(): Promise<void> {
           } else if (action.type === 'regen') {
             const enemy = gameState.enemies.get(action.enemyKey);
             if (enemy) {
-              ls.healthBarManager.update(lk(action.enemyKey), enemy.hp, enemy.maxHp);
+              ls.healthBarManager.update(layerKey(action.enemyKey), enemy.hp, enemy.maxHp);
             }
           } else if (action.type === 'status_damage') {
             const enemy = gameState.enemies.get(action.enemyKey);
             if (enemy) {
-              enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(action.fromCol, action.fromRow)));
-              ls.healthBarManager.update(lk(action.enemyKey), enemy.hp, enemy.maxHp);
+              enemyDamageFlash(ls.enemyMeshes.meshMap, layerKey(doorKey(action.fromCol, action.fromRow)));
+              ls.healthBarManager.update(layerKey(action.enemyKey), enemy.hp, enemy.maxHp);
             }
           } else if (action.type === 'status_kill') {
             const enemy = gameState.enemies.get(action.enemyKey);
             if (enemy) {
-              enemyDamageFlash(ls.enemyMeshes.meshMap, lk(doorKey(action.fromCol, action.fromRow)));
+              enemyDamageFlash(ls.enemyMeshes.meshMap, layerKey(doorKey(action.fromCol, action.fromRow)));
               handleEnemyKill(action.enemyKey, action.fromCol, action.fromRow, enemy);
             }
           }
