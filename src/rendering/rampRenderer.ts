@@ -445,29 +445,22 @@ function buildSingleRamp(
   const hasLeftTopWall = isWallAt(grid, walkable, topCol + offsets.left[0], topRow + offsets.left[1]);
   const hasRightTopWall = isWallAt(grid, walkable, topCol + offsets.right[0], topRow + offsets.right[1]);
 
-  // Resolve side wall textures from the adjacent cells so they match the
-  // half-walls the dungeon builder renders for the top cell's neighbors.
-  function resolveNeighborWallTex(colOff: number, rowOff: number): WallTextureName {
-    const nc = topCol + colOff;
-    const nr = topRow + rowOff;
-    const nChar = (grid[nr] && grid[nr][nc]) || '#';
-    return resolveTextures(nc, nr, nChar, defaults, charDefMap, areas).wall;
-  }
-  const leftWallTex = resolveNeighborWallTex(offsets.left[0], offsets.left[1]);
-  const rightWallTex = resolveNeighborWallTex(offsets.right[0], offsets.right[1]);
+  // Side wall texture from the top cell — matches the half-walls the dungeon
+  // builder renders (resolveWallMat resolves from the solid top cell).
+  const topChar = (grid[topRow] && grid[topRow][topCol]) || '#';
+  const topResolved = resolveTextures(topCol, topRow, topChar, defaults, charDefMap, areas);
+  const sideWallTex = topResolved.wall;
 
   let rampGroup: THREE.Group;
 
   if (ramp.style === 'stairs') {
     const stepMat = getRampStepMaterial(floorTex);
-    const leftSideMat = getRampSideMaterial(leftWallTex);
-    const rightSideMat = getRampSideMaterial(rightWallTex);
-    rampGroup = buildStairedRamp(stepMat, leftSideMat, rightSideMat, hasLeftTopWall, hasRightTopWall);
+    const sideMat = getRampSideMaterial(sideWallTex);
+    rampGroup = buildStairedRamp(stepMat, sideMat, sideMat, hasLeftTopWall, hasRightTopWall);
   } else {
     const slopeMat = getRampSlopeMaterial(floorTex);
-    const leftSideMat = getRampSideMaterial(leftWallTex);
-    const rightSideMat = getRampSideMaterial(rightWallTex);
-    rampGroup = buildSmoothRamp(slopeMat, leftSideMat, rightSideMat, hasLeftTopWall, hasRightTopWall);
+    const sideMat = getRampSideMaterial(sideWallTex);
+    rampGroup = buildSmoothRamp(slopeMat, sideMat, sideMat, hasLeftTopWall, hasRightTopWall);
   }
 
   // Rotate from canonical to the ramp's actual facing direction
