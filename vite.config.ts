@@ -45,6 +45,28 @@ function editorApiPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';
+
+        // Unauthenticated: return the most recently modified level filename
+        if (url === '/api/levels/latest') {
+          if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
+          try {
+            const files = fs.readdirSync(LEVELS_DIR).filter(f => f.endsWith('.json'));
+            let newest = '';
+            let newestMtime = 0;
+            for (const f of files) {
+              const mtime = fs.statSync(path.join(LEVELS_DIR, f)).mtimeMs;
+              if (mtime > newestMtime) { newestMtime = mtime; newest = f; }
+            }
+            console.log(`[levels] latest: ${newest}`);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ file: newest }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err) }));
+          }
+          return;
+        }
+
         if (!url.startsWith('/api/editor/')) return next();
 
         // CSRF check

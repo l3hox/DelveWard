@@ -164,8 +164,17 @@ async function init(): Promise<void> {
   // Verify all referenced PNG assets exist (non-blocking, logs errors)
   checkAssets();
 
-  // --- Dungeon ---
-  const dungeon: Dungeon = await loadDungeon('/levels/test_ramps.json');
+  // --- Dungeon (auto-load most recently modified level) ---
+  let levelPath = '/levels/ruins.json'; // fallback
+  try {
+    const resp = await fetch('/api/levels/latest');
+    if (resp.ok) {
+      const { file } = await resp.json();
+      if (file) levelPath = `/levels/${file}`;
+    }
+  } catch { /* dev server not available — use fallback */ }
+  console.log(`Loading level: ${levelPath}`);
+  const dungeon: Dungeon = await loadDungeon(levelPath);
   const startLevelId = dungeon.playerStart.levelId;
   const firstLevel = dungeon.levels.find(l => l.id === startLevelId) ?? dungeon.levels[0];
 
