@@ -387,7 +387,7 @@ export function buildLevelScene(
     mergeMap(sharedSconceLightMap, ldSconceMeshes.lightMap, li);
 
     // Stair meshes
-    const ldStairMeshes = buildStairMeshes(gameState.stairs, ldDefaults, ldAreas, ld.grid, level.charDefs);
+    const ldStairMeshes = buildStairMeshes(gameState.stairs, ldDefaults, ldAreas, ld.grid, level.charDefs, ldWalkable);
     ldStairMeshes.group.position.y = yOffset;
     sharedStairGroup.add(ldStairMeshes.group);
 
@@ -462,7 +462,7 @@ export function buildLevelScene(
     mergeMap(sharedThinWallMeshMap, ldThinWallMeshes.meshMap, li);
 
     // Ramp meshes
-    const ldRampMeshes = buildRampMeshes(gameState, ld.grid, ldDefaults, level.charDefs, ldAreas);
+    const ldRampMeshes = buildRampMeshes(gameState, ld.grid, ldDefaults, level.charDefs, ldAreas, ldWalkable);
     ldRampMeshes.group.position.y = yOffset;
     sharedRampGroup.add(ldRampMeshes.group);
     mergeMap(sharedRampMeshMap, ldRampMeshes.meshMap, li);

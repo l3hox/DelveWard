@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { CELL_SIZE, WALL_HEIGHT, LAYER_HEIGHT } from './dungeon';
 import { getFloorTexture, getWallTexture } from './textures';
 import type { WallTextureName, FloorTextureName } from '../core/textureNames';
-import type { Facing } from '../core/grid';
+import { type Facing, FACING_DELTA } from '../core/grid';
 import type { GameState, RampInstance } from '../core/gameState';
 import type { TextureSet, TextureArea, CharDef } from '../core/types';
 import { resolveTextures } from '../core/textureResolver';
+import { buildWalkableSet } from '../core/grid';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -130,6 +131,7 @@ function scaleBoxUVs(
 function buildTriangularSide(
   x: number,
   material: THREE.MeshLambertMaterial,
+  includeTopCellWall: boolean = true,
 ): THREE.Mesh {
   const half = CELL_SIZE / 2;
   const nx = x < 0 ? -1 : 1;
@@ -157,24 +159,26 @@ function buildTriangularSide(
   }
 
   // Full-height side wall covering the entire top cell (cell boundary to far edge).
-  // The top cell is # on the lower layer — no walkable cell generates walls for it.
-  const zNear = 0;             // cell boundary between bottom and top cells
-  const zFar = -CELL_SIZE;     // far edge of the top cell
-  const uD = CELL_SIZE / CELL_SIZE; // = 1.0 (full cell width)
-  if (x < 0) {
-    pushQuad(verts, uvArr, norms,
-      [x, 0, zNear], [x, H, zNear],
-      [x, H, zFar], [x, 0, zFar],
-      [0, 0], [0, 1], [uD, 1], [uD, 0],
-      nx, 0, 0,
-    );
-  } else {
-    pushQuad(verts, uvArr, norms,
-      [x, 0, zFar], [x, H, zFar],
-      [x, H, zNear], [x, 0, zNear],
-      [uD, 0], [uD, 1], [0, 1], [0, 0],
-      nx, 0, 0,
-    );
+  // Only rendered if the neighbor on this side of the top cell is a wall.
+  if (includeTopCellWall) {
+    const zNear = 0;             // cell boundary between bottom and top cells
+    const zFar = -CELL_SIZE;     // far edge of the top cell
+    const uD = CELL_SIZE / CELL_SIZE; // = 1.0 (full cell width)
+    if (x < 0) {
+      pushQuad(verts, uvArr, norms,
+        [x, 0, zNear], [x, H, zNear],
+        [x, H, zFar], [x, 0, zFar],
+        [0, 0], [0, 1], [uD, 1], [uD, 0],
+        nx, 0, 0,
+      );
+    } else {
+      pushQuad(verts, uvArr, norms,
+        [x, 0, zFar], [x, H, zFar],
+        [x, H, zNear], [x, 0, zNear],
+        [uD, 0], [uD, 1], [0, 1], [0, 0],
+        nx, 0, 0,
+      );
+    }
   }
 
   const geo = new THREE.BufferGeometry();
@@ -192,6 +196,8 @@ function buildTriangularSide(
 function buildSmoothRamp(
   slopeMaterial: THREE.MeshLambertMaterial,
   sideMaterial: THREE.MeshLambertMaterial,
+  hasLeftTopWall: boolean,
+  hasRightTopWall: boolean,
 ): THREE.Group {
   const group = new THREE.Group();
   const half = CELL_SIZE / 2;
@@ -224,9 +230,9 @@ function buildSmoothRamp(
   const slope = new THREE.Mesh(slopeGeo, slopeMaterial);
   group.add(slope);
 
-  // Triangular side fills
-  group.add(buildTriangularSide(-half, sideMaterial));
-  group.add(buildTriangularSide(half, sideMaterial));
+  // Triangular side fills (left = -X in canonical, right = +X)
+  group.add(buildTriangularSide(-half, sideMaterial, hasLeftTopWall));
+  group.add(buildTriangularSide(half, sideMaterial, hasRightTopWall));
 
   // Side walls for the far half of the top cell (beyond ramp geometry)
   return group;
@@ -261,6 +267,8 @@ function pushQuad(
 function buildStairedRamp(
   stepMaterial: THREE.MeshLambertMaterial,
   sideMaterial: THREE.MeshLambertMaterial,
+  hasLeftTopWall: boolean,
+  hasRightTopWall: boolean,
 ): THREE.Group {
   const group = new THREE.Group();
   const half = CELL_SIZE / 2;
@@ -358,24 +366,27 @@ function buildStairedRamp(
       }
     }
 
-    // Full-height wall covering the entire top cell (cell boundary to far edge)
-    const zNear = 0;
-    const zFar = -CELL_SIZE;
-    const uD = CELL_SIZE / CELL_SIZE;
-    if (side < 0) {
-      pushQuad(sv, su, sn,
-        [x, 0, zNear], [x, WALL_HEIGHT, zNear],
-        [x, WALL_HEIGHT, zFar], [x, 0, zFar],
-        [0, 0], [0, 1], [uD, 1], [uD, 0],
-        nx, 0, 0,
-      );
-    } else {
-      pushQuad(sv, su, sn,
-        [x, 0, zFar], [x, WALL_HEIGHT, zFar],
-        [x, WALL_HEIGHT, zNear], [x, 0, zNear],
-        [uD, 0], [uD, 1], [0, 1], [0, 0],
-        nx, 0, 0,
-      );
+    // Full-height wall covering the entire top cell — only if neighbor is a wall
+    const includeTopWall = side < 0 ? hasLeftTopWall : hasRightTopWall;
+    if (includeTopWall) {
+      const zNear = 0;
+      const zFar = -CELL_SIZE;
+      const uD = CELL_SIZE / CELL_SIZE;
+      if (side < 0) {
+        pushQuad(sv, su, sn,
+          [x, 0, zNear], [x, WALL_HEIGHT, zNear],
+          [x, WALL_HEIGHT, zFar], [x, 0, zFar],
+          [0, 0], [0, 1], [uD, 1], [uD, 0],
+          nx, 0, 0,
+        );
+      } else {
+        pushQuad(sv, su, sn,
+          [x, 0, zFar], [x, WALL_HEIGHT, zFar],
+          [x, WALL_HEIGHT, zNear], [x, 0, zNear],
+          [uD, 0], [uD, 1], [0, 1], [0, 0],
+          nx, 0, 0,
+        );
+      }
     }
 
     const sideGeo = new THREE.BufferGeometry();
@@ -393,9 +404,26 @@ function buildStairedRamp(
 // Single ramp builder
 // ---------------------------------------------------------------------------
 
+// In canonical orientation (facing=N, bottom at +Z, top at -Z):
+// Left side = -X, Right side = +X.
+// These offsets are relative to the TOP cell position.
+const TOP_CELL_SIDE_OFFSETS: Record<Facing, { left: [number, number]; right: [number, number] }> = {
+  N: { left: [-1, 0], right: [1, 0] },
+  S: { left: [1, 0], right: [-1, 0] },
+  E: { left: [0, -1], right: [0, 1] },
+  W: { left: [0, 1], right: [0, -1] },
+};
+
+function isWallAt(grid: string[], walkable: Set<string>, col: number, row: number): boolean {
+  if (row < 0 || row >= grid.length) return true;
+  if (col < 0 || col >= grid[row].length) return true;
+  return !walkable.has(grid[row][col]);
+}
+
 function buildSingleRamp(
   ramp: RampInstance,
   grid: string[],
+  walkable: Set<string>,
   defaults?: TextureSet,
   charDefs?: CharDef[],
   areas?: TextureArea[],
@@ -408,16 +436,24 @@ function buildSingleRamp(
   const floorTex = resolved.floor;
   const wallTex = resolved.wall;
 
+  // Top cell = one step in the facing direction from the bottom cell
+  const [dc, dr] = FACING_DELTA[ramp.facing];
+  const topCol = ramp.col + dc;
+  const topRow = ramp.row + dr;
+  const offsets = TOP_CELL_SIDE_OFFSETS[ramp.facing];
+  const hasLeftTopWall = isWallAt(grid, walkable, topCol + offsets.left[0], topRow + offsets.left[1]);
+  const hasRightTopWall = isWallAt(grid, walkable, topCol + offsets.right[0], topRow + offsets.right[1]);
+
   let rampGroup: THREE.Group;
 
   if (ramp.style === 'stairs') {
     const stepMat = getRampStepMaterial(floorTex);
     const sideMat = getRampSideMaterial(wallTex);
-    rampGroup = buildStairedRamp(stepMat, sideMat);
+    rampGroup = buildStairedRamp(stepMat, sideMat, hasLeftTopWall, hasRightTopWall);
   } else {
     const slopeMat = getRampSlopeMaterial(floorTex);
     const sideMat = getRampSideMaterial(wallTex);
-    rampGroup = buildSmoothRamp(slopeMat, sideMat);
+    rampGroup = buildSmoothRamp(slopeMat, sideMat, hasLeftTopWall, hasRightTopWall);
   }
 
   // Rotate from canonical to the ramp's actual facing direction
@@ -456,12 +492,15 @@ export function buildRampMeshes(
   defaults?: TextureSet,
   charDefs?: CharDef[],
   areas?: TextureArea[],
+  walkable?: Set<string>,
 ): RampMeshes {
   const group = new THREE.Group();
   const meshMap = new Map<string, THREE.Group>();
 
+  const ws = walkable ?? buildWalkableSet(charDefs);
+
   for (const [key, ramp] of gameState.ramps) {
-    const rampGroup = buildSingleRamp(ramp, grid, defaults, charDefs, areas);
+    const rampGroup = buildSingleRamp(ramp, grid, ws, defaults, charDefs, areas);
     group.add(rampGroup);
     meshMap.set(key, rampGroup);
   }

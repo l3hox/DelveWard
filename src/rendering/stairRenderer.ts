@@ -129,6 +129,8 @@ function buildStairGroup(
   stepMaterial: THREE.MeshLambertMaterial,
   sideMaterial: THREE.MeshLambertMaterial,
   ceilingMaterial: THREE.MeshLambertMaterial,
+  hasLeftWall: boolean = true,
+  hasRightWall: boolean = true,
 ): THREE.Group {
   const group = new THREE.Group();
   const isDown = direction === 'down';
@@ -197,53 +199,59 @@ function buildStairGroup(
     group.add(mesh);
   }
 
-  // Side walls — extend one extra floor in the stair direction
-  const sideWallHeight = WALL_HEIGHT * 2;
-  const sideGeo = new THREE.BoxGeometry(SIDE_WALL_THICKNESS, sideWallHeight, CELL_SIZE);
+  // Side walls — only render if the neighbor on that side is a wall
+  if (hasLeftWall || hasRightWall) {
+    const sideWallHeight = WALL_HEIGHT * 2;
+    const sideGeo = new THREE.BoxGeometry(SIDE_WALL_THICKNESS, sideWallHeight, CELL_SIZE);
 
-  // Fix UVs so textures aren't squeezed or stretched.
-  // BoxGeometry face order: +x(0-3), -x(4-7), +y(8-11), -y(12-15), +z(16-19), -z(20-23)
-  const uRatio = SIDE_WALL_THICKNESS / CELL_SIZE;
-  const vRatio = sideWallHeight / WALL_HEIGHT;
-  const uv = sideGeo.getAttribute('uv');
-  // ±x faces (large inner/outer): V spans sideWallHeight, scale to repeat
-  for (const faceStart of [0, 4]) {
-    for (let j = 0; j < 4; j++) {
-      uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
+    // Fix UVs so textures aren't squeezed or stretched.
+    // BoxGeometry face order: +x(0-3), -x(4-7), +y(8-11), -y(12-15), +z(16-19), -z(20-23)
+    const uRatio = SIDE_WALL_THICKNESS / CELL_SIZE;
+    const vRatio = sideWallHeight / WALL_HEIGHT;
+    const uv = sideGeo.getAttribute('uv');
+    // ±x faces (large inner/outer): V spans sideWallHeight, scale to repeat
+    for (const faceStart of [0, 4]) {
+      for (let j = 0; j < 4; j++) {
+        uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
+      }
+    }
+    // ±y faces (top/bottom): U spans thin width, scale down
+    for (const faceStart of [8, 12]) {
+      for (let j = 0; j < 4; j++) {
+        uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
+      }
+    }
+    // ±z faces (front/back): U spans thin width, V spans tall height
+    for (const faceStart of [16, 20]) {
+      for (let j = 0; j < 4; j++) {
+        uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
+        uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
+      }
+    }
+    uv.needsUpdate = true;
+
+    applyDepthFade(sideGeo, 0);
+
+    if (hasLeftWall) {
+      const leftWall = new THREE.Mesh(sideGeo, sideMaterial);
+      leftWall.position.set(
+        -STEP_WIDTH / 2 - SIDE_WALL_THICKNESS / 2,
+        isDown ? 0 : WALL_HEIGHT,
+        0,
+      );
+      group.add(leftWall);
+    }
+
+    if (hasRightWall) {
+      const rightWall = new THREE.Mesh(sideGeo, sideMaterial);
+      rightWall.position.set(
+        STEP_WIDTH / 2 + SIDE_WALL_THICKNESS / 2,
+        isDown ? 0 : WALL_HEIGHT,
+        0,
+      );
+      group.add(rightWall);
     }
   }
-  // ±y faces (top/bottom): U spans thin width, scale down
-  for (const faceStart of [8, 12]) {
-    for (let j = 0; j < 4; j++) {
-      uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
-    }
-  }
-  // ±z faces (front/back): U spans thin width, V spans tall height
-  for (const faceStart of [16, 20]) {
-    for (let j = 0; j < 4; j++) {
-      uv.setX(faceStart + j, uv.getX(faceStart + j) * uRatio);
-      uv.setY(faceStart + j, uv.getY(faceStart + j) * vRatio);
-    }
-  }
-  uv.needsUpdate = true;
-
-  applyDepthFade(sideGeo, 0);
-
-  const leftWall = new THREE.Mesh(sideGeo, sideMaterial);
-  leftWall.position.set(
-    -STEP_WIDTH / 2 - SIDE_WALL_THICKNESS / 2,
-    isDown ? 0 : WALL_HEIGHT,
-    0,
-  );
-  group.add(leftWall);
-
-  const rightWall = new THREE.Mesh(sideGeo, sideMaterial);
-  rightWall.position.set(
-    STEP_WIDTH / 2 + SIDE_WALL_THICKNESS / 2,
-    isDown ? 0 : WALL_HEIGHT,
-    0,
-  );
-  group.add(rightWall);
 
   // Back wall — pure black at the far end of the stairwell, covers two floors.
   // Down: current level + one below (Y: -WALL_HEIGHT to WALL_HEIGHT)
@@ -266,12 +274,36 @@ export interface StairMeshes {
   group: THREE.Group;
 }
 
+// Left/right neighbor offsets relative to the stair's facing direction.
+// Facing = approach direction: the player walks in the opposite direction.
+// Left/right are from the player's perspective looking into the stairs.
+const SIDE_OFFSETS: Record<Facing, { left: [number, number]; right: [number, number] }> = {
+  S: { left: [-1, 0], right: [1, 0] },   // approach from south, looking north
+  N: { left: [1, 0], right: [-1, 0] },    // approach from north, looking south
+  E: { left: [0, -1], right: [0, 1] },    // approach from east, looking west
+  W: { left: [0, 1], right: [0, -1] },    // approach from west, looking east
+};
+
+function isWallNeighbor(
+  grid: string[] | undefined,
+  walkable: Set<string> | undefined,
+  col: number,
+  row: number,
+): boolean {
+  if (!grid) return true;
+  if (row < 0 || row >= grid.length) return true;
+  if (col < 0 || col >= grid[row].length) return true;
+  if (walkable) return !walkable.has(grid[row][col]);
+  return grid[row][col] === '#';
+}
+
 export function buildStairMeshes(
   stairs: Map<string, StairInstance>,
   defaults?: TextureSet,
   areas?: TextureArea[],
   grid?: string[],
   charDefs?: CharDef[],
+  walkable?: Set<string>,
 ): StairMeshes {
   const group = new THREE.Group();
 
@@ -288,7 +320,12 @@ export function buildStairMeshes(
     const stepMat = getStairStepMaterial(tex.floor);
     const sideMat = getStairSideMaterial(tex.wall);
     const ceilMat = getStairCeilingMaterial(tex.ceiling);
-    const stairGroup = buildStairGroup(direction, facing, stepMat, sideMat, ceilMat);
+
+    const offsets = SIDE_OFFSETS[facing];
+    const hasLeftWall = isWallNeighbor(grid, walkable, col + offsets.left[0], row + offsets.left[1]);
+    const hasRightWall = isWallNeighbor(grid, walkable, col + offsets.right[0], row + offsets.right[1]);
+
+    const stairGroup = buildStairGroup(direction, facing, stepMat, sideMat, ceilMat, hasLeftWall, hasRightWall);
     const cx = col * CELL_SIZE + CELL_SIZE / 2;
     const cz = row * CELL_SIZE + CELL_SIZE / 2;
     stairGroup.position.set(cx, 0, cz);
