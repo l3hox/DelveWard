@@ -92,14 +92,14 @@
             "###T.T##########################",
             "###T.TT#########################",
             "###TSTTTTTTTTTT#################",
-            "###TSSSSSSSSSTT#################",
-            "###TTTTT.TTTSTT#################",
-            "#######TTT#TS.TT################",
-            "###########TSS.TTT##############",
-            "###########DSSSSTT##############",
-            "###########DDDDSTT##############",
-            "###########D..DSTT##############",
-            "###########DDDDSTT##############",
+            "##..S##SSSSSSTT#################",
+            "###S.##T.TTTSTT#################",
+            "###E...TTT#TS.TT################",
+            "####.######TSS.TTT##############",
+            "##.....####DSSSSTT##############",
+            "##.....####DDDDSTT##############",
+            "##.....####D..DSTT##############",
+            "##.....####DDDDSTT##############",
             "############TTTS.TTT############",
             "############TTTS..TT############",
             "###########TTT.S.TT#############",
@@ -119,21 +119,6 @@
             "################################"
           ],
           "entities": [
-            {
-              "col": 8,
-              "row": 8,
-              "type": "enemy",
-              "id": "enemy_1",
-              "enemyType": "goblin",
-              "drops": {
-                "guaranteed": [
-                  {
-                    "itemId": "sword_rusty",
-                    "quality": "common"
-                  }
-                ]
-              }
-            },
             {
               "col": 12,
               "row": 11,
@@ -360,6 +345,114 @@
               "height": "full",
               "texture": "railing",
               "textureBack": "railing"
+            },
+            {
+              "id": "thin_wall_3",
+              "type": "thin_wall",
+              "col": 3,
+              "row": 11,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_4",
+              "type": "thin_wall",
+              "col": 4,
+              "row": 11,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_5",
+              "type": "thin_wall",
+              "col": 5,
+              "row": 11,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_6",
+              "type": "thin_wall",
+              "col": 3,
+              "row": 13,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_7",
+              "type": "thin_wall",
+              "col": 4,
+              "row": 13,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_8",
+              "type": "thin_wall",
+              "col": 5,
+              "row": 13,
+              "wall": "S",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_9",
+              "type": "thin_wall",
+              "col": 2,
+              "row": 12,
+              "wall": "E",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_10",
+              "type": "thin_wall",
+              "col": 2,
+              "row": 13,
+              "wall": "E",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_11",
+              "type": "thin_wall",
+              "col": 5,
+              "row": 12,
+              "wall": "E",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "id": "thin_wall_12",
+              "type": "thin_wall",
+              "col": 5,
+              "row": 13,
+              "wall": "E",
+              "solid": true,
+              "height": "full",
+              "texture": "wood_fence"
+            },
+            {
+              "col": 3,
+              "row": 8,
+              "type": "ramp",
+              "id": "ramp_1",
+              "facing": "S",
+              "style": "ramp"
             }
           ],
           "ceiling": false,
