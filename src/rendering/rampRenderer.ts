@@ -156,10 +156,11 @@ function buildTriangularSide(
     );
   }
 
-  // Full-height rectangle for the far half of the top cell
-  const zNear = -half;
-  const zFar = -CELL_SIZE;
-  const uD = half / CELL_SIZE;
+  // Full-height side wall covering the entire top cell (cell boundary to far edge).
+  // The top cell is # on the lower layer — no walkable cell generates walls for it.
+  const zNear = 0;             // cell boundary between bottom and top cells
+  const zFar = -CELL_SIZE;     // far edge of the top cell
+  const uD = CELL_SIZE / CELL_SIZE; // = 1.0 (full cell width)
   if (x < 0) {
     pushQuad(verts, uvArr, norms,
       [x, 0, zNear], [x, H, zNear],
@@ -357,10 +358,10 @@ function buildStairedRamp(
       }
     }
 
-    // Full-height wall for the far half of the top cell (beyond ramp end)
-    const zNear = -half;
+    // Full-height wall covering the entire top cell (cell boundary to far edge)
+    const zNear = 0;
     const zFar = -CELL_SIZE;
-    const uD = half / CELL_SIZE;
+    const uD = CELL_SIZE / CELL_SIZE;
     if (side < 0) {
       pushQuad(sv, su, sn,
         [x, 0, zNear], [x, WALL_HEIGHT, zNear],
