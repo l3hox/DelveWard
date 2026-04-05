@@ -48,6 +48,7 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - `isRampAccessible` callback overrides walkability (walls going up, holes going down)
   - `canMoveTo()` consolidates walkability + edge blocking + ramp checks in PlayerState
   - `RampCellInfo` + `RampHalfWallMap` in buildDungeon: ceiling/floor/wall suppression + half-wall splitting for adjacent cells
+  - Ramp renderer builds side walls for the full top cell (# with # neighbors, no dungeon walls)
   - Cell-resolved textures via resolveTextures()
   - Editor: palette, directional grid icon, facing/style inspector
   - Particle fix: all particle systems enableAll() for multi-zone visibility

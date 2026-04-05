@@ -24,7 +24,9 @@ Each entry records what was decided or changed — design decisions, architectur
 
 **Movement**: `isRampAccessible` callback on `PlayerState` overrides `isWalkable()` when a ramp connects the cells. Going UP walks into a wall cell (normally blocked); going DOWN walks over a hole (normally blocked). Layer switch + camera Y tween triggered in `onMove` callback after successful movement. `canMoveTo()` helper consolidates all movement checks.
 
-**Dungeon geometry integration**: Complex wall/floor/ceiling suppression around ramp cells. `RampCellInfo` in `buildDungeon()` handles bottom cell (skip ceiling, suppress wall in facing direction) and top cell on upper layer (half-floor via `floorKeepHalf`, suppress wall opposite to facing, half side walls via `keepHalf`). `RampHalfWallMap` targets adjacent walkable cells' walls toward the ramp top cell for per-wall half-wall splitting. The top cell is `#` (not processed by dungeon builder), so its visible walls come from adjacent walkable cells.
+**Dungeon geometry integration**: Complex wall/floor/ceiling suppression around ramp cells. `RampCellInfo` in `buildDungeon()` handles bottom cell (skip ceiling, suppress wall in facing direction) and top cell on upper layer (half-floor via `floorKeepHalf`, suppress wall opposite to facing, half side walls via `keepHalf`). `RampHalfWallMap` targets adjacent walkable cells' walls toward the ramp top cell for per-wall half-wall splitting.
+
+**Ramp renderer side walls**: The top cell is `#` (not processed by dungeon builder) with `#` neighbors — no walkable cell generates side walls. The ramp renderer itself now builds full-height side walls covering the entire top cell (from cell boundary to far edge). Built as part of the same `BufferGeometry` as the triangular/stepped side fills — one mesh per side.
 
 **Particle fix**: All particle systems (dust motes, sconce embers, water drips, fireflies, fireball explosions) were missing `layers.enableAll()` for multi-zone rendering. Fixed at root objects + dynamically spawned sprites/points.
 
