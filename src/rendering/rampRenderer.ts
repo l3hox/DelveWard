@@ -195,7 +195,8 @@ function buildTriangularSide(
 
 function buildSmoothRamp(
   slopeMaterial: THREE.MeshLambertMaterial,
-  sideMaterial: THREE.MeshLambertMaterial,
+  leftSideMaterial: THREE.MeshLambertMaterial,
+  rightSideMaterial: THREE.MeshLambertMaterial,
   hasLeftTopWall: boolean,
   hasRightTopWall: boolean,
 ): THREE.Group {
@@ -231,8 +232,8 @@ function buildSmoothRamp(
   group.add(slope);
 
   // Triangular side fills (left = -X in canonical, right = +X)
-  group.add(buildTriangularSide(-half, sideMaterial, hasLeftTopWall));
-  group.add(buildTriangularSide(half, sideMaterial, hasRightTopWall));
+  group.add(buildTriangularSide(-half, leftSideMaterial, hasLeftTopWall));
+  group.add(buildTriangularSide(half, rightSideMaterial, hasRightTopWall));
 
   // Side walls for the far half of the top cell (beyond ramp geometry)
   return group;
@@ -266,7 +267,8 @@ function pushQuad(
 
 function buildStairedRamp(
   stepMaterial: THREE.MeshLambertMaterial,
-  sideMaterial: THREE.MeshLambertMaterial,
+  leftSideMaterial: THREE.MeshLambertMaterial,
+  rightSideMaterial: THREE.MeshLambertMaterial,
   hasLeftTopWall: boolean,
   hasRightTopWall: boolean,
 ): THREE.Group {
@@ -393,7 +395,7 @@ function buildStairedRamp(
     sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
     sideGeo.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
     sideGeo.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
-    group.add(new THREE.Mesh(sideGeo, sideMaterial));
+    group.add(new THREE.Mesh(sideGeo, side < 0 ? leftSideMaterial : rightSideMaterial));
   }
 
   // Side walls for the far half of the top cell (beyond ramp geometry)
@@ -434,7 +436,6 @@ function buildSingleRamp(
   const char = (grid[ramp.row] && grid[ramp.row][ramp.col]) || '.';
   const resolved = resolveTextures(ramp.col, ramp.row, char, defaults, charDefMap, areas);
   const floorTex = resolved.floor;
-  const wallTex = resolved.wall;
 
   // Top cell = one step in the facing direction from the bottom cell
   const [dc, dr] = FACING_DELTA[ramp.facing];
@@ -444,16 +445,29 @@ function buildSingleRamp(
   const hasLeftTopWall = isWallAt(grid, walkable, topCol + offsets.left[0], topRow + offsets.left[1]);
   const hasRightTopWall = isWallAt(grid, walkable, topCol + offsets.right[0], topRow + offsets.right[1]);
 
+  // Resolve side wall textures from the adjacent cells so they match the
+  // half-walls the dungeon builder renders for the top cell's neighbors.
+  function resolveNeighborWallTex(colOff: number, rowOff: number): WallTextureName {
+    const nc = topCol + colOff;
+    const nr = topRow + rowOff;
+    const nChar = (grid[nr] && grid[nr][nc]) || '#';
+    return resolveTextures(nc, nr, nChar, defaults, charDefMap, areas).wall;
+  }
+  const leftWallTex = resolveNeighborWallTex(offsets.left[0], offsets.left[1]);
+  const rightWallTex = resolveNeighborWallTex(offsets.right[0], offsets.right[1]);
+
   let rampGroup: THREE.Group;
 
   if (ramp.style === 'stairs') {
     const stepMat = getRampStepMaterial(floorTex);
-    const sideMat = getRampSideMaterial(wallTex);
-    rampGroup = buildStairedRamp(stepMat, sideMat, hasLeftTopWall, hasRightTopWall);
+    const leftSideMat = getRampSideMaterial(leftWallTex);
+    const rightSideMat = getRampSideMaterial(rightWallTex);
+    rampGroup = buildStairedRamp(stepMat, leftSideMat, rightSideMat, hasLeftTopWall, hasRightTopWall);
   } else {
     const slopeMat = getRampSlopeMaterial(floorTex);
-    const sideMat = getRampSideMaterial(wallTex);
-    rampGroup = buildSmoothRamp(slopeMat, sideMat, hasLeftTopWall, hasRightTopWall);
+    const leftSideMat = getRampSideMaterial(leftWallTex);
+    const rightSideMat = getRampSideMaterial(rightWallTex);
+    rampGroup = buildSmoothRamp(slopeMat, leftSideMat, rightSideMat, hasLeftTopWall, hasRightTopWall);
   }
 
   // Rotate from canonical to the ramp's actual facing direction
