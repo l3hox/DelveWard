@@ -547,6 +547,19 @@ export function buildLevelScene(
     }
   }
 
+  // Apply opened secret wall state — hide meshes for already-opened walls
+  // (needed when returning to a previously visited level)
+  for (let li = 0; li < layerDefs.length; li++) {
+    gameState.activeLayerIndex = li;
+    for (const [key, sw] of gameState.secretWalls) {
+      if (!sw.opened) continue;
+      const entry = sharedWallEntityMeshMap.get(layerDoorKey(li, key));
+      if (!entry) continue;
+      if (!sw.persistent) entry.wallGroup.visible = false;
+      entry.floorCeilGroup.visible = true;
+    }
+  }
+
   // Restore active layer index
   gameState.activeLayerIndex = activeLayerIdx;
 
