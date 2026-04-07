@@ -594,13 +594,7 @@ export function buildLevelScene(
     gameState.isDoorOpen.bind(gameState),
     (col, row) => {
       if (gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row)) return true;
-      // Block movement over holes (no floor — layer below has non-wall cell)
-      const belowGrid = layerDefs[gameState.activeLayerIndex - 1]?.grid;
-      if (belowGrid && row >= 0 && row < belowGrid.length && col >= 0 && col < belowGrid[0].length) {
-        const ch = belowGrid[row][col];
-        const def = level.charDefs?.find(d => d.char === ch);
-        if (!(ch === '#' || (def && def.solid && !def.seeThrough))) return true;
-      }
+      // Holes (no floor) are handled by the falling system, not blocked here
       return false;
     },
     gameState.stairs,

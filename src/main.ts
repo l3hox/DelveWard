@@ -700,6 +700,39 @@ async function init(): Promise<void> {
         }
       }
 
+      // Hole detection — falling through open floors
+      if (!ls.player.debugNoClip && col !== undefined && row !== undefined) {
+        const currentLayer = gameState.activeLayerIndex;
+        if (currentLayer > 0) {
+          const belowGrid = ls.layerGrids[currentLayer - 1];
+          let isHole = false;
+          if (belowGrid && row >= 0 && row < belowGrid.length && col >= 0 && col < belowGrid[0].length) {
+            const ch = belowGrid[row][col];
+            const def = ls.level.charDefs?.find((d: { char: string }) => d.char === ch);
+            if (!(ch === '#' || (def && (def as any).solid && !(def as any).seeThrough))) {
+              isHole = true;
+            }
+          }
+          if (isHole) {
+            // Compute landing layer: scan downward for first layer with a floor
+            let landingLayer = 0;
+            for (let li = currentLayer - 1; li >= 1; li--) {
+              const gridBelow = ls.layerGrids[li - 1];
+              if (gridBelow && row < gridBelow.length && col < gridBelow[0].length) {
+                const ch = gridBelow[row][col];
+                const def = ls.level.charDefs?.find((d: { char: string }) => d.char === ch);
+                if (ch === '#' || (def && (def as any).solid && !(def as any).seeThrough)) {
+                  landingLayer = li;
+                  break;
+                }
+              }
+            }
+            const totalDistance = (currentLayer - landingLayer) * LAYER_HEIGHT;
+            ls.player.setPendingFall(landingLayer, totalDistance);
+          }
+        }
+      }
+
       // Stair detection — entity-based lookup
       if (gameState.getStair(col, row)) {
         const stairInstance = gameState.getStair(col, row)!;
@@ -717,6 +750,14 @@ async function init(): Promise<void> {
     ls.player.setOnTurn(() => {
       const s = ls.player.getState();
       gameState.revealAround(s.col, s.row, s.facing, activeGrid());
+    });
+
+    ls.player.setOnFallLand((landingLayer: number) => {
+      const ps = ls.player.getState();
+      gameState.activeLayerIndex = landingLayer;
+      debugLayerIndex = landingLayer;
+      ls.player.switchGrid(ls.layerGrids[landingLayer], buildWalkableSet(ls.level.charDefs), gameState.stairs);
+      gameState.revealAround(ps.col, ps.row, ps.facing, ls.layerGrids[landingLayer]);
     });
 
     // Signal-driven door state changes → animate door mesh
@@ -1027,6 +1068,7 @@ async function init(): Promise<void> {
 
   window.addEventListener('keydown', (e) => {
     if (transition.isActive) return;
+    if (ls.player.falling) return; // block all input during fall
     if (signOverlay.isOpen()) return; // sign overlay handles its own dismissal
     if (dialogOverlay.isOpen()) return; // dialog overlay handles its own keys
     if (saveLoadOverlay.isOpen()) return; // save/load overlay handles its own keys

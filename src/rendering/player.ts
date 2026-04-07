@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL_SIZE, EYE_HEIGHT } from './dungeon';
+import { CELL_SIZE, EYE_HEIGHT, LAYER_HEIGHT } from './dungeon';
 import { PlayerState, Facing, FACING_ANGLE, FACING_DELTA, TURN_LEFT, TURN_RIGHT } from '../core/grid';
 import { doorKey, type StairInstance } from '../core/gameState';
 
@@ -9,6 +9,13 @@ const CAMERA_BACK_OFFSET = 0.95; // pull camera back from cell center to see til
 const STAIR_Y_OFFSET = 0.35; // camera dips/rises when stepping onto stairs
 const STAIR_PITCH = 0.15; // camera tilts down/up on stairs (radians, ~8.5°)
 const MAX_QUEUED_COMMANDS = 3;
+
+// Fall physics
+const FALL_TERMINAL_VELOCITY = 12;  // units/sec
+const FALL_ACCEL_DISTANCE = 2 * LAYER_HEIGHT; // accelerate over 2 layers (5.0 units)
+const FALL_ACCEL = (FALL_TERMINAL_VELOCITY * FALL_TERMINAL_VELOCITY) / (2 * FALL_ACCEL_DISTANCE);
+const FALL_CAMERA_PITCH = -0.4;     // radians — look down during fall
+const FALL_TRIGGER_PROGRESS = 0.667; // activate fall at 2/3 of walk tween
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
@@ -28,12 +35,23 @@ export class Player {
   private onMoveCallback?: (col: number, row: number) => void;
   private onMoveBlocked?: (col: number, row: number) => void;
   private onTurnCallback?: () => void;
+  private onFallLandCallback?: (landingLayer: number) => void;
   private commandQueue: Array<() => void> = [];
 
   public slowMultiplier = 1;
   public yOffset = 0;         // additional Y offset (used for layer positioning)
   public targetYOffset = 0;   // target Y offset (lerped in update)
   public debugNoClip = false;  // bypass walkability + blocked checks (bounds only)
+
+  // Fall state
+  private isFalling = false;
+  private fallVelocity = 0;
+  private fallDistance = 0;
+  private fallTargetYOffset = 0;
+  private fallLandingLayer = 0;
+  private pendingFall: { landingLayer: number; totalDistance: number } | null = null;
+  private moveStartPos: THREE.Vector3 | null = null;
+  private moveStartDist = 0;
 
   private stairs?: Map<string, StairInstance>;
 
@@ -92,6 +110,8 @@ export class Player {
 
   private isAnimating(): boolean {
     return (
+      this.isFalling ||
+      this.pendingFall !== null ||
       this.currentPos.distanceTo(this.targetPos) > ANIM_THRESHOLD ||
       Math.abs(this.currentAngle - this.targetAngle) > ANIM_THRESHOLD
     );
@@ -113,6 +133,18 @@ export class Player {
     this.onTurnCallback = callback;
   }
 
+  setOnFallLand(callback: (landingLayer: number) => void): void {
+    this.onFallLandCallback = callback;
+  }
+
+  setPendingFall(landingLayer: number, totalDistance: number): void {
+    this.pendingFall = { landingLayer, totalDistance };
+  }
+
+  get falling(): boolean {
+    return this.isFalling || this.pendingFall !== null;
+  }
+
   /** Debug noclip move: only check grid bounds, skip walkability/blocked. */
   private debugMove(dc: number, dr: number): boolean {
     const nc = this.state.col + dc;
@@ -123,6 +155,11 @@ export class Player {
     return true;
   }
 
+  private trackMoveStart(): void {
+    this.moveStartPos = this.currentPos.clone();
+    this.moveStartDist = this.moveStartPos.distanceTo(this.targetPos);
+  }
+
   moveForward(): void {
     if (this.isAnimating()) { this.enqueue(() => this.moveForward()); return; }
     const [dc, dr] = FACING_DELTA[this.state.facing];
@@ -130,6 +167,7 @@ export class Player {
     if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
+      this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
     } else if (!this.debugNoClip) {
       this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr);
@@ -143,6 +181,7 @@ export class Player {
     if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
+      this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -154,6 +193,7 @@ export class Player {
     if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
+      this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -165,6 +205,7 @@ export class Player {
     if (moved) {
       this.targetPos.copy(this.gridToWorld(this.state.col, this.state.row));
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
+      this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
     }
   }
@@ -207,10 +248,49 @@ export class Player {
       this.currentPitch = this.targetPitch;
     }
 
-    // Lerp debug Y offset
-    this.yOffset += (this.targetYOffset - this.yOffset) * alpha;
-    if (Math.abs(this.yOffset - this.targetYOffset) < 0.005) {
-      this.yOffset = this.targetYOffset;
+    // Check if a pending fall should activate (at 2/3 of walk progress)
+    if (this.pendingFall && this.moveStartPos && this.moveStartDist > 0) {
+      const remainDist = this.currentPos.distanceTo(this.targetPos);
+      const progress = 1 - remainDist / this.moveStartDist;
+      if (progress >= FALL_TRIGGER_PROGRESS) {
+        this.isFalling = true;
+        this.fallVelocity = 0;
+        this.fallDistance = 0;
+        this.fallTargetYOffset = this.pendingFall.landingLayer * LAYER_HEIGHT;
+        this.fallLandingLayer = this.pendingFall.landingLayer;
+        this.targetPitch = FALL_CAMERA_PITCH;
+        this.commandQueue = [];
+        this.pendingFall = null;
+        this.moveStartPos = null;
+      }
+    }
+
+    // Y offset: gravity physics during fall, normal lerp otherwise
+    if (this.isFalling) {
+      if (this.fallDistance < FALL_ACCEL_DISTANCE) {
+        this.fallVelocity = Math.min(
+          this.fallVelocity + FALL_ACCEL * delta,
+          FALL_TERMINAL_VELOCITY,
+        );
+      }
+      const dy = this.fallVelocity * delta;
+      this.yOffset -= dy;
+      this.fallDistance += dy;
+
+      if (this.yOffset <= this.fallTargetYOffset) {
+        this.yOffset = this.fallTargetYOffset;
+        this.targetYOffset = this.fallTargetYOffset;
+        this.isFalling = false;
+        this.fallVelocity = 0;
+        this.fallDistance = 0;
+        this.targetPitch = 0;
+        this.onFallLandCallback?.(this.fallLandingLayer);
+      }
+    } else {
+      this.yOffset += (this.targetYOffset - this.yOffset) * alpha;
+      if (Math.abs(this.yOffset - this.targetYOffset) < 0.005) {
+        this.yOffset = this.targetYOffset;
+      }
     }
 
     this.camera.position.copy(this.currentPos);
@@ -221,8 +301,8 @@ export class Player {
     this.camera.rotation.y = this.currentAngle;
     this.camera.rotation.x = this.currentPitch;
 
-    // Drain one queued command per frame when animation completes
-    if (!this.isAnimating() && this.commandQueue.length > 0) {
+    // Drain one queued command per frame when animation completes (not during fall)
+    if (!this.isFalling && !this.isAnimating() && this.commandQueue.length > 0) {
       const next = this.commandQueue.shift()!;
       next();
     }
