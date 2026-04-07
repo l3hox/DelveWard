@@ -18,7 +18,6 @@ export type OpenResult =
 
 export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const hasLayers = level.layers !== undefined && level.layers.length > 0;
   if (level.id !== undefined) out.id = level.id;
   out.name = level.name;
   if (level.playerStart) out.playerStart = level.playerStart;
@@ -28,16 +27,8 @@ export function serializeLevel(level: DungeonLevel): Record<string, unknown> {
   if (level.dustMotes !== undefined) out.dustMotes = level.dustMotes;
   if (level.waterDrips !== undefined) out.waterDrips = level.waterDrips;
   if (level.charDefs !== undefined && level.charDefs.length > 0) out.charDefs = level.charDefs;
-  if (hasLayers) {
-    // Per-layer fields live only in layers, not duplicated at top level
-    out.layers = level.layers!.map(serializeLayerDef);
-  } else {
-    out.grid = level.grid;
-    out.entities = level.entities;
-    if (level.ceiling !== undefined) out.ceiling = level.ceiling;
-    if (level.defaults !== undefined) out.defaults = level.defaults;
-    if (level.areas !== undefined && level.areas.length > 0) out.areas = level.areas;
-  }
+  // Per-layer fields live only in layers, not duplicated at top level
+  out.layers = level.layers.map(serializeLayerDef);
   return out;
 }
 

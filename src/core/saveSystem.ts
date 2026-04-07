@@ -206,7 +206,7 @@ export function serializeMultiLayerSnapshot(snapshot: MultiLayerSnapshot): Seria
 }
 
 export function deserializeMultiLayerSnapshot(data: SerializedMultiLayerSnapshot | SerializedLevelSnapshot): MultiLayerSnapshot {
-  // Backward compat: old saves have flat SerializedLevelSnapshot (no 'layers' property)
+  // Backward compat for old save files: wrap flat snapshot as single layer
   if ('layers' in data && Array.isArray(data.layers)) {
     const multi = data as SerializedMultiLayerSnapshot;
     return {

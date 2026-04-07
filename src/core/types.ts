@@ -50,7 +50,7 @@ export interface DungeonLevel {
   defaults?: TextureSet;
   charDefs?: CharDef[];
   areas?: TextureArea[];
-  layers?: LayerDef[];           // if present, grid/entities/areas/defaults/ceiling are per-layer; charDefs are level-global
+  layers: LayerDef[];            // per-layer grids/entities/areas/defaults/ceiling; charDefs are level-global
 }
 
 export interface Dungeon {

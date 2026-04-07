@@ -3,12 +3,25 @@ import { validateLevel, validateDungeon, migrateEntities } from './levelLoader';
 import type { Entity } from '../core/types';
 
 function validLevel(overrides: Record<string, unknown> = {}) {
+  const grid = (overrides.grid as string[] | undefined) ?? ['###', '#.#', '###'];
+  const entities = (overrides.entities as Entity[] | undefined) ?? [];
+  const defaults = overrides.defaults;
+  const areas = overrides.areas;
+  const charDefs = overrides.charDefs;
+  const layerOverrides: Record<string, unknown> = { id: '0', grid, entities };
+  if (defaults !== undefined) layerOverrides.defaults = defaults;
+  if (areas !== undefined) layerOverrides.areas = areas;
+  const layers = overrides.layers ?? [layerOverrides];
   return {
     name: 'Test',
-    grid: ['###', '#.#', '###'],
+    grid,
     playerStart: { col: 1, row: 1, facing: 'N' },
-    entities: [],
+    entities,
+    layers,
+    ...(charDefs !== undefined ? { charDefs } : {}),
     ...overrides,
+    // Ensure layers reflects grid/entities overrides
+    ...(overrides.layers === undefined ? { layers } : {}),
   };
 }
 
@@ -32,10 +45,10 @@ describe('validateLevel', () => {
     expect(() => validateLevel(validLevel({ name: 123 }), 'test')).toThrow('"name" must be a string');
   });
 
-  it('rejects missing or empty grid', () => {
-    expect(() => validateLevel(validLevel({ grid: undefined }), 'test')).toThrow('"grid" must be a non-empty array');
-    expect(() => validateLevel(validLevel({ grid: [] }), 'test')).toThrow('"grid" must be a non-empty array');
-    expect(() => validateLevel(validLevel({ grid: [1, 2] }), 'test')).toThrow('"grid" must be a non-empty array');
+  it('rejects missing or empty grid in layer', () => {
+    expect(() => validateLevel(validLevel({ layers: [{ id: '0', grid: undefined, entities: [] }] }), 'test')).toThrow('"grid" must be a non-empty array');
+    expect(() => validateLevel(validLevel({ layers: [{ id: '0', grid: [], entities: [] }] }), 'test')).toThrow('"grid" must be a non-empty array');
+    expect(() => validateLevel(validLevel({ layers: [{ id: '0', grid: [1, 2], entities: [] }] }), 'test')).toThrow('"grid" must be a non-empty array');
   });
 
   it('rejects grid rows with inconsistent lengths', () => {
@@ -77,9 +90,9 @@ describe('validateLevel', () => {
     }), 'test')).toThrow('is not a walkable tile');
   });
 
-  it('rejects missing entities', () => {
-    expect(() => validateLevel(validLevel({ entities: undefined }), 'test')).toThrow('"entities" must be an array');
-    expect(() => validateLevel(validLevel({ entities: 'bad' }), 'test')).toThrow('"entities" must be an array');
+  it('rejects missing entities in layer', () => {
+    expect(() => validateLevel(validLevel({ layers: [{ id: '0', grid: ['###', '#.#', '###'], entities: undefined }] }), 'test')).toThrow('"entities" must be an array');
+    expect(() => validateLevel(validLevel({ layers: [{ id: '0', grid: ['###', '#.#', '###'], entities: 'bad' }] }), 'test')).toThrow('"entities" must be an array');
   });
 
   // --- defaults validation ---
@@ -688,13 +701,18 @@ describe('stair entity validation', () => {
 // --- validateDungeon ---
 
 function validDungeonLevel(id: string, overrides: Record<string, unknown> = {}) {
+  const grid = (overrides.grid as string[] | undefined) ?? ['#####', '#...#', '#...#', '#...#', '#####'];
+  const entities = (overrides.entities as unknown[] | undefined) ?? [];
+  const layers = overrides.layers ?? [{ id: '0', grid, entities }];
   return {
     id,
     name: `Level ${id}`,
-    grid: ['#####', '#...#', '#...#', '#...#', '#####'],
+    grid,
     playerStart: { col: 1, row: 1, facing: 'S' },
-    entities: [],
+    entities,
+    layers,
     ...overrides,
+    ...(overrides.layers === undefined ? { layers } : {}),
   };
 }
 
@@ -791,26 +809,20 @@ describe('validateDungeon', () => {
 
   it('warns (not throws) for stair whose spawn position is out of bounds', () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const grid1 = ['#####', '#...#', '#...#', '#...#', '#####'];
+    const entities1 = [
+      { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
+    ];
+    const grid2 = ['.....', '#####'];
+    const entities2 = [
+      { col: 1, row: 0, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
+    ];
     expect(() => validateDungeon({
       name: 'Test Dungeon',
       playerStart: { levelId: 'level1', col: 1, row: 1, facing: 'S' },
       levels: [
-        {
-          id: 'level1',
-          name: 'Level level1',
-          grid: ['#####', '#...#', '#...#', '#...#', '#####'],
-          entities: [
-            { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_up_1', id: 'stair_down_1' },
-          ],
-        },
-        {
-          id: 'level2',
-          name: 'Level level2',
-          grid: ['.....', '#####'],
-          entities: [
-            { col: 1, row: 0, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_down_1', id: 'stair_up_1' },
-          ],
-        },
+        { id: 'level1', name: 'Level level1', grid: grid1, entities: entities1, layers: [{ id: '0', grid: grid1, entities: entities1 }] },
+        { id: 'level2', name: 'Level level2', grid: grid2, entities: entities2, layers: [{ id: '0', grid: grid2, entities: entities2 }] },
       ],
     }, 'test')).not.toThrow();
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('spawn position (1,-1) is out of bounds on level "level2"'));

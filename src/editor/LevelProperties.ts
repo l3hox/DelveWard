@@ -98,7 +98,7 @@ export class LevelProperties {
                 this.onStatusHintChanged?.();
                 return;
               }
-              dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing, layerIndex: this.app.hasLayers() ? this.app.getActiveLayerCoord() : undefined };
+              dungeon.playerStart = { levelId: level.id!, col, row, facing: dungeon.playerStart.facing, layerIndex: this.app.getActiveLayerCoord() };
               this.app.coordPickCallback = null;
               this.app.statusHint = null;
               this.onStatusHintChanged?.();
@@ -123,17 +123,15 @@ export class LevelProperties {
           this.onChanged?.();
         });
 
-        // Layer dropdown (only for layered levels)
-        if (this.app.hasLayers() && level.layers) {
-          const layerOptions = level.layers.map(l => l.id ?? '0');
-          const currentLayerCoord = String(ps.layerIndex ?? 0);
-          this.addDropdownField(body, 'layer', currentLayerCoord, layerOptions, (val) => {
-            this.onBeforeDiscreteChange?.();
-            ps.layerIndex = parseInt(val, 10) || 0;
-            this.onChanged?.();
-            this.refresh();
-          });
-        }
+        // Layer dropdown
+        const layerOptions = level.layers.map(l => l.id ?? '0');
+        const currentLayerCoord = String(ps.layerIndex ?? 0);
+        this.addDropdownField(body, 'layer', currentLayerCoord, layerOptions, (val) => {
+          this.onBeforeDiscreteChange?.();
+          ps.layerIndex = parseInt(val, 10) || 0;
+          this.onChanged?.();
+          this.refresh();
+        });
 
         const pickBtn = document.createElement('button');
         pickBtn.className = 'btn-add';
@@ -150,9 +148,7 @@ export class LevelProperties {
               }
             dungeon.playerStart.col = col;
             dungeon.playerStart.row = row;
-            if (this.app.hasLayers()) {
-              dungeon.playerStart.layerIndex = this.app.getActiveLayerCoord();
-            }
+            dungeon.playerStart.layerIndex = this.app.getActiveLayerCoord();
             this.app.coordPickCallback = null;
             this.app.statusHint = null;
             this.onStatusHintChanged?.();
@@ -182,17 +178,15 @@ export class LevelProperties {
           this.onChanged?.();
         });
 
-        // Layer dropdown (only for layered levels)
-        if (this.app.hasLayers() && level.layers) {
-          const layerOptions = level.layers.map(l => l.id ?? '0');
-          const currentLayerCoord = String(ps.layerIndex ?? 0);
-          this.addDropdownField(body, 'layer', currentLayerCoord, layerOptions, (val) => {
-            this.onBeforeDiscreteChange?.();
-            ps.layerIndex = parseInt(val, 10) || 0;
-            this.onChanged?.();
-            this.refresh();
-          });
-        }
+        // Layer dropdown
+        const singleLayerOptions = level.layers.map(l => l.id ?? '0');
+        const singleCurrentLayerCoord = String(ps.layerIndex ?? 0);
+        this.addDropdownField(body, 'layer', singleCurrentLayerCoord, singleLayerOptions, (val) => {
+          this.onBeforeDiscreteChange?.();
+          ps.layerIndex = parseInt(val, 10) || 0;
+          this.onChanged?.();
+          this.refresh();
+        });
 
         const pickBtn = document.createElement('button');
         pickBtn.className = 'btn-add';
@@ -209,9 +203,7 @@ export class LevelProperties {
               }
             ps.col = col;
             ps.row = row;
-            if (this.app.hasLayers()) {
-              ps.layerIndex = this.app.getActiveLayerCoord();
-            }
+            ps.layerIndex = this.app.getActiveLayerCoord();
             this.app.coordPickCallback = null;
             this.app.statusHint = null;
             this.onStatusHintChanged?.();

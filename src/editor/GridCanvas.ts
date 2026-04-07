@@ -1474,7 +1474,7 @@ export class GridCanvas {
     }
     if (!ps) return;
     // Only show player start on the matching layer
-    if (this.app.hasLayers() && (ps.layerIndex ?? 0) !== this.app.getActiveLayerCoord()) return;
+    if ((ps.layerIndex ?? 0) !== this.app.getActiveLayerCoord()) return;
 
     const { col, row, facing } = ps;
 

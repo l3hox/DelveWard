@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GameState } from './gameState';
-import type { Entity } from './types';
+import type { Entity, LayerDef } from './types';
+
+/** Wrap entities into a single-layer LayerDef array for loadNewLevel. */
+function asLayer(entities: Entity[]): LayerDef[] {
+  return [{ id: '0', grid: ['...', '...', '...'], entities }];
+}
 
 vi.mock('./itemDatabase', () => ({
   itemDatabase: {
@@ -262,9 +267,9 @@ describe('GameState', () => {
       ]);
       expect(gs.entityById.has('door_old')).toBe(true);
 
-      gs.loadNewLevel([
+      gs.loadNewLevel(asLayer([
         { col: 3, row: 3, type: 'door', state: 'closed', id: 'door_new' },
-      ]);
+      ]));
 
       expect(gs.entityById.has('door_old')).toBe(false);
       expect(gs.entityById.has('door_new')).toBe(true);
@@ -748,7 +753,7 @@ describe('GameState', () => {
       ]);
       gs.exploredCells.add('1,1');
 
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
 
       expect(gs.doors.size).toBe(0);
       expect(gs.keys.size).toBe(0);
@@ -757,7 +762,7 @@ describe('GameState', () => {
 
     it('parses new entities correctly after reset', () => {
       const gs = new GameState([doorEntity(1, 1, 'closed')]);
-      gs.loadNewLevel([doorEntity(9, 9, 'open')]);
+      gs.loadNewLevel(asLayer([doorEntity(9, 9, 'open')]));
 
       expect(gs.getDoor(1, 1)).toBeUndefined();
       expect(gs.getDoor(9, 9)).toBeDefined();
@@ -770,7 +775,7 @@ describe('GameState', () => {
       gs.torchFuel = 50;
       gs.addKey('iron_key');
 
-      gs.loadNewLevel([doorEntity(3, 3, 'closed')]);
+      gs.loadNewLevel(asLayer([doorEntity(3, 3, 'closed')]));
 
       expect(gs.hp).toBe(15);
       expect(gs.torchFuel).toBe(50);
@@ -818,7 +823,7 @@ describe('GameState', () => {
       const gs = new GameState([
         { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stairs_2' },
       ]);
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.stairs.size).toBe(0);
     });
   });
@@ -883,7 +888,7 @@ describe('GameState', () => {
     it('hunger persists across loadNewLevel', () => {
       const gs = new GameState([]);
       gs.hunger = 42;
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.hunger).toBe(42);
     });
 
@@ -1121,7 +1126,7 @@ describe('GameState', () => {
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
       ], undefined, 'test_level');
       gs.pickupEquipmentAt(1, 1);
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.entityRegistry.getEquipped('weapon')).toBeDefined();
     });
 
@@ -1130,7 +1135,7 @@ describe('GameState', () => {
         { col: 1, row: 1, type: 'equipment', itemId: 'sword', name: 'Sword', slot: 'weapon', atkBonus: 2, defBonus: 0 },
       ], undefined, 'test_level');
       expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(1);
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(0);
     });
 
@@ -1248,7 +1253,7 @@ describe('GameState', () => {
     it('backpack items persist across loadNewLevel', () => {
       const gs = new GameState([], undefined, 'test_level');
       gs.entityRegistry.createItem('hp1', 'common', { kind: 'backpack', slot: 0 });
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.entityRegistry.getBackpackItems().length).toBe(1);
       expect(gs.entityRegistry.getBackpackItems()[0].itemId).toBe('hp1');
     });
@@ -1258,7 +1263,7 @@ describe('GameState', () => {
         { col: 1, row: 1, type: 'consumable', itemId: 'hp1', name: 'Potion', consumableType: 'health_potion', value: 10 },
       ], undefined, 'test_level');
       expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(1);
-      gs.loadNewLevel([]);
+      gs.loadNewLevel(asLayer([]));
       expect(gs.entityRegistry.getAllGroundItemsForLevel('test_level').length).toBe(0);
     });
 

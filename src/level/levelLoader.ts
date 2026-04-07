@@ -7,29 +7,24 @@ import { npcDatabase } from '../npcs/npcDatabase';
 
 const VALID_FACINGS: Facing[] = ['N', 'E', 'S', 'W'];
 
-/** Get all entities from a level, searching all layers if present. */
+/** Get all entities from a level across all layers. */
 export function getAllLevelEntities(level: DungeonLevel): Entity[] {
-  if (level.layers && level.layers.length > 0) {
-    const all: Entity[] = [];
-    for (const layer of level.layers) {
-      all.push(...layer.entities);
-    }
-    return all;
+  const all: Entity[] = [];
+  for (const layer of level.layers) {
+    all.push(...layer.entities);
   }
-  return level.entities;
+  return all;
 }
 
 /** Resolve a layer coordinate (numeric ID like 0, 1, -1) to an array index. Returns 0 if not found. */
 export function resolveLayerCoord(level: DungeonLevel, coord: number): number {
-  if (!level.layers) return 0;
   const id = String(coord);
   const idx = level.layers.findIndex(l => l.id === id);
   return idx >= 0 ? idx : 0;
 }
 
-/** Find which layer index an entity is on (by id). Returns 0 for non-layered levels. */
+/** Find which layer index an entity is on (by id). Returns 0 if not found. */
 export function findEntityLayerIndex(level: DungeonLevel, entityId: string): number {
-  if (!level.layers) return 0;
   for (let li = 0; li < level.layers.length; li++) {
     if (level.layers[li].entities.some(e => e.id === entityId)) return li;
   }
@@ -458,9 +453,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
     throw new Error(`Level ${source}: "name" must be a string`);
   }
 
-  // For layered levels, we need to validate charDefs first (level-global), then layers.
-  // For non-layered levels, the existing flow validates grid → charDefs → grid chars.
-  const hasLayers = obj.layers !== undefined;
+  // Validate charDefs first (level-global), then layers.
 
   // charDefs (optional, level-global — validate BEFORE grid/layers so custom chars are known)
   const charDefChars = new Set<string>();
@@ -519,46 +512,26 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   const extendedKnown = new Set(BUILTIN_CHARS);
   for (const ch of charDefChars) extendedKnown.add(ch);
 
-  // Layers validation — charDefs are now known, pass to each layer
-  if (hasLayers) {
-    if (!Array.isArray(obj.layers) || obj.layers.length === 0) {
-      throw new Error(`Level ${source}: "layers" must be a non-empty array`);
-    }
-    const globalEntityIds = new Set<string>();
-    const validatedLayers: LayerDef[] = [];
-    for (let li = 0; li < obj.layers.length; li++) {
-      const rawLayer = obj.layers[li];
-      if (typeof rawLayer !== 'object' || rawLayer === null || Array.isArray(rawLayer)) {
-        throw new Error(`Level ${source}: layers[${li}] must be an object`);
-      }
-      validatedLayers.push(validateLayerDef(rawLayer as Record<string, unknown>, li, source, globalEntityIds, extendedKnown, walkableChars));
-    }
-    obj.layers = validatedLayers;
-    // Set top-level grid/entities from layer 0 for backward-compat access
-    obj.grid = validatedLayers[0].grid;
-    obj.entities = validatedLayers[0].entities;
+  // Layers validation — charDefs are now known, validate each layer
+  if (!Array.isArray(obj.layers) || obj.layers.length === 0) {
+    throw new Error(`Level ${source}: "layers" must be a non-empty array`);
   }
+  const globalEntityIds = new Set<string>();
+  const validatedLayers: LayerDef[] = [];
+  for (let li = 0; li < obj.layers.length; li++) {
+    const rawLayer = obj.layers[li];
+    if (typeof rawLayer !== 'object' || rawLayer === null || Array.isArray(rawLayer)) {
+      throw new Error(`Level ${source}: layers[${li}] must be an object`);
+    }
+    validatedLayers.push(validateLayerDef(rawLayer as Record<string, unknown>, li, source, globalEntityIds, extendedKnown, walkableChars));
+  }
+  obj.layers = validatedLayers;
+  // Set top-level grid/entities from layer 0 for convenience access
+  obj.grid = validatedLayers[0].grid;
+  obj.entities = validatedLayers[0].entities;
 
-  // Ensure grid is set (either directly or from layer 0 above)
-  if (!Array.isArray(obj.grid) || obj.grid.length === 0 || !obj.grid.every((r: unknown) => typeof r === 'string')) {
-    throw new Error(`Level ${source}: "grid" must be a non-empty array of strings`);
-  }
   const grid = obj.grid as string[];
   const rowLen = grid[0].length;
-  if (!grid.every((r) => r.length === rowLen)) {
-    throw new Error(`Level ${source}: all grid rows must be the same length`);
-  }
-
-  // Grid char validation (skip for layered levels — already validated per-layer above)
-  if (!hasLayers) {
-    for (const row of grid) {
-      for (const ch of row) {
-        if (!extendedKnown.has(ch)) {
-          throw new Error(`Level ${source}: unknown cell character '${ch}'`);
-        }
-      }
-    }
-  }
 
   // playerStart (optional — single-level mode only; dungeon mode validates at dungeon level)
   if (obj.playerStart !== undefined) {

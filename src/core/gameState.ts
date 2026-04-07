@@ -513,7 +513,6 @@ export class GameState {
     this.hp = this.maxHp;
 
     if (layerDefs && layerDefs.length > 0) {
-      // Multi-layer: create a fresh LayerState per layer and parse entities into each.
       this.layers = layerDefs.map(() => createEmptyLayerState());
       for (let i = 0; i < layerDefs.length; i++) {
         this.activeLayerIndex = i;
@@ -521,6 +520,7 @@ export class GameState {
       }
       this.activeLayerIndex = 0;
     } else {
+      // Convenience for tests: wrap bare entities as single layer
       this._parseEntities(entities, grid);
     }
   }
@@ -1347,67 +1347,35 @@ export class GameState {
     // Note: _rebuildEntityIndex and _initSignalManager are NOT called here — caller handles.
   }
 
-  loadLevelState(snapshot: LevelSnapshot | MultiLayerSnapshot): void {
-    if ('layers' in snapshot && Array.isArray(snapshot.layers)) {
-      // Multi-layer path
-      const multi = snapshot as MultiLayerSnapshot;
-      this.layers = multi.layers.map(() => createEmptyLayerState());
-      for (let li = 0; li < multi.layers.length; li++) {
-        this.activeLayerIndex = li;
-        this._restoreActiveLayer(multi.layers[li]);
-      }
-      this.activeLayerIndex = multi.activeLayerIndex;
-      // Global state stored in the first layer snapshot
-      if (multi.layers[0].registrySnapshot) {
-        this.entityRegistry.restore(multi.layers[0].registrySnapshot);
-      }
-      this._rebuildEntityIndex();
-      this._initSignalManager();
-      // Restore saved signal state (source active flags, timers, gate states)
-      // so that signal evaluation works correctly after returning to a level.
-      if (multi.layers[0].signalState) {
-        this.signalManager.loadState(multi.layers[0].signalState);
-      }
-    } else {
-      // Single-layer backward-compat path
-      const single = snapshot as LevelSnapshot;
-      this.layers = [createEmptyLayerState()];
-      this.activeLayerIndex = 0;
-      this._restoreActiveLayer(single);
-      if (single.registrySnapshot) {
-        this.entityRegistry.restore(single.registrySnapshot);
-      }
-      this._rebuildEntityIndex();
-      this._initSignalManager();
-      // Restore saved signal state (source active flags, timers, gate states)
-      // so that signal evaluation works correctly after returning to a level.
-      if (single.signalState) {
-        this.signalManager.loadState(single.signalState);
-      }
+  loadLevelState(snapshot: MultiLayerSnapshot): void {
+    this.layers = snapshot.layers.map(() => createEmptyLayerState());
+    for (let li = 0; li < snapshot.layers.length; li++) {
+      this.activeLayerIndex = li;
+      this._restoreActiveLayer(snapshot.layers[li]);
+    }
+    this.activeLayerIndex = snapshot.activeLayerIndex;
+    if (snapshot.layers[0].registrySnapshot) {
+      this.entityRegistry.restore(snapshot.layers[0].registrySnapshot);
+    }
+    this._rebuildEntityIndex();
+    this._initSignalManager();
+    if (snapshot.layers[0].signalState) {
+      this.signalManager.loadState(snapshot.layers[0].signalState);
     }
   }
 
-  loadNewLevel(entities: Entity[], grid?: string[], levelId?: string, layerDefs?: LayerDef[]): void {
+  loadNewLevel(layerDefs: LayerDef[], levelId?: string): void {
     const oldLevelId = this.currentLevelId;
     if (levelId) this.currentLevelId = levelId;
-    // Clear only ground items for the old level; equipped/backpack items survive transitions.
     this.entityRegistry.clearLevel(oldLevelId);
     this.entityById = new Map();
 
-    if (layerDefs && layerDefs.length > 0) {
-      // Multi-layer: create a fresh LayerState per layer and parse entities into each.
-      this.layers = layerDefs.map(() => createEmptyLayerState());
-      for (let i = 0; i < layerDefs.length; i++) {
-        this.activeLayerIndex = i;
-        this._parseEntities(layerDefs[i].entities, layerDefs[i].grid);
-      }
-      this.activeLayerIndex = 0;
-    } else {
-      // Single-layer (existing behavior).
-      this.layers = [createEmptyLayerState()];
-      this.activeLayerIndex = 0;
-      this._parseEntities(entities, grid);
+    this.layers = layerDefs.map(() => createEmptyLayerState());
+    for (let i = 0; i < layerDefs.length; i++) {
+      this.activeLayerIndex = i;
+      this._parseEntities(layerDefs[i].entities, layerDefs[i].grid);
     }
+    this.activeLayerIndex = 0;
   }
 
   drainTorchFuel(amount: number): void {

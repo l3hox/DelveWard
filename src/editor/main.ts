@@ -465,12 +465,17 @@ toolbar.setNewDungeonCallback(() => {
 
   const dungeon: Dungeon = {
     name,
-    playerStart: { levelId: 'level_1', col: 1, row: 1, facing: 'S' },
+    playerStart: { levelId: 'level_1', col: 1, row: 1, facing: 'S', layerIndex: 0 },
     levels: [{
       id: 'level_1',
       name: 'Level 1',
       grid,
       entities: [],
+      layers: [{
+        id: '0',
+        grid,
+        entities: [],
+      }],
     }],
   };
 
@@ -568,12 +573,6 @@ layerList.onRemoveLayer = (index) => {
     markDirty();
     refreshAllUI();
   }
-};
-
-layerList.onConvertToLayers = () => {
-  app.convertToLayers();
-  markDirty();
-  refreshAllUI();
 };
 
 // Selection callback — update inspector

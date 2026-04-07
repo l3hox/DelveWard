@@ -90,14 +90,7 @@ export function buildLevelScene(
   startRow: number,
   startFacing: Facing,
 ): LevelScene {
-  // Resolve layer definitions — backward compat: wrap flat level as single-layer list
-  const layerDefs: LayerDef[] = level.layers ?? [{
-    grid: level.grid,
-    entities: level.entities,
-    defaults: level.defaults,
-    areas: level.areas,
-    ceiling: level.ceiling,
-  }];
+  const layerDefs: LayerDef[] = level.layers;
   const activeLayerIdx = gameState.activeLayerIndex;
   const activeLayerDef = layerDefs[activeLayerIdx];
 

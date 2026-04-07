@@ -10,7 +10,6 @@ export class LayerList {
   onAddLayerAbove: (() => void) | null = null;
   onAddLayerBelow: (() => void) | null = null;
   onRemoveLayer: ((index: number) => void) | null = null;
-  onConvertToLayers: (() => void) | null = null;
   onBeforeDiscreteChange: (() => void) | null = null;
 
   constructor(container: HTMLElement, app: EditorApp) {
@@ -26,20 +25,8 @@ export class LayerList {
       return;
     }
 
-    // Always show for layered levels
-    if (!this.app.hasLayers()) {
-      this.container.classList.add('visible');
-      // Show "Convert to Layers" button
-      const convertBtn = document.createElement('button');
-      convertBtn.className = 'btn-add';
-      convertBtn.textContent = 'Convert to Layers';
-      convertBtn.addEventListener('click', () => this.onConvertToLayers?.());
-      this.container.appendChild(convertBtn);
-      return;
-    }
-
     this.container.classList.add('visible');
-    const layers = this.app.level.layers!;
+    const layers = this.app.level.layers;
 
     // "Layers" header
     const header = document.createElement('div');

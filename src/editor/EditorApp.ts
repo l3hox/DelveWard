@@ -143,10 +143,8 @@ export class EditorApp {
     // Open the layer where playerStart is (default layer 0)
     const psLayer = level.playerStart?.layerIndex ?? 0;
     this.activeLayerIndex = this.resolveLayerIndex(psLayer);
-    // If level has layers, sync active layer data into the working surface
-    if (level.layers && level.layers.length > 0) {
-      this.syncFromActiveLayer();
-    }
+    // Sync active layer data into the working surface
+    this.syncFromActiveLayer();
     this.rebuildDerivedState();
     this.undo.init();
 
@@ -216,12 +214,10 @@ export class EditorApp {
     }
     // Pre-seed the layer for the start level so switchToLevel opens the right layer
     const startLevel = dungeon.levels[startLevelIndex];
-    if (startLevel.layers && startLevel.layers.length > 0) {
-      const layerCoord = ps.layerIndex ?? 0;  // default to layer 0 when not specified
-      const id = String(layerCoord);
-      const layerIdx = startLevel.layers.findIndex(l => l.id === id);
-      if (layerIdx >= 0) this.lastLayerPerLevel.set(startLevelIndex, layerIdx);
-    }
+    const layerCoord = ps.layerIndex ?? 0;  // default to layer 0 when not specified
+    const layerStartId = String(layerCoord);
+    const layerStartIdx = startLevel.layers.findIndex(l => l.id === layerStartId);
+    if (layerStartIdx >= 0) this.lastLayerPerLevel.set(startLevelIndex, layerStartIdx);
     this.switchToLevel(startLevelIndex);
   }
 
@@ -244,12 +240,10 @@ export class EditorApp {
     this.level = this.dungeon.levels[index];
     // Restore last active layer for this level (default 0)
     this.activeLayerIndex = this.lastLayerPerLevel.get(index) ?? 0;
-    if (this.level.layers && this.activeLayerIndex >= this.level.layers.length) {
+    if (this.activeLayerIndex >= this.level.layers.length) {
       this.activeLayerIndex = 0;
     }
-    if (this.level.layers && this.level.layers.length > 0) {
-      this.syncFromActiveLayer();
-    }
+    this.syncFromActiveLayer();
 
     this.rebuildDerivedState();
     this.viewport = { offsetX: 0, offsetY: 0, zoom: 1 };
@@ -374,13 +368,9 @@ export class EditorApp {
     }
   }
 
-  hasLayers(): boolean {
-    return this.level?.layers !== undefined && this.level.layers.length > 0;
-  }
-
   /** Resolve a layer coordinate (numeric ID like 0, 1, -1) to an array index. Returns 0 if not found. */
   resolveLayerIndex(coord: number): number {
-    if (!this.level?.layers) return 0;
+    if (!this.level) return 0;
     const id = String(coord);
     const idx = this.level.layers.findIndex(l => l.id === id);
     return idx >= 0 ? idx : 0;
@@ -388,7 +378,7 @@ export class EditorApp {
 
   /** Sync the level's top-level editing fields back to the active layer in layers[]. */
   syncToActiveLayer(): void {
-    if (!this.level?.layers) return;
+    if (!this.level) return;
     const layer = this.level.layers[this.activeLayerIndex];
     if (!layer) return;
     layer.grid = this.level.grid;
@@ -401,7 +391,7 @@ export class EditorApp {
 
   /** Load the active layer's data into the level's top-level editing fields. */
   syncFromActiveLayer(): void {
-    if (!this.level?.layers) return;
+    if (!this.level) return;
     const layer = this.level.layers[this.activeLayerIndex];
     if (!layer) return;
     this.level.grid = layer.grid;
@@ -413,7 +403,7 @@ export class EditorApp {
   }
 
   switchToLayer(index: number): void {
-    if (!this.level?.layers || index < 0 || index >= this.level.layers.length) return;
+    if (!this.level || index < 0 || index >= this.level.layers.length) return;
     // Save current editing surface back to old layer
     this.syncToActiveLayer();
     this.activeLayerIndex = index;
@@ -423,24 +413,9 @@ export class EditorApp {
     this.rebuildDerivedState();
   }
 
-  convertToLayers(): void {
-    if (!this.level || this.hasLayers()) return;
-    // Wrap current level data as layer 0
-    // charDefs stay on level (global), not per-layer
-    this.level.layers = [{
-      id: '0',
-      grid: this.level.grid,
-      entities: this.level.entities,
-      areas: this.level.areas,
-      defaults: this.level.defaults,
-      ceiling: this.level.ceiling,
-    }];
-    this.activeLayerIndex = 0;
-  }
-
   /** Insert a new empty layer above the uppermost or below the lowermost. Returns the new layer's index. */
   insertLayer(position: 'above' | 'below'): number {
-    if (!this.level || !this.level.layers) return -1;
+    if (!this.level) return -1;
     this.syncToActiveLayer();
     const rows = this.level.grid.length;
     const cols = this.level.grid[0].length;
@@ -467,7 +442,7 @@ export class EditorApp {
   }
 
   removeLayerFromLevel(index: number): boolean {
-    if (!this.level?.layers || this.level.layers.length <= 1) return false;
+    if (!this.level || this.level.layers.length <= 1) return false;
     this.syncToActiveLayer();
     this.level.layers.splice(index, 1);
     if (this.activeLayerIndex >= this.level.layers.length) {
@@ -499,12 +474,12 @@ export class EditorApp {
 
   /** Get the active layer's coordinate (numeric ID). */
   getActiveLayerCoord(): number {
-    if (!this.level?.layers) return 0;
+    if (!this.level) return 0;
     return parseInt(this.level.layers[this.activeLayerIndex]?.id ?? '0', 10) || 0;
   }
 
   setPlayerStart(col: number, row: number, facing: import('../core/grid').Facing, levelId?: string): void {
-    const layerCoord = this.hasLayers() ? this.getActiveLayerCoord() : undefined;
+    const layerCoord = this.getActiveLayerCoord();
     if (this.dungeon) {
       this.dungeon.playerStart = { levelId: levelId ?? this.dungeon.playerStart.levelId, col, row, facing, layerIndex: layerCoord };
     } else if (this.level) {
@@ -638,7 +613,7 @@ export class EditorApp {
       const dp = this.dungeon.playerStart;
       if (dp.levelId === level.id) {
         const arrIdx = this.resolveLayerIndex(dp.layerIndex ?? 0);
-        const psGrid = level.layers?.[arrIdx]?.grid ?? level.grid;
+        const psGrid = level.layers[arrIdx].grid;
         if (dp.row < 0 || dp.row >= psGrid.length ||
             dp.col < 0 || dp.col >= (psGrid[dp.row]?.length ?? 0)) {
           errors.push({ message: `Player start (${dp.col},${dp.row}) is out of bounds on layer ${dp.layerIndex ?? 0}` });
@@ -650,7 +625,7 @@ export class EditorApp {
       const ps = level.playerStart;
       if (ps) {
         const arrIdx = this.resolveLayerIndex(ps.layerIndex ?? 0);
-        const psGrid = level.layers?.[arrIdx]?.grid ?? level.grid;
+        const psGrid = level.layers[arrIdx].grid;
         if (ps.row < 0 || ps.row >= psGrid.length ||
             ps.col < 0 || ps.col >= (psGrid[ps.row]?.length ?? 0)) {
           errors.push({ message: `Player start (${ps.col},${ps.row}) is out of bounds on layer ${ps.layerIndex ?? 0}` });
@@ -661,31 +636,17 @@ export class EditorApp {
     }
 
     // Entity on non-walkable cell — check each layer's entities against its own grid
-    if (level.layers) {
-      for (let li = 0; li < level.layers.length; li++) {
-        const layerGrid = level.layers[li].grid;
-        for (const e of level.layers[li].entities) {
-          if (e.row < 0 || e.row >= layerGrid.length ||
-              e.col < 0 || e.col >= (layerGrid[e.row]?.length ?? 0)) {
-            errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds on layer ${level.layers[li].id ?? li}`, entity: e });
-            continue;
-          }
-          const ch = layerGrid[e.row][e.col];
-          if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
-            errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}' on layer ${level.layers[li].id ?? li}`, entity: e });
-          }
-        }
-      }
-    } else {
-      for (const e of level.entities) {
-        if (e.row < 0 || e.row >= level.grid.length ||
-            e.col < 0 || e.col >= (level.grid[e.row]?.length ?? 0)) {
-          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds`, entity: e });
+    for (let li = 0; li < level.layers.length; li++) {
+      const layerGrid = level.layers[li].grid;
+      for (const e of level.layers[li].entities) {
+        if (e.row < 0 || e.row >= layerGrid.length ||
+            e.col < 0 || e.col >= (layerGrid[e.row]?.length ?? 0)) {
+          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is out of bounds on layer ${level.layers[li].id ?? li}`, entity: e });
           continue;
         }
-        const ch = level.grid[e.row][e.col];
+        const ch = layerGrid[e.row][e.col];
         if (!this.walkableSet.has(ch) && e.type !== 'gate' && e.type !== 'breakable_wall' && e.type !== 'secret_wall') {
-          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}'`, entity: e });
+          errors.push({ message: `${e.type} '${e.id ?? '?'}' at (${e.col},${e.row}) is on non-walkable cell '${ch}' on layer ${level.layers[li].id ?? li}`, entity: e });
         }
       }
     }
@@ -731,7 +692,7 @@ export class EditorApp {
         }
 
         // Validate spawn cell using the target stair's layer grid
-        const targetGrid = targetLevel.layers?.[targetLayerIdx]?.grid ?? targetLevel.grid;
+        const targetGrid = targetLevel.layers[targetLayerIdx].grid;
         const FACING_OFFSETS: Record<string, [number, number]> = {
           N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
         };
@@ -767,8 +728,13 @@ export class EditorApp {
     const level: DungeonLevel = {
       name: 'Untitled',
       grid,
-      playerStart: { col: 1, row: 1, facing: 'S' },
+      playerStart: { col: 1, row: 1, facing: 'S', layerIndex: 0 },
       entities: [],
+      layers: [{
+        id: '0',
+        grid,
+        entities: [],
+      }],
     };
     this.loadLevel(level);
     // sourcePath already reset by loadLevel

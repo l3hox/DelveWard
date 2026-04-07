@@ -352,7 +352,7 @@ async function init(): Promise<void> {
       const origGrid = originalGrids.get(currentLevelId);
       if (origGrid) startLevel.grid = [...origGrid];
       levelSnapshots.clear();
-      gameState.loadNewLevel(startLevel.entities, startLevel.grid, startLevel.id ?? startLevel.name, startLevel.layers);
+      gameState.loadNewLevel(startLevel.layers, startLevel.id ?? startLevel.name);
       gameState.activeLayerIndex = resolveLayerCoord(startLevel, dungeon.playerStart.layerIndex ?? 0);
       projectileManager.clear();
       fireballExplosions.clear();
@@ -943,7 +943,7 @@ async function init(): Promise<void> {
       if (snapshot) {
         gameState.loadLevelState(snapshot);
       } else {
-        gameState.loadNewLevel(targetLevel.entities, targetLevel.grid, targetLevelId, targetLevel.layers);
+        gameState.loadNewLevel(targetLevel.layers, targetLevelId);
       }
       gameState.activeLayerIndex = targetLayerIndex;
 
