@@ -144,14 +144,6 @@
               "type": "torch_sconce",
               "id": "torch_sconce_7",
               "wall": "N"
-            },
-            {
-              "col": 12,
-              "row": 2,
-              "type": "pressure_plate",
-              "id": "pressure_plate_1",
-              "targets": [],
-              "signalMode": "toggle"
             }
           ]
         },

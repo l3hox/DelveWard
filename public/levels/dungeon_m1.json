@@ -33,219 +33,224 @@
           "floorTexture": "grass"
         }
       ],
-      "grid": [
-        "FFFFFFFFFFFFFFFFF",
-        "F''''T'T'TT'T'TTF",
-        "F'#''''''''''''TF",
-        "F'''''''''''''TTF",
-        "######.##########",
-        "#....#..........#",
-        "#....#..........#",
-        "#...............#",
-        "#....#..........#",
-        "######..........#",
-        "#...............#",
-        "#...............#",
-        "#...............#",
-        "#####.###########",
-        "#...............#",
-        "#############.###",
-        "#################"
-      ],
-      "entities": [
+      "layers": [
         {
-          "type": "npc",
-          "npcId": "merchant_gregor",
-          "col": 3,
-          "row": 3,
-          "facing": "N"
-        },
-        {
-          "id": "door_1",
-          "col": 6,
-          "row": 4,
-          "type": "door"
-        },
-        {
-          "id": "door_2",
-          "col": 5,
-          "row": 7,
-          "type": "door"
-        },
-        {
-          "id": "door_3",
-          "col": 5,
-          "row": 13,
-          "type": "door"
-        },
-        {
-          "id": "stairs_1",
-          "col": 13,
-          "row": 15,
-          "type": "stairs",
-          "direction": "down",
-          "facing": "N",
-          "target": "stairs_2"
-        },
-        {
-          "col": 2,
-          "row": 3,
-          "type": "torch_sconce",
-          "wall": "S"
-        },
-        {
-          "col": 10,
-          "row": 3,
-          "type": "torch_sconce",
-          "wall": "S"
-        },
-        {
-          "col": 8,
-          "row": 5,
-          "type": "torch_sconce",
-          "wall": "N"
-        },
-        {
-          "col": 8,
-          "row": 14,
-          "type": "torch_sconce",
-          "wall": "N"
-        },
-        {
-          "col": 4,
-          "row": 2,
-          "type": "equipment",
-          "itemId": "sword_rusty"
-        },
-        {
-          "col": 2,
-          "row": 3,
-          "type": "equipment",
-          "itemId": "armor_leather_vest"
-        },
-        {
-          "col": 10,
-          "row": 6,
-          "type": "consumable",
-          "itemId": "health_potion_small"
-        },
-        {
-          "col": 14,
-          "row": 6,
-          "type": "consumable",
-          "itemId": "health_potion_small"
-        },
-        {
-          "col": 8,
-          "row": 11,
-          "type": "consumable",
-          "itemId": "torch_oil"
-        },
-        {
-          "col": 9,
-          "row": 2,
-          "type": "enemy",
-          "enemyType": "rat"
-        },
-        {
-          "col": 13,
-          "row": 2,
-          "type": "enemy",
-          "enemyType": "rat"
-        },
-        {
-          "col": 1,
-          "row": 5,
-          "type": "enemy",
-          "enemyType": "rat"
-        },
-        {
-          "col": 3,
-          "row": 5,
-          "type": "enemy",
-          "enemyType": "rat"
-        },
-        {
-          "col": 7,
-          "row": 6,
-          "type": "enemy",
-          "enemyType": "giant_bat"
-        },
-        {
-          "col": 11,
-          "row": 7,
-          "type": "enemy",
-          "enemyType": "giant_bat"
-        },
-        {
-          "col": 15,
-          "row": 8,
-          "type": "enemy",
-          "enemyType": "giant_bat"
-        },
-        {
-          "col": 3,
-          "row": 14,
-          "type": "enemy",
-          "enemyType": "goblin"
-        },
-        {
-          "col": 11,
-          "row": 14,
-          "type": "enemy",
-          "enemyType": "goblin"
-        },
-        {
-          "col": 6,
-          "row": 14,
-          "type": "enemy",
-          "enemyType": "goblin"
-        },
-        {
-          "col": 13,
-          "row": 14,
-          "type": "enemy",
-          "enemyType": "goblin"
-        },
-        {
-          "col": 6,
-          "row": 2,
-          "type": "npc",
-          "id": "npc_1",
-          "npcId": "questgiver_hilda",
-          "facing": "W"
-        },
-        {
-          "col": 8,
-          "row": 2,
-          "type": "npc",
-          "id": "npc_2",
-          "npcId": "lorekeeper_owen",
-          "facing": "S"
-        },
-        {
-          "col": 8,
-          "row": 6,
-          "type": "equipment",
-          "id": "equipment_1",
-          "itemId": "amulet_gregor"
-        }
-      ],
-      "defaults": {
-        "wallTexture": "stone",
-        "floorTexture": "stone_tile",
-        "ceilingTexture": "dark_rock"
-      },
-      "areas": [
-        {
-          "fromCol": 0,
-          "toCol": 16,
-          "fromRow": 4,
-          "toRow": 16,
-          "wallTexture": "stone",
-          "floorTexture": "stone_tile",
-          "ceilingTexture": "dark_rock",
-          "environment": "dungeon"
+          "id": "0",
+          "grid": [
+            "FFFFFFFFFFFFFFFFF",
+            "F''''T'T'TT'T'TTF",
+            "F'#''''''''''''TF",
+            "F'''''''''''''TTF",
+            "######.##########",
+            "#....#..........#",
+            "#....#..........#",
+            "#...............#",
+            "#....#..........#",
+            "######..........#",
+            "#...............#",
+            "#...............#",
+            "#...............#",
+            "#####.###########",
+            "#...............#",
+            "#############.###",
+            "#################"
+          ],
+          "entities": [
+            {
+              "type": "npc",
+              "npcId": "merchant_gregor",
+              "col": 3,
+              "row": 3,
+              "facing": "N"
+            },
+            {
+              "id": "door_1",
+              "col": 6,
+              "row": 4,
+              "type": "door"
+            },
+            {
+              "id": "door_2",
+              "col": 5,
+              "row": 7,
+              "type": "door"
+            },
+            {
+              "id": "door_3",
+              "col": 5,
+              "row": 13,
+              "type": "door"
+            },
+            {
+              "id": "stairs_1",
+              "col": 13,
+              "row": 15,
+              "type": "stairs",
+              "direction": "down",
+              "facing": "N",
+              "target": "stairs_2"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "torch_sconce",
+              "wall": "S"
+            },
+            {
+              "col": 10,
+              "row": 3,
+              "type": "torch_sconce",
+              "wall": "S"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "torch_sconce",
+              "wall": "N"
+            },
+            {
+              "col": 8,
+              "row": 14,
+              "type": "torch_sconce",
+              "wall": "N"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "equipment",
+              "itemId": "sword_rusty"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "equipment",
+              "itemId": "armor_leather_vest"
+            },
+            {
+              "col": 10,
+              "row": 6,
+              "type": "consumable",
+              "itemId": "health_potion_small"
+            },
+            {
+              "col": 14,
+              "row": 6,
+              "type": "consumable",
+              "itemId": "health_potion_small"
+            },
+            {
+              "col": 8,
+              "row": 11,
+              "type": "consumable",
+              "itemId": "torch_oil"
+            },
+            {
+              "col": 9,
+              "row": 2,
+              "type": "enemy",
+              "enemyType": "rat"
+            },
+            {
+              "col": 13,
+              "row": 2,
+              "type": "enemy",
+              "enemyType": "rat"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "enemy",
+              "enemyType": "rat"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "enemy",
+              "enemyType": "rat"
+            },
+            {
+              "col": 7,
+              "row": 6,
+              "type": "enemy",
+              "enemyType": "giant_bat"
+            },
+            {
+              "col": 11,
+              "row": 7,
+              "type": "enemy",
+              "enemyType": "giant_bat"
+            },
+            {
+              "col": 15,
+              "row": 8,
+              "type": "enemy",
+              "enemyType": "giant_bat"
+            },
+            {
+              "col": 3,
+              "row": 14,
+              "type": "enemy",
+              "enemyType": "goblin"
+            },
+            {
+              "col": 11,
+              "row": 14,
+              "type": "enemy",
+              "enemyType": "goblin"
+            },
+            {
+              "col": 6,
+              "row": 14,
+              "type": "enemy",
+              "enemyType": "goblin"
+            },
+            {
+              "col": 13,
+              "row": 14,
+              "type": "enemy",
+              "enemyType": "goblin"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "npc",
+              "id": "npc_1",
+              "npcId": "questgiver_hilda",
+              "facing": "W"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "npc",
+              "id": "npc_2",
+              "npcId": "lorekeeper_owen",
+              "facing": "S"
+            },
+            {
+              "col": 8,
+              "row": 6,
+              "type": "equipment",
+              "id": "equipment_1",
+              "itemId": "amulet_gregor"
+            }
+          ],
+          "defaults": {
+            "wallTexture": "stone",
+            "floorTexture": "stone_tile",
+            "ceilingTexture": "dark_rock"
+          },
+          "areas": [
+            {
+              "fromCol": 0,
+              "toCol": 16,
+              "fromRow": 4,
+              "toRow": 16,
+              "wallTexture": "stone",
+              "floorTexture": "stone_tile",
+              "ceilingTexture": "dark_rock",
+              "environment": "dungeon"
+            }
+          ]
         }
       ]
     },
