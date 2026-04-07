@@ -288,101 +288,106 @@
     {
       "id": "level_2",
       "name": "Level 2",
-      "grid": [
-        "################",
-        "#...#....#.....#",
-        "#...#....#.....#",
-        "#........#.....#",
-        "#...#....#.....#",
-        "#...#....#.....#",
-        "#...######.....#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "#..............#",
-        "################"
-      ],
-      "entities": [
+      "layers": [
         {
-          "col": 6,
-          "row": 1,
-          "type": "stairs",
-          "id": "stairs_2",
-          "direction": "up",
-          "facing": "S",
-          "target": "stairs_1"
-        },
-        {
-          "col": 5,
-          "row": 5,
-          "type": "lever",
-          "id": "lever_5",
-          "targets": [
-            "door_7"
+          "id": "0",
+          "grid": [
+            "################",
+            "#...#....#.....#",
+            "#...#....#.....#",
+            "#........#.....#",
+            "#...#....#.....#",
+            "#...#....#.....#",
+            "#...######.....#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "################"
           ],
-          "wall": "S"
-        },
-        {
-          "col": 6,
-          "row": 5,
-          "type": "lever",
-          "id": "lever_6",
-          "targets": [
-            "door_7"
-          ],
-          "wall": "S"
-        },
-        {
-          "col": 7,
-          "row": 5,
-          "type": "lever",
-          "id": "lever_7",
-          "targets": [
-            "door_7"
-          ],
-          "wall": "S"
-        },
-        {
-          "col": 8,
-          "row": 5,
-          "type": "lever",
-          "id": "lever_8",
-          "targets": [
-            "door_7"
-          ],
-          "wall": "S"
-        },
-        {
-          "col": 5,
-          "row": 2,
-          "type": "torch_sconce",
-          "id": "torch_sconce_18",
-          "wall": "W"
-        },
-        {
-          "col": 5,
-          "row": 4,
-          "type": "torch_sconce",
-          "id": "torch_sconce_19",
-          "wall": "W"
-        },
-        {
-          "col": 8,
-          "row": 3,
-          "type": "torch_sconce",
-          "id": "torch_sconce_20",
-          "wall": "E"
-        },
-        {
-          "col": 4,
-          "row": 3,
-          "type": "door",
-          "id": "door_7",
-          "state": "closed"
+          "entities": [
+            {
+              "col": 6,
+              "row": 1,
+              "type": "stairs",
+              "id": "stairs_2",
+              "direction": "up",
+              "facing": "S",
+              "target": "stairs_1"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "lever",
+              "id": "lever_5",
+              "targets": [
+                "door_7"
+              ],
+              "wall": "S"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "lever",
+              "id": "lever_6",
+              "targets": [
+                "door_7"
+              ],
+              "wall": "S"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "lever",
+              "id": "lever_7",
+              "targets": [
+                "door_7"
+              ],
+              "wall": "S"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "lever",
+              "id": "lever_8",
+              "targets": [
+                "door_7"
+              ],
+              "wall": "S"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "torch_sconce",
+              "id": "torch_sconce_18",
+              "wall": "W"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "torch_sconce",
+              "id": "torch_sconce_19",
+              "wall": "W"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "torch_sconce",
+              "id": "torch_sconce_20",
+              "wall": "E"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "door",
+              "id": "door_7",
+              "state": "closed"
+            }
+          ]
         }
       ]
     }

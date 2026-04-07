@@ -88,66 +88,71 @@
     {
       "id": "lower_vault",
       "name": "Lower Vault",
-      "grid": [
-        "####.####",
-        "#.......#",
-        "#.#.#.#.#",
-        "#.......#",
-        "#.......#",
-        "#.#...#.#",
-        "#.......#",
-        "#.......#",
-        "#########"
-      ],
-      "entities": [
+      "layers": [
         {
-          "col": 3,
-          "row": 4,
-          "type": "enemy",
-          "enemyType": "skeleton"
-        },
-        {
-          "col": 5,
-          "row": 7,
-          "type": "enemy",
-          "enemyType": "orc"
-        },
-        {
-          "col": 7,
-          "row": 4,
-          "type": "torch_sconce",
-          "wall": "E"
-        },
-        {
-          "col": 7,
-          "row": 7,
-          "type": "equipment",
-          "itemId": "iron_shield"
-        },
-        {
-          "col": 1,
-          "row": 3,
-          "type": "equipment",
-          "itemId": "power_ring"
-        },
-        {
-          "col": 1,
-          "row": 7,
-          "type": "consumable",
-          "itemId": "torch_oil"
-        },
-        {
-          "col": 3,
-          "row": 7,
-          "type": "consumable",
-          "itemId": "health_potion_2"
+          "id": "0",
+          "grid": [
+            "####.####",
+            "#.......#",
+            "#.#.#.#.#",
+            "#.......#",
+            "#.......#",
+            "#.#...#.#",
+            "#.......#",
+            "#.......#",
+            "#########"
+          ],
+          "entities": [
+            {
+              "col": 3,
+              "row": 4,
+              "type": "enemy",
+              "enemyType": "skeleton"
+            },
+            {
+              "col": 5,
+              "row": 7,
+              "type": "enemy",
+              "enemyType": "orc"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "torch_sconce",
+              "wall": "E"
+            },
+            {
+              "col": 7,
+              "row": 7,
+              "type": "equipment",
+              "itemId": "iron_shield"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "equipment",
+              "itemId": "power_ring"
+            },
+            {
+              "col": 1,
+              "row": 7,
+              "type": "consumable",
+              "itemId": "torch_oil"
+            },
+            {
+              "col": 3,
+              "row": 7,
+              "type": "consumable",
+              "itemId": "health_potion_2"
+            }
+          ],
+          "defaults": {
+            "wallTexture": "brick",
+            "floorTexture": "dirt",
+            "ceilingTexture": "wooden_beams"
+          }
         }
-      ],
-      "defaults": {
-        "wallTexture": "brick",
-        "floorTexture": "dirt",
-        "ceilingTexture": "wooden_beams"
-      }
+      ]
     }
   ]
 }
