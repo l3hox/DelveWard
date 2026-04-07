@@ -553,7 +553,7 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
       throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is out of grid bounds`);
     }
     if (!walkableChars.has(grid[startRow][startCol])) {
-      throw new Error(`Level ${source}: playerStart (${startCol},${startRow}) is not a walkable tile`);
+      console.warn(`Level ${source}: playerStart (${startCol},${startRow}) is not a walkable tile`);
     }
   }
 
@@ -771,7 +771,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
       }
     }
     if (!startWalkable.has(startGrid[startRow][startCol])) {
-      throw new Error(`Dungeon ${source}: playerStart (${startCol},${startRow}) is on a non-walkable tile on level "${dps.levelId}" layer ${startLayerCoord}`);
+      console.warn(`Dungeon ${source}: playerStart (${startCol},${startRow}) is on a non-walkable tile on level "${dps.levelId}" layer ${startLayerCoord}`);
     }
 
     dungeonPlayerStart = {

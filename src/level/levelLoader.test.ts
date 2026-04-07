@@ -84,10 +84,13 @@ describe('validateLevel', () => {
     }), 'test')).toThrow('is out of grid bounds');
   });
 
-  it('rejects playerStart on a wall cell', () => {
+  it('warns (not throws) for playerStart on a wall cell', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateLevel(validLevel({
       playerStart: { col: 0, row: 0, facing: 'N' },
-    }), 'test')).toThrow('is not a walkable tile');
+    }), 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('not a walkable tile'));
+    spy.mockRestore();
   });
 
   it('rejects missing entities in layer', () => {
@@ -332,12 +335,15 @@ describe('validateLevel', () => {
     expect(level.playerStart?.col).toBe(1);
   });
 
-  it('rejects playerStart on solid charDef cell', () => {
+  it('warns (not throws) for playerStart on solid charDef cell', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => validateLevel(validLevel({
       charDefs: [{ char: '@', solid: true, wallTexture: 'wood' }],
       grid: ['###', '#@#', '###'],
       playerStart: { col: 1, row: 1, facing: 'N' },
-    }), 'test')).toThrow('is not a walkable tile');
+    }), 'test')).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('not a walkable tile'));
+    spy.mockRestore();
   });
 
   // --- entity validation ---
