@@ -96,7 +96,7 @@ function resolveWallMat(
 }
 
 export interface RampCellInfo {
-  wallDir: import('../core/grid').Facing;  // wall direction to suppress entirely
+  wallDirs: import('../core/grid').Facing[];  // wall directions to suppress entirely
   skipCeiling: boolean;
   skipFloor: boolean;
   /** For perpendicular walls: keep only the half in this direction, remove the other half. */
@@ -344,9 +344,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         return isSolid(grid, c, r, renderable);
       };
 
-      // Ramp facing at this cell — skip the wall in the ramp direction,
+      // Ramp facing at this cell — skip walls in the ramp direction(s),
       // and for perpendicular walls keep only the half away from the ramp entrance.
-      const rampDir = rampInfo?.wallDir;
+      const rampDirs = rampInfo?.wallDirs;
       const rampKeep = rampInfo?.keepHalf;
 
       // Helper: add a half-wall (only one half of a wall along its length)
@@ -380,7 +380,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
 
       // North wall (faces south, runs along X axis)
       const skipN = wallEntityCells?.has(doorKey(col, row - 1)) ?? false;
-      if (!isStair && !skipN && rampDir !== 'N' && solidCheck(col, row - 1)) {
+      if (!isStair && !skipN && !rampDirs?.includes('N') && solidCheck(col, row - 1)) {
         const wallMat = resolveWallMat(grid, col, row - 1, cellWallMat, charDefMap);
         if (halfN) {
           addHalfWall(wallMat, 0, cx, cz - CELL_SIZE / 2, halfN, 'along-x');
@@ -393,7 +393,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
 
       // South wall (faces north, runs along X axis)
       const skipS = wallEntityCells?.has(doorKey(col, row + 1)) ?? false;
-      if (!isStair && !skipS && rampDir !== 'S' && solidCheck(col, row + 1)) {
+      if (!isStair && !skipS && !rampDirs?.includes('S') && solidCheck(col, row + 1)) {
         const wallMat = resolveWallMat(grid, col, row + 1, cellWallMat, charDefMap);
         if (halfS) {
           addHalfWall(wallMat, Math.PI, cx, cz + CELL_SIZE / 2, halfS, 'along-x');
@@ -406,7 +406,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
 
       // East wall (faces west, runs along Z axis)
       const skipE = wallEntityCells?.has(doorKey(col + 1, row)) ?? false;
-      if (!isStair && !skipE && rampDir !== 'E' && solidCheck(col + 1, row)) {
+      if (!isStair && !skipE && !rampDirs?.includes('E') && solidCheck(col + 1, row)) {
         const wallMat = resolveWallMat(grid, col + 1, row, cellWallMat, charDefMap);
         if (halfE) {
           addHalfWall(wallMat, -Math.PI / 2, cx + CELL_SIZE / 2, cz, halfE, 'along-z');
@@ -419,7 +419,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
 
       // West wall (faces east, runs along Z axis)
       const skipW = wallEntityCells?.has(doorKey(col - 1, row)) ?? false;
-      if (!isStair && !skipW && rampDir !== 'W' && solidCheck(col - 1, row)) {
+      if (!isStair && !skipW && !rampDirs?.includes('W') && solidCheck(col - 1, row)) {
         const wallMat = resolveWallMat(grid, col - 1, row, cellWallMat, charDefMap);
         if (halfW) {
           addHalfWall(wallMat, Math.PI / 2, cx - CELL_SIZE / 2, cz, halfW, 'along-z');

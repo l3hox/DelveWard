@@ -237,13 +237,31 @@ export function buildLevelScene(
       ? (multiZone ? zoneMap : undefined)
       : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
 
-    // Ramp cells that need ceiling/wall/floor suppression on this layer
+    // Ramp cells that need ceiling/wall/floor suppression on this layer.
+    // A cell may be affected by multiple ramps (stacked ramps), so we merge entries.
     const ldRampOpenCells = new Map<string, RampCellInfo>();
-    // Bottom cells on this layer: skip ceiling + wall in facing direction
     const OPPOSITE: Record<string, Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+    function mergeRampCell(key: string, info: RampCellInfo): void {
+      const existing = ldRampOpenCells.get(key);
+      if (!existing) {
+        ldRampOpenCells.set(key, info);
+        return;
+      }
+      // Merge: combine wallDirs, OR boolean flags, keep first non-undefined optional fields
+      for (const d of info.wallDirs) {
+        if (!existing.wallDirs.includes(d)) existing.wallDirs.push(d);
+      }
+      existing.skipCeiling = existing.skipCeiling || info.skipCeiling;
+      existing.skipFloor = existing.skipFloor || info.skipFloor;
+      if (info.keepHalf !== undefined && existing.keepHalf === undefined) existing.keepHalf = info.keepHalf;
+      if (info.floorKeepHalf !== undefined && existing.floorKeepHalf === undefined) existing.floorKeepHalf = info.floorKeepHalf;
+    }
+
+    // Bottom cells on this layer: skip ceiling + wall in facing direction
     for (const ramp of gameState.ramps.values()) {
-      ldRampOpenCells.set(doorKey(ramp.col, ramp.row), {
-        wallDir: ramp.facing,
+      mergeRampCell(doorKey(ramp.col, ramp.row), {
+        wallDirs: [ramp.facing],
         skipCeiling: true,
         skipFloor: false,
       });
@@ -251,8 +269,8 @@ export function buildLevelScene(
       const [dx, dz] = FACING_DELTA[ramp.facing];
       const topCol = ramp.col + dx;
       const topRow = ramp.row + dz;
-      ldRampOpenCells.set(doorKey(topCol, topRow), {
-        wallDir: OPPOSITE[ramp.facing],
+      mergeRampCell(doorKey(topCol, topRow), {
+        wallDirs: [OPPOSITE[ramp.facing]],
         skipCeiling: false,
         skipFloor: false,
         keepHalf: ramp.facing,
@@ -268,11 +286,11 @@ export function buildLevelScene(
         const [dx, dz] = FACING_DELTA[ramp.facing];
         const topCol = ramp.col + dx;
         const topRow = ramp.row + dz;
-        ldRampOpenCells.set(doorKey(topCol, topRow), {
-          wallDir: OPPOSITE[ramp.facing],
+        mergeRampCell(doorKey(topCol, topRow), {
+          wallDirs: [OPPOSITE[ramp.facing]],
           skipCeiling: false,
           skipFloor: false,
-          floorKeepHalf: ramp.facing,  // keep floor on the far half, open where ramp comes through
+          floorKeepHalf: ramp.facing,
         });
       }
       gameState.activeLayerIndex = savedIdx;
