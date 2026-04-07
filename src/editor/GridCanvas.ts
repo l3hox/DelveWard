@@ -1598,6 +1598,7 @@ export class GridCanvas {
       if (eType === 'enemy') ghostEntity.enemyType = this.app.selectedEnemyType;
       if (eType === 'equipment') ghostEntity.itemId = this.app.selectedEquipmentId;
       if (eType === 'consumable') ghostEntity.itemId = this.app.selectedConsumableId;
+      if (eType === 'ramp') { ghostEntity.facing = this.app.selectedRampFacing; ghostEntity.style = this.app.selectedRampStyle; }
       // Try sprite first (always, regardless of showItemPreview toggle)
       if (!this.drawEntitySprite(ghostEntity as Entity, px, py, tw, th)) {
         this.drawEntityIcon(ghostEntity as Entity, px, py, tw, th);

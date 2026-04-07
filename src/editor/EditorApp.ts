@@ -127,6 +127,8 @@ export class EditorApp {
   showLayerBelow = true;
   floodFill = false;
   selectedEnemyType = 'rat';
+  selectedRampFacing: import('../core/grid').Facing = 'N';
+  selectedRampStyle: 'ramp' | 'stairs' = 'ramp';
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
   selectedThinWallTexture = 'stone_thin';
@@ -879,6 +881,9 @@ export class EditorApp {
       entity.itemId = this.selectedEquipmentId;
     } else if (type === 'consumable' && this.selectedConsumableId) {
       entity.itemId = this.selectedConsumableId;
+    } else if (type === 'ramp') {
+      entity.facing = this.selectedRampFacing;
+      entity.style = this.selectedRampStyle;
     }
     // Auto-detect wall orientation for wall-mounted entities
     if ((type === 'lever' || type === 'torch_sconce') && this.level) {

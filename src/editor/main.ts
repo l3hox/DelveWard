@@ -609,6 +609,10 @@ inspector.setEntityChangedCallback(() => {
     if (e.type === 'enemy' && typeof e.enemyType === 'string') app.selectedEnemyType = e.enemyType;
     if (e.type === 'equipment' && typeof e.itemId === 'string') app.selectedEquipmentId = e.itemId;
     if (e.type === 'consumable' && typeof e.itemId === 'string') app.selectedConsumableId = e.itemId;
+    if (e.type === 'ramp') {
+      if (typeof e.facing === 'string') app.selectedRampFacing = e.facing as import('../core/grid').Facing;
+      if (typeof e.style === 'string') app.selectedRampStyle = e.style as 'ramp' | 'stairs';
+    }
   }
   updateStairHighlight();
   levelList.refresh();
