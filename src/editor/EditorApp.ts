@@ -204,6 +204,7 @@ export class EditorApp {
     // Populate clean snapshots
     this.levelCleanSnapshots = dungeon.levels.map(level => JSON.stringify(level));
     this.dirtyLevelIndices = new Set();
+    this.lastLayerPerLevel = new Map();
     this.undo.init();
     // Open the level and layer where playerStart is
     const ps = dungeon.playerStart;
@@ -414,29 +415,44 @@ export class EditorApp {
   }
 
   /** Insert a new empty layer above the uppermost or below the lowermost. Returns the new layer's index. */
-  insertLayer(position: 'above' | 'below'): number {
+  insertLayer(position: 'above' | 'below', copyLayout = false): number {
     if (!this.level) return -1;
     this.syncToActiveLayer();
-    const rows = this.level.grid.length;
-    const cols = this.level.grid[0].length;
-    const grid: string[] = [];
-    for (let r = 0; r < rows; r++) {
-      if (r === 0 || r === rows - 1) {
-        grid.push('#'.repeat(cols));
-      } else {
-        grid.push('#' + '.'.repeat(cols - 2) + '#');
+    const activeLayer = this.level.layers[this.activeLayerIndex];
+    const rows = activeLayer.grid.length;
+    const cols = activeLayer.grid[0].length;
+
+    let grid: string[];
+    let entities: Entity[] = [];
+
+    if (copyLayout) {
+      // Copy the grid (walls + floors) from the active layer
+      grid = activeLayer.grid.map(r => r);
+      // Copy only thin_wall entities (layout elements, not gameplay entities)
+      entities = activeLayer.entities
+        .filter(e => e.type === 'thin_wall')
+        .map(e => ({ ...e, id: undefined }));
+    } else {
+      grid = [];
+      for (let r = 0; r < rows; r++) {
+        if (r === 0 || r === rows - 1) {
+          grid.push('#'.repeat(cols));
+        } else {
+          grid.push('#' + '.'.repeat(cols - 2) + '#');
+        }
       }
     }
+
     if (position === 'above') {
       const topId = parseInt(this.level.layers[this.level.layers.length - 1].id ?? '0', 10) || 0;
-      const newLayer: LayerDef = { id: String(topId + 1), grid, entities: [] };
+      const newLayer: LayerDef = { id: String(topId + 1), grid, entities };
       this.level.layers.push(newLayer);
       return this.level.layers.length - 1;
     } else {
       const bottomId = parseInt(this.level.layers[0].id ?? '0', 10) || 0;
-      const newLayer: LayerDef = { id: String(bottomId - 1), grid, entities: [] };
+      const newLayer: LayerDef = { id: String(bottomId - 1), grid, entities };
       this.level.layers.splice(0, 0, newLayer);
-      this.activeLayerIndex++; // array indices shift, but layer IDs and references don't
+      this.activeLayerIndex++;
       return 0;
     }
   }
@@ -745,6 +761,11 @@ export class EditorApp {
     if (this.dungeon) {
       this.dungeon.levels[this.activeLevelIndex] = level;
     }
+    // Clamp activeLayerIndex in case layer count changed (undo add/remove layer)
+    if (this.activeLayerIndex >= level.layers.length) {
+      this.activeLayerIndex = level.layers.length - 1;
+    }
+    this.syncFromActiveLayer();
     this.rebuildDerivedState();
     // Preserve selection by matching id in restored level
     if (this.selectedEntity) {

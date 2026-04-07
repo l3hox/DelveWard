@@ -186,6 +186,7 @@ app.onLevelRestored = () => {
   updateStairHighlight();
   levelProps.refresh();
   levelList.refresh();
+  layerList.refresh();
   toolbar.updatePalette(app.level!.charDefs, app.level!.defaults);
   if (app.isDungeonMode()) {
     app.dirty = app.isDungeonDirty();
@@ -551,7 +552,8 @@ layerList.onLayerSwitch = (index) => {
 };
 
 layerList.onAddLayerAbove = () => {
-  const newIndex = app.insertLayer('above');
+  app.undo.snapshot(app.level!, app.activeLevelIndex);
+  const newIndex = app.insertLayer('above', layerList.copyLayout);
   if (newIndex >= 0) {
     app.switchToLayer(newIndex);
     markDirty();
@@ -560,7 +562,8 @@ layerList.onAddLayerAbove = () => {
 };
 
 layerList.onAddLayerBelow = () => {
-  const newIndex = app.insertLayer('below');
+  app.undo.snapshot(app.level!, app.activeLevelIndex);
+  const newIndex = app.insertLayer('below', layerList.copyLayout);
   if (newIndex >= 0) {
     app.switchToLayer(newIndex);
     markDirty();
@@ -569,6 +572,7 @@ layerList.onAddLayerBelow = () => {
 };
 
 layerList.onRemoveLayer = (index) => {
+  app.undo.snapshot(app.level!, app.activeLevelIndex);
   if (app.removeLayerFromLevel(index)) {
     markDirty();
     refreshAllUI();

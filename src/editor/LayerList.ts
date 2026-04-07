@@ -11,6 +11,7 @@ export class LayerList {
   onAddLayerBelow: (() => void) | null = null;
   onRemoveLayer: ((index: number) => void) | null = null;
   onBeforeDiscreteChange: (() => void) | null = null;
+  copyLayout = false;  // when true, new layers copy current layer's walls + thin walls
 
   constructor(container: HTMLElement, app: EditorApp) {
     this.container = container;
@@ -96,5 +97,21 @@ export class LayerList {
     addBelowBtn.style.marginTop = '2px';
     addBelowBtn.addEventListener('click', () => this.onAddLayerBelow?.());
     this.container.appendChild(addBelowBtn);
+
+    // "Copy layout" checkbox
+    const copyLabel = document.createElement('label');
+    copyLabel.style.display = 'flex';
+    copyLabel.style.alignItems = 'center';
+    copyLabel.style.gap = '4px';
+    copyLabel.style.marginTop = '4px';
+    copyLabel.style.fontSize = '11px';
+    copyLabel.style.cursor = 'pointer';
+    const copyCheck = document.createElement('input');
+    copyCheck.type = 'checkbox';
+    copyCheck.checked = this.copyLayout;
+    copyCheck.addEventListener('change', () => { this.copyLayout = copyCheck.checked; });
+    copyLabel.appendChild(copyCheck);
+    copyLabel.appendChild(document.createTextNode('Copy layout'));
+    this.container.appendChild(copyLabel);
   }
 }
