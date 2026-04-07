@@ -168,7 +168,7 @@ const COLORS: Record<string, number> = {
 };
 
 // Shared geometries and materials — created once, reused across all projectile meshes.
-let sharedGeos: Map<string, THREE.PlaneGeometry> | null = null;
+let sharedGeos: Map<string, THREE.BufferGeometry> | null = null;
 let sharedMats: Map<string, THREE.MeshBasicMaterial | THREE.MeshStandardMaterial> | null = null;
 
 function ensureSharedAssets(): void {
@@ -177,7 +177,11 @@ function ensureSharedAssets(): void {
   sharedMats = new Map();
 
   for (const [type, size] of Object.entries(QUAD_SIZE)) {
-    sharedGeos.set(type, new THREE.PlaneGeometry(size, size));
+    if (type === 'fireball') {
+      sharedGeos.set(type, new THREE.CircleGeometry(size / 2, 16));
+    } else {
+      sharedGeos.set(type, new THREE.PlaneGeometry(size, size));
+    }
   }
 
   sharedMats.set('dart', new THREE.MeshBasicMaterial({
@@ -215,7 +219,9 @@ export function createProjectileMesh(type: string): THREE.Mesh {
   ensureSharedAssets();
 
   const geo = sharedGeos!.get(type)
-    ?? new THREE.PlaneGeometry(quadSizeFor(type), quadSizeFor(type));
+    ?? (type === 'fireball'
+      ? new THREE.CircleGeometry(quadSizeFor(type) / 2, 16)
+      : new THREE.PlaneGeometry(quadSizeFor(type), quadSizeFor(type)));
 
   const mat = sharedMats!.get(type)
     ?? new THREE.MeshBasicMaterial({ color: colorFor(type), side: THREE.DoubleSide });

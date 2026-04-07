@@ -868,6 +868,7 @@ async function init(): Promise<void> {
         projectileType: launcher.projectileType,
         source: 'trap',
         maxRange: launcher.maxRange,
+        layerIndex: gameState.activeLayerIndex,
       });
     };
 
@@ -1459,15 +1460,30 @@ async function init(): Promise<void> {
         }
         gameState.activeLayerIndex = saved;
       }
-      projectileManager.update(
-        delta,
-        (col, row) => ls.walkable.has(activeGrid()[row]?.[col]),
-        gameState.isDoorOpen.bind(gameState),
-        lastPlayerCol, lastPlayerRow,
-        gameState.isEnemyAt.bind(gameState),
-        gameState.isBlockAt.bind(gameState),
-        gameState.isSolidEdgeBlocked.bind(gameState),
-      );
+      // Update projectiles per-layer so collision checks use the correct grid and entities
+      {
+        const savedLayer = gameState.activeLayerIndex;
+        const playerLayer = savedLayer;
+        const layers = new Set(projectileManager.getAll().map(p => p.layerIndex));
+        for (const li of layers) {
+          gameState.activeLayerIndex = li;
+          const layerGrid = ls.layerGrids[li] ?? activeGrid();
+          // Only check player collision on the player's own layer
+          const pCol = li === playerLayer ? lastPlayerCol : -1;
+          const pRow = li === playerLayer ? lastPlayerRow : -1;
+          projectileManager.update(
+            delta,
+            (col, row) => ls.walkable.has(layerGrid[row]?.[col]),
+            gameState.isDoorOpen.bind(gameState),
+            pCol, pRow,
+            gameState.isEnemyAt.bind(gameState),
+            gameState.isBlockAt.bind(gameState),
+            gameState.isSolidEdgeBlocked.bind(gameState),
+            li,
+          );
+        }
+        gameState.activeLayerIndex = savedLayer;
+      }
       tickBlockedDoors(delta);
 
       // Sync projectile meshes with active projectiles

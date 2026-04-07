@@ -18,6 +18,7 @@ export interface Projectile {
   projectileType: string; // 'dart' | 'arrow' | 'fireball'
   traveled: number;     // cells traveled so far
   maxRange: number;
+  layerIndex: number;   // which layer this projectile lives on
 }
 
 // Projectile type -> stats lookup
@@ -55,6 +56,7 @@ export class ProjectileManager {
     projectileType: string;
     source?: 'trap';
     maxRange?: number;
+    layerIndex?: number;
   }): Projectile {
     const stats = PROJECTILE_STATS[opts.projectileType];
     if (!stats) {
@@ -82,6 +84,7 @@ export class ProjectileManager {
       projectileType: opts.projectileType,
       traveled: 0,
       maxRange: opts.maxRange ?? stats.maxRange,
+      layerIndex: opts.layerIndex ?? 0,
     };
 
     this.projectiles.set(id, projectile);
@@ -97,10 +100,12 @@ export class ProjectileManager {
     isEnemyAt?: (col: number, row: number) => boolean,
     isBlockAt?: (col: number, row: number) => boolean,
     isSolidEdgeBlocked?: (fromCol: number, fromRow: number, toCol: number, toRow: number) => boolean,
+    layerFilter?: number,
   ): void {
     const toRemove: string[] = [];
 
     for (const projectile of this.projectiles.values()) {
+      if (layerFilter !== undefined && projectile.layerIndex !== layerFilter) continue;
       const [dcol, drow] = FACING_DELTA[projectile.direction];
       const moveDist = projectile.speed * delta;
 
