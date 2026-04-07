@@ -259,6 +259,8 @@ export function buildLevelScene(
       });
     }
     // Top cells from ramps on the layer below: skip floor + wall opposite to facing
+    // On the upper layer the top cell is walkable — don't halve its perpendicular walls
+    // (keepHalf is only for the lower layer where the top cell is #).
     if (li > 0) {
       const savedIdx = gameState.activeLayerIndex;
       gameState.activeLayerIndex = li - 1;
@@ -270,7 +272,6 @@ export function buildLevelScene(
           wallDir: OPPOSITE[ramp.facing],
           skipCeiling: false,
           skipFloor: false,
-          keepHalf: ramp.facing,
           floorKeepHalf: ramp.facing,  // keep floor on the far half, open where ramp comes through
         });
       }
