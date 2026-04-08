@@ -18,7 +18,7 @@ M4 adds vertical space to the game. The dungeon needs multiple Y-stacked floors 
 - **Layers**: Y-stacked slices of the same world. All rendered simultaneously. Unlimited visibility. Connected by ramps/stairs (future). Each layer has its own grid, entities, and areas.
 - **Levels**: Separate worlds. Teleport transitions (existing stair system). No cross-visibility.
 
-A `DungeonLevel` gains an optional `layers: LayerDef[]` field. Each `LayerDef` has grid, entities, areas, ceiling toggle. Backward compatible — levels without `layers` are single-layer.
+A `DungeonLevel` gains a required `layers: LayerDef[]` field. Each `LayerDef` has grid, entities, areas, ceiling toggle.
 
 ### Alternatives Rejected
 
@@ -31,6 +31,7 @@ A `DungeonLevel` gains an optional `layers: LayerDef[]` field. Each `LayerDef` h
 - All layers of a level are always in the Three.js scene — simple, no culling logic
 - Entity simulation runs on all layers (no dormancy for M4)
 - Geometry is lightweight enough for 20+ layers
+- `layers` is required — backward-compat code (`hasLayers()`, `convertToLayers()`, single-layer fallback wrapping) has been fully removed. All level JSON files must use the layered format.
 - Future: ramps between layers, possible level collapse into one big layer stack
 
 ---
@@ -174,8 +175,9 @@ With multiple layers simulated simultaneously, the question is which game system
 
 **Layer-locked for M4** (but all layers tick — see ADR-M4-08):
 - **Enemy AI**: Enemies pathfind within their own layer, attacks only connect on the player's layer. AI ticks on ALL layers (enemies move, regen, take status damage even when player is on another layer).
-- **Projectiles**: Travel within originating layer only. No cross-layer flight through hollows.
-- **Player movement**: Restricted to current layer grid. Layer transitions via pit traps or stairs (future: ramps).
+- **Projectiles**: Travel within originating layer only. No cross-layer flight through hollows. Each `ProjectileInstance` stores `layerIndex` at spawn; the update loop groups projectiles by layer, switches `activeLayerIndex` per group, and restricts player hit detection to the player's own layer.
+- **Player movement**: Restricted to current layer grid. Layer transitions via ramps (stair-style or smooth) or falling through open floors (ADR-M4-13).
+- **Falling**: Stepping onto an `openBottom` cell triggers a gravity-based fall to the layer below. See ADR-M4-13 for full implementation details.
 - **Combat**: Player attacks and enemy attacks only affect entities on the same layer.
 
 **Cross-layer for M4:**
@@ -470,3 +472,84 @@ The inventory/backpack system needs a model for how items are positioned in the 
 - Keyboard quick-use (1-8) is reliable and memorable
 - Drag-and-drop rearranging feels natural (items stay where placed)
 - Slightly more complex than auto-pack (need explicit slot tracking)
+
+---
+
+## ADR-M4-13 — Falling Through Open Floors
+
+**Status:** Accepted
+**Date:** 2026-04-05
+
+### Context
+
+Cells with `openBottom` previously blocked player movement — stepping onto a hole was treated the same as stepping into a wall. This eliminated an obvious gameplay mechanic (pit traps, intentional drops between layers) and felt unnatural in a multi-layer world.
+
+### Decision
+
+**Allow stepping onto `openBottom` cells; trigger a gravity-based fall at 2/3 of walk progress.**
+
+The 2/3 trigger point means the player has visually committed to the step before the fall begins — it reads as intentional rather than a teleport. From there:
+
+- Gravity accelerates the camera Y downward over a distance of 2 × `LAYER_HEIGHT` (two full cell heights).
+- After that distance, velocity clamps to terminal velocity (20 u/s).
+- The camera tilts downward during the fall via a `yRotation` lerp for visual feedback.
+- Player input is blocked for the fall duration.
+- On landing, `activeLayerIndex` and the grid position are switched to the destination layer, and the camera resets to upright.
+
+**Implementation:** `pendingFall: boolean` flag on `Player`, set during the walk tween in `main.ts`. Physics replaces the normal `yOffset` lerp in `Player.update()` while falling. The hole-blocking guard in `levelSceneBuilder` was removed — `openBottom` cells are now passable. A landing callback in `main.ts` handles the layer/grid switch and re-enables input.
+
+Debug noclip mode skips fall detection so designers can freely traverse floors.
+
+### Alternatives Rejected
+
+**Immediate teleport to lower layer on step:** Rejected. No visual feedback, disorienting. The gravity arc communicates what happened spatially.
+
+**Block movement onto open-floor cells (status quo):** Rejected. Prevents pit traps and deliberate multi-layer drop shortcuts, both of which are core M4 design affordances.
+
+### Consequences
+
+- Pit traps are now possible as a level design element — an openBottom cell with enemies or loot below
+- Multi-step falls (more than one layer) are supported — the fall keeps going until it hits a floor or an `openBottom` cell on the next layer
+- Debug noclip must bypass the fall check to remain useful
+- Landing on a layer with no valid floor cell is not guarded — level designers are responsible for ensuring a floor exists at the landing position
+
+---
+
+## ADR-M4-14 — Ramp Geometry: Wall Suppression and Merging
+
+**Status:** Accepted
+**Date:** 2026-04-08
+
+### Context
+
+Ramps connect two adjacent layers using a cell on the lower layer (bottom cell, walkable `.`) and a corresponding cell on the upper layer (top cell, wall `#`). The ramp renderer handles geometry for these two cells, but several edge cases required additional design:
+
+1. **Stacked ramps** — a cell that is simultaneously the top of one ramp and the bottom of the next. Without special handling, it generates conflicting wall-suppression from two `RampCellInfo` entries.
+2. **Adjacent ramp top cells** — two ramps side by side whose top cells share a boundary. The ramp renderer was generating side walls between them, producing double geometry.
+3. **Side fill texture** — the triangular/stepped side fill used the wrong layer's texture.
+4. **Upper layer wall height** — perpendicular walls at the ramp top cell were halved (`keepHalf`) when they should be full height.
+
+### Decision
+
+**`RampCellInfo.wallDirs: Facing[]` + `mergeRampCell()` + top-cell exclusion from `isWallAt`.**
+
+- **`wallDirs: Facing[]`**: Widened from a single `Facing` to an array. A stacked-ramp shared cell collects suppressions from both the ramp above and the ramp below. `mergeRampCell()` combines two `RampCellInfo` entries for the same cell, unioning their `wallDirs` arrays. The resulting entry suppresses walls in all relevant facing directions.
+
+- **Adjacent top-cell exclusion**: The ramp renderer collects all ramp top-cell positions before generating side walls. `isWallAt` is extended to treat top cells from other ramps as non-wall (open), preventing side walls from being generated between adjacent top cells.
+
+- **Side fill texture**: Changed to always sample from the top cell's wall texture. This matches the texture the dungeon builder uses for the half-walls adjacent to the ramp top cell, producing a visually continuous surface.
+
+- **Upper layer full walls**: `keepHalf` removed from perpendicular walls on the upper-layer ramp top cell. These walls were being halved under the assumption they needed to align with the ramp slope, but visually they should be full height — the ramp slope is handled by the ramp geometry itself, not by wall height.
+
+### Alternatives Rejected
+
+**Two separate `RampCellInfo` entries for the shared cell:** Rejected. The dungeon builder processes them independently, causing each entry to re-add walls that the other entry suppressed. A merge step is required.
+
+**Per-neighbor side wall check without top-cell exclusion:** Rejected. Side walls between two adjacent ramp top cells were generated because each top cell was classified as a solid wall (`#`) by the other ramp's renderer. The exclusion list is necessary.
+
+### Consequences
+
+- Stacked ramps (e.g., a three-layer cliff face) render correctly with no spurious walls on shared cells
+- Adjacent ramp top cells (parallel ramps side by side) produce clean geometry with no overlapping faces
+- Side fill texture is consistent with the rest of the ramp visual — the triangle fills look like part of the same wall surface
+- `mergeRampCell()` must be called whenever a `RampCellInfo` entry is added for a cell that already exists in the map — this is enforced in `buildDungeon()`

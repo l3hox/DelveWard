@@ -40,6 +40,38 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - GameState: constructor accepts layers, _parseEntities split into 5 sub-methods
   - +12 tests for thin wall edge blocking + pathfinding (777 total)
   - ADR audit: added M4-11, M4-12, M3-07; revised M4-04, M4-06
+- [x] **Falling Mechanic**:
+  - Player falls when stepping on `openBottom` cells — triggered at 2/3 into the walk tween
+  - Gravity acceleration over 2 blocks (2 × LAYER_HEIGHT), terminal velocity 20 u/s
+  - Camera tilts down during fall, input blocked for duration
+  - On landing: `activeLayerIndex` + grid position switch to destination layer, camera resets
+  - `pendingFall` flag on `Player`, physics in `update()`, hole-blocking removed from `levelSceneBuilder`
+  - Debug noclip bypasses fall detection
+- [x] **Ramp Geometry Fixes**:
+  - Conditional side walls: only render when neighbor is a solid wall (not walkable)
+  - Side fill texture: uses top cell's wall texture (matching dungeon builder half-walls)
+  - Upper layer perpendicular walls: `keepHalf` removed — full height on ramp top cell
+  - `RampCellInfo.wallDirs: Facing[]` (widened from single `Facing`) + `mergeRampCell()` for stacked ramps
+  - Adjacent ramp top cells excluded from `isWallAt` — no redundant side walls between them
+- [x] **Projectile Layer-Aware Collision**:
+  - `ProjectileInstance` stores `layerIndex` at spawn
+  - Update loop groups projectiles by layer, switches `activeLayerIndex` per group
+  - Player hit detection only runs when projectile layer matches player layer
+  - Fireball mesh changed from `PlaneGeometry` to `CircleGeometry`
+- [x] **Non-Layered Dungeon Removal**:
+  - `DungeonLevel.layers` is now required (was optional)
+  - Removed `hasLayers()`, `convertToLayers()`, single-layer snapshot path, all backward-compat fallbacks
+  - `loadNewLevel` signature: `(layerDefs: LayerDef[], levelId?)` — no raw entities/grid params
+  - All 10 level JSONs across 7 dungeon files converted to layered format
+  - "Convert to Layers" editor button removed
+  - Tests updated with `asLayer()` helper
+- [x] **Editor Layer Undo/Redo + Copy Layout**:
+  - `snapshot()` before `insertLayer()` and `removeLayerFromLevel()`
+  - Layer list rebuilds on undo/redo; `restoreLevel` clamps `activeLayerIndex` on layer count change
+  - Copy layout checkbox: new layers optionally inherit grid + thin_wall entities from active layer
+  - Ramp remembered subtypes: facing/style inherited from last placed/edited ramp
+- [x] **Secret Wall Persistence Fix**:
+  - `levelSceneBuilder` applies opened state after building meshes — opened walls stay hidden on level revisit
 - [x] **Ramps: Physical Layer Transitions**:
   - `RampInstance` with `facing` and `style` (ramp/stairs), entity on bottom cell
   - `rampRenderer.ts`: exact-vertex quad geometry for both styles (no boxes)

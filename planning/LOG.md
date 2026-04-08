@@ -4,6 +4,48 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-08 — Falling, Ramp Fixes, Layer Cleanup
+
+### Falling mechanic (`player.ts`, `levelSceneBuilder.ts`, `main.ts`)
+
+Player now falls when stepping onto a cell marked `openBottom` (no floor). The fall activates at 2/3 into the walking tween — far enough that the step looks intentional. Gravity accelerates over 2 blocks (2 × `LAYER_HEIGHT`), then clamps to terminal velocity (20 u/s). Camera tilts down during the fall via `yRotation` lerp. Input is blocked for the duration. On landing the grid position and `activeLayerIndex` switch to the destination layer; camera resets. The `pendingFall` flag on `Player` is set during the walk tween and consumed in `update()`. Previously, open-floor cells were blocked; that guard was removed from `levelSceneBuilder`. Debug noclip mode skips fall detection.
+
+### Ramp geometry fixes (`stairRenderer.ts`, `rampRenderer.ts`, `levelSceneBuilder.ts`)
+
+Four edge cases resolved since the initial ramp implementation:
+
+1. **Conditional side walls**: Side walls on ramps and stairs now check neighbors. A walkable neighbor gets no side wall; only solid wall neighbors trigger side wall geometry. Previously a side wall was always rendered regardless of neighbor type.
+
+2. **Side fill texture**: The triangular/stepped side fill panels now sample the top cell's wall texture, matching the half-wall texture the dungeon builder uses for the same visual region. Previously used the bottom cell's or neighbor's texture.
+
+3. **Upper layer full walls**: The perpendicular walls on the upper-layer ramp top cell had `keepHalf` applied (halved to match the ramp slope). Removed — these walls are now full height, consistent with how the dungeon builder renders regular walls next to other entities.
+
+4. **Stacked ramps** (`RampCellInfo`): `wallDir: Facing` widened to `wallDirs: Facing[]`. New `mergeRampCell()` helper merges two `RampCellInfo` entries when a cell is simultaneously the top of one ramp and the bottom of the next — suppressing walls in both facing directions on the shared cell. Without this, the shared cell generated a blocking half-wall between the two ramps.
+
+5. **Adjacent ramp top cells**: When two ramps sit side-by-side, their top cells are adjacent. The ramp renderer now collects all top-cell positions and passes them to `isWallAt` as exclusions, preventing redundant side-wall geometry between those cells.
+
+### Projectile layer-aware collision (`projectileManager.ts`, `main.ts`)
+
+Projectiles were previously layer-agnostic — a fireball spawned on layer 1 could hit the player on layer 0. Fix: each `ProjectileInstance` stores `layerIndex` at spawn time. The update loop groups projectiles by layer, switches `gameState.activeLayerIndex` to each group's layer before ticking, and only runs player hit detection when the projectile's layer matches the player's layer. Fireball mesh changed from square `PlaneGeometry` to round `CircleGeometry`.
+
+### Non-layered dungeon removal
+
+`DungeonLevel.layers` promoted from optional to required. All backward-compat code removed: `hasLayers()`, `convertToLayers()`, single-layer snapshot path in save/load, fallback wrapping in `levelSceneBuilder`/`gameState`/`levelLoader`. The "Convert to Layers" button removed from the editor. `loadNewLevel` signature simplified to `(layerDefs: LayerDef[], levelId?)` — no more raw `entities`/`grid` params. All 10 level JSONs across 7 dungeon files were converted to the layered format. Tests updated with a shared `asLayer()` helper to reduce boilerplate.
+
+### Editor improvements
+
+- **Layer undo/redo**: `snapshot()` now called before `insertLayer()` and `removeLayerFromLevel()`. Layer list UI rebuilds on undo/redo. `restoreLevel` clamps `activeLayerIndex` to the new layer count and re-syncs the active layer — previously an undo that removed a layer could leave the editor pointing at a stale index.
+- **Copy layout checkbox**: New checkbox in the layer list panel. When checked, a newly added layer inherits the grid and `thin_wall` entities from the currently active layer, saving the designer from re-drawing room geometry on stacked floors.
+- **Ramp remembered subtypes**: Placing or editing a ramp records its `facing` and `style`. The next ramp placed inherits those values, consistent with how the editor handles enemy types.
+
+### Other fixes
+
+- **Secret wall persistence**: `levelSceneBuilder` now applies the opened/closed state of secret walls after building meshes, so returning to a previously visited level restores the correct visual state.
+- **Auto-load latest level**: New `/api/levels/latest` Vite dev-server endpoint returns the path of the most recently modified level JSON. The game auto-loads it at startup instead of the hardcoded default, removing a manual config step during active level design.
+- **PlayerStart validation**: A non-walkable `playerStart` is now a warning, not an error. The level still loads, which allows editing and debugging layouts where the start cell is temporarily blocked.
+
+---
+
 ## 2026-04-03 — Codebase Refactoring
 
 **main.ts split**: 2341→1640 lines. Extracted `src/game/levelSceneBuilder.ts` (719 lines — `LevelScene` interface, `buildLevelScene`, `teardownLevelScene`, `mergeMap`). Extracted `src/game/lootSpawner.ts` (loot spawn pattern deduplicated from 5 occurrences).
