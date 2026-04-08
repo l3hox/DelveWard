@@ -322,7 +322,6 @@ Non-interactive 3D meshes for atmosphere. Stalactites, pillars, rubble, statues,
     - `stalagmite`: cone rising from floor
     - `statue`: humanoid-ish box figure on pedestal
     - `crate_stack`: 2-3 stacked boxes
-    - `torch_bracket`: wall-mounted, always lit (non-interactive, unlike sconce)
     - `banner`: wall-mounted cloth rectangle
 42. **Props don't block movement** — purely decoration. Player walks through them.
 43. **Save/load**: Props are static — no state changes, no save needed. Rebuilt from level JSON on load.

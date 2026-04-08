@@ -492,6 +492,27 @@ export class Inspector {
         });
         break;
 
+      case 'prop': {
+        const PROP_IDS = ['pillar', 'rubble', 'stalactite', 'stalagmite', 'statue', 'crate_stack', 'banner'];
+        this.addDropdownField('propId', (entity.propId as string) ?? 'pillar', PROP_IDS, (val) => {
+          entity.propId = val;
+          this.onEntityChanged?.();
+        });
+        if ((entity.propId as string) === 'banner') {
+          this.addDropdownField('wall', (entity.wall as string) ?? 'N', ['N', 'S', 'E', 'W'], (val) => {
+            entity.wall = val;
+            this.onEntityChanged?.();
+          });
+        }
+        if ((entity.propId as string) === 'statue' || (entity.propId as string) === 'crate_stack') {
+          this.addDropdownField('rotation', String((entity.rotation as number) ?? 0), ['0', '1', '2', '3'], (val) => {
+            entity.rotation = parseInt(val, 10);
+            this.onEntityChanged?.();
+          });
+        }
+        break;
+      }
+
       case 'thin_wall': {
         this.addDropdownField('wall', (entity.wall as string) ?? 'S', ['S', 'E'], (val) => {
           entity.wall = val;

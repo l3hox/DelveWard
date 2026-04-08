@@ -42,6 +42,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   altar:          { buffType: 'atk', buffAmount: 5, buffDuration: 60 },
   barrel:         { hp: 10 },
   ramp:           { facing: 'N', style: 'ramp' },
+  prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
 
@@ -129,6 +130,7 @@ export class EditorApp {
   selectedEnemyType = 'rat';
   selectedRampFacing: import('../core/grid').Facing = 'N';
   selectedRampStyle: 'ramp' | 'stairs' = 'ramp';
+  selectedPropId = 'pillar';
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
   selectedThinWallTexture = 'stone_thin';
@@ -884,6 +886,8 @@ export class EditorApp {
     } else if (type === 'ramp') {
       entity.facing = this.selectedRampFacing;
       entity.style = this.selectedRampStyle;
+    } else if (type === 'prop') {
+      entity.propId = this.selectedPropId;
     }
     // Auto-detect wall orientation for wall-mounted entities
     if ((type === 'lever' || type === 'torch_sconce') && this.level) {
@@ -902,6 +906,13 @@ export class EditorApp {
       const detected = this.autoDetectWall(col, row);
       if (detected) {
         entity.wall = detected;
+      }
+    }
+    if (type === 'prop' && this.level) {
+      // Auto-detect wall for wall-mounted props (banner)
+      if (entity.propId === 'banner') {
+        const detected = this.autoDetectWall(col, row);
+        if (detected) entity.wall = detected;
       }
     }
     // Trap launcher: auto-detect facing (opposite of the wall it's mounted on)

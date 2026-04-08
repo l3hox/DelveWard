@@ -613,6 +613,7 @@ inspector.setEntityChangedCallback(() => {
       if (typeof e.facing === 'string') app.selectedRampFacing = e.facing as import('../core/grid').Facing;
       if (typeof e.style === 'string') app.selectedRampStyle = e.style as 'ramp' | 'stairs';
     }
+    if (e.type === 'prop' && typeof e.propId === 'string') app.selectedPropId = e.propId;
   }
   updateStairHighlight();
   levelList.refresh();

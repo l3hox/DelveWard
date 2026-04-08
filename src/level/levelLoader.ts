@@ -326,6 +326,20 @@ function validateEntity(
       }
       break;
     }
+    case 'prop': {
+      const w = checkWalkable('prop'); if (w) return w;
+      const PROP_IDS = ['pillar', 'rubble', 'stalactite', 'stalagmite', 'statue', 'crate_stack', 'banner'];
+      if (!e.propId || !PROP_IDS.includes(e.propId as string)) {
+        return `${pfx} prop must have a valid propId (${PROP_IDS.join(', ')})`;
+      }
+      if (e.propId === 'banner' && e.wall !== undefined && !['N', 'S', 'E', 'W'].includes(e.wall as string)) {
+        return `${pfx} banner wall must be N, S, E, or W`;
+      }
+      if (e.rotation !== undefined && (typeof e.rotation !== 'number' || ![0, 1, 2, 3].includes(e.rotation as number))) {
+        return `${pfx} prop rotation must be 0, 1, 2, or 3`;
+      }
+      break;
+    }
   }
 
   return null;

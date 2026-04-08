@@ -237,6 +237,15 @@ export interface RampInstance {
   style: 'ramp' | 'stairs';   // visual style
 }
 
+export interface PropInstance {
+  id?: string;
+  col: number;
+  row: number;
+  propId: string;
+  wall?: Facing;
+  rotation?: number;
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -314,6 +323,7 @@ export interface LevelSnapshot {
   barrels: Map<string, BarrelInstance>;
   thinWalls: Map<string, ThinWallInstance>;
   ramps: Map<string, RampInstance>;
+  props: Map<string, PropInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -352,6 +362,7 @@ export interface LayerState {
   barrels: Map<string, BarrelInstance>;
   thinWalls: Map<string, ThinWallInstance>;
   ramps: Map<string, RampInstance>;
+  props: Map<string, PropInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -365,7 +376,7 @@ export function createEmptyLayerState(): LayerState {
     secretWalls: new Map(), blocks: new Map(), chests: new Map(),
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
-    thinWalls: new Map(), ramps: new Map(),
+    thinWalls: new Map(), ramps: new Map(), props: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -426,6 +437,8 @@ export class GameState {
   set thinWalls(v) { this.activeLayer.thinWalls = v; }
   get ramps() { return this.activeLayer.ramps; }
   set ramps(v) { this.activeLayer.ramps = v; }
+  get props() { return this.activeLayer.props; }
+  set props(v) { this.activeLayer.props = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -794,6 +807,17 @@ export class GameState {
       });
       return true;
     }
+    if (e.type === 'prop') {
+      this.props.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        propId: (e.propId as string) ?? 'pillar',
+        wall: e.wall as Facing | undefined,
+        rotation: (e.rotation as number) ?? undefined,
+      });
+      return true;
+    }
     return false;
   }
 
@@ -1088,6 +1112,7 @@ export class GameState {
       for (const b of this.barrels.values()) register(b, 'barrel', li);
       for (const tw of this.thinWalls.values()) register(tw, 'thin_wall', li);
       for (const r of this.ramps.values()) register(r, 'ramp', li);
+      for (const p of this.props.values()) register(p, 'prop', li);
     }
     this.activeLayerIndex = savedIndex;
   }
@@ -1211,6 +1236,10 @@ export class GameState {
     for (const [k, v] of this.ramps) {
       ramps.set(k, { ...v });
     }
+    const props = new Map<string, PropInstance>();
+    for (const [k, v] of this.props) {
+      props.set(k, { ...v });
+    }
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1219,7 +1248,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1340,6 +1369,12 @@ export class GameState {
     if (snapshot.ramps) {
       for (const [k, v] of snapshot.ramps) {
         this.ramps.set(k, { ...v });
+      }
+    }
+    this.props = new Map<string, PropInstance>();
+    if (snapshot.props) {
+      for (const [k, v] of snapshot.props) {
+        this.props.set(k, { ...v });
       }
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);

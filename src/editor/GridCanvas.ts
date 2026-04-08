@@ -1340,6 +1340,71 @@ export class GridCanvas {
         break;
       }
 
+      case 'prop': {
+        const propId = (entity.propId as string) || 'pillar';
+        ctx.fillStyle = '#888888';
+        switch (propId) {
+          case 'pillar':
+            ctx.beginPath();
+            ctx.arc(cx, cy, iconRadius * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#555555';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            break;
+          case 'rubble':
+            for (const [dx, dy] of [[-0.3, -0.2], [0.2, -0.1], [-0.1, 0.3], [0.25, 0.25]]) {
+              ctx.fillRect(cx + dx * iconRadius * 2 - 2, cy + dy * iconRadius * 2 - 2, 4, 4);
+            }
+            break;
+          case 'stalactite':
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + iconRadius * 0.6);
+            ctx.lineTo(cx - iconRadius * 0.4, cy - iconRadius * 0.4);
+            ctx.lineTo(cx + iconRadius * 0.4, cy - iconRadius * 0.4);
+            ctx.closePath();
+            ctx.fill();
+            break;
+          case 'stalagmite':
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - iconRadius * 0.6);
+            ctx.lineTo(cx - iconRadius * 0.4, cy + iconRadius * 0.4);
+            ctx.lineTo(cx + iconRadius * 0.4, cy + iconRadius * 0.4);
+            ctx.closePath();
+            ctx.fill();
+            break;
+          case 'statue':
+            ctx.fillRect(cx - iconRadius * 0.25, cy - iconRadius * 0.5, iconRadius * 0.5, iconRadius);
+            ctx.beginPath();
+            ctx.arc(cx, cy - iconRadius * 0.5, iconRadius * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          case 'crate_stack':
+            ctx.fillStyle = '#8B6914';
+            ctx.fillRect(cx - iconRadius * 0.5, cy - iconRadius * 0.2, iconRadius, iconRadius * 0.6);
+            ctx.fillStyle = '#9B7924';
+            ctx.fillRect(cx - iconRadius * 0.35, cy - iconRadius * 0.6, iconRadius * 0.7, iconRadius * 0.45);
+            break;
+          case 'banner': {
+            ctx.fillStyle = '#8B1A1A';
+            const wallDir = (entity.wall as string) || 'N';
+            if (wallDir === 'N' || wallDir === 'S') {
+              const wy = wallDir === 'N' ? cy - iconRadius * 0.8 : cy + iconRadius * 0.8;
+              ctx.fillRect(cx - iconRadius * 0.4, wy - iconRadius * 0.1, iconRadius * 0.8, iconRadius * 0.5);
+            } else {
+              const wx = wallDir === 'W' ? cx - iconRadius * 0.8 : cx + iconRadius * 0.8;
+              ctx.fillRect(wx - iconRadius * 0.1, cy - iconRadius * 0.4, iconRadius * 0.5, iconRadius * 0.8);
+            }
+            break;
+          }
+          default:
+            ctx.beginPath();
+            ctx.arc(cx, cy, iconRadius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);
@@ -1599,6 +1664,7 @@ export class GridCanvas {
       if (eType === 'equipment') ghostEntity.itemId = this.app.selectedEquipmentId;
       if (eType === 'consumable') ghostEntity.itemId = this.app.selectedConsumableId;
       if (eType === 'ramp') { ghostEntity.facing = this.app.selectedRampFacing; ghostEntity.style = this.app.selectedRampStyle; }
+      if (eType === 'prop') ghostEntity.propId = this.app.selectedPropId;
       // Try sprite first (always, regardless of showItemPreview toggle)
       if (!this.drawEntitySprite(ghostEntity as Entity, px, py, tw, th)) {
         this.drawEntityIcon(ghostEntity as Entity, px, py, tw, th);

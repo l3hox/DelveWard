@@ -29,6 +29,7 @@ import { buildAltarMeshes } from '../rendering/altarRenderer';
 import { buildBarrelMeshes } from '../rendering/barrelRenderer';
 import { buildThinWallMeshes } from '../rendering/thinWallRenderer';
 import { buildRampMeshes } from '../rendering/rampRenderer';
+import { buildPropMeshes } from '../rendering/propRenderer';
 import { buildNpcMeshes, type NpcMeshes } from '../rendering/npcRenderer';
 import { EnemyAnimator } from '../rendering/enemyAnimator';
 import { LeverAnimator } from '../rendering/leverAnimator';
@@ -68,6 +69,7 @@ export interface LevelScene {
   barrelMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   thinWallMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  propMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -183,6 +185,10 @@ export function buildLevelScene(
   const sharedRampGroup = new THREE.Group();
   scene.add(sharedRampGroup);
   const sharedRampMeshMap = new Map<string, THREE.Group>();
+
+  const sharedPropGroup = new THREE.Group();
+  scene.add(sharedPropGroup);
+  const sharedPropMeshMap = new Map<string, THREE.Group>();
 
   const sharedNpcGroup = new THREE.Group();
   scene.add(sharedNpcGroup);
@@ -479,6 +485,12 @@ export function buildLevelScene(
     sharedRampGroup.add(ldRampMeshes.group);
     mergeMap(sharedRampMeshMap, ldRampMeshes.meshMap, li);
 
+    // Prop meshes
+    const ldPropMeshes = buildPropMeshes(gameState);
+    ldPropMeshes.group.position.y = yOffset;
+    sharedPropGroup.add(ldPropMeshes.group);
+    mergeMap(sharedPropMeshMap, ldPropMeshes.meshMap, li);
+
     // NPC meshes
     const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
     ldNpcMeshes.group.position.y = yOffset;
@@ -538,6 +550,7 @@ export function buildLevelScene(
       for (const [key, mesh] of ldAltarMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldBarrelMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldRampMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldPropMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldThinWallMeshes.meshMap) {
         // Thin wall keys are "col,row:S" or "col,row:E" — strip the direction suffix for zone lookup
         const cellKey = key.split(':')[0];
@@ -673,6 +686,7 @@ export function buildLevelScene(
     barrelMeshes: { group: sharedBarrelGroup, meshMap: sharedBarrelMeshMap },
     thinWallMeshes: { group: sharedThinWallGroup, meshMap: sharedThinWallMeshMap },
     rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
+    propMeshes: { group: sharedPropGroup, meshMap: sharedPropMeshMap },
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
     enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,
@@ -716,6 +730,7 @@ export function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.barrelMeshes.group,
     ls.thinWallMeshes.group,
     ls.rampMeshes.group,
+    ls.propMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),
