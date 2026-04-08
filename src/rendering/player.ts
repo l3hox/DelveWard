@@ -11,7 +11,7 @@ const STAIR_PITCH = 0.15; // camera tilts down/up on stairs (radians, ~8.5°)
 const MAX_QUEUED_COMMANDS = 3;
 
 // Fall physics
-const FALL_TERMINAL_VELOCITY = 12;  // units/sec
+const FALL_TERMINAL_VELOCITY = 20;  // units/sec
 const FALL_ACCEL_DISTANCE = 2 * LAYER_HEIGHT; // accelerate over 2 layers (5.0 units)
 const FALL_ACCEL = (FALL_TERMINAL_VELOCITY * FALL_TERMINAL_VELOCITY) / (2 * FALL_ACCEL_DISTANCE);
 const FALL_CAMERA_PITCH = -0.4;     // radians — look down during fall
