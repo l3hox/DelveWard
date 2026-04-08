@@ -416,9 +416,10 @@ const TOP_CELL_SIDE_OFFSETS: Record<Facing, { left: [number, number]; right: [nu
   W: { left: [0, 1], right: [0, -1] },
 };
 
-function isWallAt(grid: string[], walkable: Set<string>, col: number, row: number): boolean {
+function isWallAt(grid: string[], walkable: Set<string>, col: number, row: number, rampTopCells?: Set<string>): boolean {
   if (row < 0 || row >= grid.length) return true;
   if (col < 0 || col >= grid[row].length) return true;
+  if (rampTopCells?.has(`${col},${row}`)) return false;  // adjacent ramp top cell — not a wall
   return !walkable.has(grid[row][col]);
 }
 
@@ -429,6 +430,7 @@ function buildSingleRamp(
   defaults?: TextureSet,
   charDefs?: CharDef[],
   areas?: TextureArea[],
+  rampTopCells?: Set<string>,
 ): THREE.Group {
   // Resolve textures from the ramp's cell context
   const charDefMap = new Map<string, CharDef>();
@@ -442,8 +444,8 @@ function buildSingleRamp(
   const topCol = ramp.col + dc;
   const topRow = ramp.row + dr;
   const offsets = TOP_CELL_SIDE_OFFSETS[ramp.facing];
-  const hasLeftTopWall = isWallAt(grid, walkable, topCol + offsets.left[0], topRow + offsets.left[1]);
-  const hasRightTopWall = isWallAt(grid, walkable, topCol + offsets.right[0], topRow + offsets.right[1]);
+  const hasLeftTopWall = isWallAt(grid, walkable, topCol + offsets.left[0], topRow + offsets.left[1], rampTopCells);
+  const hasRightTopWall = isWallAt(grid, walkable, topCol + offsets.right[0], topRow + offsets.right[1], rampTopCells);
 
   // Side wall texture from the top cell — matches the half-walls the dungeon
   // builder renders (resolveWallMat resolves from the solid top cell).
@@ -506,8 +508,15 @@ export function buildRampMeshes(
 
   const ws = walkable ?? buildWalkableSet(charDefs);
 
+  // Collect all ramp top cell positions so adjacent ramps don't render side walls between them
+  const rampTopCells = new Set<string>();
+  for (const ramp of gameState.ramps.values()) {
+    const [dx, dr] = FACING_DELTA[ramp.facing];
+    rampTopCells.add(`${ramp.col + dx},${ramp.row + dr}`);
+  }
+
   for (const [key, ramp] of gameState.ramps) {
-    const rampGroup = buildSingleRamp(ramp, grid, ws, defaults, charDefs, areas);
+    const rampGroup = buildSingleRamp(ramp, grid, ws, defaults, charDefs, areas, rampTopCells);
     group.add(rampGroup);
     meshMap.set(key, rampGroup);
   }
