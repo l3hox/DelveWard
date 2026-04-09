@@ -64,6 +64,7 @@ export class GridCanvas {
   onPreviewResize: (() => void) | null = null;
   onPreviewClose: (() => void) | null = null;
   onPreviewModeToggle: (() => void) | null = null;
+  onPreviewContentClick: (() => void) | null = null;
   previewCameraMode: 'noclip' | 'freefly' = 'noclip';
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
@@ -258,8 +259,9 @@ export class GridCanvas {
           return;
         }
         if (hit === 'content') {
-          // Click inside preview content — focus the preview for keyboard
+          // Click inside preview content — focus the preview for keyboard + pointer lock
           this.previewCanvas?.focus();
+          this.onPreviewContentClick?.();
           return;
         }
       }

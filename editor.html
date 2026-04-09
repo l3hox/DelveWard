@@ -909,9 +909,14 @@
         background: #3a3a3a;
         border-color: #888;
       }
-      /* Preview canvas is offscreen — drawn onto the 2D grid canvas as a floating window */
+      /* Preview canvas renders offscreen — drawn onto the 2D grid canvas as a floating window.
+         Must stay in DOM and focusable for keyboard input and pointer lock. */
       #preview-canvas {
-        display: none;
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 1px;
+        height: 1px;
       }
       /* Preview canvas focus indicators removed — preview is now an in-canvas window */
     </style>

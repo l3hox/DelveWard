@@ -8,6 +8,7 @@ export class FreeFlyCamera {
   private euler = new THREE.Euler(0, 0, 0, 'YXZ');
   private keys = new Set<string>();
   private locked = false;
+  private attachedCanvas: HTMLCanvasElement | null = null;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -15,9 +16,7 @@ export class FreeFlyCamera {
 
   /** Call once with the preview canvas to set up pointer lock and input. */
   attach(canvas: HTMLCanvasElement): void {
-    canvas.addEventListener('click', () => {
-      if (!this.locked) canvas.requestPointerLock();
-    });
+    this.attachedCanvas = canvas;
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
       if (!this.locked) this.keys.clear();
@@ -45,6 +44,11 @@ export class FreeFlyCamera {
   }
 
   get isLocked(): boolean { return this.locked; }
+
+  /** Request pointer lock on the attached canvas. */
+  requestLock(): void {
+    if (!this.locked && this.attachedCanvas) this.attachedCanvas.requestPointerLock();
+  }
 
   update(delta: number): void {
     if (!this.locked) return;

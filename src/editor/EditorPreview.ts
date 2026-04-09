@@ -306,6 +306,11 @@ export class EditorPreview {
 
   getCameraMode(): PreviewCameraMode { return this.cameraMode; }
 
+  /** Request pointer lock for free-fly mode. */
+  requestPointerLock(): void {
+    this.freeFly.requestLock();
+  }
+
   /** Get camera grid position, Y-rotation, and approximate layer index for the 2D grid overlay indicator. */
   getCameraInfo(): { col: number; row: number; angle: number; layerIndex: number } | null {
     if (!this.active) return null;

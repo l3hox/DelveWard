@@ -56,6 +56,9 @@ gridCanvas.onPreviewResize = () => {
   preview.resize(w, h);
 };
 gridCanvas.onPreviewClose = () => togglePreview(false);
+gridCanvas.onPreviewContentClick = () => {
+  if (preview.getCameraMode() === 'freefly') preview.requestPointerLock();
+};
 preview.onFrameCallback = () => gridCanvas.markDirty();
 
 function togglePreview(active: boolean): void {
