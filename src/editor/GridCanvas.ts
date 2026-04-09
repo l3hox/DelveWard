@@ -569,18 +569,14 @@ export class GridCanvas {
 
   private setupResize(container: HTMLElement): void {
     const observer = new ResizeObserver(() => {
-      // Use the canvas's own layout width so that CSS width:50% in preview
-      // split mode produces the correct pixel resolution.
-      this.canvas.width = this.canvas.clientWidth || container.clientWidth;
+      this.canvas.width = container.clientWidth;
       this.canvas.height = container.clientHeight;
       this.dirty = true;
     });
     observer.observe(container);
-    // Also observe the canvas itself so toggling preview-active triggers a resize.
-    observer.observe(this.canvas);
 
     // Initial size
-    this.canvas.width = this.canvas.clientWidth || container.clientWidth;
+    this.canvas.width = container.clientWidth;
     this.canvas.height = container.clientHeight;
   }
 
