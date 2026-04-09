@@ -223,6 +223,8 @@ export class EditorApp {
     const layerStartId = String(layerCoord);
     const layerStartIdx = startLevel.layers.findIndex(l => l.id === layerStartId);
     if (layerStartIdx >= 0) this.lastLayerPerLevel.set(startLevelIndex, layerStartIdx);
+    // Clear current level so switchToLevel doesn't save outgoing state over the pre-seed
+    this.level = null;
     this.switchToLevel(startLevelIndex);
   }
 
