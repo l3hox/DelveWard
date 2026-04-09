@@ -47,6 +47,9 @@ export class EditorPreview {
   private keys = new Set<string>();
   private focused = false;
 
+  /** Called every preview frame so the 2D grid can update the camera indicator. */
+  onFrameCallback: (() => void) | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -108,6 +111,7 @@ export class EditorPreview {
       this.torchFillLight.position.y -= 0.5;
 
       this.renderer.render(this.scene, this.camera);
+      this.onFrameCallback?.();
     };
     requestAnimationFrame(loop);
   }
@@ -315,6 +319,43 @@ export class EditorPreview {
     };
   }
 
+  /** Rebuild all geometry + entities but keep the camera/player position. */
+  private rebuildSceneKeepCamera(level: DungeonLevel): void {
+    this.level = level;
+    applyEnvironment(level.environment, this.scene, this.ambient);
+
+    // Remove old dungeon groups
+    for (const g of this.layerDungeonGroups) {
+      g.removeFromParent();
+      g.traverse(child => { if (child instanceof THREE.Mesh) child.geometry?.dispose(); });
+    }
+    this.layerDungeonGroups = [];
+
+    // Rebuild dungeon geometry for all layers
+    for (let li = 0; li < level.layers.length; li++) {
+      const ld = level.layers[li];
+      const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
+      const aboveGrid = level.layers[li + 1]?.grid;
+      const belowGrid = level.layers[li - 1]?.grid;
+
+      const dungeonGroup = buildDungeon(
+        ld.grid,
+        ld.defaults ?? level.defaults,
+        ld.areas ?? level.areas,
+        level.charDefs,
+        li === level.layers.length - 1 ? (ld.ceiling ?? level.ceiling) !== false : true,
+        new Set(), new Set(), undefined, undefined,
+        aboveGrid, belowGrid,
+      );
+      dungeonGroup.position.y = yOffset;
+      this.scene.add(dungeonGroup);
+      this.layerDungeonGroups[li] = dungeonGroup;
+    }
+
+    // Rebuild entities
+    this.rebuildAllEntities(level);
+  }
+
   markGeometryDirty(layerIndex: number): void {
     this.geometryDirtyLayers.add(layerIndex);
     this.dirty = true;
@@ -335,7 +376,8 @@ export class EditorPreview {
     if (!this.level) return;
 
     if (this.fullRebuildNeeded) {
-      this.buildScene(this.level, 0);
+      this.rebuildSceneKeepCamera(this.level);
+      this.fullRebuildNeeded = false;
       return;
     }
 

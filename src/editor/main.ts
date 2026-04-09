@@ -52,6 +52,7 @@ const cameraModeBtn = document.getElementById('btn-camera-mode') as HTMLButtonEl
 const gridCanvas = new GridCanvas(canvas, container, app);
 const preview = new EditorPreview(previewCanvas);
 gridCanvas.previewCameraGetter = () => preview.getCameraInfo();
+preview.onFrameCallback = () => gridCanvas.markDirty();
 
 previewToggleBtn.addEventListener('click', () => {
   const active = !preview.active;
@@ -216,9 +217,7 @@ function refreshAllUI(): void {
   updateDirtyDisplay();
   updateErrorBanner();
   updateStatusHint();
-  if (preview.active && app.level) {
-    preview.buildScene(app.level, app.activeLayerIndex);
-  }
+  if (preview.active) preview.markFullRebuild();
 }
 
 // --- Undo/Redo: onLevelRestored callback ---
@@ -238,9 +237,7 @@ app.onLevelRestored = () => {
   gridCanvas.markDirty();
   gridCanvas.updateCursor();
   updateErrorBanner();
-  if (preview.active && app.level) {
-    preview.buildScene(app.level, app.activeLayerIndex);
-  }
+  if (preview.active) preview.markFullRebuild();
 };
 
 // Toolbar callbacks — cancel pick mode on tool switch
