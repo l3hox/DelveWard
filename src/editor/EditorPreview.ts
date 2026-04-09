@@ -130,6 +130,7 @@ export class EditorPreview {
   private geometryDirtyLayers = new Set<number>();
   private fullRebuildNeeded = false;
   needsPlayerReset = false;
+  pendingPlayerStart: { col: number; row: number; facing?: string } | null = null;
 
   // Per-layer dungeon groups for incremental rebuild
   private layerDungeonGroups: THREE.Group[] = [];
@@ -233,8 +234,9 @@ export class EditorPreview {
   get hasScene(): boolean { return this.level !== null && this.layerDungeonGroups.length > 0; }
 
   /** Full rebuild including player reset to playerStart. Call on file open. */
-  resetScene(level: DungeonLevel, activeLayerIndex: number): void {
+  resetScene(level: DungeonLevel, activeLayerIndex: number, playerStart?: { col: number; row: number; facing?: string }): void {
     this.level = level;
+    this.pendingPlayerStart = playerStart ?? null;
     this.needsPlayerReset = true;
     if (this.active) {
       this.buildScene(level, activeLayerIndex);
@@ -294,7 +296,8 @@ export class EditorPreview {
     this.rebuildAllEntities(level);
 
     const grid = level.layers[activeLayerIndex]?.grid ?? level.layers[0].grid;
-    const ps = (level as any).playerStart;
+    const ps = this.pendingPlayerStart ?? level.playerStart;
+    this.pendingPlayerStart = null;
     const startCol = ps?.col ?? 1;
     const startRow = ps?.row ?? 1;
     const startFacing: Facing = (ps?.facing as Facing) ?? 'S';
