@@ -1,4 +1,5 @@
 import { EditorApp, type EditorTool } from './EditorApp';
+import { EditorPreview } from './EditorPreview';
 import { getAllLevelEntities } from '../level/levelLoader';
 import { GridCanvas } from './GridCanvas';
 import { Toolbar } from './Toolbar';
@@ -44,7 +45,43 @@ const coordEl = document.getElementById('coord-display') as HTMLSpanElement;
 const errorBannerEl = document.getElementById('error-banner') as HTMLElement;
 const statusHintEl = document.getElementById('status-hint') as HTMLElement;
 
+const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
+const previewToggleBtn = document.getElementById('btn-preview-3d') as HTMLButtonElement;
+const cameraModeBtn = document.getElementById('btn-camera-mode') as HTMLButtonElement;
+
 const gridCanvas = new GridCanvas(canvas, container, app);
+const preview = new EditorPreview(previewCanvas);
+
+previewToggleBtn.addEventListener('click', () => {
+  const active = !preview.active;
+  preview.setActive(active);
+  container.classList.toggle('preview-active', active);
+  previewToggleBtn.classList.toggle('active', active);
+  cameraModeBtn.style.display = active ? '' : 'none';
+
+  if (active && app.level) {
+    const rect = container.getBoundingClientRect();
+    preview.resize(Math.floor(rect.width / 2), rect.height);
+    preview.buildScene(app.level, app.activeLayerIndex);
+  }
+
+  // Trigger 2D canvas resize
+  gridCanvas.markDirty();
+});
+
+cameraModeBtn.addEventListener('click', () => {
+  const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
+  preview.setCameraMode(mode);
+  cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
+});
+
+new ResizeObserver(() => {
+  if (preview.active) {
+    const rect = container.getBoundingClientRect();
+    preview.resize(Math.floor(rect.width / 2), rect.height);
+  }
+}).observe(container);
+
 const toolbar = new Toolbar(document.getElementById('toolbar')!);
 toolbar.setActiveTool('select');
 const inspector = new Inspector(document.getElementById('inspector')!, app);
@@ -178,6 +215,9 @@ function refreshAllUI(): void {
   updateDirtyDisplay();
   updateErrorBanner();
   updateStatusHint();
+  if (preview.active && app.level) {
+    preview.buildScene(app.level, app.activeLayerIndex);
+  }
 }
 
 // --- Undo/Redo: onLevelRestored callback ---
@@ -197,6 +237,9 @@ app.onLevelRestored = () => {
   gridCanvas.markDirty();
   gridCanvas.updateCursor();
   updateErrorBanner();
+  if (preview.active && app.level) {
+    preview.buildScene(app.level, app.activeLayerIndex);
+  }
 };
 
 // Toolbar callbacks — cancel pick mode on tool switch
@@ -620,6 +663,7 @@ inspector.setEntityChangedCallback(() => {
   markDirty();
   gridCanvas.markDirty();
   updateErrorBanner();
+  if (preview.active) preview.markFullRebuild();
 });
 
 inspector.setDeleteCallback(() => {
@@ -635,6 +679,7 @@ inspector.setDeleteCallback(() => {
   gridCanvas.markDirty();
   app.rebuildDerivedState();
   updateErrorBanner();
+  if (preview.active) preview.markFullRebuild();
 });
 
 // Inspector undo callbacks
@@ -711,12 +756,14 @@ gridCanvas.setAfterPaintCallback(() => {
   markDirty();
   app.rebuildDerivedState();
   updateErrorBanner();
+  if (preview.active) preview.markGeometryDirty(app.activeLayerIndex);
 });
 
 // Entity add snapshot
 gridCanvas.setBeforeEntityAddCallback(() => {
   if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
   markDirty();
+  if (preview.active) preview.markFullRebuild();
 });
 
 // Pick complete snapshot

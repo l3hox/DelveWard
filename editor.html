@@ -909,6 +909,28 @@
         background: #3a3a3a;
         border-color: #888;
       }
+      #preview-canvas {
+        display: none;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 50%;
+        height: 100%;
+      }
+      #canvas-container.preview-active #editor-canvas {
+        width: 50% !important;
+      }
+      #canvas-container.preview-active #preview-canvas {
+        display: block;
+      }
+      #preview-canvas.focused {
+        outline: 2px solid #4488ff;
+        outline-offset: -2px;
+      }
+      #canvas-container.preview-active #editor-canvas.focused {
+        outline: 2px solid #4488ff;
+        outline-offset: -2px;
+      }
     </style>
   </head>
   <body>
@@ -916,6 +938,8 @@
       <button id="btn-open">Open File</button>
       <span id="level-name">Level: (none)</span>
       <span id="coord-display">Pos: —</span>
+      <button id="btn-preview-3d" style="margin-left:8px">3D</button>
+      <button id="btn-camera-mode" style="margin-left:4px; display:none">Noclip</button>
     </div>
     <div id="char-palette" class="dimmed"></div>
     <div id="entity-palette" class="dimmed"></div>
@@ -928,6 +952,7 @@
       <div id="canvas-container">
         <canvas id="editor-canvas"></canvas>
         <canvas id="dialog-canvas" style="display:none"></canvas>
+        <canvas id="preview-canvas"></canvas>
       </div>
       <div id="inspector"></div>
       <div id="dialog-inspector" style="display:none"></div>
