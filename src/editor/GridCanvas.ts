@@ -48,6 +48,18 @@ export class GridCanvas {
   private onBeforeEntityAdd: (() => void) | null = null;
   private onBeforePickComplete: (() => void) | null = null;
   previewCameraGetter: (() => { col: number; row: number; angle: number; layerIndex: number } | null) | null = null;
+
+  // 3D preview floating window
+  previewCanvas: HTMLCanvasElement | null = null;
+  previewActive = false;
+  private previewWin = { x: 20, y: 20, w: 400, h: 300 };
+  private previewDrag: { type: 'move' | 'resize'; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null = null;
+  private readonly TITLE_H = 22;
+  private readonly BORDER = 5;
+  private readonly MIN_W = 200;
+  private readonly MIN_H = 150;
+  onPreviewResize: (() => void) | null = null;
+  onPreviewClose: (() => void) | null = null;
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
@@ -100,6 +112,31 @@ export class GridCanvas {
     const canvas = this.canvas;
 
     canvas.addEventListener('mousemove', (e) => {
+      // Handle preview window drag/resize
+      if (this.previewDrag) {
+        const dx = e.clientX - this.previewDrag.startX;
+        const dy = e.clientY - this.previewDrag.startY;
+        if (this.previewDrag.type === 'move') {
+          this.previewWin.x = this.previewDrag.origX + dx;
+          this.previewWin.y = this.previewDrag.origY + dy;
+        } else {
+          this.previewWin.w = Math.max(this.MIN_W, this.previewDrag.origW + dx);
+          this.previewWin.h = Math.max(this.MIN_H, this.previewDrag.origH + dy);
+          this.onPreviewResize?.();
+        }
+        this.dirty = true;
+        return;
+      }
+
+      // Update cursor for preview window hit zones
+      if (this.previewActive) {
+        const rect = canvas.getBoundingClientRect();
+        const hit = this.previewHitTest(e.clientX - rect.left, e.clientY - rect.top);
+        if (hit === 'resize') { canvas.style.cursor = 'nwse-resize'; return; }
+        if (hit === 'title') { canvas.style.cursor = 'grab'; return; }
+        if (hit === 'content') { canvas.style.cursor = 'default'; return; }
+      }
+
       if (this.isPanning) {
         const dx = e.clientX - this.lastPanX;
         const dy = e.clientY - this.lastPanY;
@@ -186,6 +223,34 @@ export class GridCanvas {
     });
 
     canvas.addEventListener('mousedown', (e) => {
+      // Preview window interactions
+      if (this.previewActive && e.button === 0) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const hit = this.previewHitTest(sx, sy);
+        if (hit === 'title') {
+          // Check close button (last 18px of title bar)
+          if (sx > this.previewWin.x + this.previewWin.w - 18) {
+            this.onPreviewClose?.();
+            return;
+          }
+          this.previewDrag = { type: 'move', startX: e.clientX, startY: e.clientY, origX: this.previewWin.x, origY: this.previewWin.y, origW: this.previewWin.w, origH: this.previewWin.h };
+          e.preventDefault();
+          return;
+        }
+        if (hit === 'resize') {
+          this.previewDrag = { type: 'resize', startX: e.clientX, startY: e.clientY, origX: this.previewWin.x, origY: this.previewWin.y, origW: this.previewWin.w, origH: this.previewWin.h };
+          e.preventDefault();
+          return;
+        }
+        if (hit === 'content') {
+          // Click inside preview content — focus the preview for keyboard
+          this.previewCanvas?.focus();
+          return;
+        }
+      }
+
       if (e.button === 1) {
         this.isPanning = true;
         this.lastPanX = e.clientX;
@@ -333,6 +398,10 @@ export class GridCanvas {
     });
 
     canvas.addEventListener('mouseup', (e) => {
+      if (this.previewDrag) {
+        this.previewDrag = null;
+        return;
+      }
       if (e.button === 1) {
         this.isPanning = false;
       }
@@ -629,6 +698,9 @@ export class GridCanvas {
         this.drawEdgeLine(edge, 'rgba(139, 69, 19, 0.7)', 3, offsetX, offsetY, tileSize);
       }
     }
+
+    // Draw 3D preview floating window (always on top)
+    this.drawPreviewWindow();
   }
 
   private drawCell(
@@ -1588,6 +1660,67 @@ export class GridCanvas {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+  }
+
+  /** Hit-test the preview window. Returns 'title', 'resize', 'content', or null. */
+  private previewHitTest(sx: number, sy: number): 'title' | 'resize' | 'content' | null {
+    if (!this.previewActive) return null;
+    const { x, y, w, h } = this.previewWin;
+    const totalH = h + this.TITLE_H;
+    if (sx < x || sx > x + w || sy < y || sy > y + totalH) return null;
+    if (sy < y + this.TITLE_H) return 'title';
+    if (sx > x + w - this.BORDER && sy > y + totalH - this.BORDER) return 'resize';
+    return 'content';
+  }
+
+  /** Get the preview window rect for external resize syncing. */
+  getPreviewContentSize(): { w: number; h: number } {
+    return { w: this.previewWin.w, h: this.previewWin.h };
+  }
+
+  private drawPreviewWindow(): void {
+    if (!this.previewActive || !this.previewCanvas) return;
+    const { ctx } = this;
+    const { x, y, w, h } = this.previewWin;
+    const totalH = h + this.TITLE_H;
+
+    // Drop shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(x, y, w, totalH);
+    ctx.restore();
+
+    // Title bar
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(x, y, w, this.TITLE_H);
+    ctx.fillStyle = '#aabbcc';
+    ctx.font = '11px monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('3D Preview', x + 6, y + this.TITLE_H / 2);
+
+    // Close button
+    ctx.fillStyle = '#666';
+    ctx.fillText('\u00d7', x + w - 14, y + this.TITLE_H / 2);
+
+    // Border
+    ctx.strokeStyle = '#3a3a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, totalH - 1);
+
+    // Content — draw the 3D canvas
+    ctx.drawImage(this.previewCanvas, x, y + this.TITLE_H, w, h);
+
+    // Resize grip (bottom-right corner)
+    ctx.fillStyle = '#555';
+    const gx = x + w - 10;
+    const gy = y + totalH - 10;
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(gx + i * 3, gy + (2 - i) * 3, 2, 2);
+    }
   }
 
   private drawPreviewCamera(offsetX: number, offsetY: number, tileSize: number): void {

@@ -51,27 +51,33 @@ const cameraModeBtn = document.getElementById('btn-camera-mode') as HTMLButtonEl
 
 const gridCanvas = new GridCanvas(canvas, container, app);
 const preview = new EditorPreview(previewCanvas);
+gridCanvas.previewCanvas = previewCanvas;
 gridCanvas.previewCameraGetter = () => preview.getCameraInfo();
+gridCanvas.onPreviewResize = () => {
+  const { w, h } = gridCanvas.getPreviewContentSize();
+  preview.resize(w, h);
+};
+gridCanvas.onPreviewClose = () => togglePreview(false);
 preview.onFrameCallback = () => gridCanvas.markDirty();
 
-previewToggleBtn.addEventListener('click', () => {
-  const active = !preview.active;
+function togglePreview(active: boolean): void {
   preview.setActive(active);
-  container.classList.toggle('preview-active', active);
+  gridCanvas.previewActive = active;
   previewToggleBtn.classList.toggle('active', active);
   cameraModeBtn.style.display = active ? '' : 'none';
 
   if (active && app.level) {
-    const rect = container.getBoundingClientRect();
-    preview.resize(Math.floor(rect.width / 2), rect.height);
+    const { w, h } = gridCanvas.getPreviewContentSize();
+    preview.resize(w, h);
     if (!preview.hasScene) {
       preview.buildScene(app.level, app.activeLayerIndex);
     }
   }
 
-  // Trigger 2D canvas resize
   gridCanvas.markDirty();
-});
+}
+
+previewToggleBtn.addEventListener('click', () => togglePreview(!preview.active));
 
 cameraModeBtn.addEventListener('click', () => {
   const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
@@ -79,12 +85,7 @@ cameraModeBtn.addEventListener('click', () => {
   cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
 });
 
-new ResizeObserver(() => {
-  if (preview.active) {
-    const rect = container.getBoundingClientRect();
-    preview.resize(Math.floor(rect.width / 2), rect.height);
-  }
-}).observe(container);
+// No split-panel resize needed — preview is a floating window on the canvas
 
 const toolbar = new Toolbar(document.getElementById('toolbar')!);
 toolbar.setActiveTool('select');

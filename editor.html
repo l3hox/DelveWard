@@ -909,28 +909,11 @@
         background: #3a3a3a;
         border-color: #888;
       }
+      /* Preview canvas is offscreen — drawn onto the 2D grid canvas as a floating window */
       #preview-canvas {
         display: none;
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 50%;
-        height: 100%;
       }
-      #canvas-container.preview-active #editor-canvas {
-        width: 50% !important;
-      }
-      #canvas-container.preview-active #preview-canvas {
-        display: block;
-      }
-      #preview-canvas.focused {
-        outline: 2px solid #4488ff;
-        outline-offset: -2px;
-      }
-      #canvas-container.preview-active #editor-canvas.focused {
-        outline: 2px solid #4488ff;
-        outline-offset: -2px;
-      }
+      /* Preview canvas focus indicators removed — preview is now an in-canvas window */
     </style>
   </head>
   <body>
