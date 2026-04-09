@@ -303,6 +303,18 @@ export class EditorPreview {
 
   getCameraMode(): PreviewCameraMode { return this.cameraMode; }
 
+  /** Get camera grid position and Y-rotation for the 2D grid overlay indicator. */
+  getCameraInfo(): { col: number; row: number; angle: number } | null {
+    if (!this.active) return null;
+    const CELL_SIZE = 2; // from dungeon.ts
+    const pos = this.camera.position;
+    return {
+      col: pos.x / CELL_SIZE - 0.5,
+      row: pos.z / CELL_SIZE - 0.5,
+      angle: this.camera.rotation.y,
+    };
+  }
+
   markGeometryDirty(layerIndex: number): void {
     this.geometryDirtyLayers.add(layerIndex);
     this.dirty = true;

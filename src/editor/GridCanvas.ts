@@ -47,6 +47,7 @@ export class GridCanvas {
   private onAfterPaint: (() => void) | null = null;
   private onBeforeEntityAdd: (() => void) | null = null;
   private onBeforePickComplete: (() => void) | null = null;
+  previewCameraGetter: (() => { col: number; row: number; angle: number } | null) | null = null;
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
@@ -595,6 +596,9 @@ export class GridCanvas {
 
     // Draw player start marker
     this.drawPlayerStart(offsetX, offsetY, tileSize);
+
+    // Draw 3D preview camera indicator
+    this.drawPreviewCamera(offsetX, offsetY, tileSize);
 
     // Draw hover highlight
     this.drawHover(offsetX, offsetY, tileSize);
@@ -1584,6 +1588,47 @@ export class GridCanvas {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+  }
+
+  private drawPreviewCamera(offsetX: number, offsetY: number, tileSize: number): void {
+    const info = this.previewCameraGetter?.();
+    if (!info) return;
+
+    const { ctx } = this;
+    const px = offsetX + info.col * tileSize;
+    const py = offsetY + info.row * tileSize;
+    const cx = px + tileSize / 2;
+    const cy = py + tileSize / 2;
+    const r = Math.max(5, Math.min(tileSize, tileSize) * 0.32);
+
+    // Blink: use time-based alpha (sinusoidal pulse)
+    const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
+
+    // Arrow pointing in camera direction (angle is Y-rotation, 0 = north/−Z)
+    const dx = -Math.sin(info.angle);
+    const dy = -Math.cos(info.angle);
+    const tipX = cx + dx * r;
+    const tipY = cy + dy * r;
+    const perpX = -dy;
+    const perpY = dx;
+    const baseHalf = r * 0.6;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#4488ff';
+    ctx.strokeStyle = '#112244';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(cx - dx * r * 0.4 + perpX * baseHalf, cy - dy * r * 0.4 + perpY * baseHalf);
+    ctx.lineTo(cx - dx * r * 0.4 - perpX * baseHalf, cy - dy * r * 0.4 - perpY * baseHalf);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Keep canvas dirty so the blink animates
+    this.dirty = true;
   }
 
   private drawHover(offsetX: number, offsetY: number, tileSize: number): void {

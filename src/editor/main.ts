@@ -51,6 +51,7 @@ const cameraModeBtn = document.getElementById('btn-camera-mode') as HTMLButtonEl
 
 const gridCanvas = new GridCanvas(canvas, container, app);
 const preview = new EditorPreview(previewCanvas);
+gridCanvas.previewCameraGetter = () => preview.getCameraInfo();
 
 previewToggleBtn.addEventListener('click', () => {
   const active = !preview.active;
