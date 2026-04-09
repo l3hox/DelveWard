@@ -5,6 +5,7 @@ import { GameState, doorKey } from '../core/gameState';
 import { buildDungeon, LAYER_HEIGHT } from '../rendering/dungeon';
 import type { RampCellInfo } from '../rendering/dungeon';
 import { applyEnvironment } from '../rendering/environment';
+import { createSkyboxMesh } from '../rendering/skybox';
 import { Player } from '../rendering/player';
 import { buildWalkableSet, FACING_ANGLE, FACING_DELTA } from '../core/grid';
 import { buildDoorMeshes } from '../rendering/doorRenderer';
@@ -136,6 +137,7 @@ export class EditorPreview {
   private layerDungeonGroups: THREE.Group[] = [];
   private entityGroup: THREE.Group;
   private billboardMeshes: THREE.Mesh[] = []; // sprites that face camera each frame
+  private skyboxMesh: THREE.Mesh | null = null;
   private forestMeshes: ForestMeshes = { group: new THREE.Group(), instances: [] };
 
   private dirty = true;
@@ -264,6 +266,7 @@ export class EditorPreview {
     this.clearScene();
 
     applyEnvironment(level.environment, this.scene, this.ambient);
+    this.updateSkybox(level);
 
     const walkable = buildWalkableSet(level.charDefs);
     const gs = new GameState([], undefined, 'preview', level.layers);
@@ -351,7 +354,25 @@ export class EditorPreview {
     });
     this.entityGroup.clear();
 
+    if (this.skyboxMesh) {
+      this.scene.remove(this.skyboxMesh);
+      this.skyboxMesh.geometry.dispose();
+      this.skyboxMesh = null;
+    }
+
     this.player = null;
+  }
+
+  private updateSkybox(level: DungeonLevel): void {
+    if (this.skyboxMesh) {
+      this.scene.remove(this.skyboxMesh);
+      this.skyboxMesh.geometry.dispose();
+      this.skyboxMesh = null;
+    }
+    if (level.skybox) {
+      this.skyboxMesh = createSkyboxMesh(level.skybox);
+      this.scene.add(this.skyboxMesh);
+    }
   }
 
   private rebuildAllEntities(level: DungeonLevel): void {
@@ -574,6 +595,7 @@ export class EditorPreview {
   private rebuildSceneKeepCamera(level: DungeonLevel): void {
     this.level = level;
     applyEnvironment(level.environment, this.scene, this.ambient);
+    this.updateSkybox(level);
 
     // Remove old dungeon groups
     for (const g of this.layerDungeonGroups) {
