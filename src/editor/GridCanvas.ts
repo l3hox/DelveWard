@@ -65,6 +65,7 @@ export class GridCanvas {
   onPreviewClose: (() => void) | null = null;
   onPreviewModeToggle: (() => void) | null = null;
   onPreviewContentClick: (() => void) | null = null;
+  onPreviewBlur: (() => void) | null = null;
   previewCameraMode: 'noclip' | 'freefly' = 'noclip';
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
@@ -263,6 +264,13 @@ export class GridCanvas {
           this.onPreviewContentClick?.();
           return;
         }
+      }
+
+      // Clicking outside the preview window unfocuses it
+      if (this.previewActive && e.button === 0) {
+        const rect = canvas.getBoundingClientRect();
+        const hit = this.previewHitTest(e.clientX - rect.left, e.clientY - rect.top);
+        if (!hit) this.onPreviewBlur?.();
       }
 
       if (e.button === 1) {

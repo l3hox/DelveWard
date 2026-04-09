@@ -72,21 +72,17 @@ export class EditorPreview {
     this.freeFly = new FreeFlyCamera(this.camera);
     this.freeFly.attach(canvas);
 
-    // Input handling — only when focused
-    canvas.tabIndex = 0;
-    canvas.addEventListener('mousedown', () => this.focus());
-    canvas.addEventListener('keydown', (e) => {
-      if (!this.focused) return;
+    // Input handling — document-level, gated by focused flag
+    document.addEventListener('keydown', (e) => {
+      if (!this.focused || !this.active) return;
       this.keys.add(e.code);
       e.preventDefault();
-    });
-    canvas.addEventListener('keyup', (e) => {
+      e.stopPropagation();
+    }, true); // capture phase — intercept before editor shortcuts
+    document.addEventListener('keyup', (e) => {
+      if (!this.focused || !this.active) return;
       this.keys.delete(e.code);
-    });
-    canvas.addEventListener('blur', () => {
-      this.keys.clear();
-      this.setFocused(false);
-    });
+    }, true);
 
     // Render loop
     const loop = (time: number) => {
@@ -99,7 +95,7 @@ export class EditorPreview {
       this.processDirtyState();
 
       if (this.cameraMode === 'freefly') {
-        this.freeFly.update(delta);
+        this.freeFly.update(delta, this.keys);
       } else {
         this.processInput();
         if (this.player) this.player.update(delta);
@@ -119,6 +115,11 @@ export class EditorPreview {
   focus(): void {
     this.canvas.focus();
     this.setFocused(true);
+  }
+
+  blur(): void {
+    this.keys.clear();
+    this.setFocused(false);
   }
 
   private setFocused(f: boolean): void {

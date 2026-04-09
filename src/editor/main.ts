@@ -60,6 +60,9 @@ gridCanvas.onPreviewContentClick = () => {
   preview.focus();
   if (preview.getCameraMode() === 'freefly') preview.requestPointerLock();
 };
+gridCanvas.onPreviewBlur = () => {
+  preview.blur();
+};
 preview.onFrameCallback = () => gridCanvas.markDirty();
 
 function togglePreview(active: boolean): void {

@@ -28,14 +28,8 @@ export class FreeFlyCamera {
       this.euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.euler.x));
       this.camera.quaternion.setFromEuler(this.euler);
     });
-    canvas.addEventListener('keydown', (e) => {
-      if (!this.locked) return;
-      this.keys.add(e.code);
-      e.preventDefault();
-    });
-    canvas.addEventListener('keyup', (e) => {
-      this.keys.delete(e.code);
-    });
+    // Keyboard handled by EditorPreview's document-level listeners
+    // FreeFlyCamera reads from its own keys set, fed by update()
   }
 
   /** Sync euler from current camera rotation (call when switching to this mode). */
@@ -50,19 +44,20 @@ export class FreeFlyCamera {
     if (!this.locked && this.attachedCanvas) this.attachedCanvas.requestPointerLock();
   }
 
-  update(delta: number): void {
+  update(delta: number, keys?: Set<string>): void {
     if (!this.locked) return;
 
+    const k = keys ?? this.keys;
     const speed = FLY_SPEED * delta;
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
 
-    if (this.keys.has('KeyW')) this.camera.position.addScaledVector(forward, speed);
-    if (this.keys.has('KeyS')) this.camera.position.addScaledVector(forward, -speed);
-    if (this.keys.has('KeyA')) this.camera.position.addScaledVector(right, -speed);
-    if (this.keys.has('KeyD')) this.camera.position.addScaledVector(right, speed);
-    if (this.keys.has('Space')) this.camera.position.y += speed;
-    if (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) this.camera.position.y -= speed;
+    if (k.has('KeyW')) this.camera.position.addScaledVector(forward, speed);
+    if (k.has('KeyS')) this.camera.position.addScaledVector(forward, -speed);
+    if (k.has('KeyA')) this.camera.position.addScaledVector(right, -speed);
+    if (k.has('KeyD')) this.camera.position.addScaledVector(right, speed);
+    if (k.has('Space')) this.camera.position.y += speed;
+    if (k.has('ShiftLeft') || k.has('ShiftRight')) this.camera.position.y -= speed;
   }
 
   release(): void {
