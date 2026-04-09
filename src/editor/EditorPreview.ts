@@ -206,6 +206,9 @@ export class EditorPreview {
       this.torchFillLight.position.copy(this.camera.position);
       this.torchFillLight.position.y -= 0.5;
 
+      // Skybox follows camera
+      if (this.skyboxMesh) this.skyboxMesh.position.copy(this.camera.position);
+
       // Billboard sprites face camera (Y-axis only)
       const camY = this.camera.rotation.y;
       for (const m of this.billboardMeshes) m.rotation.y = camY;
