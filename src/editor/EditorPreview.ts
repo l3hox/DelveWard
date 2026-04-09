@@ -26,7 +26,7 @@ import { buildSignMeshes } from '../rendering/signRenderer';
 import { buildFountainMeshes } from '../rendering/fountainRenderer';
 import { buildBookshelfMeshes } from '../rendering/bookshelfRenderer';
 import { buildAltarMeshes } from '../rendering/altarRenderer';
-import { buildForestMeshes } from '../rendering/forestRenderer';
+import { buildForestMeshes, updateForestBillboards, type ForestMeshes } from '../rendering/forestRenderer';
 import { buildNpcMeshes } from '../rendering/npcRenderer';
 import { buildEnemyMeshes } from '../rendering/enemyRenderer';
 import { buildItemMeshes, buildConsumableMeshes } from '../rendering/groundItemRenderer';
@@ -135,6 +135,8 @@ export class EditorPreview {
   // Per-layer dungeon groups for incremental rebuild
   private layerDungeonGroups: THREE.Group[] = [];
   private entityGroup: THREE.Group;
+  private billboardMeshes: THREE.Mesh[] = []; // sprites that face camera each frame
+  private forestMeshes: ForestMeshes = { group: new THREE.Group(), instances: [] };
 
   private dirty = true;
   active = false;
@@ -201,6 +203,13 @@ export class EditorPreview {
       this.torchLight.position.copy(this.camera.position);
       this.torchFillLight.position.copy(this.camera.position);
       this.torchFillLight.position.y -= 0.5;
+
+      // Billboard sprites face camera (Y-axis only)
+      const camY = this.camera.rotation.y;
+      for (const m of this.billboardMeshes) m.rotation.y = camY;
+      if (this.forestMeshes.instances.length > 0) {
+        updateForestBillboards(this.forestMeshes, this.camera);
+      }
 
       this.renderer.render(this.scene, this.camera);
       this.onFrameCallback?.();
@@ -352,6 +361,8 @@ export class EditorPreview {
       }
     });
     this.entityGroup.clear();
+    this.billboardMeshes = [];
+    this.forestMeshes.instances = [];
 
     const gs = new GameState([], undefined, 'preview', level.layers);
     const walkable = buildWalkableSet(level.charDefs);
@@ -417,6 +428,7 @@ export class EditorPreview {
       const keyMeshes = buildKeyMeshes(gs);
       keyMeshes.group.position.y = yOffset;
       this.entityGroup.add(keyMeshes.group);
+      for (const m of keyMeshes.meshMap.values()) this.billboardMeshes.push(m);
 
       // Plates
       const plateMeshes = buildPlateMeshes(gs);
@@ -468,27 +480,32 @@ export class EditorPreview {
       if (forestMeshes.instances.length > 0) {
         forestMeshes.group.position.y = yOffset;
         this.entityGroup.add(forestMeshes.group);
+        this.forestMeshes.instances.push(...forestMeshes.instances);
       }
 
       // NPCs
       const npcMeshes = buildNpcMeshes(gs.npcs);
       npcMeshes.group.position.y = yOffset;
       this.entityGroup.add(npcMeshes.group);
+      for (const m of npcMeshes.meshMap.values()) this.billboardMeshes.push(m);
 
       // Enemies
       const enemyMeshes = buildEnemyMeshes(gs);
       enemyMeshes.group.position.y = yOffset;
       this.entityGroup.add(enemyMeshes.group);
+      for (const m of enemyMeshes.meshMap.values()) this.billboardMeshes.push(m);
 
       // Ground items
       const itemMeshes = buildItemMeshes(gs);
       itemMeshes.group.position.y = yOffset;
       this.entityGroup.add(itemMeshes.group);
+      for (const m of itemMeshes.meshMap.values()) this.billboardMeshes.push(m);
 
       // Consumables
       const consumableMeshes = buildConsumableMeshes(gs);
       consumableMeshes.group.position.y = yOffset;
       this.entityGroup.add(consumableMeshes.group);
+      for (const m of consumableMeshes.meshMap.values()) this.billboardMeshes.push(m);
     }
   }
 
