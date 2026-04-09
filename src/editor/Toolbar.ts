@@ -55,7 +55,7 @@ export class Toolbar {
   onThinWallBackSelect: ((texture: string) => void) | null = null;
   onNewLevel: (() => void) | null = null;
   onNewDungeon: (() => void) | null = null;
-  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void) | null = null;
+  onViewToggle: ((flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly' | 'show3dPreview', value: boolean) => void) | null = null;
   onItemIdChange: ((type: 'equipment' | 'consumable', itemId: string) => void) | null = null;
   onSave: (() => void) | null = null;
   onSaveAs: (() => void) | null = null;
@@ -101,7 +101,7 @@ export class Toolbar {
     this.onNewDungeon = cb;
   }
 
-  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly', value: boolean) => void): void {
+  setViewToggleCallback(cb: (flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly' | 'show3dPreview', value: boolean) => void): void {
     this.onViewToggle = cb;
   }
 
@@ -460,12 +460,13 @@ export class Toolbar {
     this.addViewToggle(this.entityPalette, 'Floor / Ceiling', 'showCeiling', false);
     this.addViewToggle(this.entityPalette, 'Item Preview', 'showItemPreview', true);
     this.addViewToggle(this.entityPalette, 'Layer Below', 'showLayerBelow', true);
+    this.addViewToggle(this.entityPalette, '3D Preview', 'show3dPreview', false);
   }
 
   private addViewToggle(
     parent: HTMLElement,
     label: string,
-    flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly',
+    flag: 'showCeiling' | 'showItemPreview' | 'showLayerBelow' | 'floodFill' | 'thinWallEraseOnly' | 'show3dPreview',
     defaultOn: boolean
   ): void {
     const wrapper = document.createElement('label');

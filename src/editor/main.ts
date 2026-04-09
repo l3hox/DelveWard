@@ -46,8 +46,6 @@ const errorBannerEl = document.getElementById('error-banner') as HTMLElement;
 const statusHintEl = document.getElementById('status-hint') as HTMLElement;
 
 const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
-const previewToggleBtn = document.getElementById('btn-preview-3d') as HTMLButtonElement;
-const cameraModeBtn = document.getElementById('btn-camera-mode') as HTMLButtonElement;
 
 const gridCanvas = new GridCanvas(canvas, container, app);
 const preview = new EditorPreview(previewCanvas);
@@ -63,8 +61,6 @@ preview.onFrameCallback = () => gridCanvas.markDirty();
 function togglePreview(active: boolean): void {
   preview.setActive(active);
   gridCanvas.previewActive = active;
-  previewToggleBtn.classList.toggle('active', active);
-  cameraModeBtn.style.display = active ? '' : 'none';
 
   if (active && app.level) {
     const { w, h } = gridCanvas.getPreviewContentSize();
@@ -77,19 +73,9 @@ function togglePreview(active: boolean): void {
   gridCanvas.markDirty();
 }
 
-previewToggleBtn.addEventListener('click', () => togglePreview(!preview.active));
-
-cameraModeBtn.addEventListener('click', () => {
-  const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
-  preview.setCameraMode(mode);
-  cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
-  gridCanvas.previewCameraMode = mode;
-});
-
 gridCanvas.onPreviewModeToggle = () => {
   const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
   preview.setCameraMode(mode);
-  cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
   gridCanvas.previewCameraMode = mode;
   gridCanvas.markDirty();
 };
@@ -229,7 +215,7 @@ function refreshAllUI(): void {
   updateDirtyDisplay();
   updateErrorBanner();
   updateStatusHint();
-  if (preview.active) preview.markFullRebuild();
+  if (preview.active) preview.markFullRebuild(app.level!);
 }
 
 // --- Undo/Redo: onLevelRestored callback ---
@@ -249,7 +235,7 @@ app.onLevelRestored = () => {
   gridCanvas.markDirty();
   gridCanvas.updateCursor();
   updateErrorBanner();
-  if (preview.active) preview.markFullRebuild();
+  if (preview.active) preview.markFullRebuild(app.level!);
 };
 
 // Toolbar callbacks — cancel pick mode on tool switch
@@ -311,6 +297,10 @@ toolbar.setItemIdChangeCallback((type, itemId) => {
 });
 
 toolbar.setViewToggleCallback(async (flag, value) => {
+  if (flag === 'show3dPreview') {
+    togglePreview(value);
+    return;
+  }
   app[flag] = value;
   if (flag === 'showItemPreview' && value) {
     const { itemDatabase } = await import('../core/itemDatabase');
@@ -673,7 +663,7 @@ inspector.setEntityChangedCallback(() => {
   markDirty();
   gridCanvas.markDirty();
   updateErrorBanner();
-  if (preview.active) preview.markFullRebuild();
+  if (preview.active) preview.markFullRebuild(app.level!);
 });
 
 inspector.setDeleteCallback(() => {
@@ -689,7 +679,7 @@ inspector.setDeleteCallback(() => {
   gridCanvas.markDirty();
   app.rebuildDerivedState();
   updateErrorBanner();
-  if (preview.active) preview.markFullRebuild();
+  if (preview.active) preview.markFullRebuild(app.level!);
 });
 
 // Inspector undo callbacks
@@ -766,14 +756,14 @@ gridCanvas.setAfterPaintCallback(() => {
   markDirty();
   app.rebuildDerivedState();
   updateErrorBanner();
-  if (preview.active) preview.markGeometryDirty(app.activeLayerIndex);
+  if (preview.active) preview.markGeometryDirty(app.activeLayerIndex, app.level!);
 });
 
 // Entity add snapshot
 gridCanvas.setBeforeEntityAddCallback(() => {
   if (app.level) app.undo.snapshot(app.level, app.activeLevelIndex);
   markDirty();
-  if (preview.active) preview.markFullRebuild();
+  if (preview.active) preview.markFullRebuild(app.level!);
 });
 
 // Pick complete snapshot

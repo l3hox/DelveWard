@@ -358,7 +358,8 @@ export class EditorPreview {
     this.rebuildAllEntities(level);
   }
 
-  markGeometryDirty(layerIndex: number): void {
+  markGeometryDirty(layerIndex: number, level?: DungeonLevel): void {
+    if (level) this.level = level;
     this.geometryDirtyLayers.add(layerIndex);
     this.dirty = true;
   }
@@ -369,7 +370,8 @@ export class EditorPreview {
     this.dirty = true;
   }
 
-  markFullRebuild(): void {
+  markFullRebuild(level?: DungeonLevel): void {
+    if (level) this.level = level;
     this.fullRebuildNeeded = true;
     this.dirty = true;
   }
