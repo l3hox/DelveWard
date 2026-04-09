@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { buildDungeon, CELL_SIZE, LAYER_HEIGHT } from '../rendering/dungeon';
-import type { RampCellInfo } from '../rendering/dungeon';
+import { CELL_SIZE, LAYER_HEIGHT } from '../rendering/dungeon';
+import { buildRampInfo, buildLayerDungeonGeometry } from '../rendering/sceneUtils';
 import { Player } from '../rendering/player';
 import { buildWalkableSet, FACING_DELTA } from '../core/grid';
 import type { Facing } from '../core/grid';
@@ -246,104 +246,20 @@ export function buildLevelScene(
       ? (multiZone ? zoneMap : undefined)
       : (multiZone ? buildEnvZoneMapWithExistingZones(ld.grid, level.environment ?? 'dungeon', ldAreas, zones) : undefined);
 
-    // Ramp cells that need ceiling/wall/floor suppression on this layer.
-    // A cell may be affected by multiple ramps (stacked ramps), so we merge entries.
-    const ldRampOpenCells = new Map<string, RampCellInfo>();
-    const OPPOSITE: Record<string, Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
-
-    function mergeRampCell(key: string, info: RampCellInfo): void {
-      const existing = ldRampOpenCells.get(key);
-      if (!existing) {
-        ldRampOpenCells.set(key, info);
-        return;
-      }
-      // Merge: combine wallDirs, OR boolean flags, keep first non-undefined optional fields
-      for (const d of info.wallDirs) {
-        if (!existing.wallDirs.includes(d)) existing.wallDirs.push(d);
-      }
-      existing.skipCeiling = existing.skipCeiling || info.skipCeiling;
-      existing.skipFloor = existing.skipFloor || info.skipFloor;
-      if (info.keepHalf !== undefined && existing.keepHalf === undefined) existing.keepHalf = info.keepHalf;
-      if (info.floorKeepHalf !== undefined && existing.floorKeepHalf === undefined) existing.floorKeepHalf = info.floorKeepHalf;
-    }
-
-    // Bottom cells on this layer: skip ceiling + wall in facing direction
-    for (const ramp of gameState.ramps.values()) {
-      mergeRampCell(doorKey(ramp.col, ramp.row), {
-        wallDirs: [ramp.facing],
-        skipCeiling: true,
-        skipFloor: false,
-      });
-      // Top cell (wall) on this same layer: split side walls, keep only the far half
-      const [dx, dz] = FACING_DELTA[ramp.facing];
-      const topCol = ramp.col + dx;
-      const topRow = ramp.row + dz;
-      mergeRampCell(doorKey(topCol, topRow), {
-        wallDirs: [OPPOSITE[ramp.facing]],
-        skipCeiling: false,
-        skipFloor: false,
-        keepHalf: ramp.facing,
-      });
-    }
-    // Top cells from ramps on the layer below: skip floor + wall opposite to facing
-    // On the upper layer the top cell is walkable — don't halve its perpendicular walls
-    // (keepHalf is only for the lower layer where the top cell is #).
-    if (li > 0) {
-      const savedIdx = gameState.activeLayerIndex;
-      gameState.activeLayerIndex = li - 1;
-      for (const ramp of gameState.ramps.values()) {
-        const [dx, dz] = FACING_DELTA[ramp.facing];
-        const topCol = ramp.col + dx;
-        const topRow = ramp.row + dz;
-        mergeRampCell(doorKey(topCol, topRow), {
-          wallDirs: [OPPOSITE[ramp.facing]],
-          skipCeiling: false,
-          skipFloor: false,
-          floorKeepHalf: ramp.facing,
-        });
-      }
-      gameState.activeLayerIndex = savedIdx;
-    }
-
-    // Per-wall half-wall overrides: walkable cells adjacent to ramp top cells
-    // need their walls TOWARD the top cell halved (keep only the half away from ramp entrance).
-    const ldRampHalfWalls = new Map<string, Facing>();
-    for (const ramp of gameState.ramps.values()) {
-      const [dx, dz] = FACING_DELTA[ramp.facing];
-      const topCol = ramp.col + dx;
-      const topRow = ramp.row + dz;
-      // Perpendicular directions to the ramp facing
-      if (ramp.facing === 'N' || ramp.facing === 'S') {
-        // E/W cells adjacent to top cell draw walls toward it
-        // Cell to the east: its WEST wall faces the top cell
-        ldRampHalfWalls.set(`${doorKey(topCol + 1, topRow)}:W`, ramp.facing);
-        // Cell to the west: its EAST wall faces the top cell
-        ldRampHalfWalls.set(`${doorKey(topCol - 1, topRow)}:E`, ramp.facing);
-      } else {
-        // N/S cells adjacent to top cell draw walls toward it
-        ldRampHalfWalls.set(`${doorKey(topCol, topRow + 1)}:N`, ramp.facing);
-        ldRampHalfWalls.set(`${doorKey(topCol, topRow - 1)}:S`, ramp.facing);
-      }
-    }
-
-    // Dungeon geometry
-    const ldAboveGrid = layerDefs[li + 1]?.grid;
-    const ldBelowGrid = layerDefs[li - 1]?.grid;
+    // Dungeon geometry (walls, floors, ceilings) with ramp suppression
     const ldDoorCells = new Set(gameState.doors.keys());
     const ldPitTrapCells = new Set(gameState.pitTraps.keys());
-    const { group: ldDungeonGroup, pitFloorMap: ldPitFloorMap } = buildDungeon(
-      ld.grid, ldDefaults, ldAreas, level.charDefs, ldCeiling,
-      ldStairPositions, ldWallEntityCells,
-      ldZoneMap,
-      (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
-      ldAboveGrid, ldBelowGrid,
-      ldRampOpenCells,
-      ldRampHalfWalls,
-      ldPitTrapCells,
+    const { group: ldDungeonGroup, pitFloorMap: ldPitFloorMap } = buildLayerDungeonGeometry(
+      gameState, li, ld, level, layerDefs.length, {
+        envZoneMap: ldZoneMap,
+        doorCells: (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
+        pitTrapCells: ldPitTrapCells,
+      },
     );
-    ldDungeonGroup.position.y = yOffset;
     allDungeonGroup.add(ldDungeonGroup);
     mergeMap(sharedPitFloorMap, ldPitFloorMap, li);
+
+    const ldAboveGrid = layerDefs[li + 1]?.grid;
 
     // Door meshes
     const ldDoorMeshes = buildDoorMeshes(ld.grid, gameState, ldWalkable, ldZoneMap);
