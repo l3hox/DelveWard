@@ -52,7 +52,8 @@ export class GridCanvas {
   // 3D preview floating window
   previewCanvas: HTMLCanvasElement | null = null;
   previewActive = false;
-  private previewWin = { x: 20, y: 20, w: 400, h: 300 };
+  private previewWin = { x: 0, y: 0, w: 400, h: 300 };
+  private previewPositioned = false;
   private previewDrag: { type: 'move' | 'resize'; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null = null;
   private readonly TITLE_H = 22;
   private readonly BORDER = 5;
@@ -1689,6 +1690,20 @@ export class GridCanvas {
 
   private drawPreviewWindow(): void {
     if (!this.previewActive || !this.previewCanvas) return;
+
+    // Default position: right-lower quarter with padding
+    if (!this.previewPositioned) {
+      const cw = this.canvas.width;
+      const ch = this.canvas.height;
+      const pad = 10;
+      this.previewWin.w = Math.max(this.MIN_W, Math.floor(cw / 2) - pad * 2);
+      this.previewWin.h = Math.max(this.MIN_H, Math.floor(ch / 2) - pad * 2);
+      this.previewWin.x = cw - this.previewWin.w - pad;
+      this.previewWin.y = ch - this.previewWin.h - this.TITLE_H - pad;
+      this.previewPositioned = true;
+      this.onPreviewResize?.();
+    }
+
     const { ctx } = this;
     const { x, y, w, h } = this.previewWin;
     const totalH = h + this.TITLE_H;
