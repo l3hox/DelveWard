@@ -72,7 +72,7 @@ function togglePreview(active: boolean): void {
   if (active && app.level) {
     const { w, h } = gridCanvas.getPreviewContentSize();
     preview.resize(w, h);
-    if (!preview.hasScene) {
+    if (!preview.hasScene || preview.needsPlayerReset) {
       preview.buildScene(app.level, app.activeLayerIndex);
     }
   }
@@ -453,6 +453,7 @@ toolbar.setOpenFromServerCallback(async () => {
       app.loadLevel(result.level);
     }
     app.sourcePath = filename;
+    preview.resetScene(app.level!, app.activeLayerIndex);
     refreshAllUI();
   } catch (err) {
     alert(`Failed to load from server: ${(err as Error).message}`);
@@ -531,6 +532,7 @@ toolbar.setNewDungeonCallback(() => {
   };
 
   app.loadDungeon(dungeon);
+  preview.resetScene(app.level!, app.activeLayerIndex);
   refreshAllUI();
 });
 
@@ -1412,6 +1414,7 @@ btnOpen.addEventListener('click', async () => {
   } else {
     app.loadLevel(result.level);
   }
+  preview.resetScene(app.level!, app.activeLayerIndex);
   refreshAllUI();
 });
 

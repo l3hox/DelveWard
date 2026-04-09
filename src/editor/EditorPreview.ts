@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import type { DungeonLevel } from '../core/types';
 import type { Facing } from '../core/grid';
-import { GameState } from '../core/gameState';
+import { GameState, doorKey } from '../core/gameState';
 import { buildDungeon, LAYER_HEIGHT } from '../rendering/dungeon';
+import type { RampCellInfo } from '../rendering/dungeon';
 import { applyEnvironment } from '../rendering/environment';
 import { Player } from '../rendering/player';
-import { buildWalkableSet, FACING_ANGLE } from '../core/grid';
+import { buildWalkableSet, FACING_ANGLE, FACING_DELTA } from '../core/grid';
 import { buildDoorMeshes } from '../rendering/doorRenderer';
 import { buildSconceMeshes } from '../rendering/sconceRenderer';
 import { buildPropMeshes } from '../rendering/propRenderer';
@@ -15,9 +16,102 @@ import { buildStairMeshes } from '../rendering/stairRenderer';
 import { buildWallEntityMeshes } from '../rendering/wallEntityRenderer';
 import { buildThinWallMeshes } from '../rendering/thinWallRenderer';
 import { buildRampMeshes } from '../rendering/rampRenderer';
+import { buildKeyMeshes } from '../rendering/keyRenderer';
+import { buildPlateMeshes } from '../rendering/plateRenderer';
+import { buildLeverMeshes } from '../rendering/leverRenderer';
+import { buildTripwireMeshes } from '../rendering/tripwireRenderer';
+import { buildTrapLauncherMeshes } from '../rendering/trapLauncherRenderer';
+import { buildChestMeshes } from '../rendering/chestRenderer';
+import { buildSignMeshes } from '../rendering/signRenderer';
+import { buildFountainMeshes } from '../rendering/fountainRenderer';
+import { buildBookshelfMeshes } from '../rendering/bookshelfRenderer';
+import { buildAltarMeshes } from '../rendering/altarRenderer';
+import { buildForestMeshes } from '../rendering/forestRenderer';
+import { buildNpcMeshes } from '../rendering/npcRenderer';
+import { buildEnemyMeshes } from '../rendering/enemyRenderer';
+import { buildItemMeshes, buildConsumableMeshes } from '../rendering/groundItemRenderer';
 import { FreeFlyCamera } from './FreeFlyCamera';
 
 export type PreviewCameraMode = 'noclip' | 'freefly';
+
+const OPPOSITE: Record<string, Facing> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+/** Compute ramp open-cell and half-wall maps for a single layer, matching levelSceneBuilder logic. */
+function buildRampInfo(
+  gs: GameState,
+  li: number,
+): { rampOpenCells: Map<string, RampCellInfo>; rampHalfWalls: Map<string, Facing> } {
+  const rampOpenCells = new Map<string, RampCellInfo>();
+
+  function mergeRampCell(key: string, info: RampCellInfo): void {
+    const existing = rampOpenCells.get(key);
+    if (!existing) {
+      rampOpenCells.set(key, info);
+      return;
+    }
+    for (const d of info.wallDirs) {
+      if (!existing.wallDirs.includes(d)) existing.wallDirs.push(d);
+    }
+    existing.skipCeiling = existing.skipCeiling || info.skipCeiling;
+    existing.skipFloor = existing.skipFloor || info.skipFloor;
+    if (info.keepHalf !== undefined && existing.keepHalf === undefined) existing.keepHalf = info.keepHalf;
+    if (info.floorKeepHalf !== undefined && existing.floorKeepHalf === undefined) existing.floorKeepHalf = info.floorKeepHalf;
+  }
+
+  // Bottom cells on this layer: suppress ceiling + forward wall
+  for (const ramp of gs.ramps.values()) {
+    mergeRampCell(doorKey(ramp.col, ramp.row), {
+      wallDirs: [ramp.facing],
+      skipCeiling: true,
+      skipFloor: false,
+    });
+    // Top cell on this same layer: keep only the far half of perpendicular walls
+    const [dx, dz] = FACING_DELTA[ramp.facing];
+    const topCol = ramp.col + dx;
+    const topRow = ramp.row + dz;
+    mergeRampCell(doorKey(topCol, topRow), {
+      wallDirs: [OPPOSITE[ramp.facing]],
+      skipCeiling: false,
+      skipFloor: false,
+      keepHalf: ramp.facing,
+    });
+  }
+
+  // Top cells from ramps on the layer below: suppress floor
+  if (li > 0) {
+    const savedIdx = gs.activeLayerIndex;
+    gs.activeLayerIndex = li - 1;
+    for (const ramp of gs.ramps.values()) {
+      const [dx, dz] = FACING_DELTA[ramp.facing];
+      const topCol = ramp.col + dx;
+      const topRow = ramp.row + dz;
+      mergeRampCell(doorKey(topCol, topRow), {
+        wallDirs: [OPPOSITE[ramp.facing]],
+        skipCeiling: false,
+        skipFloor: false,
+        floorKeepHalf: ramp.facing,
+      });
+    }
+    gs.activeLayerIndex = savedIdx;
+  }
+
+  // Half-wall overrides for cells adjacent to ramp top cells
+  const rampHalfWalls = new Map<string, Facing>();
+  for (const ramp of gs.ramps.values()) {
+    const [dx, dz] = FACING_DELTA[ramp.facing];
+    const topCol = ramp.col + dx;
+    const topRow = ramp.row + dz;
+    if (ramp.facing === 'N' || ramp.facing === 'S') {
+      rampHalfWalls.set(`${doorKey(topCol + 1, topRow)}:W`, ramp.facing);
+      rampHalfWalls.set(`${doorKey(topCol - 1, topRow)}:E`, ramp.facing);
+    } else {
+      rampHalfWalls.set(`${doorKey(topCol, topRow + 1)}:N`, ramp.facing);
+      rampHalfWalls.set(`${doorKey(topCol, topRow - 1)}:S`, ramp.facing);
+    }
+  }
+
+  return { rampOpenCells, rampHalfWalls };
+}
 
 export class EditorPreview {
   private canvas: HTMLCanvasElement;
@@ -35,6 +129,7 @@ export class EditorPreview {
 
   private geometryDirtyLayers = new Set<number>();
   private fullRebuildNeeded = false;
+  needsPlayerReset = false;
 
   // Per-layer dungeon groups for incremental rebuild
   private layerDungeonGroups: THREE.Group[] = [];
@@ -137,6 +232,15 @@ export class EditorPreview {
 
   get hasScene(): boolean { return this.level !== null && this.layerDungeonGroups.length > 0; }
 
+  /** Full rebuild including player reset to playerStart. Call on file open. */
+  resetScene(level: DungeonLevel, activeLayerIndex: number): void {
+    this.level = level;
+    this.needsPlayerReset = true;
+    if (this.active) {
+      this.buildScene(level, activeLayerIndex);
+    }
+  }
+
   setActive(active: boolean): void {
     this.active = active;
   }
@@ -151,12 +255,21 @@ export class EditorPreview {
     applyEnvironment(level.environment, this.scene, this.ambient);
 
     const walkable = buildWalkableSet(level.charDefs);
+    const gs = new GameState([], undefined, 'preview', level.layers);
 
     for (let li = 0; li < level.layers.length; li++) {
+      gs.activeLayerIndex = li;
       const ld = level.layers[li];
       const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
       const aboveGrid = level.layers[li + 1]?.grid;
       const belowGrid = level.layers[li - 1]?.grid;
+
+      const stairPositions = new Set(gs.stairs.keys());
+      const wallEntityCells = new Set<string>();
+      for (const key of gs.breakableWalls.keys()) wallEntityCells.add(key);
+      for (const key of gs.secretWalls.keys()) wallEntityCells.add(key);
+
+      const { rampOpenCells, rampHalfWalls } = buildRampInfo(gs, li);
 
       const dungeonGroup = buildDungeon(
         ld.grid,
@@ -164,12 +277,14 @@ export class EditorPreview {
         ld.areas ?? level.areas,
         level.charDefs,
         li === level.layers.length - 1 ? (ld.ceiling ?? level.ceiling) !== false : true,
-        new Set(), // stairPositions
-        new Set(), // wallEntityCells
+        stairPositions,
+        wallEntityCells,
         undefined, // envZoneMap
         undefined, // doorCells
         aboveGrid,
         belowGrid,
+        rampOpenCells,
+        rampHalfWalls,
       );
       dungeonGroup.position.y = yOffset;
       this.scene.add(dungeonGroup);
@@ -203,6 +318,7 @@ export class EditorPreview {
 
     this.dirty = true;
     this.fullRebuildNeeded = false;
+    this.needsPlayerReset = false;
   }
 
   private clearScene(): void {
@@ -293,6 +409,83 @@ export class EditorPreview {
       const rampMeshes = buildRampMeshes(gs, ld.grid, defaults, level.charDefs, areas, walkable);
       rampMeshes.group.position.y = yOffset;
       this.entityGroup.add(rampMeshes.group);
+
+      // Keys
+      const keyMeshes = buildKeyMeshes(gs);
+      keyMeshes.group.position.y = yOffset;
+      this.entityGroup.add(keyMeshes.group);
+
+      // Plates
+      const plateMeshes = buildPlateMeshes(gs);
+      plateMeshes.group.position.y = yOffset;
+      this.entityGroup.add(plateMeshes.group);
+
+      // Levers
+      const leverMeshes = buildLeverMeshes(gs);
+      leverMeshes.group.position.y = yOffset;
+      this.entityGroup.add(leverMeshes.group);
+
+      // Tripwires
+      const tripwireMeshes = buildTripwireMeshes(gs);
+      tripwireMeshes.group.position.y = yOffset;
+      this.entityGroup.add(tripwireMeshes.group);
+
+      // Trap launchers
+      const trapLauncherMeshes = buildTrapLauncherMeshes(gs);
+      trapLauncherMeshes.group.position.y = yOffset;
+      this.entityGroup.add(trapLauncherMeshes.group);
+
+      // Chests
+      const chestMeshes = buildChestMeshes(gs);
+      chestMeshes.group.position.y = yOffset;
+      this.entityGroup.add(chestMeshes.group);
+
+      // Signs
+      const signMeshes = buildSignMeshes(gs);
+      signMeshes.group.position.y = yOffset;
+      this.entityGroup.add(signMeshes.group);
+
+      // Fountains
+      const fountainMeshes = buildFountainMeshes(gs);
+      fountainMeshes.group.position.y = yOffset;
+      this.entityGroup.add(fountainMeshes.group);
+
+      // Bookshelves
+      const bookshelfMeshes = buildBookshelfMeshes(gs);
+      bookshelfMeshes.group.position.y = yOffset;
+      this.entityGroup.add(bookshelfMeshes.group);
+
+      // Altars
+      const altarMeshes = buildAltarMeshes(gs);
+      altarMeshes.group.position.y = yOffset;
+      this.entityGroup.add(altarMeshes.group);
+
+      // Forest
+      const forestMeshes = buildForestMeshes(ld.grid, level.charDefs);
+      if (forestMeshes.instances.length > 0) {
+        forestMeshes.group.position.y = yOffset;
+        this.entityGroup.add(forestMeshes.group);
+      }
+
+      // NPCs
+      const npcMeshes = buildNpcMeshes(gs.npcs);
+      npcMeshes.group.position.y = yOffset;
+      this.entityGroup.add(npcMeshes.group);
+
+      // Enemies
+      const enemyMeshes = buildEnemyMeshes(gs);
+      enemyMeshes.group.position.y = yOffset;
+      this.entityGroup.add(enemyMeshes.group);
+
+      // Ground items
+      const itemMeshes = buildItemMeshes(gs);
+      itemMeshes.group.position.y = yOffset;
+      this.entityGroup.add(itemMeshes.group);
+
+      // Consumables
+      const consumableMeshes = buildConsumableMeshes(gs);
+      consumableMeshes.group.position.y = yOffset;
+      this.entityGroup.add(consumableMeshes.group);
     }
   }
 
@@ -370,11 +563,20 @@ export class EditorPreview {
     this.layerDungeonGroups = [];
 
     // Rebuild dungeon geometry for all layers
+    const gsRebuild = new GameState([], undefined, 'preview', level.layers);
     for (let li = 0; li < level.layers.length; li++) {
+      gsRebuild.activeLayerIndex = li;
       const ld = level.layers[li];
       const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
       const aboveGrid = level.layers[li + 1]?.grid;
       const belowGrid = level.layers[li - 1]?.grid;
+
+      const stairPositions = new Set(gsRebuild.stairs.keys());
+      const wallEntityCells = new Set<string>();
+      for (const key of gsRebuild.breakableWalls.keys()) wallEntityCells.add(key);
+      for (const key of gsRebuild.secretWalls.keys()) wallEntityCells.add(key);
+
+      const { rampOpenCells, rampHalfWalls } = buildRampInfo(gsRebuild, li);
 
       const dungeonGroup = buildDungeon(
         ld.grid,
@@ -382,8 +584,14 @@ export class EditorPreview {
         ld.areas ?? level.areas,
         level.charDefs,
         li === level.layers.length - 1 ? (ld.ceiling ?? level.ceiling) !== false : true,
-        new Set(), new Set(), undefined, undefined,
-        aboveGrid, belowGrid,
+        stairPositions,
+        wallEntityCells,
+        undefined,
+        undefined,
+        aboveGrid,
+        belowGrid,
+        rampOpenCells,
+        rampHalfWalls,
       );
       dungeonGroup.position.y = yOffset;
       this.scene.add(dungeonGroup);
@@ -437,18 +645,28 @@ export class EditorPreview {
       const aboveGrid = this.level.layers[li + 1]?.grid;
       const belowGrid = this.level.layers[li - 1]?.grid;
 
+      const gsIncr = new GameState([], undefined, 'preview', this.level.layers);
+      gsIncr.activeLayerIndex = li;
+      const stairPositions = new Set(gsIncr.stairs.keys());
+      const wallEntityCells = new Set<string>();
+      for (const key of gsIncr.breakableWalls.keys()) wallEntityCells.add(key);
+      for (const key of gsIncr.secretWalls.keys()) wallEntityCells.add(key);
+      const { rampOpenCells, rampHalfWalls } = buildRampInfo(gsIncr, li);
+
       const dungeonGroup = buildDungeon(
         ld.grid,
         ld.defaults ?? this.level.defaults,
         ld.areas ?? this.level.areas,
         this.level.charDefs,
         li === this.level.layers.length - 1 ? (ld.ceiling ?? this.level.ceiling) !== false : true,
-        new Set(),
-        new Set(),
+        stairPositions,
+        wallEntityCells,
         undefined,
         undefined,
         aboveGrid,
         belowGrid,
+        rampOpenCells,
+        rampHalfWalls,
       );
       dungeonGroup.position.y = yOffset;
       this.scene.add(dungeonGroup);
