@@ -84,6 +84,24 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - Cell-resolved textures via resolveTextures()
   - Editor: palette, directional grid icon, facing/style inspector
   - Particle fix: all particle systems enableAll() for multi-zone visibility
+- [x] **Phase D: Decorative Props**:
+  - 7 prop types: pillar, rubble, stalactite, stalagmite, statue, crate_stack, banner (wall-mounted)
+  - `PropInstance` with `propId`, optional `wall` (banner), optional `rotation` (statue/crate_stack)
+  - `propRenderer.ts` (~150 lines): per-type 3D geometry with shared materials
+  - Editor: palette entry, per-propId grid icons, propId dropdown in inspector with conditional wall/rotation fields, remembered `selectedPropId`
+  - Save/load, validation, zone tagging
+- [x] **Editor 3D Live Preview**:
+  - Floating window on the 2D editor canvas: draggable title bar, resizable, close button
+  - Defaults to right-lower quarter on first open; position preserved on toggle; resets to playerStart on file open
+  - Two camera modes: Step (grid-based noclip WASD/QE/YH) and Free-fly (pointer-lock mouse look, WASD + Space/Shift)
+  - Free-fly → Step mode snaps to nearest cell + closest cardinal facing
+  - Incremental updates: painting rebuilds layer geometry, entity changes rebuild entities, layer/level switch rebuilds all
+  - All 14 entity renderers included; billboard sprites (enemies, NPCs, keys, items, consumables, forest InstancedMesh) face preview camera
+  - Ramp wall suppression (`rampOpenCells` + `rampHalfWalls`) computed correctly
+  - Camera indicator on 2D grid: blinking blue arrow (grey on different layer)
+  - Mode toggle button in preview toolbar, key hints at bottom
+  - Keyboard input via document-level capture listeners (works off-screen canvas)
+  - New files: `EditorPreview.ts` (~500 lines), `FreeFlyCamera.ts` (~70 lines)
 - [x] **Polish — Rendering**:
   - Forest: PNG sprites + InstancedMesh (4 draw calls), billboard shader USE_INSTANCING
   - Items/keys/consumables: upright billboard sprites, multi-item seeded spread

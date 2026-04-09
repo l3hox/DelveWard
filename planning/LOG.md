@@ -4,6 +4,38 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-09 — Phase D Props + Editor Live 3D Preview
+
+### Phase D: Decorative Props (`src/game/propRenderer.ts`)
+
+7 prop types added: pillar, rubble, stalactite, stalagmite, statue, crate_stack, and banner (wall-mounted). Each type has distinct 3D geometry built in `propRenderer.ts` (~150 lines) with shared materials across instances. `PropInstance` carries `propId`, an optional `wall` field (banner only — determines which wall face to mount on), and an optional `rotation` field (statue and crate_stack). Save/load, level loader validation, and zone tagging are all wired. The `torch_bracket` type was removed from the Phase D plan before implementation.
+
+**Editor integration**: dedicated palette entry, per-propId grid icons for at-a-glance identification, propId dropdown in the inspector with conditional wall/rotation fields that appear only for the relevant prop types, and remembered `selectedPropId` (same pattern as enemy types and ramp subtypes).
+
+### Editor 3D Live Preview (`src/editor/EditorPreview.ts`, `src/editor/FreeFlyCamera.ts`)
+
+A floating 3D preview window embedded in the 2D editor canvas. The window is draggable (title bar), resizable, and closeable. It defaults to the right-lower quarter of the canvas on first open; position is preserved across toggle off/on and resets to playerStart on file open.
+
+**Camera modes**: Step mode uses grid-based noclip movement (WASD/QE for movement, Y/H for layer fly). Free-fly mode uses pointer-lock mouse look with WASD + Space/Shift for altitude. Switching Free-fly → Step snaps to the nearest grid cell and the closest cardinal facing. A mode toggle button sits in the preview toolbar; key hints are shown at the bottom.
+
+**Rendering**: All 14 entity renderers are included. Billboard sprites (enemies, NPCs, keys, items, consumables, forest InstancedMesh) face the preview camera. Ramp wall suppression (`rampOpenCells` + `rampHalfWalls`) is computed correctly so the preview matches the in-game view. Keyboard input uses document-level capture listeners to work while the preview canvas is off-screen.
+
+**Incremental updates**: painting a cell rebuilds layer geometry only; entity changes rebuild entities only; layer or level switches rebuild everything. This keeps the preview responsive during active editing.
+
+**2D grid indicator**: a blinking blue arrow shows the preview camera's current cell and facing on the 2D canvas. It renders grey when the camera is on a different layer than the active editing layer.
+
+`FreeFlyCamera.ts` (~70 lines) is a standalone class handling pointer-lock acquisition, mouse-delta accumulation, and WASD/Space/Shift velocity — extracted to keep `EditorPreview.ts` focused on scene management.
+
+### Other fixes (2026-04-09)
+
+- **Stair/ramp side walls**: conditional on neighbor being a wall (already tracked from 2026-04-08 ramp work; additional cases confirmed).
+- **Adjacent ramp top cells**: excluded from side wall rendering (confirmed in geometry pass).
+- **Non-walkable playerStart**: downgraded to warning — confirmed in docs and code.
+- **Editor layer undo/redo + copy layout checkbox**: confirmed complete in docs and code.
+- **Ramp remembered subtypes**: confirmed in editor.
+
+---
+
 ## 2026-04-08 — Falling, Ramp Fixes, Layer Cleanup
 
 ### Falling mechanic (`player.ts`, `levelSceneBuilder.ts`, `main.ts`)

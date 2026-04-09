@@ -31,8 +31,9 @@ Plan — see `planning/m4/PLAN.md`. ADRs — see `planning/m4/ADR.md`.
 - [x] Phase C: Thin walls + Phase C Editor (drawing tool, dual textures, eraser, rectangle perimeter)
 - [x] Ramps: Physical layer transitions (ramp + stairs styles, walkability overrides, geometry)
 - [x] Falling: Player falls through open floors (gravity, acceleration, multi-layer)
-- [ ] Phase D: Decorative props
-- [ ] Phase D Editor: Prop palette + placement
+- [x] Phase D: Decorative props
+- [x] Phase D Editor: Prop palette + placement
+- [x] Editor 3D Live Preview (floating window, noclip + free-fly, incremental updates)
 - [ ] Phase E: Pit traps
 - [ ] Phase E Editor: Pit trap entity
 - [ ] Phase F: Enemy spawners (nice-to-have)
@@ -77,6 +78,8 @@ Plan — see `planning/m4/PLAN.md`. ADRs — see `planning/m4/ADR.md`.
 
 ## Recent Changes
 
+- **Editor 3D Live Preview**: Floating window rendered onto the 2D editor canvas (draggable title bar, resizable, close button). Two camera modes: Step (grid-based noclip WASD/QE/YH) and Free-fly (pointer-lock mouse look, WASD + Space/Shift). Incremental updates: painting rebuilds layer geometry, entity changes rebuild entities, layer/level switch rebuilds all. Billboard sprites face camera (enemies, NPCs, keys, items, consumables, forest InstancedMesh). Ramp wall suppression computed correctly. All 14 entity renderers included. Camera indicator on 2D grid: blinking blue arrow (grey on different layer). Mode toggle button in toolbar, key hints at bottom. Window defaults to right-lower quarter on first open; position preserved on toggle; resets to playerStart on file open. Free-fly → Step mode snaps to nearest cell + closest cardinal facing. New files: `EditorPreview.ts` (~500 lines), `FreeFlyCamera.ts` (~70 lines). (`src/editor/EditorPreview.ts`, `src/editor/FreeFlyCamera.ts`)
+- **Phase D: Decorative Props**: 7 prop types — pillar, rubble, stalactite, stalagmite, statue, crate_stack, banner (wall-mounted). `PropInstance` with `propId`, optional `wall` (banner), optional `rotation` (statue/crate_stack). `propRenderer.ts` (150 lines): per-type 3D geometry with shared materials. Editor: palette entry, per-propId grid icons, propId dropdown in inspector with conditional wall/rotation fields, remembered `selectedPropId`. Save/load, validation, zone tagging. (`src/game/propRenderer.ts`)
 - **Ramp side walls conditional + texture fix**: Side walls on stairs and ramps now only render when the neighbor is a solid wall — open walkable neighbors get no side wall. Triangle/stepped side fills use the top cell's wall texture (matching dungeon builder half-walls). (`stairRenderer.ts`, `rampRenderer.ts`, `levelSceneBuilder.ts`)
 - **Upper layer full walls**: Removed `keepHalf` from the ramp top cell's upper-layer perpendicular walls — they are now full height, not halved.
 - **Stacked ramps**: `RampCellInfo.wallDir` changed from single `Facing` to `wallDirs: Facing[]` array. New `mergeRampCell()` helper combines entries when a cell is both the top of one ramp and the bottom of the next. Suppresses walls in both directions on the shared cell.
