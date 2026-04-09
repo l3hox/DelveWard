@@ -111,8 +111,9 @@ export interface RampCellInfo {
  */
 export type RampHalfWallMap = Map<string, import('../core/grid').Facing>;
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap): THREE.Group {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
   const group = new THREE.Group();
+  const pitFloorMap = new Map<string, THREE.Mesh>();
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -245,6 +246,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
           floor.position.set(cx, 0, cz);
           if (zoneLayer !== undefined) floor.layers.set(zoneLayer);
           group.add(floor);
+          if (pitTrapCells?.has(doorKey(col, row))) pitFloorMap.set(doorKey(col, row), floor);
         }
       }
 
@@ -432,5 +434,5 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
     }
   }
 
-  return group;
+  return { group, pitFloorMap };
 }

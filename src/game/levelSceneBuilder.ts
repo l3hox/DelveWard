@@ -70,6 +70,7 @@ export interface LevelScene {
   thinWallMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   propMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  pitFloorMap: Map<string, THREE.Mesh>;
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -189,6 +190,8 @@ export function buildLevelScene(
   const sharedPropGroup = new THREE.Group();
   scene.add(sharedPropGroup);
   const sharedPropMeshMap = new Map<string, THREE.Group>();
+
+  const sharedPitFloorMap = new Map<string, THREE.Mesh>();
 
   const sharedNpcGroup = new THREE.Group();
   scene.add(sharedNpcGroup);
@@ -327,7 +330,8 @@ export function buildLevelScene(
     const ldAboveGrid = layerDefs[li + 1]?.grid;
     const ldBelowGrid = layerDefs[li - 1]?.grid;
     const ldDoorCells = new Set(gameState.doors.keys());
-    const ldDungeonGroup = buildDungeon(
+    const ldPitTrapCells = new Set(gameState.pitTraps.keys());
+    const { group: ldDungeonGroup, pitFloorMap: ldPitFloorMap } = buildDungeon(
       ld.grid, ldDefaults, ldAreas, level.charDefs, ldCeiling,
       ldStairPositions, ldWallEntityCells,
       ldZoneMap,
@@ -335,9 +339,11 @@ export function buildLevelScene(
       ldAboveGrid, ldBelowGrid,
       ldRampOpenCells,
       ldRampHalfWalls,
+      ldPitTrapCells,
     );
     ldDungeonGroup.position.y = yOffset;
     allDungeonGroup.add(ldDungeonGroup);
+    mergeMap(sharedPitFloorMap, ldPitFloorMap, li);
 
     // Door meshes
     const ldDoorMeshes = buildDoorMeshes(ld.grid, gameState, ldWalkable, ldZoneMap);
@@ -687,6 +693,7 @@ export function buildLevelScene(
     thinWallMeshes: { group: sharedThinWallGroup, meshMap: sharedThinWallMeshMap },
     rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
     propMeshes: { group: sharedPropGroup, meshMap: sharedPropMeshMap },
+    pitFloorMap: sharedPitFloorMap,
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
     enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,

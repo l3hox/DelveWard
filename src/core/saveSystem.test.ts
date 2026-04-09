@@ -38,6 +38,7 @@ function makeEmptySnapshot(): LevelSnapshot {
     thinWalls:     new Map(),
     ramps:         new Map(),
     props:         new Map(),
+    pitTraps:      new Map(),
     destroyedWalls: new Set(),
     exploredCells:  new Set(),
     registrySnapshot: [],
@@ -84,6 +85,7 @@ function makeMinimalSnapshot(): LevelSnapshot {
     thinWalls:     new Map(),
     ramps:         new Map(),
     props:         new Map(),
+    pitTraps:      new Map(),
     destroyedWalls: new Set(['5_6', '7_8']),
     exploredCells:  new Set(['0_0', '1_0', '0_1']),
     registrySnapshot: [

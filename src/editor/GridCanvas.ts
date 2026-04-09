@@ -1503,6 +1503,24 @@ export class GridCanvas {
         break;
       }
 
+      case 'pit_trap': {
+        const pitOpen = (entity.state as string) === 'open';
+        ctx.strokeStyle = pitOpen ? '#ff4444' : '#cc4444';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(px + tw * 0.15, py + th * 0.15, tw * 0.7, th * 0.7);
+        ctx.setLineDash([]);
+        // Down arrow
+        ctx.fillStyle = pitOpen ? '#ff4444' : '#cc4444';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + iconRadius * 0.4);
+        ctx.lineTo(cx - iconRadius * 0.3, cy - iconRadius * 0.1);
+        ctx.lineTo(cx + iconRadius * 0.3, cy - iconRadius * 0.1);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);

@@ -282,7 +282,7 @@ export class EditorPreview {
 
       const { rampOpenCells, rampHalfWalls } = buildRampInfo(gs, li);
 
-      const dungeonGroup = buildDungeon(
+      const { group: dungeonGroup } = buildDungeon(
         ld.grid,
         ld.defaults ?? level.defaults,
         ld.areas ?? level.areas,
@@ -598,7 +598,7 @@ export class EditorPreview {
 
       const { rampOpenCells, rampHalfWalls } = buildRampInfo(gsRebuild, li);
 
-      const dungeonGroup = buildDungeon(
+      const { group: dungeonGroup } = buildDungeon(
         ld.grid,
         ld.defaults ?? level.defaults,
         ld.areas ?? level.areas,
@@ -673,7 +673,7 @@ export class EditorPreview {
       for (const key of gsIncr.secretWalls.keys()) wallEntityCells.add(key);
       const { rampOpenCells, rampHalfWalls } = buildRampInfo(gsIncr, li);
 
-      const dungeonGroup = buildDungeon(
+      const { group: dungeonGroup } = buildDungeon(
         ld.grid,
         ld.defaults ?? this.level.defaults,
         ld.areas ?? this.level.areas,

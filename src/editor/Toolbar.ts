@@ -22,7 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop',
+  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop', 'pit_trap',
 ] as const;
 
 export class Toolbar {
@@ -1050,6 +1050,23 @@ export class Toolbar {
         ctx.strokeStyle = '#555555';
         ctx.lineWidth = Math.max(1, r * 0.15);
         ctx.stroke();
+        break;
+      }
+      case 'pit_trap': {
+        // Dashed square — trap door
+        ctx.strokeStyle = '#cc4444';
+        ctx.lineWidth = Math.max(1, r * 0.12);
+        ctx.setLineDash([r * 0.2, r * 0.15]);
+        ctx.strokeRect(cx - r * 0.6, cy - r * 0.6, r * 1.2, r * 1.2);
+        ctx.setLineDash([]);
+        // Down arrow
+        ctx.fillStyle = '#cc4444';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + r * 0.3);
+        ctx.lineTo(cx - r * 0.25, cy - r * 0.1);
+        ctx.lineTo(cx + r * 0.25, cy - r * 0.1);
+        ctx.closePath();
+        ctx.fill();
         break;
       }
       case 'thin_wall': {

@@ -492,6 +492,17 @@ export class Inspector {
         });
         break;
 
+      case 'pit_trap':
+        this.addDropdownField('state', (entity.state as string) ?? 'closed', ['closed', 'open'], (val) => {
+          entity.state = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('gateMode', (entity.gateMode as string) ?? 'or', ['or', 'and', 'xor'], (val) => {
+          entity.gateMode = val;
+          this.onEntityChanged?.();
+        });
+        break;
+
       case 'prop': {
         const PROP_IDS = ['pillar', 'rubble', 'stalactite', 'stalagmite', 'statue', 'crate_stack', 'banner'];
         this.addDropdownField('propId', (entity.propId as string) ?? 'pillar', PROP_IDS, (val) => {

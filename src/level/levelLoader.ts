@@ -340,6 +340,16 @@ function validateEntity(
       }
       break;
     }
+    case 'pit_trap': {
+      const w = checkWalkable('pit_trap'); if (w) return w;
+      if (e.state !== undefined && !['closed', 'open'].includes(e.state as string)) {
+        return `${pfx} pit_trap state must be 'closed' or 'open'`;
+      }
+      if (e.gateMode !== undefined && !['or', 'and', 'xor'].includes(e.gateMode as string)) {
+        return `${pfx} pit_trap gateMode must be 'or', 'and', or 'xor'`;
+      }
+      break;
+    }
   }
 
   return null;

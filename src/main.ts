@@ -700,12 +700,13 @@ async function init(): Promise<void> {
         }
       }
 
-      // Hole detection — falling through open floors
+      // Hole detection — falling through open floors or open pit traps
       if (!ls.player.debugNoClip && col !== undefined && row !== undefined) {
         const currentLayer = gameState.activeLayerIndex;
         if (currentLayer > 0) {
           const belowGrid = ls.layerGrids[currentLayer - 1];
           let isHole = false;
+          // Check natural hole (layer below is not solid)
           if (belowGrid && row >= 0 && row < belowGrid.length && col >= 0 && col < belowGrid[0].length) {
             const ch = belowGrid[row][col];
             const def = ls.level.charDefs?.find((d: { char: string }) => d.char === ch);
@@ -713,6 +714,9 @@ async function init(): Promise<void> {
               isHole = true;
             }
           }
+          // Check open pit trap on current layer
+          const pit = gameState.pitTraps.get(doorKey(col, row));
+          if (pit && pit.state === 'open') isHole = true;
           if (isHole) {
             // Compute landing layer: scan downward for first layer with a floor
             let landingLayer = 0;
@@ -779,6 +783,37 @@ async function init(): Promise<void> {
         } else {
           blockedDoors.delete(dk);
           updateDoorMesh(ls.doorMeshes.panelMap, layerKey(dk), false, ls.doorAnimator, ls.doorMeshes.boundaryLights);
+        }
+      }
+    };
+
+    // Pit trap signal → toggle floor visibility + trigger fall if player is standing on it
+    gameState.onPitTrapSignalChanged = (col, row, open) => {
+      const key = layerKey(doorKey(col, row));
+      const mesh = ls.pitFloorMap.get(key);
+      if (mesh) mesh.visible = !open;
+
+      // If the player is standing on this cell and it just opened, trigger immediate fall
+      if (open && !ls.player.falling) {
+        const ps = ls.player.getState();
+        if (ps.col === col && ps.row === row) {
+          const currentLayer = gameState.activeLayerIndex;
+          if (currentLayer > 0) {
+            let landingLayer = 0;
+            for (let li = currentLayer - 1; li >= 1; li--) {
+              const gridBelow = ls.layerGrids[li - 1];
+              if (gridBelow && row < gridBelow.length && col < gridBelow[0].length) {
+                const ch = gridBelow[row][col];
+                const def = ls.level.charDefs?.find((d: { char: string }) => d.char === ch);
+                if (ch === '#' || (def && (def as any).solid && !(def as any).seeThrough)) {
+                  landingLayer = li;
+                  break;
+                }
+              }
+            }
+            const totalDistance = (currentLayer - landingLayer) * LAYER_HEIGHT;
+            ls.player.setPendingFall(landingLayer, totalDistance);
+          }
         }
       }
     };

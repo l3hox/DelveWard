@@ -42,6 +42,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   altar:          { buffType: 'atk', buffAmount: 5, buffDuration: 60 },
   barrel:         { hp: 10 },
   ramp:           { facing: 'N', style: 'ramp' },
+  pit_trap:       { state: 'closed' },
   prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
