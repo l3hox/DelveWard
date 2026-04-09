@@ -259,8 +259,7 @@ export class GridCanvas {
           return;
         }
         if (hit === 'content') {
-          // Click inside preview content — focus the preview for keyboard + pointer lock
-          this.previewCanvas?.focus();
+          // Click inside preview content — focus for keyboard + pointer lock
           this.onPreviewContentClick?.();
           return;
         }

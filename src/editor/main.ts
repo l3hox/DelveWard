@@ -57,6 +57,7 @@ gridCanvas.onPreviewResize = () => {
 };
 gridCanvas.onPreviewClose = () => togglePreview(false);
 gridCanvas.onPreviewContentClick = () => {
+  preview.focus();
   if (preview.getCameraMode() === 'freefly') preview.requestPointerLock();
 };
 preview.onFrameCallback = () => gridCanvas.markDirty();
