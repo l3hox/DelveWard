@@ -64,7 +64,9 @@ previewToggleBtn.addEventListener('click', () => {
   if (active && app.level) {
     const rect = container.getBoundingClientRect();
     preview.resize(Math.floor(rect.width / 2), rect.height);
-    preview.buildScene(app.level, app.activeLayerIndex);
+    if (!preview.hasScene) {
+      preview.buildScene(app.level, app.activeLayerIndex);
+    }
   }
 
   // Trigger 2D canvas resize

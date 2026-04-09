@@ -134,11 +134,10 @@ export class EditorPreview {
     this.dirty = true;
   }
 
+  get hasScene(): boolean { return this.level !== null && this.layerDungeonGroups.length > 0; }
+
   setActive(active: boolean): void {
     this.active = active;
-    if (active && this.level) {
-      this.fullRebuildNeeded = true;
-    }
   }
 
   // --- Scene building ---
@@ -307,15 +306,18 @@ export class EditorPreview {
 
   getCameraMode(): PreviewCameraMode { return this.cameraMode; }
 
-  /** Get camera grid position and Y-rotation for the 2D grid overlay indicator. */
-  getCameraInfo(): { col: number; row: number; angle: number } | null {
+  /** Get camera grid position, Y-rotation, and approximate layer index for the 2D grid overlay indicator. */
+  getCameraInfo(): { col: number; row: number; angle: number; layerIndex: number } | null {
     if (!this.active) return null;
     const CELL_SIZE = 2; // from dungeon.ts
     const pos = this.camera.position;
+    const eyeHeight = 1.625; // EYE_HEIGHT from dungeon.ts
+    const layerIndex = Math.round((pos.y - eyeHeight) / LAYER_HEIGHT);
     return {
       col: pos.x / CELL_SIZE - 0.5,
       row: pos.z / CELL_SIZE - 0.5,
       angle: this.camera.rotation.y,
+      layerIndex: Math.max(0, layerIndex),
     };
   }
 

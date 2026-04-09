@@ -47,7 +47,7 @@ export class GridCanvas {
   private onAfterPaint: (() => void) | null = null;
   private onBeforeEntityAdd: (() => void) | null = null;
   private onBeforePickComplete: (() => void) | null = null;
-  previewCameraGetter: (() => { col: number; row: number; angle: number } | null) | null = null;
+  previewCameraGetter: (() => { col: number; row: number; angle: number; layerIndex: number } | null) | null = null;
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
@@ -1601,8 +1601,12 @@ export class GridCanvas {
     const cy = py + tileSize / 2;
     const r = Math.max(5, Math.min(tileSize, tileSize) * 0.32);
 
-    // Blink: use time-based alpha (sinusoidal pulse)
-    const alpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
+    // Check if camera is on the same layer as the editor's active layer
+    const sameLayer = info.layerIndex === this.app.activeLayerIndex;
+
+    // Blink: use time-based alpha (sinusoidal pulse), dimmer if on different layer
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.005);
+    const alpha = sameLayer ? pulse : 0.5 * pulse;
 
     // Arrow pointing in camera direction (angle is Y-rotation, 0 = north/−Z)
     const dx = -Math.sin(info.angle);
@@ -1615,8 +1619,8 @@ export class GridCanvas {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#4488ff';
-    ctx.strokeStyle = '#112244';
+    ctx.fillStyle = sameLayer ? '#4488ff' : '#888888';
+    ctx.strokeStyle = sameLayer ? '#112244' : '#444444';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
@@ -1626,9 +1630,6 @@ export class GridCanvas {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
-
-    // Keep canvas dirty so the blink animates
-    this.dirty = true;
   }
 
   private drawHover(offsetX: number, offsetY: number, tileSize: number): void {
