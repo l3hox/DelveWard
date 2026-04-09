@@ -474,6 +474,7 @@ levelProps.setChangedCallback(() => {
   markDirty();
   gridCanvas.markDirty();
   updateErrorBanner();
+  if (preview.active) preview.markFullRebuild(app.level!);
 });
 
 // New level callback
