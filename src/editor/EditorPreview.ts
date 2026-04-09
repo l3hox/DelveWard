@@ -5,7 +5,7 @@ import { GameState } from '../core/gameState';
 import { buildDungeon, LAYER_HEIGHT } from '../rendering/dungeon';
 import { applyEnvironment } from '../rendering/environment';
 import { Player } from '../rendering/player';
-import { buildWalkableSet } from '../core/grid';
+import { buildWalkableSet, FACING_ANGLE } from '../core/grid';
 import { buildDoorMeshes } from '../rendering/doorRenderer';
 import { buildSconceMeshes } from '../rendering/sconceRenderer';
 import { buildPropMeshes } from '../rendering/propRenderer';
@@ -300,9 +300,39 @@ export class EditorPreview {
 
   setCameraMode(mode: PreviewCameraMode): void {
     if (mode === this.cameraMode) return;
-    if (this.cameraMode === 'freefly') this.freeFly.release();
+
+    if (this.cameraMode === 'freefly' && mode === 'noclip' && this.player) {
+      // Snap player to nearest grid cell + closest cardinal facing from current camera
+      this.freeFly.release();
+      const CELL_SIZE = 2;
+      const pos = this.camera.position;
+      const col = Math.round(pos.x / CELL_SIZE - 0.5);
+      const row = Math.round(pos.z / CELL_SIZE - 0.5);
+
+      // Find closest cardinal facing from camera Y rotation
+      const angle = this.camera.rotation.y;
+      const facings: Facing[] = ['N', 'E', 'S', 'W'];
+      let bestFacing: Facing = 'N';
+      let bestDist = Infinity;
+      for (const f of facings) {
+        let diff = Math.abs(angle - FACING_ANGLE[f]);
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff < bestDist) { bestDist = diff; bestFacing = f; }
+      }
+
+      this.player.teleport(col, row, bestFacing);
+      // Sync Y offset to camera height
+      const eyeHeight = 1.625;
+      const layerY = Math.round((pos.y - eyeHeight) / LAYER_HEIGHT) * LAYER_HEIGHT;
+      this.player.yOffset = layerY;
+      this.player.targetYOffset = layerY;
+    }
+
+    if (this.cameraMode === 'noclip' && mode === 'freefly') {
+      this.freeFly.syncFromCamera();
+    }
+
     this.cameraMode = mode;
-    if (mode === 'freefly') this.freeFly.syncFromCamera();
   }
 
   getCameraMode(): PreviewCameraMode { return this.cameraMode; }

@@ -121,6 +121,21 @@ export class Player {
     return this.state;
   }
 
+  /** Snap the player to a specific grid cell and facing (no animation). */
+  teleport(col: number, row: number, facing: Facing): void {
+    this.state.col = col;
+    this.state.row = row;
+    this.state.facing = facing;
+    const pos = this.gridToWorld(col, row);
+    this.currentPos.copy(pos);
+    this.targetPos.copy(pos);
+    this.currentAngle = FACING_ANGLE[facing];
+    this.targetAngle = this.currentAngle;
+    this.currentPitch = 0;
+    this.targetPitch = 0;
+    this.commandQueue = [];
+  }
+
   setOnMove(callback: (col: number, row: number) => void): void {
     this.onMoveCallback = callback;
   }
