@@ -83,7 +83,16 @@ cameraModeBtn.addEventListener('click', () => {
   const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
   preview.setCameraMode(mode);
   cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
+  gridCanvas.previewCameraMode = mode;
 });
+
+gridCanvas.onPreviewModeToggle = () => {
+  const mode = preview.getCameraMode() === 'noclip' ? 'freefly' : 'noclip';
+  preview.setCameraMode(mode);
+  cameraModeBtn.textContent = mode === 'noclip' ? 'Noclip' : 'Free-fly';
+  gridCanvas.previewCameraMode = mode;
+  gridCanvas.markDirty();
+};
 
 // No split-panel resize needed — preview is a floating window on the canvas
 

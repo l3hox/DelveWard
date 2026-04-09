@@ -58,8 +58,12 @@ export class GridCanvas {
   private readonly BORDER = 5;
   private readonly MIN_W = 200;
   private readonly MIN_H = 150;
+  private readonly TOOLBAR_H = 20;
+  private readonly HINT_H = 16;
   onPreviewResize: (() => void) | null = null;
   onPreviewClose: (() => void) | null = null;
+  onPreviewModeToggle: (() => void) | null = null;
+  previewCameraMode: 'noclip' | 'freefly' = 'noclip';
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
@@ -134,6 +138,7 @@ export class GridCanvas {
         const hit = this.previewHitTest(e.clientX - rect.left, e.clientY - rect.top);
         if (hit === 'resize') { canvas.style.cursor = 'nwse-resize'; return; }
         if (hit === 'title') { canvas.style.cursor = 'grab'; return; }
+        if (hit === 'toolbar') { canvas.style.cursor = 'pointer'; return; }
         if (hit === 'content') { canvas.style.cursor = 'default'; return; }
       }
 
@@ -242,6 +247,13 @@ export class GridCanvas {
         if (hit === 'resize') {
           this.previewDrag = { type: 'resize', startX: e.clientX, startY: e.clientY, origX: this.previewWin.x, origY: this.previewWin.y, origW: this.previewWin.w, origH: this.previewWin.h };
           e.preventDefault();
+          return;
+        }
+        if (hit === 'toolbar') {
+          // Check if mode toggle button was clicked (first 70px of toolbar)
+          if (sx < this.previewWin.x + 70) {
+            this.onPreviewModeToggle?.();
+          }
           return;
         }
         if (hit === 'content') {
@@ -1658,20 +1670,21 @@ export class GridCanvas {
     ctx.restore();
   }
 
-  /** Hit-test the preview window. Returns 'title', 'resize', 'content', or null. */
-  private previewHitTest(sx: number, sy: number): 'title' | 'resize' | 'content' | null {
+  /** Hit-test the preview window. Returns 'title', 'toolbar', 'resize', 'content', or null. */
+  private previewHitTest(sx: number, sy: number): 'title' | 'toolbar' | 'resize' | 'content' | null {
     if (!this.previewActive) return null;
     const { x, y, w, h } = this.previewWin;
     const totalH = h + this.TITLE_H;
     if (sx < x || sx > x + w || sy < y || sy > y + totalH) return null;
     if (sy < y + this.TITLE_H) return 'title';
+    if (sy < y + this.TITLE_H + this.TOOLBAR_H) return 'toolbar';
     if (sx > x + w - this.BORDER && sy > y + totalH - this.BORDER) return 'resize';
     return 'content';
   }
 
-  /** Get the preview window rect for external resize syncing. */
+  /** Get the 3D viewport size (excluding title, toolbar, hint). */
   getPreviewContentSize(): { w: number; h: number } {
-    return { w: this.previewWin.w, h: this.previewWin.h };
+    return { w: this.previewWin.w, h: this.previewWin.h - this.TOOLBAR_H - this.HINT_H };
   }
 
   private drawPreviewWindow(): void {
@@ -1679,6 +1692,8 @@ export class GridCanvas {
     const { ctx } = this;
     const { x, y, w, h } = this.previewWin;
     const totalH = h + this.TITLE_H;
+    const contentY = y + this.TITLE_H + this.TOOLBAR_H;
+    const contentH = h - this.TOOLBAR_H - this.HINT_H;
 
     // Drop shadow
     ctx.save();
@@ -1702,13 +1717,42 @@ export class GridCanvas {
     ctx.fillStyle = '#666';
     ctx.fillText('\u00d7', x + w - 14, y + this.TITLE_H / 2);
 
+    // Toolbar
+    const tbY = y + this.TITLE_H;
+    ctx.fillStyle = '#222233';
+    ctx.fillRect(x, tbY, w, this.TOOLBAR_H);
+    // Mode toggle button
+    const modeLabel = this.previewCameraMode === 'noclip' ? 'Step' : 'Free-fly';
+    ctx.fillStyle = '#333344';
+    ctx.fillRect(x + 3, tbY + 2, 62, this.TOOLBAR_H - 4);
+    ctx.strokeStyle = '#555566';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 3.5, tbY + 2.5, 61, this.TOOLBAR_H - 5);
+    ctx.fillStyle = '#bbccdd';
+    ctx.font = '10px monospace';
+    ctx.fillText(modeLabel, x + 8, tbY + this.TOOLBAR_H / 2);
+
+    // 3D content
+    if (contentH > 0) {
+      ctx.drawImage(this.previewCanvas, x, contentY, w, contentH);
+    }
+
+    // Hint bar at bottom
+    const hintY = y + totalH - this.HINT_H;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, hintY, w, this.HINT_H);
+    ctx.fillStyle = '#778899';
+    ctx.font = '9px monospace';
+    ctx.textBaseline = 'middle';
+    const hint = this.previewCameraMode === 'noclip'
+      ? 'WASD move  Q/E turn  Y/H layer'
+      : 'Click to lock  WASD move  Space/Shift up/down  Esc release';
+    ctx.fillText(hint, x + 4, hintY + this.HINT_H / 2);
+
     // Border
     ctx.strokeStyle = '#3a3a4a';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, totalH - 1);
-
-    // Content — draw the 3D canvas
-    ctx.drawImage(this.previewCanvas, x, y + this.TITLE_H, w, h);
 
     // Resize grip (bottom-right corner)
     ctx.fillStyle = '#555';
