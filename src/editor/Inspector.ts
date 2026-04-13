@@ -267,6 +267,8 @@ export class Inspector {
         this.addDropdownField('gateType', (entity.gateType as string) ?? 'and',
           ['and', 'or', 'not', 'delay', 'pulse_edge', 'pulse_repeat'], (val) => {
             entity.gateType = val;
+            if (val === 'delay' && entity.delay === undefined) entity.delay = 1;
+            if (val === 'pulse_repeat' && entity.interval === undefined) entity.interval = 1;
             this.onEntityChanged?.();
             this.refresh();
           });

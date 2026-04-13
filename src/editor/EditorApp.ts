@@ -25,7 +25,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   trigger:        { targets: [], signalMode: 'momentary' },
   tripwire:       { targets: [], visibilityThreshold: 8, orientation: 'EW' },
   gate:           { gateType: 'and', targets: [] },
-  trap_launcher:  { facing: 'S', projectileType: 'dart', fireMode: 'repeat', reloadTime: 3 },
+  trap_launcher:  { facing: 'S', projectileType: 'dart', fireMode: 'repeat', reloadTime: 3, maxRange: 20 },
   torch_sconce:   { wall: 'N' },
   enemy:          { enemyType: 'rat' },
   equipment:      { itemId: '' },
