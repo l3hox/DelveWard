@@ -84,14 +84,14 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
-  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
-  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
-  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
-  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest' },
+  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
+  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
   key:            { field: 'keyId',  validEntityType: 'door,chest' },
   door:           { field: 'keyId',  validEntityType: 'key' },
-  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher' },
+  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,pit_trap' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
 };
 
