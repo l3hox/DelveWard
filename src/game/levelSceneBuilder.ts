@@ -72,6 +72,7 @@ export interface LevelScene {
   rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   propMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   pitFloorMap: Map<string, THREE.Mesh>;
+  pitCeilingMap: Map<string, THREE.Mesh>;
   npcMeshes: NpcMeshes;
   skyboxMesh?: THREE.Mesh;
   player: Player;
@@ -194,6 +195,7 @@ export function buildLevelScene(
   const sharedPropMeshMap = new Map<string, THREE.Group>();
 
   const sharedPitFloorMap = new Map<string, THREE.Mesh>();
+  const sharedPitCeilingMap = new Map<string, THREE.Mesh>();
 
   const sharedNpcGroup = new THREE.Group();
   scene.add(sharedNpcGroup);
@@ -251,7 +253,7 @@ export function buildLevelScene(
     // Dungeon geometry (walls, floors, ceilings) with ramp suppression
     const ldDoorCells = new Set(gameState.doors.keys());
     const ldPitTrapCells = new Set(gameState.pitTraps.keys());
-    const { group: ldDungeonGroup, pitFloorMap: ldPitFloorMap } = buildLayerDungeonGeometry(
+    const { group: ldDungeonGroup, pitFloorMap: ldPitFloorMap, pitCeilingMap: ldPitCeilingMap } = buildLayerDungeonGeometry(
       gameState, li, ld, level, layerDefs.length, {
         envZoneMap: ldZoneMap,
         doorCells: (li === activeLayerIdx && multiZone) ? ldDoorCells : undefined,
@@ -261,6 +263,7 @@ export function buildLevelScene(
     allDungeonGroup.add(ldDungeonGroup);
     layerDungeonGroups[li] = ldDungeonGroup;
     mergeMap(sharedPitFloorMap, ldPitFloorMap, li);
+    mergeMap(sharedPitCeilingMap, ldPitCeilingMap, li);
 
     const ldAboveGrid = layerDefs[li + 1]?.grid;
 
@@ -614,6 +617,7 @@ export function buildLevelScene(
     rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
     propMeshes: { group: sharedPropGroup, meshMap: sharedPropMeshMap },
     pitFloorMap: sharedPitFloorMap,
+    pitCeilingMap: sharedPitCeilingMap,
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
     enemyMeshes: { group: sharedEnemyGroup, meshMap: sharedEnemyMeshMap },
     enemyAnimator,

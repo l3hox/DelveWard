@@ -111,9 +111,10 @@ export interface RampCellInfo {
  */
 export type RampHalfWallMap = Map<string, import('../core/grid').Facing>;
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>, forceRenderable?: Map<string, { skipCeiling?: boolean }>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>, forceRenderable?: Map<string, { skipCeiling?: boolean }>, pitCeilingCells?: Set<string>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh>; pitCeilingMap: Map<string, THREE.Mesh> } {
   const group = new THREE.Group();
   const pitFloorMap = new Map<string, THREE.Mesh>();
+  const pitCeilingMap = new Map<string, THREE.Mesh>();
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -285,6 +286,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
           ceil.position.set(cx, WALL_HEIGHT, cz);
           if (zoneLayer !== undefined) ceil.layers.set(zoneLayer);
           group.add(ceil);
+          if (pitCeilingCells?.has(doorKey(col, row))) pitCeilingMap.set(doorKey(col, row), ceil);
         }
       }
 
@@ -436,5 +438,5 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
     }
   }
 
-  return { group, pitFloorMap };
+  return { group, pitFloorMap, pitCeilingMap };
 }

@@ -275,7 +275,7 @@ export function buildLayerDungeonGeometry(
     doorCells?: Set<string>;
     pitTrapCells?: Set<string>;
   },
-): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
+): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh>; pitCeilingMap: Map<string, THREE.Mesh> } {
   const yOffset = ld.yOffset ?? (li * LAYER_HEIGHT);
   const defaults = ld.defaults ?? level.defaults;
   const areas = ld.areas ?? level.areas;
@@ -304,7 +304,6 @@ export function buildLayerDungeonGeometry(
 
   // Open pit traps on the layer ABOVE: force-render wall cells below them
   // so buildDungeon treats them as walkable (walls, floor, ceiling generated).
-  // Ceiling auto-detect handles openTop via layerAboveGrid (pit cell is walkable → ceiling skipped).
   const forceRenderable = new Map<string, { skipCeiling?: boolean }>();
   if (li + 1 < layerCount) {
     const savedIdx = gs.activeLayerIndex;
@@ -320,11 +319,29 @@ export function buildLayerDungeonGeometry(
     }
     gs.activeLayerIndex = savedIdx;
   }
+  // Open pit traps TWO layers above: track ceiling meshes on this layer so they
+  // can be toggled at runtime (the cell above is force-renderable '#' turned walkable,
+  // but the original grid still has '#' so auto-detect won't catch it).
+  const pitCeilingCells = new Set<string>();
+  if (li + 2 < layerCount) {
+    const savedIdx = gs.activeLayerIndex;
+    gs.activeLayerIndex = li + 2;
+    const aboveLayerGrid = level.layers[li + 1]?.grid;
+    for (const [, pt] of gs.pitTraps) {
+      if (pt.state !== 'open') continue;
+      const { col, row } = pt;
+      if (!aboveLayerGrid || row >= aboveLayerGrid.length || col >= aboveLayerGrid[0].length) continue;
+      if (!walkable.has(aboveLayerGrid[row][col])) {
+        pitCeilingCells.add(doorKey(col, row));
+      }
+    }
+    gs.activeLayerIndex = savedIdx;
+  }
 
   const aboveGrid = level.layers[li + 1]?.grid;
   const belowGrid = level.layers[li - 1]?.grid;
 
-  const { group, pitFloorMap } = buildDungeon(
+  const { group, pitFloorMap, pitCeilingMap } = buildDungeon(
     ld.grid, defaults, areas, level.charDefs, ceiling,
     stairPositions, wallEntityCells,
     options?.envZoneMap,
@@ -333,9 +350,10 @@ export function buildLayerDungeonGeometry(
     rampOpenCells, rampHalfWalls,
     options?.pitTrapCells,
     forceRenderable.size > 0 ? forceRenderable : undefined,
+    pitCeilingCells.size > 0 ? pitCeilingCells : undefined,
   );
 
   group.position.y = yOffset;
 
-  return { group, pitFloorMap };
+  return { group, pitFloorMap, pitCeilingMap };
 }

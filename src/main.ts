@@ -791,11 +791,19 @@ async function init(): Promise<void> {
     // Pit trap signal → toggle floor visibility + trigger fall if player is standing on it
     gameState.onPitTrapSignalChanged = (col, row, open) => {
       const key = layerKey(doorKey(col, row));
-      const mesh = ls.pitFloorMap.get(key);
-      if (mesh) mesh.visible = !open;
+      const floorMesh = ls.pitFloorMap.get(key);
+      if (floorMesh) floorMesh.visible = !open;
+
+      // Toggle ceiling on layer 2 below the pit (tracked via pitCeilingMap)
+      const currentLayer = gameState.activeLayerIndex;
+      const ceilingLayer = currentLayer - 2;
+      if (ceilingLayer >= 0) {
+        const ceilKey = layerDoorKey(ceilingLayer, doorKey(col, row));
+        const ceilMesh = ls.pitCeilingMap.get(ceilKey);
+        if (ceilMesh) ceilMesh.visible = !open;
+      }
 
       // Rebuild the layer below so it shows/hides the pit opening geometry
-      const currentLayer = gameState.activeLayerIndex;
       const belowLayer = currentLayer - 1;
       if (belowLayer >= 0 && ls.layerDungeonGroups[belowLayer]) {
         const oldGroup = ls.layerDungeonGroups[belowLayer];
