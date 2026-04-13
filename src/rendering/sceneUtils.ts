@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { DungeonLevel, LayerDef } from '../core/types';
 import type { Facing } from '../core/grid';
 import { GameState, doorKey } from '../core/gameState';
-import { buildDungeon, LAYER_HEIGHT } from './dungeon';
+import { buildDungeon, CELL_SIZE, LAYER_HEIGHT, WALL_HEIGHT } from './dungeon';
 import type { RampCellInfo } from './dungeon';
 import { buildWalkableSet, FACING_DELTA } from '../core/grid';
 import { buildDoorMeshes } from './doorRenderer';
@@ -33,6 +33,8 @@ import { buildForestMeshes, type ForestMeshes } from './forestRenderer';
 import { buildNpcMeshes } from './npcRenderer';
 import { buildEnemyMeshes } from './enemyRenderer';
 import { buildItemMeshes, buildConsumableMeshes } from './groundItemRenderer';
+import { resolveTextures } from '../core/textureResolver';
+import { getFloorTexture, getCeilingTexture } from './textures';
 
 // ---------------------------------------------------------------------------
 // Ramp info computation
@@ -314,6 +316,52 @@ export function buildLayerDungeonGeometry(
     rampOpenCells, rampHalfWalls,
     options?.pitTrapCells,
   );
+
+  // Add floor + ceiling for wall cells below open pit traps on the layer above.
+  // Without this, opening a pit above a wall cell creates a black void.
+  // Textures are inherited from the pit trap cell on the layer above.
+  if (li + 1 < layerCount) {
+    const savedIdx = gs.activeLayerIndex;
+    gs.activeLayerIndex = li + 1;
+    const aboveLayer = level.layers[li + 1];
+    const charDefMap = new Map<string, import('../core/types').CharDef>();
+    if (level.charDefs) for (const def of level.charDefs) charDefMap.set(def.char, def);
+
+    for (const [, pt] of gs.pitTraps) {
+      if (pt.state !== 'open') continue;
+      const { col, row } = pt;
+      // Only fill if THIS layer has a wall at that position
+      if (row < 0 || row >= ld.grid.length || col < 0 || col >= ld.grid[0].length) continue;
+      const ch = ld.grid[row][col];
+      if (walkable.has(ch)) continue; // already rendered by buildDungeon
+
+      // Resolve texture from the layer above (the pit trap cell)
+      const aboveChar = aboveLayer?.grid[row]?.[col] ?? '.';
+      const tex = resolveTextures(col, row, aboveChar,
+        aboveLayer?.defaults ?? level.defaults, charDefMap,
+        aboveLayer?.areas ?? level.areas);
+
+      const cx = col * CELL_SIZE + CELL_SIZE / 2;
+      const cz = row * CELL_SIZE + CELL_SIZE / 2;
+      const tileGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+
+      // Floor
+      const floorMat = new THREE.MeshLambertMaterial({ map: getFloorTexture(tex.floor) });
+      const floor = new THREE.Mesh(tileGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(cx, 0, cz);
+      group.add(floor);
+
+      // Ceiling
+      const ceilMat = new THREE.MeshLambertMaterial({ map: getCeilingTexture(tex.ceiling) });
+      const ceil = new THREE.Mesh(tileGeo, ceilMat);
+      ceil.rotation.x = Math.PI / 2;
+      ceil.position.set(cx, WALL_HEIGHT, cz);
+      group.add(ceil);
+    }
+    gs.activeLayerIndex = savedIdx;
+  }
+
   group.position.y = yOffset;
 
   return { group, pitFloorMap };
