@@ -290,6 +290,18 @@ export function buildLayerDungeonGeometry(
 
   const { rampOpenCells, rampHalfWalls } = buildRampInfo(gs, li);
 
+  // Open pit traps: skip floor so the hole is visible
+  for (const [key, pt] of gs.pitTraps) {
+    if (pt.state === 'open') {
+      const existing = rampOpenCells.get(key);
+      if (existing) {
+        existing.skipFloor = true;
+      } else {
+        rampOpenCells.set(key, { wallDirs: [], skipCeiling: false, skipFloor: true });
+      }
+    }
+  }
+
   const aboveGrid = level.layers[li + 1]?.grid;
   const belowGrid = level.layers[li - 1]?.grid;
 
