@@ -111,7 +111,7 @@ export interface RampCellInfo {
  */
 export type RampHalfWallMap = Map<string, import('../core/grid').Facing>;
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>, forceRenderable?: Set<string>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>, forceRenderable?: Map<string, { skipCeiling?: boolean }>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
   const group = new THREE.Group();
   const pitFloorMap = new Map<string, THREE.Mesh>();
   const rows = grid.length;
@@ -250,8 +250,9 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
         }
       }
 
-      // Ceiling (skip for stair and ramp bottom cells)
-      if (ceiling && !isStair && !rampInfo?.skipCeiling && !isOpenTop) {
+      // Ceiling (skip for stair, ramp bottom cells, and force-renderable cells with skipCeiling)
+      const forceInfo = forceRenderable?.get(doorKey(col, row));
+      if (ceiling && !isStair && !rampInfo?.skipCeiling && !isOpenTop && !forceInfo?.skipCeiling) {
         if (splitAxis && neighborZone !== undefined && zoneLayer !== undefined) {
           if (splitAxis === 'NS') {
             const ceilN = new THREE.Mesh(halfTileNS, cellCeilMat);
