@@ -42,6 +42,7 @@ export interface LevelScene {
   level: DungeonLevel;
   walkable: Set<string>;
   dungeonGroup: THREE.Group;
+  layerDungeonGroups: THREE.Group[];
   doorMeshes: DoorMeshes;
   doorAnimator: DoorAnimator;
   keyMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
@@ -109,6 +110,7 @@ export function buildLevelScene(
   // Shared structures — all layers' meshes merged with layer-prefixed keys
   const allDungeonGroup = new THREE.Group();
   scene.add(allDungeonGroup);
+  const layerDungeonGroups: THREE.Group[] = [];
 
   const sharedDoorGroup = new THREE.Group();
   scene.add(sharedDoorGroup);
@@ -257,6 +259,7 @@ export function buildLevelScene(
       },
     );
     allDungeonGroup.add(ldDungeonGroup);
+    layerDungeonGroups[li] = ldDungeonGroup;
     mergeMap(sharedPitFloorMap, ldPitFloorMap, li);
 
     const ldAboveGrid = layerDefs[li + 1]?.grid;
@@ -581,6 +584,7 @@ export function buildLevelScene(
     level,
     walkable,
     dungeonGroup: allDungeonGroup,
+    layerDungeonGroups,
     doorMeshes: {
       group: sharedDoorGroup,
       panelMap: sharedDoorPanelMap,

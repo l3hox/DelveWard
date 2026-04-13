@@ -63,6 +63,7 @@ import {
 } from './core/saveSystem';
 import type { SaveData } from './core/saveSystem';
 import { type LevelScene, buildLevelScene, teardownLevelScene } from './game/levelSceneBuilder';
+import { buildLayerDungeonGeometry } from './rendering/sceneUtils';
 
 // Camera viewport tuning — asymmetric frustum crop via setViewOffset.
 // Positive = cut pixels, negative = expand view beyond default frustum.
@@ -792,6 +793,25 @@ async function init(): Promise<void> {
       const key = layerKey(doorKey(col, row));
       const mesh = ls.pitFloorMap.get(key);
       if (mesh) mesh.visible = !open;
+
+      // Rebuild the layer below so it shows/hides the pit opening geometry
+      const currentLayer = gameState.activeLayerIndex;
+      const belowLayer = currentLayer - 1;
+      if (belowLayer >= 0 && ls.layerDungeonGroups[belowLayer]) {
+        const oldGroup = ls.layerDungeonGroups[belowLayer];
+        oldGroup.removeFromParent();
+        oldGroup.traverse(child => { if (child instanceof THREE.Mesh) child.geometry?.dispose(); });
+
+        const savedIdx = gameState.activeLayerIndex;
+        gameState.activeLayerIndex = belowLayer;
+        const ld = ls.level.layers[belowLayer];
+        const { group: newGroup } = buildLayerDungeonGeometry(
+          gameState, belowLayer, ld, ls.level, ls.level.layers.length,
+        );
+        gameState.activeLayerIndex = savedIdx;
+        ls.dungeonGroup.add(newGroup);
+        ls.layerDungeonGroups[belowLayer] = newGroup;
+      }
 
       // If the player is standing on this cell and it just opened, trigger immediate fall
       if (open && !ls.player.falling) {
