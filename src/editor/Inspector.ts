@@ -171,10 +171,11 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
+            if (val === 'timed' && entity.signalDuration === undefined) entity.signalDuration = 3;
             this.onEntityChanged?.();
             this.refresh();
           });
@@ -188,10 +189,11 @@ export class Inspector {
         break;
 
       case 'pressure_plate':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
+            if (val === 'timed' && entity.signalDuration === undefined) entity.signalDuration = 3;
             this.onEntityChanged?.();
             this.refresh();
           });
@@ -231,10 +233,11 @@ export class Inspector {
         break;
 
       case 'trigger':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
+            if (val === 'timed' && entity.signalDuration === undefined) entity.signalDuration = 3;
             this.onEntityChanged?.();
             this.refresh();
           });
@@ -248,7 +251,7 @@ export class Inspector {
         break;
 
       case 'tripwire':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
           entity.orientation = val;
           this.onEntityChanged?.();
@@ -267,7 +270,7 @@ export class Inspector {
             this.onEntityChanged?.();
             this.refresh();
           });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         if ((entity.gateType as string) === 'delay') {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;
@@ -393,7 +396,7 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
         this.addReferencedBySection(entity);
         {
           const refs = this.app.getReferencingEntities(entity);
