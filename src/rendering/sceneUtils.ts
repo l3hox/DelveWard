@@ -304,27 +304,17 @@ export function buildLayerDungeonGeometry(
 
   // Open pit traps on the layer ABOVE: force-render wall cells below them
   // so buildDungeon treats them as walkable (walls, floor, ceiling generated).
-  // Skip ceiling if the cell 2 layers below the pit (= 1 below this layer) is not a solid wall.
+  // Ceiling auto-detect handles openTop via layerAboveGrid (pit cell is walkable → ceiling skipped).
   const forceRenderable = new Map<string, { skipCeiling?: boolean }>();
   if (li + 1 < layerCount) {
     const savedIdx = gs.activeLayerIndex;
     gs.activeLayerIndex = li + 1;
-    const twoBelow = level.layers[li - 1]?.grid;
     for (const [, pt] of gs.pitTraps) {
       if (pt.state !== 'open') continue;
       const { col, row } = pt;
       if (row >= 0 && row < ld.grid.length && col >= 0 && col < ld.grid[0].length) {
         if (!walkable.has(ld.grid[row][col])) {
-          // Check if the cell 2 layers below the pit is void (not solid wall)
-          let skipCeiling = false;
-          if (twoBelow && row < twoBelow.length && col < twoBelow[0].length) {
-            const ch = twoBelow[row][col];
-            const def = level.charDefs?.find(d => d.char === ch);
-            if (!(ch === '#' || (def && def.solid && !def.seeThrough))) {
-              skipCeiling = true;
-            }
-          }
-          forceRenderable.set(doorKey(col, row), { skipCeiling });
+          forceRenderable.set(doorKey(col, row), {});
         }
       }
     }
