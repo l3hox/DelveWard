@@ -111,7 +111,7 @@ export interface RampCellInfo {
  */
 export type RampHalfWallMap = Map<string, import('../core/grid').Facing>;
 
-export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
+export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: TextureArea[], charDefs?: CharDef[], ceiling = true, stairPositions?: Set<string>, wallEntityCells?: Set<string>, envZoneMap?: Map<string, number>, doorCells?: Set<string>, layerAboveGrid?: string[], layerBelowGrid?: string[], rampOpenCells?: Map<string, RampCellInfo>, rampHalfWalls?: RampHalfWallMap, pitTrapCells?: Set<string>, forceRenderable?: Set<string>): { group: THREE.Group; pitFloorMap: Map<string, THREE.Mesh> } {
   const group = new THREE.Group();
   const pitFloorMap = new Map<string, THREE.Mesh>();
   const rows = grid.length;
@@ -133,7 +133,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      if (!renderable.has(grid[row][col])) continue;
+      if (!renderable.has(grid[row][col]) && !forceRenderable?.has(doorKey(col, row))) continue;
 
       const cx = col * CELL_SIZE + CELL_SIZE / 2;
       const cz = row * CELL_SIZE + CELL_SIZE / 2;
@@ -343,6 +343,7 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
       // OOB neighbors are treated as non-solid so no walls are generated at the perimeter.
       const solidCheck = (c: number, r: number) => {
         if (!ceiling && (r < 0 || r >= rows || c < 0 || c >= cols)) return false;
+        if (forceRenderable?.has(doorKey(c, r))) return false; // treat as walkable
         return isSolid(grid, c, r, renderable);
       };
 
