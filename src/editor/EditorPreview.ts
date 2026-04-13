@@ -55,7 +55,7 @@ export class EditorPreview {
     this.renderer.setPixelRatio(1);
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 200);
 
     this.ambient = new THREE.AmbientLight(0x1a1a22);
     this.scene.add(this.ambient);
@@ -141,6 +141,11 @@ export class EditorPreview {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    // Match game's view crop: cut 15% from top, expand 20% downward (reveals more floor)
+    const cropTop = Math.floor(height * 0.15);
+    const cropBottom = Math.floor(height * -0.2);
+    const cropSide = Math.floor(width * ((0.15 + -0.2) / 2));
+    this.camera.setViewOffset(width, height, cropSide, cropTop, width - cropSide * 2, height - cropTop - cropBottom);
     this.dirty = true;
   }
 
