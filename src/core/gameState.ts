@@ -1012,10 +1012,12 @@ export class GameState {
         }
       }
 
-      // Register pit traps as receivers
+      // Register pit traps as receivers — override initial state to match signal
       for (const pt of this.pitTraps.values()) {
         if (pt.id) {
           this.signalManager.registerReceiver(pt.id, pt.gateMode ?? 'or');
+          // Signal-connected pits ignore their JSON state; signal determines it
+          pt.state = 'closed';
         }
       }
 
