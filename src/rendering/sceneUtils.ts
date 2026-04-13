@@ -319,16 +319,15 @@ export function buildLayerDungeonGeometry(
     }
     gs.activeLayerIndex = savedIdx;
   }
-  // Open pit traps TWO layers above: track ceiling meshes on this layer so they
-  // can be toggled at runtime (the cell above is force-renderable '#' turned walkable,
-  // but the original grid still has '#' so auto-detect won't catch it).
+  // Pit traps TWO layers above: track ceiling meshes on this layer so they
+  // can be toggled at runtime when the pit opens/closes. Track ALL pits
+  // (not just open ones) so the mesh is available for future signal changes.
   const pitCeilingCells = new Set<string>();
   if (li + 2 < layerCount) {
     const savedIdx = gs.activeLayerIndex;
     gs.activeLayerIndex = li + 2;
     const aboveLayerGrid = level.layers[li + 1]?.grid;
     for (const [, pt] of gs.pitTraps) {
-      if (pt.state !== 'open') continue;
       const { col, row } = pt;
       if (!aboveLayerGrid || row >= aboveLayerGrid.length || col >= aboveLayerGrid[0].length) continue;
       if (!walkable.has(aboveLayerGrid[row][col])) {
