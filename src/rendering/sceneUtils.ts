@@ -290,17 +290,8 @@ export function buildLayerDungeonGeometry(
 
   const { rampOpenCells, rampHalfWalls } = buildRampInfo(gs, li);
 
-  // Open pit traps: skip floor so the hole is visible
-  for (const [key, pt] of gs.pitTraps) {
-    if (pt.state === 'open') {
-      const existing = rampOpenCells.get(key);
-      if (existing) {
-        existing.skipFloor = true;
-      } else {
-        rampOpenCells.set(key, { wallDirs: [], skipCeiling: false, skipFloor: true });
-      }
-    }
-  }
+  // Pit trap floor meshes are always built (tracked in pitFloorMap) so they
+  // can be toggled at runtime. Initial visibility is set after build based on state.
 
   // Open pit traps on the layer ABOVE: force-render wall cells below them
   // so buildDungeon treats them as walkable (walls, floor, ceiling generated).
@@ -351,6 +342,26 @@ export function buildLayerDungeonGeometry(
     forceRenderable.size > 0 ? forceRenderable : undefined,
     pitCeilingCells.size > 0 ? pitCeilingCells : undefined,
   );
+
+  // Apply initial pit trap state: hide floor + ceiling (2 layers below) if open
+  for (const [key, pt] of gs.pitTraps) {
+    if (pt.state === 'open') {
+      const floorMesh = pitFloorMap.get(key);
+      if (floorMesh) floorMesh.visible = false;
+    }
+  }
+  // Ceilings on this layer that correspond to pits on li+2
+  if (li + 2 < layerCount) {
+    const savedIdx = gs.activeLayerIndex;
+    gs.activeLayerIndex = li + 2;
+    for (const [, pt] of gs.pitTraps) {
+      if (pt.state === 'open') {
+        const ceilMesh = pitCeilingMap.get(doorKey(pt.col, pt.row));
+        if (ceilMesh) ceilMesh.visible = false;
+      }
+    }
+    gs.activeLayerIndex = savedIdx;
+  }
 
   group.position.y = yOffset;
 
