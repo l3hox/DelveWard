@@ -1012,12 +1012,10 @@ export class GameState {
         }
       }
 
-      // Register pit traps as receivers — override initial state to match signal
+      // Register pit traps as receivers (signal propagation will determine state)
       for (const pt of this.pitTraps.values()) {
         if (pt.id) {
           this.signalManager.registerReceiver(pt.id, pt.gateMode ?? 'or');
-          // Signal-connected pits ignore their JSON state; signal determines it
-          pt.state = 'closed';
         }
       }
 
@@ -1102,6 +1100,34 @@ export class GameState {
       }
       this.activeLayerIndex = saved;
     });
+
+    // Initial propagation: evaluate receivers based on current source state.
+    // For fresh load, sources are inactive → receivers inactive. For restored
+    // state (after loadState), receivers reflect saved state.
+    this.signalManager.propagate();
+    this.syncSignalReceiverStates();
+  }
+
+  /** Sync entity states (doors, pit traps) from signal receiver states.
+   *  Call after signal state is loaded or initially evaluated. */
+  syncSignalReceiverStates(): void {
+    const savedIdx = this.activeLayerIndex;
+    for (let li = 0; li < this.layers.length; li++) {
+      this.activeLayerIndex = li;
+      for (const pt of this.pitTraps.values()) {
+        if (!pt.id) continue;
+        if (!this.signalManager.getReceiver(pt.id)) continue;
+        const active = this.signalManager.isReceiverActive(pt.id);
+        pt.state = active ? 'open' : 'closed';
+      }
+      for (const door of this.doors.values()) {
+        if (!door.id || !door.mechanical) continue;
+        if (!this.signalManager.getReceiver(door.id)) continue;
+        const active = this.signalManager.isReceiverActive(door.id);
+        door.state = active ? 'open' : 'closed';
+      }
+    }
+    this.activeLayerIndex = savedIdx;
   }
 
   /** External callback for signal-driven door state changes (for mesh animation). */
@@ -1447,6 +1473,8 @@ export class GameState {
     this._initSignalManager();
     if (snapshot.layers[0].signalState) {
       this.signalManager.loadState(snapshot.layers[0].signalState);
+      // Re-sync entity states from restored signal state (loadState doesn't fire callbacks)
+      this.syncSignalReceiverStates();
     }
   }
 

@@ -251,7 +251,7 @@ export class SignalManager {
   }
 
   /** Propagate signal state from sources through gates to receivers. */
-  private propagate(): void {
+  propagate(): void {
     const visited = new Set<string>();
     this.propagateInternal(visited);
   }
