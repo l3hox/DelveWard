@@ -553,3 +553,49 @@ Ramps connect two adjacent layers using a cell on the lower layer (bottom cell, 
 - Adjacent ramp top cells (parallel ramps side by side) produce clean geometry with no overlapping faces
 - Side fill texture is consistent with the rest of the ramp visual — the triangle fills look like part of the same wall surface
 - `mergeRampCell()` must be called whenever a `RampCellInfo` entry is added for a cell that already exists in the map — this is enforced in `buildDungeon()`
+
+---
+
+## ADR-M4-15 — Pit Traps: Signal Receiver Pattern + forceRenderable Mechanism
+
+**Status:** Accepted
+**Date:** 2026-04-10
+
+### Context
+
+Pit traps are floor cells that can open, dropping the player to the layer below. They need to:
+
+1. Integrate with the signal system (lever-triggered, pressure-plate-triggered, etc.)
+2. Reveal a hole in the floor when open — meaning the cell on the layer below must render as walkable space rather than a solid wall, even though the grid char there is `#`
+3. Handle the ceiling two layers below (the "underside" of the hole)
+4. Avoid full scene rebuilds on every state change — these are runtime toggles that happen during play
+
+### Decision
+
+**Signal receiver pattern + `forceRenderable` Map + mesh visibility toggles, with targeted layer rebuild for geometry changes.**
+
+**Signal integration:** Pit traps register as signal receivers identically to mechanical doors. The `onPitTrapSignalChanged` callback is the state-change entry point. `syncSignalReceiverStates()` is called at the end of `_initSignalManager` to apply signal state to all receivers before the first frame — this ensures signal-connected pits start in the correct state regardless of what `state` is written in the JSON. Save/load uses signal state restoration plus a `syncSignalReceiverStates()` call on load.
+
+**`forceRenderable` Map:** `buildDungeon()` accepts a `forceRenderable: Map<"col,row", { skipCeiling: boolean }>` input. Cells in this map are treated as walkable during geometry generation regardless of their grid char. This allows a `#` wall cell on the layer below an open pit to render with proper floor, ceiling, and neighbor-facing walls — making the space look like an open room rather than a solid block. The `skipCeiling` flag suppresses the ceiling on that cell (the pit floor above is the visual ceiling from below).
+
+**When a pit opens or closes at runtime:** The `forceRenderable` set for the affected layer changes (a cell is added or removed). This triggers a targeted rebuild of just that layer's dungeon geometry — not the whole scene. Only the one layer needs to change. The pit's floor mesh visibility is toggled directly (no rebuild needed for the pit cell itself). The ceiling two layers below is toggled via `pitCeilingMap` mesh visibility — again, no geometry rebuild.
+
+**Mesh visibility toggles for floor and ceiling:** Both the pit floor mesh and the ceiling mesh two layers below are always built and tracked in maps (`pitFloorMap`, `pitCeilingMap`). Open = floor invisible, ceiling invisible. Closed = both visible. This avoids mesh creation/destruction at runtime.
+
+**Why targeted layer rebuild rather than toggle-only for the layer below:** The layer-below cells change between a solid wall appearance and an open-room appearance. This involves different wall faces, floor quads, and ceiling quads — not a single mesh to toggle. A targeted rebuild of that layer's geometry is the correct approach. It is bounded to one layer and does not affect other layers or entities.
+
+### Alternatives Rejected
+
+**Mesh visibility toggle for the layer-below cell (like pit floor):** The layer-below cell is a `#` that needs to look like a `.` when the pit is open — different faces entirely, not just hiding one mesh. Visibility toggle cannot change what faces exist.
+
+**Full scene rebuild on pit open/close:** Correct but excessive. Rebuilding all layers and entities for a single pit toggle would cause visible stutter and is inconsistent with how other runtime geometry changes (doors, secret walls) are handled.
+
+**Treating pit traps as a special kind of `openBottom` cell:** `openBottom` is auto-detected from adjacent layer geometry and is static. Pit traps are dynamic — the hole opens and closes. Conflating dynamic traps with the static hollow-area system would require making the auto-detect logic aware of runtime state, breaking the clean separation between level build time and runtime.
+
+### Consequences
+
+- Runtime pit open/close: 3 operations — toggle pit floor mesh visibility, toggle ceiling mesh visibility 2 layers below, rebuild 1 layer's dungeon geometry
+- New entity renderers need no special handling for pits — `buildLayerEntityMeshes` already accounts for the layer offset
+- The `forceRenderable` mechanism is general: any future "dynamic wall cell that needs to appear walkable at runtime" can use the same pattern
+- Fall damage when a pit opens under the player is not part of this ADR — deferred to a future damage system
+- Level designers must ensure the layer below a pit trap cell has a valid floor to land on

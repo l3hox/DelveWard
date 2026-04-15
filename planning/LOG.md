@@ -4,6 +4,48 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-10 — Phase E Pit Traps + Scene Utilities Refactoring
+
+### Phase E: Pit Traps (`src/game/pitTrapRenderer.ts`, `src/core/gameState.ts`, `src/level/levelSceneBuilder.ts`)
+
+`PitTrapInstance` carries `state` ('closed'|'open') and `gateMode`. Registration as a signal receiver follows the same pattern as mechanical doors: `onPitTrapSignalChanged` is the state-change callback, and `syncSignalReceiverStates()` is called after `_initSignalManager` to apply the correct initial state from signal state rather than the JSON `state` field. This means a signal-connected pit respects the signal's current state on level load, not whatever `state` was written in the JSON.
+
+`buildDungeon()` gained three new outputs:
+
+- **`pitTrapCells`** — used to build `pitFloorMap`: floor meshes always created, visibility toggled on open/close.
+- **`forceRenderable`** Map — cells on the layer directly below an open pit are flagged with `skipCeiling: true`. These `#` cells render as fully walkable (proper walls, floor, ceiling), bypassing the normal solid-wall logic. The set changes at runtime when a pit opens or closes, which triggers a targeted rebuild of just that layer's geometry.
+- **`pitCeilingCells`** — used to build `pitCeilingMap` two layers below the pit. The ceiling mesh there is toggled via visibility when the pit opens, revealing the fall-through opening without a full rebuild.
+
+Hole detection in `onMove` was extended to include open pit traps alongside `openBottom` cells.
+
+`signalManager.propagate()` was made public to allow it to be called directly at the end of `_initSignalManager`, ensuring all receivers are in the correct initial state.
+
+Fall damage is explicitly out of scope — deferred to a future damage system.
+
+### Phase E Editor: Pit Trap Entity (`src/editor/Inspector.ts`, `src/editor/EditorApp.ts`)
+
+`pit_trap` palette entry with a dashed square + down arrow icon and a matching grid icon. Inspector fields: `state` dropdown (closed/open) and `gateMode` dropdown. Added to all signal source target lists (lever, pressure_plate, trigger, tripwire, gate, chest) and to `WIRE_SOURCE_MAP` `validEntityType` so drag-to-wire works.
+
+### Shared Scene Utilities Refactoring (`src/rendering/sceneUtils.ts`)
+
+`EditorPreview` and `levelSceneBuilder` had grown independent but parallel implementations of ramp info computation and dungeon geometry building. The duplication meant every new entity renderer had to be added in two places, and the two files were drifting apart.
+
+Created `src/rendering/sceneUtils.ts` (~330 lines) with three shared helpers:
+
+- **`buildRampInfo(gs, li)`** — builds `RampCellInfo`/`RampHalfWallMap` from game state, previously duplicated inline in both files.
+- **`buildLayerEntityMeshes(gs, ld, level, walkable, yOffset)`** — all 23 entity renderer calls in one function. Future entity renderers only need to be added here.
+- **`buildLayerDungeonGeometry(gs, li, ld, level, layerCount, options?)`** — dungeon geometry build with all suppression logic (ramp, pit, stairs, wall entities).
+
+Result: `EditorPreview.ts` 771→459 lines (−312), `levelSceneBuilder.ts` 760→676 lines (−84).
+
+### Other fixes (2026-04-10)
+
+- **Editor preview**: FOV 75 + asymmetric view crop now matches the game. Environment/skybox changes trigger preview rebuild. Skybox follows camera position to prevent far-plane clipping. Pit trap state changes reflected in preview.
+- **Inspector phantom defaults**: `signalDuration=3` written on timed mode switch (lever/plate/trigger), `delay=1` and `interval=1` written on gate type switch, `maxRange=20` added to `trap_launcher` defaults — prevents inspector showing stale/blank values when mode is switched before saving.
+- **Editor layer on load**: Cleared `this.level = null` before `switchToLevel` during dungeon load. Without this, the outgoing-save triggered by the old level was overwriting the pre-seeded layer state of the incoming level.
+
+---
+
 ## 2026-04-09 — Phase D Props + Editor Live 3D Preview
 
 ### Phase D: Decorative Props (`src/game/propRenderer.ts`)

@@ -90,6 +90,31 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - `propRenderer.ts` (~150 lines): per-type 3D geometry with shared materials
   - Editor: palette entry, per-propId grid icons, propId dropdown in inspector with conditional wall/rotation fields, remembered `selectedPropId`
   - Save/load, validation, zone tagging
+- [x] **Phase E: Pit Traps**:
+  - `PitTrapInstance` with `state` ('closed'|'open') and `gateMode`
+  - Signal receiver registration (same pattern as mechanical doors); `onPitTrapSignalChanged` callback
+  - Signal-connected pits honor signal state (not JSON state) via `syncSignalReceiverStates()`
+  - `buildDungeon()` extended: `pitTrapCells` (→ `pitFloorMap`), `forceRenderable` Map with `skipCeiling` flag, `pitCeilingCells` (→ `pitCeilingMap` 2 layers below)
+  - Pit floor and ceiling meshes always built and tracked; visibility toggled on state change (no rebuild)
+  - Layer below open pit: `#` cells force-rendered as walkable with proper neighbor walls + floor/ceiling
+  - Runtime signal change rebuilds that layer's geometry; ceiling 2 layers below toggled via visibility
+  - Hole detection in `onMove` extended to include open pit traps
+  - `signalManager.propagate()` made public; called at end of `_initSignalManager` for initial state
+  - Save/load: signal state restoration + `syncSignalReceiverStates` preserves pit state across sessions
+  - Fall damage deferred to future damage system
+- [x] **Phase E Editor: Pit Trap Entity**:
+  - `pit_trap` palette entry (dashed square + down arrow icon, grid icon)
+  - Inspector: `state` and `gateMode` dropdowns
+  - `pit_trap` added to all signal source target lists (lever, pressure_plate, trigger, tripwire, gate, chest)
+  - Added to `WIRE_SOURCE_MAP` `validEntityType` for drag-to-wire support
+- [x] **Shared Scene Utilities Refactoring** (`src/rendering/sceneUtils.ts`):
+  - `buildRampInfo(gs, li)` — ramp cell/half-wall info, extracted from inline duplication in both consumers
+  - `buildLayerEntityMeshes(gs, ld, level, walkable, yOffset)` — all 23 entity renderer calls unified; new renderers added in one place
+  - `buildLayerDungeonGeometry(gs, li, ld, level, layerCount, options?)` — dungeon build with all suppression logic
+  - `EditorPreview.ts` 771→459 lines (−312); `levelSceneBuilder.ts` 760→676 lines (−84)
+  - Editor preview: FOV 75 + view crop match game; environment/skybox changes trigger rebuild; skybox follows camera; pit trap state reflected
+  - Inspector phantom defaults fixed: `signalDuration`, `delay`, `interval`, `maxRange` written on mode switch
+  - Editor layer-on-load bug fixed: cleared `this.level = null` before `switchToLevel` prevents outgoing-save clobbering pre-seeded state
 - [x] **Editor 3D Live Preview**:
   - Floating window on the 2D editor canvas: draggable title bar, resizable, close button
   - Defaults to right-lower quarter on first open; position preserved on toggle; resets to playerStart on file open
