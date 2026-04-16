@@ -599,3 +599,79 @@ Pit traps are floor cells that can open, dropping the player to the layer below.
 - The `forceRenderable` mechanism is general: any future "dynamic wall cell that needs to appear walkable at runtime" can use the same pattern
 - Fall damage when a pit opens under the player is not part of this ADR — deferred to a future damage system
 - Level designers must ensure the layer below a pit trap cell has a valid floor to land on
+
+---
+
+## ADR-M4-16 — Editor 3D Live Preview Architecture
+
+**Status:** Accepted
+**Date:** 2026-04-09
+
+### Context
+
+The editor needs a 3D preview to let level designers see the dungeon while editing. The question is how to integrate a Three.js renderer into the 2D editor without a separate window or page.
+
+### Decision
+
+**Floating in-canvas window rendered onto the 2D grid canvas.**
+
+- EditorPreview class owns its own Three.js scene, renderer, camera, and lights — fully independent from the game renderer.
+- The preview canvas is positioned off-screen (`left: -9999px`) but remains focusable for keyboard input and pointer lock.
+- GridCanvas draws the preview as a `ctx.drawImage()` inside a draggable/resizable window frame with title bar, toolbar, and key hints.
+- Two camera modes: **Step** (grid-based noclip via Player class) and **Free-fly** (pointer-lock 6DOF via FreeFlyCamera class).
+- Incremental updates: grid paint → rebuild layer geometry; entity changes → rebuild entities; layer/level switch → full rebuild. All use shared `sceneUtils.ts` functions.
+- Billboard sprites rotated toward camera each frame (same as game).
+- Camera position shown as blinking blue arrow on the 2D grid (grey when on different layer).
+
+### Alternatives Rejected
+
+1. **Split-panel layout (2D left, 3D right):** Implemented initially but replaced. The fixed split wastes screen space and forces a layout commitment. The floating window lets the designer choose size and position.
+
+2. **Separate browser window/tab:** Would require cross-window communication for edits. Complex and fragile.
+
+3. **Full scene rebuild on every edit:** Would work but wastes computation for small changes. The incremental approach (layer geometry + entity group) keeps paint strokes responsive.
+
+### Consequences
+
+- Preview is opt-in (toggle checkbox), zero overhead when off
+- Floating window can be moved out of the way during detailed grid editing
+- New entity renderers added to `sceneUtils.ts` automatically appear in both game and preview
+- Pointer lock for free-fly mode requires user click inside the preview content area
+
+---
+
+## ADR-M4-17 — Shared Scene Utilities: sceneUtils.ts
+
+**Status:** Accepted
+**Date:** 2026-04-10
+
+### Context
+
+The editor 3D preview (`EditorPreview.ts`) duplicated ~300 lines of scene-building logic from the game (`levelSceneBuilder.ts`): 23 entity renderer calls, ramp info computation, and dungeon geometry building. Adding a new entity renderer required changes in two places.
+
+### Decision
+
+**Extract shared functions into `src/rendering/sceneUtils.ts`.**
+
+Three functions extracted:
+
+1. `buildRampInfo(gs, li)` — Ramp cell suppression computation (ceiling/wall/floor flags, half-wall overrides). Was inline in both files (~80 lines each).
+
+2. `buildLayerEntityMeshes(gs, ld, level, walkable, yOffset)` — All 23 entity renderer calls for a single layer. Returns `{ group, billboardMeshes, forestInstances }`. Both files previously had identical call sequences.
+
+3. `buildLayerDungeonGeometry(gs, li, ld, level, layerCount, options?)` — Dungeon geometry build with ramp info, stair/wall entity suppression, pit trap force-renderable cells, and pit floor/ceiling mesh tracking. Wraps `buildDungeon()` with all the common parameter computation.
+
+The game's `levelSceneBuilder.ts` uses these functions but adds game-specific behavior on top: zone tagging, mesh map merging with `layerDoorKey`, animator registration, health bars. The editor's `EditorPreview.ts` uses them directly without those extras.
+
+### Alternatives Rejected
+
+1. **Keep duplication, synchronize manually:** Rejected. Every new entity type required changes in two files. Already caused a bug where pit trap renderers were missing from the preview.
+
+2. **Make EditorPreview use levelSceneBuilder directly:** Rejected. levelSceneBuilder is tightly coupled to the game's LevelScene interface, animators, and mesh maps. The preview doesn't need any of that. Sharing at the function level (not the orchestration level) is the right granularity.
+
+### Consequences
+
+- New entity renderers: add to `buildLayerEntityMeshes()` once, both game and preview get it
+- EditorPreview shrunk from 771 to 459 lines (-312)
+- levelSceneBuilder shrunk from 760 to 676 lines (-84)
+- sceneUtils.ts is 330 lines of pure functions with no side effects

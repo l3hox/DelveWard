@@ -371,6 +371,41 @@ Item properties (name, stats, slot, requirements) are defined in the item databa
 
 NPC properties (name, sprite, dialog file, merchant stock) are defined in the NPC database (`public/data/npcs.json`), not in the level JSON. Dialog trees are per-NPC files in `public/data/dialogs/{npcId}.json`.
 
+### prop
+
+Non-interactive decorative mesh. Placed on walkable cells.
+
+| Field    | Type   | Required | Default    | Description |
+|----------|--------|----------|------------|-------------|
+| propId   | string | yes      |            | `pillar`, `rubble`, `stalactite`, `stalagmite`, `statue`, `crate_stack`, `banner` |
+| wall     | string | no       | auto-detect | Wall direction for banner: `N`, `S`, `E`, `W` |
+| rotation | number | no       | 0          | Quarter-turn rotation (0–3) for statue, crate_stack |
+
+### pit_trap
+
+Signal-driven floor that opens to reveal the layer below. Placed on walkable cells.
+Wire from a lever, pressure plate, trigger, or tripwire to activate.
+
+| Field    | Type   | Required | Default  | Description |
+|----------|--------|----------|----------|-------------|
+| state    | string | no       | closed   | `closed` or `open` |
+| gateMode | string | no       | or       | Signal combining: `or`, `and`, `xor` |
+
+When open: floor hidden, cell below treated as walkable (walls toward neighbors rendered).
+Player falls through using gravity system. Closing restores floor.
+
+### ramp
+
+Physical slope connecting two adjacent layers. Entity placed on the **bottom cell** (walkable).
+The top cell is computed from `facing` direction (one cell in facing direction, on the layer above).
+
+| Field | Type   | Required | Default | Description |
+|-------|--------|----------|---------|-------------|
+| facing | string | yes     |         | Direction from bottom to top: `N`, `S`, `E`, `W` |
+| style  | string | no      | ramp    | Visual style: `ramp` (smooth slope) or `stairs` (stepped) |
+
+The top cell must be `#` (wall) on the bottom cell's layer and walkable on the layer above.
+
 #### Door behavior summary
 
 | Door type | Open with Space | Close with Space | Visual cue |

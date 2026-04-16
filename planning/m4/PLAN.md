@@ -75,10 +75,10 @@ Dungeon
 | B Editor | Editor: Layer management + hollow areas | B | Pending |
 | C | Thin Walls | 0 | **Done** |
 | C Editor | Editor: Thin wall painting | C | Basic done, UX polish pending |
-| D | Decorative Props | 0 | Pending |
-| D Editor | Editor: Prop palette + placement | D | Pending |
-| E | Pit Traps | B | Pending |
-| E Editor | Editor: Pit trap entity | E | Pending |
+| D | Decorative Props | 0 | **Done** |
+| D Editor | Editor: Prop palette + placement | D | **Done** |
+| E | Pit Traps | B | **Done** |
+| E Editor | Editor: Pit trap entity | E | **Done** |
 | F | Enemy Spawners | 0 | Pending |
 | F Editor | Editor: Spawner entity | F | Pending |
 | G | Rolling Boulders | 0 | Pending |
@@ -341,10 +341,10 @@ Floor that opens, dropping the player to a lower layer. Leverages the layer syst
 **Depends on:** Phase B (layer system — pit drops player to a lower layer, both visible).
 
 ### Game
-48. **PitTrapInstance**: `{ id?, col, row, state: 'closed' | 'open', targetLayer: number, targetCol: number, targetRow: number }`
-49. **Pit trap activation**: Signal-driven (like doors) or walk-on trigger (one-shot or timed reset).
-50. **Open pit rendering**: Floor geometry removed/hidden at that cell, revealing the layer below (natural void through layer stack).
-51. **Fall mechanic**: Player steps on open pit → camera drops to target layer Y offset. Fall damage (configurable, e.g., 10 HP). Brief screen effect. Player position updated to target layer/cell. Target cell must be walkable on target layer (validated by loader).
+48. **PitTrapInstance**: `{ id?, col, row, state: 'closed' | 'open', gateMode?: 'or' | 'and' | 'xor' }` — signal receiver (like mechanical doors)
+49. **Pit trap activation**: Signal-driven only. Wire from lever/plate/trigger/tripwire via `targets`. Classic trap pattern: wire tripwire → pit.
+50. **Open pit rendering**: Floor mesh tracked in `pitFloorMap`, toggled via `mesh.visible`. Cell below becomes force-renderable (walls, floor, ceiling generated). Ceiling 2 layers below tracked in `pitCeilingMap`.
+51. **Fall mechanic**: Player falls using existing gravity system (`setPendingFall`). If standing on pit when it opens, immediate fall triggered. No damage (deferred to future damage system).
 52. **Pit trap reset**: Timed (auto-close after N seconds) or permanent (one-shot). Signal modes reused from existing system.
 53. **Visual cue**: Closed pit has subtle floor crack texture to hint at danger. Open pit = void (no floor).
 

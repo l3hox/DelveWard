@@ -149,7 +149,7 @@ Plan — see `planning/m4/PLAN.md`. ADRs — see `planning/m4/ADR.md`.
 
 ## Known Issues
 
-- Balance pass pending — enemy stats and item placement may need tuning after playtesting The Architect's Tomb
+(none)
 
 ---
 

@@ -21,9 +21,9 @@ Unplanned feature ideas and wishlist items. Not scoped or scheduled — just cap
 - Environmental hazards — poison gas clouds draining HP while standing in them
 - Treasure chests — interact to open, drop random loot, animated lid
 - Torch wall shadows — dynamic shadow planes behind pillars/door frames
-- Status effects — poison (tick damage), slow (longer tween), blind (reduced torch range)
-- Pushable blocks — grid-aligned blocks for dungeon puzzles
-- Thin walls — walls between two walkable cells (edge walls, not cell walls), including thin wall doors; enables villages and walk-in houses
+- ~~Status effects — poison (tick damage), slow (longer tween), blind (reduced torch range)~~ — implemented in M2 Phase C
+- ~~Pushable blocks — grid-aligned blocks for dungeon puzzles~~ — implemented in M2 Phase D
+- ~~Thin walls — walls between two walkable cells (edge walls, not cell walls), including thin wall doors; enables villages and walk-in houses~~ — implemented in M4 Phase C
 - Editor: monster database editor — edit enemy stats (hp, atk, def, aggro, speed, xp), add/remove enemy types, preview sprites, live-save to enemyTypes
 - Editor: item database editor — edit items.json directly from the editor, add/remove items, edit stats/modifiers/requirements, icon picker from available sprites
 - Editor: direct file save via Vite dev server — add a `configureServer` plugin to `vite.config.ts` exposing `POST /api/write-file` and `GET /api/read-file` routes. Editor writes JSON files (items, enemies, dungeons) directly to the repo during `npm run dev`. Hot-reload picks up changes instantly. In non-dev mode (static build), save is unavailable but export (download) still works as fallback. If public access is ever needed, revisit with a proper backend.
