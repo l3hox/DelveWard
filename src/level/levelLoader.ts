@@ -350,6 +350,28 @@ function validateEntity(
       }
       break;
     }
+    case 'spawner': {
+      const w = checkWalkable('spawner'); if (w) return w;
+      if (e.enemyType !== undefined && typeof e.enemyType !== 'string') {
+        return `${pfx} spawner enemyType must be a string`;
+      }
+      if (e.maxActive !== undefined && (typeof e.maxActive !== 'number' || (e.maxActive as number) < 1)) {
+        return `${pfx} spawner maxActive must be a positive number`;
+      }
+      if (e.interval !== undefined && (typeof e.interval !== 'number' || (e.interval as number) <= 0)) {
+        return `${pfx} spawner interval must be a positive number`;
+      }
+      if (e.spawnRadius !== undefined && (typeof e.spawnRadius !== 'number' || (e.spawnRadius as number) < 1)) {
+        return `${pfx} spawner spawnRadius must be >= 1`;
+      }
+      if (e.gateMode !== undefined && !['or', 'and', 'xor'].includes(e.gateMode as string)) {
+        return `${pfx} spawner gateMode must be 'or', 'and', or 'xor'`;
+      }
+      if (e.visible !== undefined && typeof e.visible !== 'boolean') {
+        return `${pfx} spawner visible must be a boolean`;
+      }
+      break;
+    }
   }
 
   return null;

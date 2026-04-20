@@ -25,6 +25,7 @@ export interface EnemyInstance {
   regenPauseTimer?: number;  // remaining seconds of regen pause after taking damage
   drops?: DropsOverride;  // per-entity override from dungeon JSON
   statusEffects: StatusEffect[];
+  spawnerId?: string;
 }
 
 export function createEnemyInstance(

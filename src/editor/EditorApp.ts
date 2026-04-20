@@ -43,6 +43,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   barrel:         { hp: 10 },
   ramp:           { facing: 'N', style: 'ramp' },
   pit_trap:       { state: 'closed' },
+  spawner:        { enemyType: 'rat', maxActive: 3, interval: 10, spawnRadius: 2, active: true, visible: true },
   prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
@@ -84,14 +85,14 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
-  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
-  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
-  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
-  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap' },
+  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
+  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
   key:            { field: 'keyId',  validEntityType: 'door,chest' },
   door:           { field: 'keyId',  validEntityType: 'key' },
-  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,pit_trap' },
+  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,pit_trap,spawner' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
 };
 
@@ -889,6 +890,8 @@ export class EditorApp {
     } else if (type === 'ramp') {
       entity.facing = this.selectedRampFacing;
       entity.style = this.selectedRampStyle;
+    } else if (type === 'spawner' && this.selectedEnemyType) {
+      entity.enemyType = this.selectedEnemyType;
     } else if (type === 'prop') {
       entity.propId = this.selectedPropId;
     }

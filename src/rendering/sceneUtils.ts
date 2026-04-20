@@ -29,6 +29,7 @@ import { buildSignMeshes } from './signRenderer';
 import { buildFountainMeshes } from './fountainRenderer';
 import { buildBookshelfMeshes } from './bookshelfRenderer';
 import { buildAltarMeshes } from './altarRenderer';
+import { buildSpawnerMeshes } from './spawnerRenderer';
 import { buildForestMeshes, type ForestMeshes } from './forestRenderer';
 import { buildNpcMeshes } from './npcRenderer';
 import { buildEnemyMeshes } from './enemyRenderer';
@@ -225,6 +226,10 @@ export function buildLayerEntityMeshes(
   const altarMeshes = buildAltarMeshes(gs);
   altarMeshes.group.position.y = yOffset;
   group.add(altarMeshes.group);
+
+  const spawnerMeshes = buildSpawnerMeshes(gs);
+  spawnerMeshes.group.position.y = yOffset;
+  group.add(spawnerMeshes.group);
 
   const forestMeshes = buildForestMeshes(ld.grid, level.charDefs);
   if (forestMeshes.instances.length > 0) {

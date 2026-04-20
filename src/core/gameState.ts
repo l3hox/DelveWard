@@ -254,6 +254,20 @@ export interface PitTrapInstance {
   gateMode?: GateMode;
 }
 
+export interface SpawnerInstance {
+  id?: string;
+  col: number;
+  row: number;
+  enemyType: string;
+  maxActive: number;
+  interval: number;
+  spawnRadius: number;
+  active: boolean;
+  visible: boolean;
+  gateMode?: GateMode;
+  spawnTimer: number;
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -333,6 +347,7 @@ export interface LevelSnapshot {
   ramps: Map<string, RampInstance>;
   props: Map<string, PropInstance>;
   pitTraps: Map<string, PitTrapInstance>;
+  spawners: Map<string, SpawnerInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -373,6 +388,7 @@ export interface LayerState {
   ramps: Map<string, RampInstance>;
   props: Map<string, PropInstance>;
   pitTraps: Map<string, PitTrapInstance>;
+  spawners: Map<string, SpawnerInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -387,6 +403,7 @@ export function createEmptyLayerState(): LayerState {
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
     thinWalls: new Map(), ramps: new Map(), props: new Map(), pitTraps: new Map(),
+    spawners: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -451,6 +468,8 @@ export class GameState {
   set props(v) { this.activeLayer.props = v; }
   get pitTraps() { return this.activeLayer.pitTraps; }
   set pitTraps(v) { this.activeLayer.pitTraps = v; }
+  get spawners() { return this.activeLayer.spawners; }
+  set spawners(v) { this.activeLayer.spawners = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -840,6 +859,22 @@ export class GameState {
       });
       return true;
     }
+    if (e.type === 'spawner') {
+      this.spawners.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        enemyType: (e.enemyType as string) ?? 'rat',
+        maxActive: (e.maxActive as number) ?? 3,
+        interval: (e.interval as number) ?? 10,
+        spawnRadius: (e.spawnRadius as number) ?? 2,
+        active: (e.active as boolean) !== false,
+        visible: (e.visible as boolean) !== false,
+        gateMode: e.gateMode as GateMode | undefined,
+        spawnTimer: 0,
+      });
+      return true;
+    }
     return false;
   }
 
@@ -938,6 +973,21 @@ export class GameState {
 
     const savedIndex = this.activeLayerIndex;
 
+    // Collect all IDs targeted by any source across all layers.
+    // Used so spawners only register as receivers when actually wired —
+    // otherwise they'd be force-deactivated by signal propagation.
+    const targetedIds = new Set<string>();
+    for (const layer of this.layers) {
+      const sources: Iterable<{ targets?: string[] }> = [
+        ...layer.levers.values(), ...layer.plates.values(),
+        ...layer.triggers.values(), ...layer.tripwires.values(),
+        ...layer.gates.values(), ...layer.chests.values(),
+      ];
+      for (const src of sources) {
+        if (src.targets) for (const t of src.targets) targetedIds.add(t);
+      }
+    }
+
     for (let li = 0; li < this.layers.length; li++) {
       this.activeLayerIndex = li;
 
@@ -1019,6 +1069,12 @@ export class GameState {
         }
       }
 
+      for (const sp of this.spawners.values()) {
+        if (sp.id && targetedIds.has(sp.id)) {
+          this.signalManager.registerReceiver(sp.id, sp.gateMode ?? 'or');
+        }
+      }
+
       // Register chests with targets as sources (booby-trapped chests)
       for (const chest of this.chests.values()) {
         if (chest.id && chest.targets && chest.targets.length > 0) {
@@ -1074,6 +1130,11 @@ export class GameState {
         pit.state = active ? 'open' : 'closed';
         this.onPitTrapSignalChanged?.(entry.col, entry.row, active);
       }
+      const spawner = this.spawners.get(doorKey(entry.col, entry.row));
+      if (spawner) {
+        spawner.active = active;
+        this.onSpawnerSignalChanged?.(entry.col, entry.row, active);
+      }
       this.activeLayerIndex = saved;
     });
 
@@ -1120,6 +1181,12 @@ export class GameState {
         const active = this.signalManager.isReceiverActive(pt.id);
         pt.state = active ? 'open' : 'closed';
       }
+      for (const sp of this.spawners.values()) {
+        if (!sp.id) continue;
+        if (!this.signalManager.getReceiver(sp.id)) continue;
+        const active = this.signalManager.isReceiverActive(sp.id);
+        sp.active = active;
+      }
       for (const door of this.doors.values()) {
         if (!door.id || !door.mechanical) continue;
         if (!this.signalManager.getReceiver(door.id)) continue;
@@ -1135,6 +1202,9 @@ export class GameState {
 
   /** External callback for signal-driven pit trap state changes (floor visibility + fall). */
   onPitTrapSignalChanged: ((col: number, row: number, open: boolean) => void) | null = null;
+
+  /** External callback for signal-driven spawner active state changes. */
+  onSpawnerSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
 
   /** External callback for timed lever auto-reset (for mesh animation). */
   onLeverReset: ((col: number, row: number) => void) | null = null;
@@ -1180,6 +1250,7 @@ export class GameState {
       for (const r of this.ramps.values()) register(r, 'ramp', li);
       for (const p of this.props.values()) register(p, 'prop', li);
       for (const pt of this.pitTraps.values()) register(pt, 'pit_trap', li);
+      for (const sp of this.spawners.values()) register(sp, 'spawner', li);
     }
     this.activeLayerIndex = savedIndex;
   }
@@ -1311,6 +1382,8 @@ export class GameState {
     for (const [k, v] of this.pitTraps) {
       pitTraps.set(k, { ...v });
     }
+    const spawners = new Map<string, SpawnerInstance>();
+    for (const [k, v] of this.spawners) spawners.set(k, { ...v });
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1319,7 +1392,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, spawners, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1453,6 +1526,10 @@ export class GameState {
       for (const [k, v] of snapshot.pitTraps) {
         this.pitTraps.set(k, { ...v });
       }
+    }
+    this.spawners = new Map<string, SpawnerInstance>();
+    if (snapshot.spawners) {
+      for (const [k, v] of snapshot.spawners) this.spawners.set(k, { ...v });
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);

@@ -171,7 +171,7 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -189,7 +189,7 @@ export class Inspector {
         break;
 
       case 'pressure_plate':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -233,7 +233,7 @@ export class Inspector {
         break;
 
       case 'trigger':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -251,7 +251,7 @@ export class Inspector {
         break;
 
       case 'tripwire':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
           entity.orientation = val;
           this.onEntityChanged?.();
@@ -272,7 +272,7 @@ export class Inspector {
             this.onEntityChanged?.();
             this.refresh();
           });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         if ((entity.gateType as string) === 'delay') {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;
@@ -398,7 +398,7 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
         this.addReferencedBySection(entity);
         {
           const refs = this.app.getReferencingEntities(entity);
@@ -507,6 +507,42 @@ export class Inspector {
           this.onEntityChanged?.();
         });
         break;
+
+      case 'spawner': {
+        const spawnerEnemyType = (entity.enemyType as string) ?? enemyDatabase.getAllEnemyIds()[0] ?? '';
+        this.addEnemyTypeDropdown(entity, spawnerEnemyType);
+        this.addNumberField('maxActive', (entity.maxActive as number) ?? 3, (val) => {
+          entity.maxActive = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        this.addNumberField('interval', (entity.interval as number) ?? 10, (val) => {
+          entity.interval = val;
+          this.onEntityChanged?.();
+        }, { step: '0.5' });
+        this.addNumberField('spawnRadius', (entity.spawnRadius as number) ?? 2, (val) => {
+          entity.spawnRadius = val;
+          this.onEntityChanged?.();
+        }, { step: '1', min: '1' });
+        this.addDropdownField('active', String((entity.active as boolean) ?? true), ['true', 'false'], (val) => {
+          entity.active = val === 'true';
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('visible', String((entity.visible as boolean) ?? true), ['true', 'false'], (val) => {
+          entity.visible = val === 'true';
+          this.onEntityChanged?.();
+        });
+        this.addReferencedBySection(entity);
+        {
+          const refs = this.app.getReferencingEntities(entity);
+          if (refs.length > 0) {
+            this.addDropdownField('gateMode', (entity.gateMode as string) ?? 'or', ['or', 'and', 'xor'], (val) => {
+              entity.gateMode = val;
+              this.onEntityChanged?.();
+            });
+          }
+        }
+        break;
+      }
 
       case 'prop': {
         const PROP_IDS = ['pillar', 'rubble', 'stalactite', 'stalagmite', 'statue', 'crate_stack', 'banner'];

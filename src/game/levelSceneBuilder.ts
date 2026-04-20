@@ -26,6 +26,7 @@ import { buildSignMeshes, type SignMeshes } from '../rendering/signRenderer';
 import { buildFountainMeshes } from '../rendering/fountainRenderer';
 import { buildBookshelfMeshes } from '../rendering/bookshelfRenderer';
 import { buildAltarMeshes } from '../rendering/altarRenderer';
+import { buildSpawnerMeshes } from '../rendering/spawnerRenderer';
 import { buildBarrelMeshes } from '../rendering/barrelRenderer';
 import { buildThinWallMeshes } from '../rendering/thinWallRenderer';
 import { buildRampMeshes } from '../rendering/rampRenderer';
@@ -71,6 +72,7 @@ export interface LevelScene {
   thinWallMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   propMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
+  spawnerMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
   pitFloorMap: Map<string, THREE.Mesh>;
   pitCeilingMap: Map<string, THREE.Mesh>;
   npcMeshes: NpcMeshes;
@@ -193,6 +195,10 @@ export function buildLevelScene(
   const sharedPropGroup = new THREE.Group();
   scene.add(sharedPropGroup);
   const sharedPropMeshMap = new Map<string, THREE.Group>();
+
+  const sharedSpawnerGroup = new THREE.Group();
+  scene.add(sharedSpawnerGroup);
+  const sharedSpawnerMeshMap = new Map<string, THREE.Mesh>();
 
   const sharedPitFloorMap = new Map<string, THREE.Mesh>();
   const sharedPitCeilingMap = new Map<string, THREE.Mesh>();
@@ -419,6 +425,12 @@ export function buildLevelScene(
     sharedPropGroup.add(ldPropMeshes.group);
     mergeMap(sharedPropMeshMap, ldPropMeshes.meshMap, li);
 
+    // Spawner meshes
+    const ldSpawnerMeshes = buildSpawnerMeshes(gameState);
+    ldSpawnerMeshes.group.position.y = yOffset;
+    sharedSpawnerGroup.add(ldSpawnerMeshes.group);
+    mergeMap(sharedSpawnerMeshMap, ldSpawnerMeshes.meshMap, li);
+
     // NPC meshes
     const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
     ldNpcMeshes.group.position.y = yOffset;
@@ -479,6 +491,7 @@ export function buildLevelScene(
       for (const [key, mesh] of ldBarrelMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldRampMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldPropMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldSpawnerMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldThinWallMeshes.meshMap) {
         // Thin wall keys are "col,row:S" or "col,row:E" — strip the direction suffix for zone lookup
         const cellKey = key.split(':')[0];
@@ -616,6 +629,7 @@ export function buildLevelScene(
     thinWallMeshes: { group: sharedThinWallGroup, meshMap: sharedThinWallMeshMap },
     rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
     propMeshes: { group: sharedPropGroup, meshMap: sharedPropMeshMap },
+    spawnerMeshes: { group: sharedSpawnerGroup, meshMap: sharedSpawnerMeshMap },
     pitFloorMap: sharedPitFloorMap,
     pitCeilingMap: sharedPitCeilingMap,
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
@@ -662,6 +676,7 @@ export function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.thinWallMeshes.group,
     ls.rampMeshes.group,
     ls.propMeshes.group,
+    ls.spawnerMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),

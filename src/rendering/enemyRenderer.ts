@@ -62,6 +62,31 @@ export function buildEnemyMeshes(gameState: GameState): EnemyMeshes {
   return { group, meshMap };
 }
 
+export function createSingleEnemyMesh(
+  enemyType: string,
+  col: number,
+  row: number,
+  key: string,
+  group: THREE.Group,
+  meshMap: Map<string, THREE.Mesh>,
+  yOffset: number,
+): THREE.Mesh | null {
+  const def = enemyDatabase.getEnemy(enemyType);
+  if (!def) return null;
+  const size = def.sprite.size ?? DEFAULT_SPRITE_SIZE;
+  const geo = new THREE.PlaneGeometry(size, size);
+  const tex = getEnemyTexture(enemyType);
+  const mat = createNeutralLitMaterial(tex);
+  const mesh = new THREE.Mesh(geo, mat);
+  const cx = col * CELL_SIZE + CELL_SIZE / 2;
+  const cz = row * CELL_SIZE + CELL_SIZE / 2;
+  const spriteYOffset = def.sprite.yOffset ?? 0;
+  mesh.position.set(cx, size * 0.5 + spriteYOffset + yOffset, cz);
+  group.add(mesh);
+  meshMap.set(key, mesh);
+  return mesh;
+}
+
 export function updateEnemyBillboards(
   meshMap: Map<string, THREE.Mesh>,
   camera: THREE.Camera,

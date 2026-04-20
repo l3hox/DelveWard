@@ -12,13 +12,14 @@ import { pressPlate, releasePlate } from './rendering/plateRenderer';
 import { hideTripwire } from './rendering/tripwireRenderer';
 import { extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { updateForestBillboards } from './rendering/forestRenderer';
-import { updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures } from './rendering/enemyRenderer';
+import { updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, createSingleEnemyMesh } from './rendering/enemyRenderer';
 import { hideItemMesh, addSingleItemMesh, updateItemBillboards, hideConsumableMesh, addSingleConsumableMesh, updateConsumableBillboards } from './rendering/groundItemRenderer';
 import { preloadItemSprites } from './rendering/itemSprites';
 import { loadLootTables } from './core/lootTable';
 import { spawnLoot } from './game/lootSpawner';
 import { updateEnemies } from './enemies/enemyAI';
-import { enemyDatabase } from './enemies/enemyDatabase';
+import { enemyDatabase, DEFAULT_SPRITE_SIZE } from './enemies/enemyDatabase';
+import { createEnemyInstance } from './enemies/enemyTypes';
 import type { EnemyInstance } from './enemies/enemyTypes';
 import { playerAttack, enemyAttackPlayer } from './core/combat';
 import type { CombatResult } from './core/combat';
@@ -340,6 +341,80 @@ async function init(): Promise<void> {
       if (levelled) levelUpNotification.trigger(gameState.level);
     }
     spawnLoot(enemy.type, enemy.drops, col, row, gameState, ls);
+  }
+
+  function tickSpawners(delta: number): void {
+    const savedLayer = gameState.activeLayerIndex;
+    for (let li = 0; li < gameState.layers.length; li++) {
+      gameState.activeLayerIndex = li;
+      const layerGrid = ls.layerGrids[li];
+      if (!layerGrid) continue;
+      const yOffset = li * LAYER_HEIGHT;
+
+      for (const [, spawner] of gameState.spawners) {
+        if (!spawner.active) continue;
+
+        spawner.spawnTimer += delta;
+        if (spawner.spawnTimer < spawner.interval) continue;
+        spawner.spawnTimer -= spawner.interval;
+
+        let aliveCount = 0;
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.spawnerId === spawner.id) aliveCount++;
+        }
+        if (aliveCount >= spawner.maxActive) continue;
+
+        // BFS from spawner through walkable cells — candidates are reachable
+        // within spawnRadius steps, respecting walls.
+        const ps = ls.player.getState();
+        const candidates: Array<[number, number]> = [];
+        const visited = new Set<string>([doorKey(spawner.col, spawner.row)]);
+        const queue: Array<{ col: number; row: number; dist: number }> = [
+          { col: spawner.col, row: spawner.row, dist: 0 },
+        ];
+        let head = 0;
+        while (head < queue.length) {
+          const { col: c, row: r, dist: d } = queue[head++];
+          if (d > 0) {
+            const key = doorKey(c, r);
+            const occupied = gameState.enemies.has(key) || gameState.isBlockAt(c, r)
+              || (li === savedLayer && c === ps.col && r === ps.row);
+            if (!occupied) candidates.push([c, r]);
+          }
+          if (d >= spawner.spawnRadius) continue;
+          for (const [dc, dr] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nc = c + dc;
+            const nr = r + dr;
+            const nkey = doorKey(nc, nr);
+            if (visited.has(nkey)) continue;
+            if (nr < 0 || nr >= layerGrid.length || nc < 0 || nc >= layerGrid[0].length) continue;
+            if (!ls.walkable.has(layerGrid[nr][nc])) continue;
+            visited.add(nkey);
+            queue.push({ col: nc, row: nr, dist: d + 1 });
+          }
+        }
+        if (candidates.length === 0) continue;
+
+        const [spawnCol, spawnRow] = candidates[Math.floor(Math.random() * candidates.length)];
+        const newEnemy = createEnemyInstance(spawnCol, spawnRow, spawner.enemyType);
+        newEnemy.spawnerId = spawner.id;
+        const enemyKey = doorKey(spawnCol, spawnRow);
+        gameState.enemies.set(enemyKey, newEnemy);
+
+        const prefixedKey = layerDoorKey(li, enemyKey);
+        const mesh = createSingleEnemyMesh(
+          spawner.enemyType, spawnCol, spawnRow, prefixedKey,
+          ls.enemyMeshes.group, ls.enemyMeshes.meshMap, yOffset,
+        );
+        if (mesh) {
+          ls.enemyAnimator.register(prefixedKey, mesh, spawnCol, spawnRow);
+          const def = enemyDatabase.getEnemy(spawner.enemyType);
+          const spriteHeight = def?.sprite.size ?? DEFAULT_SPRITE_SIZE;
+          ls.healthBarManager.create(prefixedKey, mesh, newEnemy.maxHp, spriteHeight);
+        }
+      }
+    }
+    gameState.activeLayerIndex = savedLayer;
   }
 
   function restartLevel(): void {
@@ -844,6 +919,10 @@ async function init(): Promise<void> {
           }
         }
       }
+    };
+
+    gameState.onSpawnerSignalChanged = (_col, _row, _active) => {
+      // Active flag is already set on the SpawnerInstance by gameState.
     };
 
     // Timed source deactivation → animate lever reset
@@ -1677,6 +1756,8 @@ async function init(): Promise<void> {
         }
       }
       gameState.activeLayerIndex = savedLayer;
+
+      tickSpawners(delta);
 
       // Death — show save/load overlay if saves exist, else restart
       if (gameState.hp <= 0) {

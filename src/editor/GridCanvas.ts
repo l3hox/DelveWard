@@ -1521,6 +1521,22 @@ export class GridCanvas {
         break;
       }
 
+      case 'spawner': {
+        ctx.fillStyle = '#8844aa';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#cc66ff';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(cx - iconRadius * 0.5, cy);
+        ctx.lineTo(cx + iconRadius * 0.5, cy);
+        ctx.moveTo(cx, cy - iconRadius * 0.5);
+        ctx.lineTo(cx, cy + iconRadius * 0.5);
+        ctx.stroke();
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);
