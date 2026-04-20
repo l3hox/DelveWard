@@ -79,8 +79,8 @@ Dungeon
 | D Editor | Editor: Prop palette + placement | D | **Done** |
 | E | Pit Traps | B | **Done** |
 | E Editor | Editor: Pit trap entity | E | **Done** |
-| F | Enemy Spawners | 0 | Pending |
-| F Editor | Editor: Spawner entity | F | Pending |
+| F | Enemy Spawners | 0 | **Done** |
+| F Editor | Editor: Spawner entity | F | **Done** |
 | G | Rolling Boulders | 0 | Pending |
 | G Editor | Editor: Boulder entity | G | Pending |
 | H | Sub-Grid Entity Positioning | D | Pending |
@@ -354,21 +354,26 @@ Floor that opens, dropping the player to a lower layer. Leverages the layer syst
 
 ---
 
-## Phase F — Enemy Spawners
+## Phase F — Enemy Spawners (Done)
 
 Entity that periodically creates new enemies. Not vertical-world-specific but adds gameplay depth.
 
 ### Game
-56. **SpawnerInstance**: `{ id?, col, row, enemyType: string, maxActive: number, interval: number, spawnRadius: number, active: boolean }`
-57. **Spawner tick**: In game loop (paused during overlays), check interval timer. If fewer than `maxActive` spawned enemies exist, spawn one at random walkable cell within `spawnRadius` on the same layer.
-58. **Spawner activation**: Always active, or signal-driven.
-59. **Spawned enemy tracking**: Spawner tracks its spawned enemy IDs. Kill event decrements count.
-60. **Spawner rendering**: Subtle floor glyph/rune (decorative marker).
-61. **Save/load**: Spawner state (timer, active count) in LevelSnapshot.
+56. **SpawnerInstance**: `{ id?, col, row, enemyType, maxActive, interval, spawnRadius, active, visible, gateMode?, spawnTimer }`
+57. **Spawner tick** — `tickSpawners(delta)` in main.ts iterates all layers, accumulates timer, spawns an enemy when `timer >= interval`.
+58. **Activation** — Signal-driven, defaulting to `active: true`. A spawner is only registered as a signal receiver if some source actually targets it (otherwise propagation would force-deactivate it).
+59. **Spawned enemy tracking** — `EnemyInstance.spawnerId` tags children of a spawner. Per tick, spawner counts enemies with matching `spawnerId` and skips spawn if `>= maxActive`. No callback needed.
+60. **Spawn position** — BFS from spawner through walkable cells (not Manhattan). Reachable within `spawnRadius` steps respecting walls. Non-flying enemies also skip hole cells (cells with no solid wall on the layer below); flying enemies (`enemyDef.fly === true`) can traverse and spawn on holes.
+61. **Rendering** — Floor rune (`src/rendering/spawnerRenderer.ts`): flat `CircleGeometry` with procedural dark-purple arcane circle texture. `visible: false` suppresses the mesh (future-proof for replacing with a prop: bee nest, open grave, wall crack).
+62. **Runtime enemy mesh** — `createSingleEnemyMesh()` in enemyRenderer builds a single enemy mesh at spawn time (same geometry/material as scene-build-time enemies), registers with `EnemyAnimator` and `HealthBarManager`.
+63. **Save/load** — `spawners` in `LevelSnapshot`, `spawnTimer` persisted. `spawnerId` on EnemyInstance survives save/load via existing enemy serialization.
 
 ### Editor
-62. **Spawner palette entry**: New entity type
-63. **Inspector fields**: enemyType dropdown, maxActive number, interval number, spawnRadius number
+64. **Palette entry** — `spawner` in entity palette with purple circle + cross icon.
+65. **Grid icon** — Purple filled circle with cross strokes.
+66. **Inspector fields** — enemyType dropdown, maxActive, interval, spawnRadius, active, visible, gateMode (shown only when wired), referenced-by section.
+67. **Signal wiring** — Added to all 6 source `validEntityType` lists (lever, plate, trigger, tripwire, gate, chest) so drag-to-wire works.
+68. **Last-used config remembered** — `selectedSpawnerConfig` on EditorApp holds the full spawner config; subsequent placements inherit it, editing syncs back.
 
 ---
 

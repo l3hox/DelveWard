@@ -669,6 +669,15 @@ inspector.setEntityChangedCallback(() => {
       if (typeof e.style === 'string') app.selectedRampStyle = e.style as 'ramp' | 'stairs';
     }
     if (e.type === 'prop' && typeof e.propId === 'string') app.selectedPropId = e.propId;
+    if (e.type === 'spawner') {
+      const c = app.selectedSpawnerConfig;
+      if (typeof e.enemyType === 'string') c.enemyType = e.enemyType;
+      if (typeof e.maxActive === 'number') c.maxActive = e.maxActive;
+      if (typeof e.interval === 'number') c.interval = e.interval;
+      if (typeof e.spawnRadius === 'number') c.spawnRadius = e.spawnRadius;
+      if (typeof e.active === 'boolean') c.active = e.active;
+      if (typeof e.visible === 'boolean') c.visible = e.visible;
+    }
   }
   updateStairHighlight();
   levelList.refresh();

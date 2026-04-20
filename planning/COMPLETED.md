@@ -102,6 +102,21 @@ Detailed checklist of everything that's been built. For session-by-session notes
   - `signalManager.propagate()` made public; called at end of `_initSignalManager` for initial state
   - Save/load: signal state restoration + `syncSignalReceiverStates` preserves pit state across sessions
   - Fall damage deferred to future damage system
+- [x] **Phase F: Enemy Spawners**:
+  - `SpawnerInstance` with `enemyType`, `maxActive`, `interval`, `spawnRadius`, `active`, `visible`, `gateMode?`, `spawnTimer` (persisted)
+  - Signal-receiver registration only when actually wired (target-id set collected from all 6 source types at init)
+  - `EnemyInstance.spawnerId` tags children; per-tick count enforces `maxActive`
+  - BFS spawn candidate search through walkable cells (not Manhattan) — walls properly constrain radius
+  - Non-flying enemies skip hole cells (cells with no solid support below); flying enemies (`enemyDef.fly`) can traverse and spawn on holes
+  - `createSingleEnemyMesh()` runtime helper: builds a single enemy mesh, registers with `EnemyAnimator` + `HealthBarManager`
+  - `spawnerRenderer.ts` (~75 lines): flat `CircleGeometry` rune with procedural dark-purple arcane circle texture; `visible: false` suppresses mesh (future prop swap)
+  - Save/load: `LevelSnapshot.spawners?`, `spawnTimer` persisted; `spawnerId` on enemies survives via existing enemy serialization
+  - Debug fullbright (M key) now grants invincibility: HP-loss guarded at 4 damage sites (enemy melee, projectiles, status effects, starvation)
+- [x] **Phase F Editor: Spawner Entity**:
+  - `spawner` palette entry + purple circle + cross grid/toolbar icon
+  - Inspector: enemyType dropdown, maxActive, interval, spawnRadius, active, visible, conditional gateMode, referenced-by section
+  - Added to all 6 signal source `validEntityType` lists for drag-to-wire
+  - `selectedSpawnerConfig` on EditorApp remembers full config between placements; editing syncs back
 - [x] **Phase E Editor: Pit Trap Entity**:
   - `pit_trap` palette entry (dashed square + down arrow icon, grid icon)
   - Inspector: `state` and `gateMode` dropdowns

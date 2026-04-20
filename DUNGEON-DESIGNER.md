@@ -394,6 +394,29 @@ Wire from a lever, pressure plate, trigger, or tripwire to activate.
 When open: floor hidden, cell below treated as walkable (walls toward neighbors rendered).
 Player falls through using gravity system. Closing restores floor.
 
+### spawner
+
+Entity that periodically creates enemies at nearby walkable cells. Placed on a walkable cell.
+Can be signal-driven — wire from a lever, pressure plate, trigger, tripwire, gate, or chest to toggle activation.
+
+| Field       | Type    | Required | Default | Description |
+|-------------|---------|----------|---------|-------------|
+| enemyType   | string  | yes      | `rat`   | Enemy ID from `enemies.json` |
+| maxActive   | number  | no       | 3       | Max alive spawned enemies at once |
+| interval    | number  | no       | 10      | Seconds between spawn attempts |
+| spawnRadius | number  | no       | 2       | BFS reachable steps through walkable cells |
+| active      | boolean | no       | true    | Spawning enabled (signal-controllable) |
+| visible     | boolean | no       | true    | Render the floor rune mesh (false when a prop or other visual represents the spawner) |
+| gateMode    | string  | no       | `or`    | Signal combining: `or`, `and`, `xor` (only when wired from multiple sources) |
+
+Spawn position is found via BFS from the spawner cell through walkable cells (walls respected). Candidates must be reachable in ≤ `spawnRadius` steps.
+
+Non-flying enemies cannot spawn or traverse onto **hole cells** (cells whose layer-below has no solid wall). Flying enemies (with `fly: true` in `enemies.json`) can spawn and traverse through holes.
+
+When `active: false`, the spawn timer pauses. Existing spawned enemies remain alive. Re-activation resumes spawning from the paused timer.
+
+Spawners without inbound signal wires remain at their JSON `active` value. Wired spawners follow the signal state.
+
 ### ramp
 
 Physical slope connecting two adjacent layers. Entity placed on the **bottom cell** (walkable).

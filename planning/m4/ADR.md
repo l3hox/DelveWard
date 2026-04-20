@@ -640,6 +640,52 @@ The editor needs a 3D preview to let level designers see the dungeon while editi
 
 ---
 
+## ADR-M4-18 — Enemy Spawners: Conditional Signal Receiver Registration
+
+**Status:** Accepted
+**Date:** 2026-04-20
+
+### Context
+
+M4 Phase F adds enemy spawners — signal-controllable entities that periodically create new enemies. Spawners default to `active: true` and spawn enemies on their own. They can also be wired from levers, plates, triggers, etc. to toggle activation.
+
+Doors and pit traps register unconditionally as signal receivers when they have an ID. Their default state (closed door, closed pit) matches what an unwired receiver evaluates to (`active = false`), so this is harmless.
+
+Spawners are different: their default active state is `true`. The signal manager's receiver evaluation function returns `false` for a receiver with no inputs, and `syncSignalReceiverStates()` then writes that back onto the spawner (`sp.active = signalManager.isReceiverActive(sp.id)`). The editor auto-assigns an ID to every entity, so every spawner has one. The result: every unwired spawner gets force-deactivated on load.
+
+### Decision
+
+**Register a spawner as a signal receiver only when some source actually targets it.**
+
+Before the layer-iteration registration loop in `_initSignalManager()`, collect the set of all IDs targeted by any source across all layers (`levers.targets`, `plates.targets`, `triggers.targets`, `tripwires.targets`, `gates.targets`, `chests.targets`). Then the spawner registration loop becomes:
+
+```typescript
+for (const sp of this.spawners.values()) {
+  if (sp.id && targetedIds.has(sp.id)) {
+    this.signalManager.registerReceiver(sp.id, sp.gateMode ?? 'or');
+  }
+}
+```
+
+Unwired spawners skip registration, so `syncSignalReceiverStates()` leaves their `active` flag alone.
+
+The target-id collection is compact via structural typing — all six source types have `targets?: string[]`, so a single loop over `Iterable<{ targets?: string[] }>` handles them all.
+
+### Alternatives Rejected
+
+1. **Register everything, never override** — Skip `syncSignalReceiverStates` for spawners. Rejected: wired spawners would then ignore signal state, breaking the feature.
+2. **Register unconditionally, preserve flag** — After registering, explicitly write `receiver.active = spawner.active` initially. Rejected: this works only for the initial state, not for subsequent toggles (a lever toggle would override and then stay at that value).
+3. **`gateMode` as the sentinel** — Chests use `gateMode` presence as the signal to register. Rejected for spawners: the editor's spawner inspector shows `gateMode` only when refs exist, but the field could easily be set without wiring by future UI changes. The target set is the authoritative signal that a receiver is wired.
+
+### Consequences
+
+- Unwired spawners respect their JSON `active` field; wired spawners follow signal state.
+- The target-id set is cheap to compute (O(sources)) and collected once per `_initSignalManager()` call.
+- This pattern is reusable for any future signal receiver with a non-`false` default state.
+- Pit traps and doors unaffected — their default matches receiver-default-inactive.
+
+---
+
 ## ADR-M4-17 — Shared Scene Utilities: sceneUtils.ts
 
 **Status:** Accepted

@@ -4,6 +4,34 @@ Each entry records what was decided or changed — design decisions, architectur
 
 ---
 
+## 2026-04-20 — Phase F Enemy Spawners + Debug Invincibility
+
+### Phase F: Enemy Spawners (`src/rendering/spawnerRenderer.ts`, `src/core/gameState.ts`, `src/main.ts`)
+
+`SpawnerInstance` carries `enemyType`, `maxActive`, `interval`, `spawnRadius`, `active`, `visible`, optional `gateMode`, and a persisted `spawnTimer`. Signal-driven activation follows the receiver pattern from doors and pit traps, but with one critical difference: the spawner is only registered as a receiver if some source actually targets it. Otherwise, `syncSignalReceiverStates()` would force-deactivate every unwired spawner (a receiver with no inputs evaluates to `false`). The target-id set is collected once at the start of `_initSignalManager()` by scanning all sources' `targets` arrays across all layers — compacted to a single loop using structural typing (`Iterable<{ targets?: string[] }>`) across the six source types.
+
+Spawned enemies are tagged via a new optional `spawnerId: string` on `EnemyInstance`. Per tick, the spawner counts enemies whose `spawnerId` matches its own ID to enforce `maxActive`. Simple and layer-local — enemies are already stored per-layer, so counting `gameState.enemies.values()` on the current layer is correct.
+
+Spawn candidate search uses BFS from the spawner through walkable cells (not Manhattan distance). Cells are valid candidates if reachable in ≤ `spawnRadius` steps, not just within a Manhattan diamond — walls properly constrain the effective radius. Non-flying enemies can neither traverse nor spawn on hole cells (cells whose layer-below has no solid support); flying enemies (`enemyDef.fly === true`) can. The `isHole` logic mirrors the hole check already used by enemy AI.
+
+Runtime enemy mesh creation goes through a new `createSingleEnemyMesh()` helper in `enemyRenderer.ts`, which factors out the per-enemy loop body from `buildEnemyMeshes()`. Spawned enemies register with the existing `EnemyAnimator` and `HealthBarManager` just like scene-build-time enemies.
+
+Floor rune (`spawnerRenderer.ts`, ~75 lines) is a flat `CircleGeometry` with a procedural 64×64 arcane circle texture in dark purple (`#6b1a3a`). The `visible: false` flag suppresses the mesh entirely — future-proof for swapping with a prop: bee nest for giant bats, open grave for zombies, wall crack, etc. The prop would still use the spawner's gameplay mechanics.
+
+Editor: palette entry, purple-circle-with-cross grid icon, inspector with all fields (enemyType dropdown via the shared `addEnemyTypeDropdown` helper, maxActive, interval, spawnRadius, active, visible, conditional gateMode). Spawner added to the `validEntityType` lists of all 6 signal sources for drag-to-wire. `selectedSpawnerConfig` on EditorApp holds the full last-used config; the next placement inherits it via `Object.assign`, and editing an existing spawner syncs its fields back into the config.
+
+Save/load: `LevelSnapshot.spawners?: Record<string, SpawnerInstance>` with the standard `mapToRecord` / `recordToMap` pattern and `?? {}` for backward-compat.
+
+### Debug invincibility (`src/main.ts`)
+
+Debug fullbright mode (M key) now also makes the player invincible. Four damage sites guarded by `debugFullbright`: enemy melee attack (in the enemy-action handler), projectile hit, status effect ticks (poison/burning), and starvation. A minimally invasive change — no new flags or state, just re-using the existing debug toggle.
+
+### Other findings
+
+- `visible` flag on spawner designed as a boolean now, but the field is semantically "show the default rune visual" — later it may become an enum or a prop-reference when we add per-spawner visuals (bee nest, grave, etc.). Kept as a boolean for now since it's used as a simple on/off toggle in the game code.
+
+---
+
 ## 2026-04-10 — Phase E Pit Traps + Scene Utilities Refactoring
 
 ### Phase E: Pit Traps (`src/game/pitTrapRenderer.ts`, `src/core/gameState.ts`, `src/level/levelSceneBuilder.ts`)

@@ -133,6 +133,14 @@ export class EditorApp {
   selectedRampFacing: import('../core/grid').Facing = 'N';
   selectedRampStyle: 'ramp' | 'stairs' = 'ramp';
   selectedPropId = 'pillar';
+  selectedSpawnerConfig = {
+    enemyType: 'rat',
+    maxActive: 3,
+    interval: 10,
+    spawnRadius: 2,
+    active: true,
+    visible: true,
+  };
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
   selectedThinWallTexture = 'stone_thin';
@@ -890,8 +898,8 @@ export class EditorApp {
     } else if (type === 'ramp') {
       entity.facing = this.selectedRampFacing;
       entity.style = this.selectedRampStyle;
-    } else if (type === 'spawner' && this.selectedEnemyType) {
-      entity.enemyType = this.selectedEnemyType;
+    } else if (type === 'spawner') {
+      Object.assign(entity, this.selectedSpawnerConfig);
     } else if (type === 'prop') {
       entity.propId = this.selectedPropId;
     }
