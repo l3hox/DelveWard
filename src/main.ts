@@ -345,11 +345,25 @@ async function init(): Promise<void> {
 
   function tickSpawners(delta: number): void {
     const savedLayer = gameState.activeLayerIndex;
+    const charDefMap = new Map<string, import('./core/types').CharDef>();
+    if (ls.level.charDefs) for (const def of ls.level.charDefs) charDefMap.set(def.char, def);
+
     for (let li = 0; li < gameState.layers.length; li++) {
       gameState.activeLayerIndex = li;
       const layerGrid = ls.layerGrids[li];
       if (!layerGrid) continue;
       const yOffset = li * LAYER_HEIGHT;
+
+      // A cell on this layer is a "hole" when the layer below has no solid cell
+      // supporting it. Layer 0 has implicit ground. Non-flying enemies can't
+      // spawn or traverse onto hole cells.
+      const belowGrid = ls.layerGrids[li - 1];
+      const isHole = belowGrid ? (col: number, row: number): boolean => {
+        if (row < 0 || row >= belowGrid.length || col < 0 || col >= belowGrid[0].length) return true;
+        const ch = belowGrid[row][col];
+        const def = charDefMap.get(ch);
+        return !(ch === '#' || (def !== undefined && def.solid && !def.seeThrough));
+      } : null;
 
       for (const [, spawner] of gameState.spawners) {
         if (!spawner.active) continue;
@@ -364,8 +378,11 @@ async function init(): Promise<void> {
         }
         if (aliveCount >= spawner.maxActive) continue;
 
+        const canFly = enemyDatabase.getEnemy(spawner.enemyType)?.fly === true;
+
         // BFS from spawner through walkable cells — candidates are reachable
-        // within spawnRadius steps, respecting walls.
+        // within spawnRadius steps, respecting walls. Non-flying enemies also
+        // can't traverse or spawn on hole cells (no ground below).
         const ps = ls.player.getState();
         const candidates: Array<[number, number]> = [];
         const visited = new Set<string>([doorKey(spawner.col, spawner.row)]);
@@ -389,6 +406,7 @@ async function init(): Promise<void> {
             if (visited.has(nkey)) continue;
             if (nr < 0 || nr >= layerGrid.length || nc < 0 || nc >= layerGrid[0].length) continue;
             if (!ls.walkable.has(layerGrid[nr][nc])) continue;
+            if (!canFly && isHole && isHole(nc, nr)) continue;
             visited.add(nkey);
             queue.push({ col: nc, row: nr, dist: d + 1 });
           }
@@ -1016,7 +1034,7 @@ async function init(): Promise<void> {
 
     // Projectile hit → apply damage and visual effects
     projectileManager.setHitCallback((projectile, col, row, hitType) => {
-      if (hitType === 'player') {
+      if (hitType === 'player' && !debugFullbright) {
         gameState.hp -= projectile.damage;
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
         if (projectile.statusEffect) {
@@ -1651,7 +1669,7 @@ async function init(): Promise<void> {
     // Player status effect tick — paused when overlays are open
     if (!anyOverlayOpen) {
       const effectResult = tickEffects(gameState.playerStatusEffects, delta);
-      if (effectResult.damage > 0) {
+      if (effectResult.damage > 0 && !debugFullbright) {
         gameState.hp = Math.max(0, gameState.hp - effectResult.damage);
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
       }
@@ -1676,7 +1694,7 @@ async function init(): Promise<void> {
       }
 
       // Starvation damage when starving
-      if (gameState.hunger <= 0) {
+      if (gameState.hunger <= 0 && !debugFullbright) {
         starvationAccumulator += delta;
         while (starvationAccumulator >= STARVATION_INTERVAL) {
           starvationAccumulator -= STARVATION_INTERVAL;
@@ -1723,7 +1741,7 @@ async function init(): Promise<void> {
             ls.healthBarManager.rekey(layerKey(action.enemyKey), layerKey(newKey));
           } else if (action.type === 'attack') {
             // Only attack if enemy is on the player's layer
-            if (li === savedLayer) {
+            if (li === savedLayer && !debugFullbright) {
               const enemy = gameState.enemies.get(action.enemyKey);
               if (enemy) {
                 enemyAttackPlayer(gameState, enemy.atk);
