@@ -389,6 +389,9 @@ function validateEntity(
       if (e.instaKillEnemies !== undefined && typeof e.instaKillEnemies !== 'boolean') {
         return `${pfx} boulder instaKillEnemies must be a boolean`;
       }
+      if (e.pushable !== undefined && typeof e.pushable !== 'boolean') {
+        return `${pfx} boulder pushable must be a boolean`;
+      }
       if (e.gateMode !== undefined && !['or', 'and', 'xor'].includes(e.gateMode as string)) {
         return `${pfx} boulder gateMode must be 'or', 'and', or 'xor'`;
       }

@@ -686,6 +686,7 @@ inspector.setEntityChangedCallback(() => {
       if (typeof e.rollDamage === 'number') c.rollDamage = e.rollDamage;
       if (typeof e.fallDamage === 'number') c.fallDamage = e.fallDamage;
       if (typeof e.instaKillEnemies === 'boolean') c.instaKillEnemies = e.instaKillEnemies;
+      if (typeof e.pushable === 'boolean') c.pushable = e.pushable;
     }
   }
   updateStairHighlight();

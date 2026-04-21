@@ -1226,6 +1226,13 @@ async function init(): Promise<void> {
           ls.player.moveForward();
         }
       }
+
+      // Boulder push — walk into pushable idle boulder
+      const boulder = gameState.boulders.get(doorKey(col, row));
+      if (boulder && boulder.pushable && boulder.state === 'idle') {
+        boulder.direction = ls.player.getState().facing;
+        boulder.state = 'rolling';
+      }
     });
 
     // Signal-driven chest state changes → animate chest mesh

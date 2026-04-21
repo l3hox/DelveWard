@@ -279,6 +279,7 @@ export interface BoulderInstance {
   rollDamage: number;
   fallDamage: number;
   instaKillEnemies: boolean;
+  pushable: boolean;
 }
 
 export interface TempBuff {
@@ -904,6 +905,7 @@ export class GameState {
         rollDamage: (e.rollDamage as number) ?? 30,
         fallDamage: (e.fallDamage as number) ?? 60,
         instaKillEnemies: (e.instaKillEnemies as boolean) !== false,
+        pushable: (e.pushable as boolean) === true,
       });
       return true;
     }

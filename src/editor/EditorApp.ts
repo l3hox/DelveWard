@@ -44,7 +44,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   ramp:           { facing: 'N', style: 'ramp' },
   pit_trap:       { state: 'closed' },
   spawner:        { enemyType: 'rat', maxActive: 3, interval: 10, spawnRadius: 2, active: true, visible: true },
-  boulder:        { direction: 'N', state: 'idle', active: true, rollDamage: 30, fallDamage: 60, instaKillEnemies: true },
+  boulder:        { direction: 'N', state: 'idle', active: true, rollDamage: 30, fallDamage: 60, instaKillEnemies: true, pushable: false },
   prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
@@ -149,6 +149,7 @@ export class EditorApp {
     rollDamage: 30,
     fallDamage: 60,
     instaKillEnemies: true,
+    pushable: false,
   };
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';

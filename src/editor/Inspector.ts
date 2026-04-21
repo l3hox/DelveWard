@@ -570,6 +570,10 @@ export class Inspector {
           entity.instaKillEnemies = val === 'true';
           this.onEntityChanged?.();
         });
+        this.addDropdownField('pushable', String((entity.pushable as boolean) ?? false), ['true', 'false'], (val) => {
+          entity.pushable = val === 'true';
+          this.onEntityChanged?.();
+        });
         this.addReferencedBySection(entity);
         {
           const refs = this.app.getReferencingEntities(entity);
