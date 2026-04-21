@@ -44,6 +44,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   ramp:           { facing: 'N', style: 'ramp' },
   pit_trap:       { state: 'closed' },
   spawner:        { enemyType: 'rat', maxActive: 3, interval: 10, spawnRadius: 2, active: true, visible: true },
+  boulder:        { direction: 'N', state: 'idle', active: true, rollDamage: 30, fallDamage: 60, instaKillEnemies: true },
   prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
@@ -85,14 +86,14 @@ interface WireSourceInfo {
 }
 
 const WIRE_SOURCE_MAP: Record<string, WireSourceInfo> = {
-  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
-  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
-  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
-  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
-  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner' },
+  lever:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner,boulder' },
+  pressure_plate: { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner,boulder' },
+  trigger:        { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner,boulder' },
+  tripwire:       { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner,boulder' },
+  gate:           { field: 'targets', validEntityType: 'door,gate,trap_launcher,chest,pit_trap,spawner,boulder' },
   key:            { field: 'keyId',  validEntityType: 'door,chest' },
   door:           { field: 'keyId',  validEntityType: 'key' },
-  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,pit_trap,spawner' },
+  chest:          { field: 'targets', validEntityType: 'door,gate,trap_launcher,pit_trap,spawner,boulder' },
   stairs:         { field: 'target', validEntityType: 'stairs' },
 };
 
@@ -140,6 +141,14 @@ export class EditorApp {
     spawnRadius: 2,
     active: true,
     visible: true,
+  };
+  selectedBoulderConfig = {
+    direction: 'N' as import('../core/grid').Facing,
+    state: 'idle' as 'idle' | 'rolling' | 'falling',
+    active: true,
+    rollDamage: 30,
+    fallDamage: 60,
+    instaKillEnemies: true,
   };
   selectedEquipmentId = 'sword_iron';
   selectedConsumableId = 'health_potion_small';
@@ -900,6 +909,8 @@ export class EditorApp {
       entity.style = this.selectedRampStyle;
     } else if (type === 'spawner') {
       Object.assign(entity, this.selectedSpawnerConfig);
+    } else if (type === 'boulder') {
+      Object.assign(entity, this.selectedBoulderConfig);
     } else if (type === 'prop') {
       entity.propId = this.selectedPropId;
     }

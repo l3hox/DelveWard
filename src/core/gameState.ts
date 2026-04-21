@@ -268,6 +268,19 @@ export interface SpawnerInstance {
   spawnTimer: number;
 }
 
+export interface BoulderInstance {
+  id?: string;
+  col: number;
+  row: number;
+  direction: Facing;
+  state: 'idle' | 'rolling' | 'falling';
+  active: boolean;
+  gateMode?: GateMode;
+  rollDamage: number;
+  fallDamage: number;
+  instaKillEnemies: boolean;
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -348,6 +361,7 @@ export interface LevelSnapshot {
   props: Map<string, PropInstance>;
   pitTraps: Map<string, PitTrapInstance>;
   spawners: Map<string, SpawnerInstance>;
+  boulders: Map<string, BoulderInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -389,6 +403,7 @@ export interface LayerState {
   props: Map<string, PropInstance>;
   pitTraps: Map<string, PitTrapInstance>;
   spawners: Map<string, SpawnerInstance>;
+  boulders: Map<string, BoulderInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -403,7 +418,7 @@ export function createEmptyLayerState(): LayerState {
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
     thinWalls: new Map(), ramps: new Map(), props: new Map(), pitTraps: new Map(),
-    spawners: new Map(),
+    spawners: new Map(), boulders: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -470,6 +485,8 @@ export class GameState {
   set pitTraps(v) { this.activeLayer.pitTraps = v; }
   get spawners() { return this.activeLayer.spawners; }
   set spawners(v) { this.activeLayer.spawners = v; }
+  get boulders() { return this.activeLayer.boulders; }
+  set boulders(v) { this.activeLayer.boulders = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -875,6 +892,21 @@ export class GameState {
       });
       return true;
     }
+    if (e.type === 'boulder') {
+      this.boulders.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        direction: (e.direction as Facing) ?? 'N',
+        state: (e.state as 'idle' | 'rolling' | 'falling') ?? 'idle',
+        active: (e.active as boolean) !== false,
+        gateMode: e.gateMode as GateMode | undefined,
+        rollDamage: (e.rollDamage as number) ?? 30,
+        fallDamage: (e.fallDamage as number) ?? 60,
+        instaKillEnemies: (e.instaKillEnemies as boolean) !== false,
+      });
+      return true;
+    }
     return false;
   }
 
@@ -1075,6 +1107,12 @@ export class GameState {
         }
       }
 
+      for (const b of this.boulders.values()) {
+        if (b.id && targetedIds.has(b.id)) {
+          this.signalManager.registerReceiver(b.id, b.gateMode ?? 'or');
+        }
+      }
+
       // Register chests with targets as sources (booby-trapped chests)
       for (const chest of this.chests.values()) {
         if (chest.id && chest.targets && chest.targets.length > 0) {
@@ -1134,6 +1172,13 @@ export class GameState {
       if (spawner) {
         spawner.active = active;
         this.onSpawnerSignalChanged?.(entry.col, entry.row, active);
+      }
+      const boulder = this.boulders.get(doorKey(entry.col, entry.row));
+      if (boulder) {
+        if (active && boulder.state === 'idle') {
+          boulder.state = 'rolling';
+          this.onBoulderSignalChanged?.(entry.col, entry.row, true);
+        }
       }
       this.activeLayerIndex = saved;
     });
@@ -1206,6 +1251,9 @@ export class GameState {
   /** External callback for signal-driven spawner active state changes. */
   onSpawnerSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
 
+  /** External callback for signal-driven boulder rising-edge trigger. */
+  onBoulderSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
+
   /** External callback for timed lever auto-reset (for mesh animation). */
   onLeverReset: ((col: number, row: number) => void) | null = null;
 
@@ -1251,6 +1299,7 @@ export class GameState {
       for (const p of this.props.values()) register(p, 'prop', li);
       for (const pt of this.pitTraps.values()) register(pt, 'pit_trap', li);
       for (const sp of this.spawners.values()) register(sp, 'spawner', li);
+      for (const b of this.boulders.values()) register(b, 'boulder', li);
     }
     this.activeLayerIndex = savedIndex;
   }
@@ -1384,6 +1433,8 @@ export class GameState {
     }
     const spawners = new Map<string, SpawnerInstance>();
     for (const [k, v] of this.spawners) spawners.set(k, { ...v });
+    const boulders = new Map<string, BoulderInstance>();
+    for (const [k, v] of this.boulders) boulders.set(k, { ...v });
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1392,7 +1443,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, spawners, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, spawners, boulders, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1530,6 +1581,10 @@ export class GameState {
     this.spawners = new Map<string, SpawnerInstance>();
     if (snapshot.spawners) {
       for (const [k, v] of snapshot.spawners) this.spawners.set(k, { ...v });
+    }
+    this.boulders = new Map<string, BoulderInstance>();
+    if (snapshot.boulders) {
+      for (const [k, v] of snapshot.boulders) this.boulders.set(k, { ...v });
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);

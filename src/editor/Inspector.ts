@@ -171,7 +171,7 @@ export class Inspector {
           entity.wall = val;
           this.onEntityChanged?.();
         });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -189,7 +189,7 @@ export class Inspector {
         break;
 
       case 'pressure_plate':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'toggle',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -233,7 +233,7 @@ export class Inspector {
         break;
 
       case 'trigger':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         this.addSignalModeField(entity, (entity.signalMode as string) ?? 'momentary',
           ['toggle', 'momentary', 'one_shot', 'timed'], (val) => {
             entity.signalMode = val;
@@ -251,7 +251,7 @@ export class Inspector {
         break;
 
       case 'tripwire':
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         this.addDropdownField('orientation', (entity.orientation as string) ?? 'EW', ['EW', 'NS'], (val) => {
           entity.orientation = val;
           this.onEntityChanged?.();
@@ -272,7 +272,7 @@ export class Inspector {
             this.onEntityChanged?.();
             this.refresh();
           });
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         if ((entity.gateType as string) === 'delay') {
           this.addNumberField('delay', (entity.delay as number) ?? 1, (val) => {
             entity.delay = val;
@@ -398,7 +398,7 @@ export class Inspector {
           entity.keyId = val;
           this.onEntityChanged?.();
         }, undefined, 'key');
-        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner');
+        this.addTargetsArrayField(entity, 'door,gate,trap_launcher,pit_trap,spawner,boulder');
         this.addReferencedBySection(entity);
         {
           const refs = this.app.getReferencingEntities(entity);
@@ -529,6 +529,45 @@ export class Inspector {
         });
         this.addDropdownField('visible', String((entity.visible as boolean) ?? true), ['true', 'false'], (val) => {
           entity.visible = val === 'true';
+          this.onEntityChanged?.();
+        });
+        this.addReferencedBySection(entity);
+        {
+          const refs = this.app.getReferencingEntities(entity);
+          if (refs.length > 0) {
+            this.addDropdownField('gateMode', (entity.gateMode as string) ?? 'or', ['or', 'and', 'xor'], (val) => {
+              entity.gateMode = val;
+              this.onEntityChanged?.();
+            });
+          }
+        }
+        break;
+      }
+
+      case 'boulder': {
+        const FACINGS = ['N', 'S', 'E', 'W'];
+        this.addDropdownField('direction', (entity.direction as string) ?? 'N', FACINGS, (val) => {
+          entity.direction = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('state', (entity.state as string) ?? 'idle', ['idle', 'rolling'], (val) => {
+          entity.state = val;
+          this.onEntityChanged?.();
+        });
+        this.addDropdownField('active', String((entity.active as boolean) ?? true), ['true', 'false'], (val) => {
+          entity.active = val === 'true';
+          this.onEntityChanged?.();
+        });
+        this.addNumberField('rollDamage', (entity.rollDamage as number) ?? 30, (val) => {
+          entity.rollDamage = Math.max(0, Math.round(val));
+          this.onEntityChanged?.();
+        }, { step: '1', min: '0' });
+        this.addNumberField('fallDamage', (entity.fallDamage as number) ?? 60, (val) => {
+          entity.fallDamage = Math.max(0, Math.round(val));
+          this.onEntityChanged?.();
+        }, { step: '1', min: '0' });
+        this.addDropdownField('instaKillEnemies', String((entity.instaKillEnemies as boolean) ?? true), ['true', 'false'], (val) => {
+          entity.instaKillEnemies = val === 'true';
           this.onEntityChanged?.();
         });
         this.addReferencedBySection(entity);

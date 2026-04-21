@@ -1537,6 +1537,17 @@ export class GridCanvas {
         break;
       }
 
+      case 'boulder': {
+        ctx.fillStyle = '#6b4423';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#3a2414';
+        ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
+        ctx.stroke();
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL_SIZE, LAYER_HEIGHT } from './rendering/dungeon';
 import { loadDungeon, getAllLevelEntities, findEntityLayerIndex, resolveLayerCoord } from './level/levelLoader';
-import { buildWalkableSet, getFacingCell, FACING_DELTA, isWalkable } from './core/grid';
+import { buildWalkableSet, getFacingCell, FACING_DELTA, isWalkable, TURN_LEFT, TURN_RIGHT } from './core/grid';
 import { GameState, doorKey, meshKey, layerDoorKey } from './core/gameState';
 import { ProjectileManager } from './core/projectileManager';
 import type { TrapLauncherInstance } from './core/gameState';
@@ -432,6 +432,219 @@ async function init(): Promise<void> {
         }
       }
     }
+    gameState.activeLayerIndex = savedLayer;
+  }
+
+  function tickBoulders(delta: number): void {
+    ls.boulderAnimator.update(delta);
+
+    const savedLayer = gameState.activeLayerIndex;
+    const ps = ls.player.getState();
+    const charDefMap = new Map<string, import('./core/types').CharDef>();
+    if (ls.level.charDefs) for (const def of ls.level.charDefs) charDefMap.set(def.char, def);
+
+    // Check if a specific cell on a given layer is a "hole" (no solid support from the layer below).
+    function isHoleAt(col: number, row: number, li: number): boolean {
+      const belowGrid = ls.layerGrids[li - 1];
+      if (!belowGrid) return false; // ground layer has implicit support
+      if (row < 0 || row >= belowGrid.length || col < 0 || col >= belowGrid[0].length) return true;
+      const ch = belowGrid[row][col];
+      const def = charDefMap.get(ch);
+      return !(ch === '#' || (def !== undefined && def.solid && !def.seeThrough));
+    }
+
+    // Find the layer the boulder lands on when falling from `fromLayer` at (col, row).
+    function computeLandingLayer(col: number, row: number, fromLayer: number): number {
+      for (let li = fromLayer - 1; li >= 1; li--) {
+        const grid = ls.layerGrids[li - 1];
+        if (!grid) return 0;
+        if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) continue;
+        const ch = grid[row][col];
+        const def = charDefMap.get(ch);
+        if (ch === '#' || (def !== undefined && def.solid && !def.seeThrough)) return li;
+      }
+      return 0;
+    }
+
+    // Can boulder enter (nc, nr) on current layer? Returns the action to take.
+    type EnterResult = 'enter' | 'kill_enemy' | 'damage_player' | 'blocked';
+    function canBoulderEnter(nc: number, nr: number, li: number, boulder: import('./core/gameState').BoulderInstance): EnterResult {
+      const layerGrid = ls.layerGrids[li];
+      if (!layerGrid) return 'blocked';
+      if (nr < 0 || nr >= layerGrid.length || nc < 0 || nc >= layerGrid[0].length) return 'blocked';
+      if (!ls.walkable.has(layerGrid[nr][nc])) return 'blocked';
+      // Closed door on this layer
+      const door = gameState.getDoor(nc, nr);
+      if (door && !gameState.isDoorOpen(nc, nr)) return 'blocked';
+      // Block
+      if (gameState.isBlockAt(nc, nr)) return 'blocked';
+      // Enemy
+      const enemy = gameState.enemies.get(doorKey(nc, nr));
+      if (enemy) return boulder.instaKillEnemies ? 'kill_enemy' : 'blocked';
+      // Player (only on player's layer)
+      if (li === savedLayer && ps.col === nc && ps.row === nr) return 'damage_player';
+      return 'enter';
+    }
+
+    // Check ramp descent: boulder at (col, row) on layer li, rolling in `direction`.
+    // Returns the bottom cell position if descent is possible, else null.
+    function checkRampDescent(col: number, row: number, li: number, direction: Facing): { bottomCol: number; bottomRow: number } | null {
+      if (li === 0) return null;
+      const savedIdx = gameState.activeLayerIndex;
+      gameState.activeLayerIndex = li - 1;
+      let result: { bottomCol: number; bottomRow: number } | null = null;
+      for (const ramp of gameState.ramps.values()) {
+        const [rdx, rdy] = FACING_DELTA[ramp.facing];
+        const topCol = ramp.col + rdx;
+        const topRow = ramp.row + rdy;
+        if (topCol === col && topRow === row) {
+          const [bdx, bdy] = FACING_DELTA[direction];
+          if (bdx === -rdx && bdy === -rdy) {
+            result = { bottomCol: ramp.col, bottomRow: ramp.row };
+            break;
+          }
+        }
+      }
+      gameState.activeLayerIndex = savedIdx;
+      return result;
+    }
+
+    function killEnemyAt(col: number, row: number): void {
+      const key = doorKey(col, row);
+      const enemy = gameState.enemies.get(key);
+      if (enemy) handleEnemyKill(key, col, row, enemy);
+    }
+
+    // Transfer a boulder from layer li to a different layer (fall landing or ramp descent).
+    function transferBoulderToLayer(boulder: import('./core/gameState').BoulderInstance, oldKey: string, oldLi: number, newCol: number, newRow: number, newLi: number): string {
+      const oldPrefKey = layerDoorKey(oldLi, oldKey);
+      const newKey = doorKey(newCol, newRow);
+      const newPrefKey = layerDoorKey(newLi, newKey);
+
+      gameState.activeLayerIndex = oldLi;
+      gameState.boulders.delete(oldKey);
+      gameState.activeLayerIndex = newLi;
+      boulder.col = newCol;
+      boulder.row = newRow;
+      gameState.boulders.set(newKey, boulder);
+
+      const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
+      if (mesh) {
+        ls.boulderMeshes.meshMap.delete(oldPrefKey);
+        ls.boulderMeshes.meshMap.set(newPrefKey, mesh);
+      }
+      ls.boulderAnimator.rekey(oldPrefKey, newPrefKey);
+      return newKey;
+    }
+
+    // Move boulder within the same layer to a new cell — updates maps + keys.
+    function moveBoulderSameLayer(boulder: import('./core/gameState').BoulderInstance, oldKey: string, li: number, newCol: number, newRow: number): string {
+      const oldPrefKey = layerDoorKey(li, oldKey);
+      const newKey = doorKey(newCol, newRow);
+      const newPrefKey = layerDoorKey(li, newKey);
+      gameState.boulders.delete(oldKey);
+      boulder.col = newCol;
+      boulder.row = newRow;
+      gameState.boulders.set(newKey, boulder);
+      const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
+      if (mesh) {
+        ls.boulderMeshes.meshMap.delete(oldPrefKey);
+        ls.boulderMeshes.meshMap.set(newPrefKey, mesh);
+      }
+      ls.boulderAnimator.rekey(oldPrefKey, newPrefKey);
+      return newKey;
+    }
+
+    // Decide and execute the next step for a boulder at rest whose game state != idle.
+    function decideNext(boulder: import('./core/gameState').BoulderInstance, key: string, li: number): void {
+      // Falling just completed → apply landing effects, transition to rolling
+      if (boulder.state === 'falling') {
+        if (li === savedLayer && ps.col === boulder.col && ps.row === boulder.row) {
+          gameState.hp = Math.max(0, gameState.hp - (debugFullbright ? 0 : boulder.fallDamage));
+          playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+        }
+        if (boulder.instaKillEnemies) killEnemyAt(boulder.col, boulder.row);
+        boulder.state = 'rolling';
+      }
+
+      // Is the current cell a hole? Then fall before rolling further.
+      if (isHoleAt(boulder.col, boulder.row, li)) {
+        const landingLi = computeLandingLayer(boulder.col, boulder.row, li);
+        const newKey = transferBoulderToLayer(boulder, key, li, boulder.col, boulder.row, landingLi);
+        boulder.state = 'falling';
+        const newPrefKey = layerDoorKey(landingLi, newKey);
+        ls.boulderAnimator.startFall(newPrefKey, landingLi * LAYER_HEIGHT);
+        return;
+      }
+
+      // Ramp descent
+      const descent = checkRampDescent(boulder.col, boulder.row, li, boulder.direction);
+      if (descent) {
+        const newLi = li - 1;
+        const newKey = transferBoulderToLayer(boulder, key, li, descent.bottomCol, descent.bottomRow, newLi);
+        const newPrefKey = layerDoorKey(newLi, newKey);
+        ls.boulderAnimator.startDescent(newPrefKey, descent.bottomCol, descent.bottomRow, newLi * LAYER_HEIGHT, boulder.direction);
+        return;
+      }
+
+      // Try to roll in current direction
+      const [dc, dr] = FACING_DELTA[boulder.direction];
+      const nc = boulder.col + dc;
+      const nr = boulder.row + dr;
+      const result = canBoulderEnter(nc, nr, li, boulder);
+
+      if (result === 'kill_enemy') killEnemyAt(nc, nr);
+      if (result === 'damage_player') {
+        gameState.hp = Math.max(0, gameState.hp - (debugFullbright ? 0 : boulder.rollDamage));
+        playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
+      }
+
+      if (result === 'enter' || result === 'kill_enemy' || result === 'damage_player') {
+        const newKey = moveBoulderSameLayer(boulder, key, li, nc, nr);
+        const newPrefKey = layerDoorKey(li, newKey);
+        ls.boulderAnimator.startRoll(newPrefKey, nc, nr, li * LAYER_HEIGHT, boulder.direction);
+        return;
+      }
+
+      // Blocked — apply wall turn logic
+      const leftDir = TURN_LEFT[boulder.direction];
+      const rightDir = TURN_RIGHT[boulder.direction];
+      const [ldc, ldr] = FACING_DELTA[leftDir];
+      const [rdc, rdr] = FACING_DELTA[rightDir];
+      const leftResult = canBoulderEnter(boulder.col + ldc, boulder.row + ldr, li, boulder);
+      const rightResult = canBoulderEnter(boulder.col + rdc, boulder.row + rdr, li, boulder);
+      const leftOpen = leftResult !== 'blocked';
+      const rightOpen = rightResult !== 'blocked';
+
+      if (leftOpen && rightOpen) {
+        boulder.state = 'idle';
+        return;
+      }
+      if (leftOpen) {
+        boulder.direction = leftDir;
+        // Let the next tick handle the roll — decideNext will re-run with new direction
+        return;
+      }
+      if (rightOpen) {
+        boulder.direction = rightDir;
+        return;
+      }
+      boulder.state = 'idle';
+    }
+
+    for (let li = 0; li < gameState.layers.length; li++) {
+      gameState.activeLayerIndex = li;
+      const boulderKeys = Array.from(gameState.boulders.keys());
+      for (const key of boulderKeys) {
+        const boulder = gameState.boulders.get(key);
+        if (!boulder) continue; // moved to another layer during this tick
+        if (boulder.state === 'idle') continue;
+        const prefKey = layerDoorKey(li, key);
+        if (ls.boulderAnimator.getMode(prefKey) !== 'rest') continue;
+        decideNext(boulder, key, li);
+      }
+    }
+
     gameState.activeLayerIndex = savedLayer;
   }
 
@@ -941,6 +1154,11 @@ async function init(): Promise<void> {
 
     gameState.onSpawnerSignalChanged = (_col, _row, _active) => {
       // Active flag is already set on the SpawnerInstance by gameState.
+    };
+
+    gameState.onBoulderSignalChanged = (_col, _row, _active) => {
+      // gameState has already transitioned boulder.state idle → rolling on rising edge.
+      // tickBoulders will handle movement on next frame.
     };
 
     // Timed source deactivation → animate lever reset
@@ -1776,6 +1994,7 @@ async function init(): Promise<void> {
       gameState.activeLayerIndex = savedLayer;
 
       tickSpawners(delta);
+      tickBoulders(delta);
 
       // Death — show save/load overlay if saves exist, else restart
       if (gameState.hp <= 0) {

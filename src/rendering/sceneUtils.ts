@@ -30,6 +30,7 @@ import { buildFountainMeshes } from './fountainRenderer';
 import { buildBookshelfMeshes } from './bookshelfRenderer';
 import { buildAltarMeshes } from './altarRenderer';
 import { buildSpawnerMeshes } from './spawnerRenderer';
+import { buildBoulderMeshes } from './boulderRenderer';
 import { buildForestMeshes, type ForestMeshes } from './forestRenderer';
 import { buildNpcMeshes } from './npcRenderer';
 import { buildEnemyMeshes } from './enemyRenderer';
@@ -230,6 +231,10 @@ export function buildLayerEntityMeshes(
   const spawnerMeshes = buildSpawnerMeshes(gs);
   spawnerMeshes.group.position.y = yOffset;
   group.add(spawnerMeshes.group);
+
+  const boulderMeshes = buildBoulderMeshes(gs);
+  boulderMeshes.group.position.y = yOffset;
+  group.add(boulderMeshes.group);
 
   const forestMeshes = buildForestMeshes(ld.grid, level.charDefs);
   if (forestMeshes.instances.length > 0) {

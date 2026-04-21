@@ -22,7 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop', 'pit_trap', 'spawner',
+  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop', 'pit_trap', 'spawner', 'boulder',
 ] as const;
 
 export class Toolbar {
@@ -1081,6 +1081,16 @@ export class Toolbar {
         ctx.lineTo(cx + r * 0.5, cy);
         ctx.moveTo(cx, cy - r * 0.5);
         ctx.lineTo(cx, cy + r * 0.5);
+        ctx.stroke();
+        break;
+      }
+      case 'boulder': {
+        ctx.fillStyle = '#6b4423';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#3a2414';
+        ctx.lineWidth = Math.max(1, r * 0.08);
         ctx.stroke();
         break;
       }

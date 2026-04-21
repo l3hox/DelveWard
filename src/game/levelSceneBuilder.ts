@@ -31,6 +31,8 @@ import { buildBarrelMeshes } from '../rendering/barrelRenderer';
 import { buildThinWallMeshes } from '../rendering/thinWallRenderer';
 import { buildRampMeshes } from '../rendering/rampRenderer';
 import { buildPropMeshes } from '../rendering/propRenderer';
+import { buildBoulderMeshes } from '../rendering/boulderRenderer';
+import { BoulderAnimator } from '../rendering/boulderAnimator';
 import { buildNpcMeshes, type NpcMeshes } from '../rendering/npcRenderer';
 import { EnemyAnimator } from '../rendering/enemyAnimator';
 import { LeverAnimator } from '../rendering/leverAnimator';
@@ -73,6 +75,8 @@ export interface LevelScene {
   rampMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   propMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Group> };
   spawnerMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  boulderMeshes: { group: THREE.Group; meshMap: Map<string, THREE.Mesh> };
+  boulderAnimator: BoulderAnimator;
   pitFloorMap: Map<string, THREE.Mesh>;
   pitCeilingMap: Map<string, THREE.Mesh>;
   npcMeshes: NpcMeshes;
@@ -199,6 +203,11 @@ export function buildLevelScene(
   const sharedSpawnerGroup = new THREE.Group();
   scene.add(sharedSpawnerGroup);
   const sharedSpawnerMeshMap = new Map<string, THREE.Mesh>();
+
+  const sharedBoulderGroup = new THREE.Group();
+  scene.add(sharedBoulderGroup);
+  const sharedBoulderMeshMap = new Map<string, THREE.Mesh>();
+  const boulderAnimator = new BoulderAnimator();
 
   const sharedPitFloorMap = new Map<string, THREE.Mesh>();
   const sharedPitCeilingMap = new Map<string, THREE.Mesh>();
@@ -431,6 +440,16 @@ export function buildLevelScene(
     sharedSpawnerGroup.add(ldSpawnerMeshes.group);
     mergeMap(sharedSpawnerMeshMap, ldSpawnerMeshes.meshMap, li);
 
+    // Boulder meshes + animator registration
+    const ldBoulderMeshes = buildBoulderMeshes(gameState);
+    ldBoulderMeshes.group.position.y = yOffset;
+    sharedBoulderGroup.add(ldBoulderMeshes.group);
+    mergeMap(sharedBoulderMeshMap, ldBoulderMeshes.meshMap, li);
+    for (const [key, mesh] of ldBoulderMeshes.meshMap) {
+      const boulder = gameState.boulders.get(key);
+      if (boulder) boulderAnimator.register(layerDoorKey(li, key), mesh, boulder.col, boulder.row, yOffset, boulder.direction);
+    }
+
     // NPC meshes
     const ldNpcMeshes = buildNpcMeshes(gameState.npcs);
     ldNpcMeshes.group.position.y = yOffset;
@@ -492,6 +511,7 @@ export function buildLevelScene(
       for (const [key, mesh] of ldRampMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldPropMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldSpawnerMeshes.meshMap) tagByKey(mesh, key);
+      for (const [key, mesh] of ldBoulderMeshes.meshMap) tagByKey(mesh, key);
       for (const [key, mesh] of ldThinWallMeshes.meshMap) {
         // Thin wall keys are "col,row:S" or "col,row:E" — strip the direction suffix for zone lookup
         const cellKey = key.split(':')[0];
@@ -630,6 +650,8 @@ export function buildLevelScene(
     rampMeshes: { group: sharedRampGroup, meshMap: sharedRampMeshMap },
     propMeshes: { group: sharedPropGroup, meshMap: sharedPropMeshMap },
     spawnerMeshes: { group: sharedSpawnerGroup, meshMap: sharedSpawnerMeshMap },
+    boulderMeshes: { group: sharedBoulderGroup, meshMap: sharedBoulderMeshMap },
+    boulderAnimator,
     pitFloorMap: sharedPitFloorMap,
     pitCeilingMap: sharedPitCeilingMap,
     npcMeshes: { group: sharedNpcGroup, meshMap: sharedNpcMeshMap },
@@ -677,6 +699,7 @@ export function teardownLevelScene(ls: LevelScene, scene: THREE.Scene): void {
     ls.rampMeshes.group,
     ls.propMeshes.group,
     ls.spawnerMeshes.group,
+    ls.boulderMeshes.group,
     ls.npcMeshes.group,
     ls.enemyMeshes.group,
     ls.healthBarManager.getGroup(),

@@ -372,6 +372,28 @@ function validateEntity(
       }
       break;
     }
+    case 'boulder': {
+      const w = checkWalkable('boulder'); if (w) return w;
+      if (e.direction !== undefined && !['N', 'S', 'E', 'W'].includes(e.direction as string)) {
+        return `${pfx} boulder direction must be 'N', 'S', 'E', or 'W'`;
+      }
+      if (e.state !== undefined && !['idle', 'rolling', 'falling'].includes(e.state as string)) {
+        return `${pfx} boulder state must be 'idle', 'rolling', or 'falling'`;
+      }
+      if (e.rollDamage !== undefined && (typeof e.rollDamage !== 'number' || (e.rollDamage as number) < 0)) {
+        return `${pfx} boulder rollDamage must be >= 0`;
+      }
+      if (e.fallDamage !== undefined && (typeof e.fallDamage !== 'number' || (e.fallDamage as number) < 0)) {
+        return `${pfx} boulder fallDamage must be >= 0`;
+      }
+      if (e.instaKillEnemies !== undefined && typeof e.instaKillEnemies !== 'boolean') {
+        return `${pfx} boulder instaKillEnemies must be a boolean`;
+      }
+      if (e.gateMode !== undefined && !['or', 'and', 'xor'].includes(e.gateMode as string)) {
+        return `${pfx} boulder gateMode must be 'or', 'and', or 'xor'`;
+      }
+      break;
+    }
   }
 
   return null;

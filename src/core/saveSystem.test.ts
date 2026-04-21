@@ -40,6 +40,7 @@ function makeEmptySnapshot(): LevelSnapshot {
     props:         new Map(),
     pitTraps:      new Map(),
     spawners:      new Map(),
+    boulders:      new Map(),
     destroyedWalls: new Set(),
     exploredCells:  new Set(),
     registrySnapshot: [],
@@ -88,6 +89,7 @@ function makeMinimalSnapshot(): LevelSnapshot {
     props:         new Map(),
     pitTraps:      new Map(),
     spawners:      new Map(),
+    boulders:      new Map(),
     destroyedWalls: new Set(['5_6', '7_8']),
     exploredCells:  new Set(['0_0', '1_0', '0_1']),
     registrySnapshot: [
@@ -145,6 +147,7 @@ function makeComplexSnapshot(): LevelSnapshot {
     props:          new Map(),
     pitTraps:       new Map(),
     spawners:       new Map(),
+    boulders:       new Map(),
     destroyedWalls: new Set(),
     exploredCells:  new Set(['0_0']),
     registrySnapshot: [],
