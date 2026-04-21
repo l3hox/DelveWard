@@ -6,6 +6,16 @@ import { itemDatabase, type ItemDef, type ItemQuality } from '../core/itemDataba
 import { getItemImage } from '../rendering/itemSprites';
 import { getLootTable } from '../core/lootTable';
 
+function decorateFacingLabel(opt: string): string {
+  switch (opt) {
+    case 'N': return 'N (↑)';
+    case 'S': return 'S (↓)';
+    case 'E': return 'E (→)';
+    case 'W': return 'W (←)';
+    default: return opt;
+  }
+}
+
 const enemySpriteCache = new Map<string, HTMLImageElement>();
 function getEnemySpriteImage(type: string): HTMLImageElement | null {
   const cached = enemySpriteCache.get(type);
@@ -697,7 +707,7 @@ export class Inspector {
     for (const opt of options) {
       const option = document.createElement('option');
       option.value = opt;
-      option.textContent = opt;
+      option.textContent = decorateFacingLabel(opt);
       if (opt === value) option.selected = true;
       select.appendChild(option);
     }

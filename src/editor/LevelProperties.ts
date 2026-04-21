@@ -5,6 +5,16 @@ import type { WallTextureName, FloorTextureName, CeilingTextureName } from '../c
 import { getWallTexture, getFloorTexture, getCeilingTexture } from '../rendering/textures';
 import type { Facing } from '../core/grid';
 
+function decorateFacingLabel(opt: string): string {
+  switch (opt) {
+    case 'N': return 'N (↑)';
+    case 'S': return 'S (↓)';
+    case 'E': return 'E (→)';
+    case 'W': return 'W (←)';
+    default: return opt;
+  }
+}
+
 export class LevelProperties {
   private container: HTMLElement;
   private app: EditorApp;
@@ -716,7 +726,7 @@ export class LevelProperties {
     for (const opt of options) {
       const option = document.createElement('option');
       option.value = opt;
-      option.textContent = opt;
+      option.textContent = decorateFacingLabel(opt);
       if (opt === value) option.selected = true;
       select.appendChild(option);
     }
