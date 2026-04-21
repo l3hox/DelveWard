@@ -474,6 +474,14 @@ async function init(): Promise<void> {
       const pit = gameState.pitTraps.get(doorKey(col, row));
       gameState.activeLayerIndex = savedIdx;
       if (pit && pit.state === 'open') hole = true;
+      // A standing boulder directly below provides solid support — falling boulders
+      // stack on top of it rather than falling through.
+      if (hole) {
+        const sIdx = gameState.activeLayerIndex;
+        gameState.activeLayerIndex = li - 1;
+        if (gameState.boulders.has(doorKey(col, row))) hole = false;
+        gameState.activeLayerIndex = sIdx;
+      }
       return hole;
     }
 
@@ -579,6 +587,7 @@ async function init(): Promise<void> {
     // Decide and execute the next step for a boulder at rest whose game state != idle.
     function decideNext(boulder: import('./core/gameState').BoulderInstance, key: string, li: number): void {
       // Falling just completed → apply landing effects, transition to rolling
+      const justLanded = boulder.state === 'falling';
       if (boulder.state === 'falling') {
         if (li === savedLayer && ps.col === boulder.col && ps.row === boulder.row) {
           gameState.hp = Math.max(0, gameState.hp - (debugFullbright ? 0 : boulder.fallDamage));
@@ -613,6 +622,31 @@ async function init(): Promise<void> {
       const nc = boulder.col + dc;
       const nr = boulder.row + dr;
 
+      // Post-fall: if the boulder just landed and its forward path is blocked,
+      // apply two effects simultaneously:
+      //   1. If the blocker is another boulder with clear space ahead, chain-
+      //      transfer the momentum (other boulder starts rolling in our dir).
+      //   2. The landed boulder bounces back — reverses if the reverse cell is
+      //      open, otherwise stops.
+      if (justLanded && canBoulderEnter(nc, nr, li, boulder) === 'blocked') {
+        const blockerBoulder = gameState.boulders.get(doorKey(nc, nr));
+        if (blockerBoulder) {
+          const beyondResult = canBoulderEnter(nc + dc, nr + dr, li, blockerBoulder);
+          if (beyondResult !== 'blocked') {
+            blockerBoulder.direction = boulder.direction;
+            blockerBoulder.state = 'rolling';
+          }
+        }
+        const reverseDir = TURN_LEFT[TURN_LEFT[boulder.direction]];
+        const [vdc, vdr] = FACING_DELTA[reverseDir];
+        if (canBoulderEnter(boulder.col + vdc, boulder.row + vdr, li, boulder) !== 'blocked') {
+          boulder.direction = reverseDir;
+          return;
+        }
+        boulder.state = 'idle';
+        return;
+      }
+
       // Boulder-on-boulder collision: stop before impact; transfer momentum if the
       // next boulder has clear space ahead in our direction (Newton's cradle).
       const nextBoulder = gameState.boulders.get(doorKey(nc, nr));
@@ -641,7 +675,7 @@ async function init(): Promise<void> {
         return;
       }
 
-      // Blocked — apply wall turn logic
+      // Blocked — apply wall turn logic (post-fall bounce-back handled above)
       const leftDir = TURN_LEFT[boulder.direction];
       const rightDir = TURN_RIGHT[boulder.direction];
       const [ldc, ldr] = FACING_DELTA[leftDir];
