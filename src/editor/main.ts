@@ -1362,6 +1362,7 @@ document.addEventListener('keydown', (e) => {
     gridCanvas.updateCursor();
     gridCanvas.markDirty();
     updateErrorBanner();
+    if (preview.active) preview.markFullRebuild(app.level!);
     return;
   }
 
