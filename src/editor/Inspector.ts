@@ -564,10 +564,6 @@ export class Inspector {
           entity.state = val;
           this.onEntityChanged?.();
         });
-        this.addDropdownField('active', String((entity.active as boolean) ?? true), ['true', 'false'], (val) => {
-          entity.active = val === 'true';
-          this.onEntityChanged?.();
-        });
         this.addNumberField('rollDamage', (entity.rollDamage as number) ?? 30, (val) => {
           entity.rollDamage = Math.max(0, Math.round(val));
           this.onEntityChanged?.();

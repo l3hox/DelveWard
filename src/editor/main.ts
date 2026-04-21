@@ -682,7 +682,6 @@ inspector.setEntityChangedCallback(() => {
       const c = app.selectedBoulderConfig;
       if (typeof e.direction === 'string') c.direction = e.direction as import('../core/grid').Facing;
       if (typeof e.state === 'string') c.state = e.state as 'idle' | 'rolling' | 'falling';
-      if (typeof e.active === 'boolean') c.active = e.active;
       if (typeof e.rollDamage === 'number') c.rollDamage = e.rollDamage;
       if (typeof e.fallDamage === 'number') c.fallDamage = e.fallDamage;
       if (typeof e.instaKillEnemies === 'boolean') c.instaKillEnemies = e.instaKillEnemies;

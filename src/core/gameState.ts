@@ -274,7 +274,6 @@ export interface BoulderInstance {
   row: number;
   direction: Facing;
   state: 'idle' | 'rolling' | 'falling';
-  active: boolean;
   gateMode?: GateMode;
   rollDamage: number;
   fallDamage: number;
@@ -900,7 +899,6 @@ export class GameState {
         row: e.row,
         direction: (e.direction as Facing) ?? 'N',
         state: (e.state as 'idle' | 'rolling' | 'falling') ?? 'idle',
-        active: (e.active as boolean) !== false,
         gateMode: e.gateMode as GateMode | undefined,
         rollDamage: (e.rollDamage as number) ?? 30,
         fallDamage: (e.fallDamage as number) ?? 60,
