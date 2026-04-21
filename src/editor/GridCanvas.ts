@@ -1545,6 +1545,35 @@ export class GridCanvas {
         ctx.strokeStyle = '#3a2414';
         ctx.lineWidth = Math.max(1, Math.min(tw, th) * 0.04);
         ctx.stroke();
+
+        // Faint grey arrow indicating rolling direction
+        const bDir = (entity.direction as string) ?? 'N';
+        let ax = 0, ay = 0;
+        if (bDir === 'N') ay = -1;
+        else if (bDir === 'S') ay = 1;
+        else if (bDir === 'E') ax = 1;
+        else if (bDir === 'W') ax = -1;
+        const arrowLen = iconRadius * 1.0;
+        const arrowHead = iconRadius * 0.35;
+        const tipX = cx + ax * arrowLen * 0.55;
+        const tipY = cy + ay * arrowLen * 0.55;
+        const tailX = cx - ax * arrowLen * 0.45;
+        const tailY = cy - ay * arrowLen * 0.45;
+        ctx.strokeStyle = 'rgba(210, 210, 210, 0.85)';
+        ctx.lineWidth = Math.max(1.5, Math.min(tw, th) * 0.05);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(tipX, tipY);
+        // Head: two strokes perpendicular+backward from tip
+        const perpX = -ay;
+        const perpY = ax;
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - ax * arrowHead + perpX * arrowHead * 0.6, tipY - ay * arrowHead + perpY * arrowHead * 0.6);
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - ax * arrowHead - perpX * arrowHead * 0.6, tipY - ay * arrowHead - perpY * arrowHead * 0.6);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
         break;
       }
 
