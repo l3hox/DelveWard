@@ -435,7 +435,9 @@ export class EditorApp {
     this.activeLayerIndex = index;
     // Load new layer into editing surface
     this.syncFromActiveLayer();
-    this.selectedEntity = null;
+    // Preserve selection when a target-pick is in progress so the user keeps
+    // context on the source entity while switching to the target layer.
+    if (!this.pickMode) this.selectedEntity = null;
     this.rebuildDerivedState();
   }
 
@@ -573,20 +575,20 @@ export class EditorApp {
       errors.push({ message: `Tile '${ch}' is used in the grid but has no tile type definition` });
     }
 
-    // Entity references to non-existent targets
+    // Entity references to non-existent targets — IDs are level-wide, so collect
+    // across all layers (signal sources can target receivers on other layers).
+    const allLevelEntities = getAllLevelEntities(level);
     const entityIds = new Set<string>();
-    for (const e of level.entities) {
+    for (const e of allLevelEntities) {
       if (e.id) entityIds.add(e.id);
     }
-    for (const e of level.entities) {
+    for (const e of allLevelEntities) {
       if (e.type === 'stairs') continue; // stairs.target points to another level — validated separately below
       const rec = e as Record<string, unknown>;
-      // Check scalar target field
       const target = rec.target;
       if (typeof target === 'string' && target && !entityIds.has(target)) {
         errors.push({ message: `${e.type} '${e.id ?? '?'}' references non-existent target '${target}'`, entity: e });
       }
-      // Check targets array field (lever, pressure_plate)
       if (Array.isArray(rec.targets)) {
         for (const t of rec.targets as string[]) {
           if (typeof t === 'string' && t && !entityIds.has(t)) {
@@ -599,11 +601,11 @@ export class EditorApp {
     // Signal chain loop detection — DFS with proper cycle detection
     const SIGNAL_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate', 'chest']);
     const entityMap = new Map<string, Entity>();
-    for (const e of level.entities) {
+    for (const e of allLevelEntities) {
       if (e.id) entityMap.set(e.id, e);
     }
     const reportedLoops = new Set<string>(); // avoid duplicate loop errors
-    for (const e of level.entities) {
+    for (const e of allLevelEntities) {
       if (!SIGNAL_ENTITY_TYPES.has(e.type) || !e.id) continue;
       // DFS: check if any path from e leads back to e
       const visited = new Set<string>();
@@ -637,9 +639,9 @@ export class EditorApp {
       }
     }
 
-    // Entities with empty targets (warning — not blocking)
+    // Entities with empty targets (warning — not blocking). All layers.
     const TARGETS_ENTITY_TYPES = new Set(['lever', 'pressure_plate', 'trigger', 'tripwire', 'gate']);
-    for (const e of level.entities) {
+    for (const e of allLevelEntities) {
       if (TARGETS_ENTITY_TYPES.has(e.type)) {
         const rec = e as Record<string, unknown>;
         const targets = rec.targets as string[] | undefined;
@@ -692,8 +694,8 @@ export class EditorApp {
       }
     }
 
-    // Sign with empty text
-    for (const e of level.entities) {
+    // Sign with empty text (all layers)
+    for (const e of allLevelEntities) {
       if (e.type === 'sign' && !(e.text as string)) {
         errors.push({ message: `sign '${e.id ?? '?'}' at (${e.col},${e.row}) has empty text`, entity: e });
       }
@@ -1125,21 +1127,26 @@ export class EditorApp {
 
   getReferencingEntities(entity: Entity): Entity[] {
     if (!this.level || !entity.id) return [];
-    return this.level.entities.filter(e => {
+    // Search across all layers — signals and IDs are level-wide, not layer-scoped.
+    return getAllLevelEntities(this.level).filter(e => {
       const rec = e as Record<string, unknown>;
-      // Check scalar target field (stairs)
       if (rec.target === entity.id) return true;
-      // Check targets array field (lever, pressure_plate)
       if (Array.isArray(rec.targets) && (rec.targets as string[]).includes(entity.id!)) return true;
       return false;
     });
+  }
+
+  /** Find an entity by id across all layers in the current level. */
+  findEntityById(id: string): Entity | null {
+    if (!this.level) return null;
+    return getAllLevelEntities(this.level).find(e => e.id === id) ?? null;
   }
 
   getKeyIdPeers(entity: Entity): Entity[] {
     if (!this.level) return [];
     const keyId = (entity as Record<string, unknown>).keyId as string;
     if (!keyId) return [];
-    return this.level.entities.filter(e => e !== entity && (e as Record<string, unknown>).keyId === keyId);
+    return getAllLevelEntities(this.level).filter(e => e !== entity && (e as Record<string, unknown>).keyId === keyId);
   }
 
   getWireSourceInfo(entity: Entity): WireSourceInfo | null {

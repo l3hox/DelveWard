@@ -1342,8 +1342,8 @@ export class Inspector {
       span.style.overflow = 'hidden';
       span.style.textOverflow = 'ellipsis';
       const targetId = targets[i];
-      // Resolve to show type @ (col, row), fall back to just the ID
-      const targetEntity = this.app.level?.entities.find(e => e.id === targetId);
+      // Resolve across all layers — signals are level-wide.
+      const targetEntity = this.app.findEntityById(targetId);
       if (targetEntity) {
         span.textContent = `${targetEntity.type} @ (${targetEntity.col}, ${targetEntity.row})`;
         span.title = targetId;

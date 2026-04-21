@@ -435,18 +435,9 @@ function validateLayerDef(
     }
   }
 
-  // entities
+  // entities (already migrated and ID-collected in validateLevel's first pass)
   if (!Array.isArray(layer.entities)) {
     throw new Error(`${pfx}: "entities" must be an array`);
-  }
-  migrateEntities(layer.entities as Entity[]);
-
-  // Collect entity IDs cross-layer
-  for (const ent of layer.entities as Array<Record<string, unknown>>) {
-    if (ent.id) {
-      if (globalEntityIds.has(ent.id as string)) throw new Error(`${pfx}: duplicate entity id "${ent.id}"`);
-      globalEntityIds.add(ent.id as string);
-    }
   }
 
   const validEntities: Record<string, unknown>[] = [];
@@ -587,14 +578,31 @@ export function validateLevel(data: unknown, source: string): DungeonLevel {
   if (!Array.isArray(obj.layers) || obj.layers.length === 0) {
     throw new Error(`Level ${source}: "layers" must be a non-empty array`);
   }
+  // First pass: migrate entities and collect all entity IDs across all layers so
+  // per-layer validation can resolve cross-layer target IDs (signals are level-wide).
   const globalEntityIds = new Set<string>();
-  const validatedLayers: LayerDef[] = [];
   for (let li = 0; li < obj.layers.length; li++) {
     const rawLayer = obj.layers[li];
     if (typeof rawLayer !== 'object' || rawLayer === null || Array.isArray(rawLayer)) {
       throw new Error(`Level ${source}: layers[${li}] must be an object`);
     }
-    validatedLayers.push(validateLayerDef(rawLayer as Record<string, unknown>, li, source, globalEntityIds, extendedKnown, walkableChars));
+    const layer = rawLayer as Record<string, unknown>;
+    if (!Array.isArray(layer.entities)) {
+      throw new Error(`Level ${source} layers[${li}]: "entities" must be an array`);
+    }
+    migrateEntities(layer.entities as Entity[]);
+    for (const ent of layer.entities as Array<Record<string, unknown>>) {
+      if (ent.id) {
+        if (globalEntityIds.has(ent.id as string)) {
+          throw new Error(`Level ${source} layers[${li}]: duplicate entity id "${ent.id}"`);
+        }
+        globalEntityIds.add(ent.id as string);
+      }
+    }
+  }
+  const validatedLayers: LayerDef[] = [];
+  for (let li = 0; li < obj.layers.length; li++) {
+    validatedLayers.push(validateLayerDef(obj.layers[li] as Record<string, unknown>, li, source, globalEntityIds, extendedKnown, walkableChars));
   }
   obj.layers = validatedLayers;
   // Set top-level grid/entities from layer 0 for convenience access
