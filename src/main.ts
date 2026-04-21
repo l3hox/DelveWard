@@ -478,6 +478,8 @@ async function init(): Promise<void> {
       if (door && !gameState.isDoorOpen(nc, nr)) return 'blocked';
       // Block
       if (gameState.isBlockAt(nc, nr)) return 'blocked';
+      // Another boulder — always blocks (chain transfer handled separately in decideNext)
+      if (gameState.isBoulderAt(nc, nr)) return 'blocked';
       // Enemy
       const enemy = gameState.enemies.get(doorKey(nc, nr));
       if (enemy) return boulder.instaKillEnemies ? 'kill_enemy' : 'blocked';
@@ -591,6 +593,20 @@ async function init(): Promise<void> {
       const [dc, dr] = FACING_DELTA[boulder.direction];
       const nc = boulder.col + dc;
       const nr = boulder.row + dr;
+
+      // Boulder-on-boulder collision: stop before impact; transfer momentum if the
+      // next boulder has clear space ahead in our direction (Newton's cradle).
+      const nextBoulder = gameState.boulders.get(doorKey(nc, nr));
+      if (nextBoulder) {
+        const beyondResult = canBoulderEnter(nc + dc, nr + dr, li, nextBoulder);
+        if (beyondResult !== 'blocked') {
+          nextBoulder.direction = boulder.direction;
+          nextBoulder.state = 'rolling';
+        }
+        boulder.state = 'idle';
+        return;
+      }
+
       const result = canBoulderEnter(nc, nr, li, boulder);
 
       if (result === 'kill_enemy') killEnemyAt(nc, nr);
