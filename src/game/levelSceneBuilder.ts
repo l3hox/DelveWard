@@ -579,7 +579,7 @@ export function buildLevelScene(
     playerWalkable,
     gameState.isDoorOpen.bind(gameState),
     (col, row) => {
-      if (gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row)) return true;
+      if (gameState.isBlockedByEnemy(col, row) || gameState.isBlockAt(col, row) || gameState.isNpcAt(col, row) || gameState.isBarrelAt(col, row) || gameState.isBoulderAt(col, row)) return true;
       // Holes (no floor) are handled by the falling system, not blocked here
       return false;
     },

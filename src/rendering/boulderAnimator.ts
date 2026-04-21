@@ -12,10 +12,10 @@ const FALL_ACCEL_DISTANCE = 2 * LAYER_HEIGHT;
 const FALL_ACCEL = (FALL_TERMINAL_VELOCITY * FALL_TERMINAL_VELOCITY) / (2 * FALL_ACCEL_DISTANCE);
 
 const ROTATION_AXIS: Record<Facing, THREE.Vector3> = {
-  N: new THREE.Vector3(1, 0, 0),
-  S: new THREE.Vector3(-1, 0, 0),
-  E: new THREE.Vector3(0, 0, 1),
-  W: new THREE.Vector3(0, 0, -1),
+  N: new THREE.Vector3(-1, 0, 0),
+  S: new THREE.Vector3(1, 0, 0),
+  E: new THREE.Vector3(0, 0, -1),
+  W: new THREE.Vector3(0, 0, 1),
 };
 
 const ANGULAR_VELOCITY = (CELL_SIZE * BOULDER_SPEED) / BOULDER_RADIUS;

@@ -2022,6 +2022,10 @@ export class GameState {
     return this.barrels.has(doorKey(col, row));
   }
 
+  isBoulderAt(col: number, row: number): boolean {
+    return this.boulders.has(doorKey(col, row));
+  }
+
   damageBarrel(col: number, row: number, damage: number): { destroyed: boolean; drops?: DropsOverride } {
     const barrel = this.barrels.get(doorKey(col, row));
     if (!barrel) return { destroyed: false };
