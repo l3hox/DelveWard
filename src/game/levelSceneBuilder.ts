@@ -440,9 +440,14 @@ export function buildLevelScene(
     sharedSpawnerGroup.add(ldSpawnerMeshes.group);
     mergeMap(sharedSpawnerMeshMap, ldSpawnerMeshes.meshMap, li);
 
-    // Boulder meshes + animator registration
+    // Boulder meshes + animator registration. Boulders animate across layers
+    // (fall, ramp descent), so each mesh carries its world Y directly rather
+    // than living inside a per-layer Y-offset group (which would be baked in
+    // and re-applied by the animator → double-offset bug).
     const ldBoulderMeshes = buildBoulderMeshes(gameState);
-    ldBoulderMeshes.group.position.y = yOffset;
+    for (const mesh of ldBoulderMeshes.meshMap.values()) {
+      mesh.position.y += yOffset;
+    }
     sharedBoulderGroup.add(ldBoulderMeshes.group);
     mergeMap(sharedBoulderMeshMap, ldBoulderMeshes.meshMap, li);
     for (const [key, mesh] of ldBoulderMeshes.meshMap) {

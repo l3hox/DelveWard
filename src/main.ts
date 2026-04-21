@@ -443,25 +443,44 @@ async function init(): Promise<void> {
     const charDefMap = new Map<string, import('./core/types').CharDef>();
     if (ls.level.charDefs) for (const def of ls.level.charDefs) charDefMap.set(def.char, def);
 
-    // Check if a specific cell on a given layer is a "hole" (no solid support from the layer below).
+    // Check if a specific cell on a given layer has no floor support (a "hole"),
+    // matching the engine's floor logic: layer-below solid wall → supported,
+    // unless overridden by an `openBottom` area or an open pit trap on this layer.
     function isHoleAt(col: number, row: number, li: number): boolean {
+      if (li === 0) return false; // ground layer has implicit support
+      let hole = false;
       const belowGrid = ls.layerGrids[li - 1];
-      if (!belowGrid) return false; // ground layer has implicit support
-      if (row < 0 || row >= belowGrid.length || col < 0 || col >= belowGrid[0].length) return true;
-      const ch = belowGrid[row][col];
-      const def = charDefMap.get(ch);
-      return !(ch === '#' || (def !== undefined && def.solid && !def.seeThrough));
+      if (belowGrid && row >= 0 && row < belowGrid.length && col >= 0 && col < belowGrid[0].length) {
+        const ch = belowGrid[row][col];
+        const def = charDefMap.get(ch);
+        const solidWall = ch === '#' || (def !== undefined && def.solid && !def.seeThrough);
+        if (!solidWall) hole = true;
+      } else {
+        hole = true; // out-of-bounds below → treat as hole
+      }
+      // openBottom area flag on current layer overrides auto-detect
+      const layer = ls.level.layers[li];
+      const areas = layer.areas ?? ls.level.areas;
+      if (areas) {
+        for (const area of areas) {
+          if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
+            if (area.openBottom !== undefined) hole = area.openBottom;
+          }
+        }
+      }
+      // Open pit trap on this layer's cell forces hole
+      const savedIdx = gameState.activeLayerIndex;
+      gameState.activeLayerIndex = li;
+      const pit = gameState.pitTraps.get(doorKey(col, row));
+      gameState.activeLayerIndex = savedIdx;
+      if (pit && pit.state === 'open') hole = true;
+      return hole;
     }
 
     // Find the layer the boulder lands on when falling from `fromLayer` at (col, row).
     function computeLandingLayer(col: number, row: number, fromLayer: number): number {
       for (let li = fromLayer - 1; li >= 1; li--) {
-        const grid = ls.layerGrids[li - 1];
-        if (!grid) return 0;
-        if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) continue;
-        const ch = grid[row][col];
-        const def = charDefMap.get(ch);
-        if (ch === '#' || (def !== undefined && def.solid && !def.seeThrough)) return li;
+        if (!isHoleAt(col, row, li)) return li;
       }
       return 0;
     }
