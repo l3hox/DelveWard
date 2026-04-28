@@ -425,14 +425,54 @@ Two improvements: props get fractional positioning, and ground items switch from
 
 ---
 
-## Phase I — Content: "The Cliffside Keep"
+## Phase I — Content: First Real Dungeon
 
-Test dungeon showcasing M4 features. A vertical level with 3 layers + indoor/outdoor.
+The first hand-designed, narrative-driven dungeon. Goal: one short, coherent place with a single clear mood — not a feature showcase. M4 mechanics are tools to serve the story, not boxes to tick.
 
-76. **Layer 0 — The Cavern**: Underground. Stalactite/stalagmite props, rubble. Hollow areas where the cliff face opens. Pit trap from Layer 1 drops here.
-77. **Layer 1 — The Keep Interior**: Castle rooms. Thin wall dividers (stone half-walls, iron fences). Enemy spawner in barracks. Boulder trap in corridor. Bookshelves, fountain.
-78. **Layer 2 — The Battlements**: Outdoor environment, daylight skybox, no ceiling. Hollow areas overlooking Layer 0 cavern far below. Banner props, statue props. Final encounter.
-79. Three layers stacked, connected visually through hollows. Player moves between layers via pit traps (down) and stairs-within-level (up — future ramps, for now use existing stair entity repurposed for same-level layer transitions).
+**Working name**: "The Cliffside Keep" (placeholder — the actual location/theme comes out of the creative session).
+
+### Authorship split
+
+This phase is **author-led, not agent-generated**. Jakub designs and authors the dungeon. Agent role:
+
+- **Creative pair sessions** — short collaborative sessions to develop the premise, atmosphere, key locations, NPCs, antagonists, and a 1-2 page story spine. Output is a written brief, not JSON.
+- **Mechanic adjustments** — when the story needs a behaviour the engine doesn't yet support, agent implements the small feature/extension. Examples that may emerge: a new prop variant, an NPC dialog effect, a special trigger condition, an environmental mood preset, a sign template.
+- **Content editing tooling** — quality-of-life editor improvements that surface during authoring (faster paint flows, missing inspector fields, validation gaps).
+- **Bug fixing + polish** — issues found while play-testing the level.
+
+Agent does **not** auto-generate level JSON, dialog trees, signs, lore text, or character dialog.
+
+### Creative pair-session output (target before authoring starts)
+
+A short brief covering:
+
+- **Place**: where is this, what was it, what is it now?
+- **Mood**: 3-5 atmosphere words; one dominant feeling.
+- **Premise**: why is the player here? What's at stake?
+- **Antagonists**: 1-2 named threats (existing enemy types, possibly with reskins or behavioural tweaks).
+- **NPCs**: 1-3 named characters with a clear function and voice.
+- **Key locations / set-pieces**: ~5-8 named rooms or moments. Not a map, just thematic anchors.
+- **Hook + close**: how the player enters, how the dungeon ends.
+- **Scope**: target play length (e.g. 30-60 min for the first one).
+
+### Authoring workflow
+
+1. Pair-session → brief.
+2. Jakub builds the dungeon in the editor — grid, layers, entities, dialog, signs.
+3. As the design pushes against engine limits, surface them; agent implements small extensions.
+4. Iterate via play-tests. Track issues in `planning/IDEAS.md` or a Phase I scratch file.
+5. When the dungeon stands on its own (a stranger could play it and feel something), Phase I is done.
+
+### Constraints worth honouring
+
+- One dominant mood; resist variety-pack temptation.
+- Story carried mostly by environment + signs + short NPC fragments. No long expository monologues.
+- M4 mechanics appear naturally where the story calls for them, not as a feature parade.
+- Audio is out of scope for Phase I (separate milestone). The dungeon should feel atmospheric even silent.
+
+### Milestone close
+
+M4 is complete when the dungeon is playable end-to-end and the engine survives a play-through without regressions.
 
 ---
 
