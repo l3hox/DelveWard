@@ -1577,6 +1577,49 @@ export class GridCanvas {
         break;
       }
 
+      case 'boulder_spawner': {
+        // Empty brown ring
+        ctx.strokeStyle = '#6b4423';
+        ctx.lineWidth = Math.max(2, Math.min(tw, th) * 0.05);
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+        // Small dark center dot
+        ctx.fillStyle = '#3a2414';
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconRadius * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Direction arrow (same style as boulder's direction arrow)
+        const bsDir = (entity.direction as string) ?? 'N';
+        let ax = 0, ay = 0;
+        if (bsDir === 'N') ay = -1;
+        else if (bsDir === 'S') ay = 1;
+        else if (bsDir === 'E') ax = 1;
+        else if (bsDir === 'W') ax = -1;
+        const arrowLen = iconRadius * 1.0;
+        const arrowHead = iconRadius * 0.35;
+        const tipX = cx + ax * arrowLen * 0.55;
+        const tipY = cy + ay * arrowLen * 0.55;
+        const tailX = cx - ax * arrowLen * 0.45;
+        const tailY = cy - ay * arrowLen * 0.45;
+        ctx.strokeStyle = 'rgba(180, 130, 80, 0.85)';
+        ctx.lineWidth = Math.max(1.5, Math.min(tw, th) * 0.05);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(tipX, tipY);
+        const perpX = -ay;
+        const perpY = ax;
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - ax * arrowHead + perpX * arrowHead * 0.6, tipY - ay * arrowHead + perpY * arrowHead * 0.6);
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - ax * arrowHead - perpX * arrowHead * 0.6, tipY - ay * arrowHead - perpY * arrowHead * 0.6);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        break;
+      }
+
       case 'thin_wall': {
         const twWall = (entity.wall as string) || 'S';
         const twThick = Math.max(2, Math.min(tw, th) * 0.08);

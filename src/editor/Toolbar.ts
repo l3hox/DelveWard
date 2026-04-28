@@ -22,7 +22,7 @@ const ENTITY_TYPES = [
   'trigger', 'tripwire', 'gate', 'trap_launcher',
   'torch_sconce', 'equipment', 'consumable', 'stairs',
   'breakable_wall', 'secret_wall', 'block', 'chest', 'sign', 'npc',
-  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop', 'pit_trap', 'spawner', 'boulder',
+  'fountain', 'bookshelf', 'altar', 'barrel', 'ramp', 'prop', 'pit_trap', 'spawner', 'boulder', 'boulder_spawner',
 ] as const;
 
 export class Toolbar {
@@ -1092,6 +1092,20 @@ export class Toolbar {
         ctx.strokeStyle = '#3a2414';
         ctx.lineWidth = Math.max(1, r * 0.08);
         ctx.stroke();
+        break;
+      }
+      case 'boulder_spawner': {
+        // empty brown ring (no fill — distinguishes from solid boulder icon)
+        ctx.strokeStyle = '#6b4423';
+        ctx.lineWidth = Math.max(1.5, r * 0.12);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.85, 0, Math.PI * 2);
+        ctx.stroke();
+        // small dark center dot
+        ctx.fillStyle = '#3a2414';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.2, 0, Math.PI * 2);
+        ctx.fill();
         break;
       }
       case 'thin_wall': {

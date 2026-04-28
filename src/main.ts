@@ -13,6 +13,7 @@ import { hideTripwire } from './rendering/tripwireRenderer';
 import { extinguishSconce, updateSconceFlicker } from './rendering/sconceRenderer';
 import { updateForestBillboards } from './rendering/forestRenderer';
 import { updateEnemyBillboards, hideEnemyMesh, updateEnemyMeshPosition, preloadEnemyTextures, createSingleEnemyMesh } from './rendering/enemyRenderer';
+import { createSingleBoulderMesh } from './rendering/boulderRenderer';
 import { hideItemMesh, addSingleItemMesh, updateItemBillboards, hideConsumableMesh, addSingleConsumableMesh, updateConsumableBillboards } from './rendering/groundItemRenderer';
 import { preloadItemSprites } from './rendering/itemSprites';
 import { loadLootTables } from './core/lootTable';
@@ -717,6 +718,44 @@ async function init(): Promise<void> {
     gameState.activeLayerIndex = savedLayer;
   }
 
+  function tickBoulderSpawners(delta: number): void {
+    const savedLayer = gameState.activeLayerIndex;
+    for (let li = 0; li < gameState.layers.length; li++) {
+      gameState.activeLayerIndex = li;
+      const yOffset = li * LAYER_HEIGHT;
+      for (const [, bs] of gameState.boulderSpawners) {
+        if (!bs.active) continue;
+        bs.spawnTimer += delta;
+        if (bs.spawnTimer < bs.interval) continue;
+        bs.spawnTimer -= bs.interval;
+
+        const cellKey = doorKey(bs.col, bs.row);
+        // Cell already has a boulder — skip this tick
+        if (gameState.boulders.has(cellKey)) continue;
+
+        const newBoulder: import('./core/gameState').BoulderInstance = {
+          col: bs.col,
+          row: bs.row,
+          direction: bs.direction,
+          state: 'rolling',
+          rollDamage: bs.rollDamage,
+          fallDamage: bs.fallDamage,
+          instaKillEnemies: bs.instaKillEnemies,
+          pushable: bs.pushable,
+        };
+        gameState.boulders.set(cellKey, newBoulder);
+
+        const prefKey = layerDoorKey(li, cellKey);
+        const mesh = createSingleBoulderMesh(
+          bs.col, bs.row, prefKey,
+          ls.boulderMeshes.group, ls.boulderMeshes.meshMap, yOffset,
+        );
+        ls.boulderAnimator.register(prefKey, mesh, bs.col, bs.row, yOffset, bs.direction);
+      }
+    }
+    gameState.activeLayerIndex = savedLayer;
+  }
+
   function restartLevel(): void {
     transition.startTransition(() => {
       teardownLevelScene(ls, scene);
@@ -1228,6 +1267,10 @@ async function init(): Promise<void> {
     gameState.onBoulderSignalChanged = (_col, _row, _active) => {
       // gameState has already transitioned boulder.state idle → rolling on rising edge.
       // tickBoulders will handle movement on next frame.
+    };
+
+    gameState.onBoulderSpawnerSignalChanged = (_col, _row, _active) => {
+      // active flag is already set on the BoulderSpawnerInstance by gameState.
     };
 
     // Timed source deactivation → animate lever reset
@@ -2071,6 +2114,7 @@ async function init(): Promise<void> {
 
       tickSpawners(delta);
       tickBoulders(delta);
+      tickBoulderSpawners(delta);
 
       // Death — show save/load overlay if saves exist, else restart
       if (gameState.hp <= 0) {

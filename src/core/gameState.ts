@@ -281,6 +281,23 @@ export interface BoulderInstance {
   pushable: boolean;
 }
 
+export interface BoulderSpawnerInstance {
+  id?: string;
+  col: number;
+  row: number;
+  direction: Facing;        // direction inherited by spawned boulders
+  interval: number;         // seconds between spawn attempts
+  active: boolean;          // signal-controllable; default true
+  gateMode?: GateMode;
+  spawnTimer: number;       // accumulator, persisted
+
+  // Boulder template — spawned boulders inherit these
+  rollDamage: number;
+  fallDamage: number;
+  instaKillEnemies: boolean;
+  pushable: boolean;
+}
+
 export interface TempBuff {
   stat: BuffStat;
   amount: number;
@@ -362,6 +379,7 @@ export interface LevelSnapshot {
   pitTraps: Map<string, PitTrapInstance>;
   spawners: Map<string, SpawnerInstance>;
   boulders: Map<string, BoulderInstance>;
+  boulderSpawners: Map<string, BoulderSpawnerInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
   registrySnapshot: ItemEntity[];
@@ -404,6 +422,7 @@ export interface LayerState {
   pitTraps: Map<string, PitTrapInstance>;
   spawners: Map<string, SpawnerInstance>;
   boulders: Map<string, BoulderInstance>;
+  boulderSpawners: Map<string, BoulderSpawnerInstance>;
   destroyedWalls: Set<string>;
   exploredCells: Set<string>;
 }
@@ -418,7 +437,7 @@ export function createEmptyLayerState(): LayerState {
     signs: new Map(), npcs: new Map(), fountains: new Map(),
     bookshelves: new Map(), altars: new Map(), barrels: new Map(),
     thinWalls: new Map(), ramps: new Map(), props: new Map(), pitTraps: new Map(),
-    spawners: new Map(), boulders: new Map(),
+    spawners: new Map(), boulders: new Map(), boulderSpawners: new Map(),
     destroyedWalls: new Set(), exploredCells: new Set(),
   };
 }
@@ -487,6 +506,8 @@ export class GameState {
   set spawners(v) { this.activeLayer.spawners = v; }
   get boulders() { return this.activeLayer.boulders; }
   set boulders(v) { this.activeLayer.boulders = v; }
+  get boulderSpawners() { return this.activeLayer.boulderSpawners; }
+  set boulderSpawners(v) { this.activeLayer.boulderSpawners = v; }
   get destroyedWalls() { return this.activeLayer.destroyedWalls; }
   set destroyedWalls(v) { this.activeLayer.destroyedWalls = v; }
   get exploredCells() { return this.activeLayer.exploredCells; }
@@ -907,6 +928,23 @@ export class GameState {
       });
       return true;
     }
+    if (e.type === 'boulder_spawner') {
+      this.boulderSpawners.set(doorKey(e.col, e.row), {
+        id: e.id as string | undefined,
+        col: e.col,
+        row: e.row,
+        direction: (e.direction as Facing) ?? 'N',
+        interval: (e.interval as number) ?? 5,
+        active: (e.active as boolean) !== false,
+        gateMode: e.gateMode as GateMode | undefined,
+        spawnTimer: 0,
+        rollDamage: (e.rollDamage as number) ?? 30,
+        fallDamage: (e.fallDamage as number) ?? 60,
+        instaKillEnemies: (e.instaKillEnemies as boolean) !== false,
+        pushable: (e.pushable as boolean) === true,
+      });
+      return true;
+    }
     return false;
   }
 
@@ -1107,6 +1145,12 @@ export class GameState {
         }
       }
 
+      for (const bs of this.boulderSpawners.values()) {
+        if (bs.id && targetedIds.has(bs.id)) {
+          this.signalManager.registerReceiver(bs.id, bs.gateMode ?? 'or');
+        }
+      }
+
       for (const b of this.boulders.values()) {
         if (b.id && targetedIds.has(b.id)) {
           this.signalManager.registerReceiver(b.id, b.gateMode ?? 'or');
@@ -1173,6 +1217,11 @@ export class GameState {
         spawner.active = active;
         this.onSpawnerSignalChanged?.(entry.col, entry.row, active);
       }
+      const boulderSpawner = this.boulderSpawners.get(doorKey(entry.col, entry.row));
+      if (boulderSpawner) {
+        boulderSpawner.active = active;
+        this.onBoulderSpawnerSignalChanged?.(entry.col, entry.row, active);
+      }
       const boulder = this.boulders.get(doorKey(entry.col, entry.row));
       if (boulder) {
         if (active && boulder.state === 'idle') {
@@ -1232,6 +1281,12 @@ export class GameState {
         const active = this.signalManager.isReceiverActive(sp.id);
         sp.active = active;
       }
+      for (const bs of this.boulderSpawners.values()) {
+        if (!bs.id) continue;
+        if (!this.signalManager.getReceiver(bs.id)) continue;
+        const active = this.signalManager.isReceiverActive(bs.id);
+        bs.active = active;
+      }
       for (const door of this.doors.values()) {
         if (!door.id || !door.mechanical) continue;
         if (!this.signalManager.getReceiver(door.id)) continue;
@@ -1250,6 +1305,9 @@ export class GameState {
 
   /** External callback for signal-driven spawner active state changes. */
   onSpawnerSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
+
+  /** External callback for signal-driven boulder spawner active state changes. */
+  onBoulderSpawnerSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
 
   /** External callback for signal-driven boulder rising-edge trigger. */
   onBoulderSignalChanged: ((col: number, row: number, active: boolean) => void) | null = null;
@@ -1300,6 +1358,7 @@ export class GameState {
       for (const pt of this.pitTraps.values()) register(pt, 'pit_trap', li);
       for (const sp of this.spawners.values()) register(sp, 'spawner', li);
       for (const b of this.boulders.values()) register(b, 'boulder', li);
+      for (const bs of this.boulderSpawners.values()) register(bs, 'boulder_spawner', li);
     }
     this.activeLayerIndex = savedIndex;
   }
@@ -1435,6 +1494,8 @@ export class GameState {
     for (const [k, v] of this.spawners) spawners.set(k, { ...v });
     const boulders = new Map<string, BoulderInstance>();
     for (const [k, v] of this.boulders) boulders.set(k, { ...v });
+    const boulderSpawners = new Map<string, BoulderSpawnerInstance>();
+    for (const [k, v] of this.boulderSpawners) boulderSpawners.set(k, { ...v });
     const destroyedWalls = new Set<string>(this.destroyedWalls);
     const exploredCells = new Set<string>(this.exploredCells);
     // Global state (registrySnapshot + signalState) is only included for the first layer.
@@ -1443,7 +1504,7 @@ export class GameState {
     return {
       doors, keys, levers, plates, triggers, tripwires, gates, trapLaunchers,
       sconces, stairs, enemies, breakableWalls, secretWalls, blocks, chests, signs,
-      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, spawners, boulders, destroyedWalls, exploredCells, registrySnapshot,
+      npcs, fountains, bookshelves, altars, barrels, thinWalls, ramps, props, pitTraps, spawners, boulders, boulderSpawners, destroyedWalls, exploredCells, registrySnapshot,
       signalState,
     };
   }
@@ -1585,6 +1646,10 @@ export class GameState {
     this.boulders = new Map<string, BoulderInstance>();
     if (snapshot.boulders) {
       for (const [k, v] of snapshot.boulders) this.boulders.set(k, { ...v });
+    }
+    this.boulderSpawners = new Map<string, BoulderSpawnerInstance>();
+    if (snapshot.boulderSpawners) {
+      for (const [k, v] of snapshot.boulderSpawners) this.boulderSpawners.set(k, { ...v });
     }
     this.destroyedWalls = new Set<string>(snapshot.destroyedWalls);
     this.exploredCells = new Set<string>(snapshot.exploredCells);

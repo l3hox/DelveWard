@@ -687,6 +687,16 @@ inspector.setEntityChangedCallback(() => {
       if (typeof e.instaKillEnemies === 'boolean') c.instaKillEnemies = e.instaKillEnemies;
       if (typeof e.pushable === 'boolean') c.pushable = e.pushable;
     }
+    if (e.type === 'boulder_spawner') {
+      const c = app.selectedBoulderSpawnerConfig;
+      if (typeof e.direction === 'string') c.direction = e.direction as import('../core/grid').Facing;
+      if (typeof e.interval === 'number') c.interval = e.interval;
+      if (typeof e.active === 'boolean') c.active = e.active;
+      if (typeof e.rollDamage === 'number') c.rollDamage = e.rollDamage;
+      if (typeof e.fallDamage === 'number') c.fallDamage = e.fallDamage;
+      if (typeof e.instaKillEnemies === 'boolean') c.instaKillEnemies = e.instaKillEnemies;
+      if (typeof e.pushable === 'boolean') c.pushable = e.pushable;
+    }
   }
   updateStairHighlight();
   levelList.refresh();

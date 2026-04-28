@@ -63,3 +63,25 @@ export function buildBoulderMeshes(gameState: GameState): BoulderMeshes {
 
   return { group, meshMap };
 }
+
+/** Build a single boulder mesh at runtime (used by boulder spawners). */
+export function createSingleBoulderMesh(
+  col: number,
+  row: number,
+  key: string,
+  group: THREE.Group,
+  meshMap: Map<string, THREE.Mesh>,
+  yOffset: number,
+): THREE.Mesh {
+  if (!boulderMat) boulderMat = new THREE.MeshLambertMaterial({ map: generateBoulderTexture() });
+  if (!boulderGeo) boulderGeo = new THREE.SphereGeometry(BOULDER_RADIUS, 16, 12);
+  const mesh = new THREE.Mesh(boulderGeo, boulderMat);
+  mesh.position.set(
+    col * CELL_SIZE + CELL_SIZE / 2,
+    BOULDER_RADIUS + yOffset,
+    row * CELL_SIZE + CELL_SIZE / 2,
+  );
+  group.add(mesh);
+  meshMap.set(key, mesh);
+  return mesh;
+}

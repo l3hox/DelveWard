@@ -26,6 +26,7 @@ import type {
   PitTrapInstance,
   SpawnerInstance,
   BoulderInstance,
+  BoulderSpawnerInstance,
   TempBuff,
 } from './gameState';
 import type { ItemEntity } from './entities';
@@ -67,6 +68,7 @@ interface SerializedLevelSnapshot {
   pitTraps?: Record<string, PitTrapInstance>;
   spawners?: Record<string, SpawnerInstance>;
   boulders?: Record<string, BoulderInstance>;
+  boulderSpawners?: Record<string, BoulderSpawnerInstance>;
   destroyedWalls: string[];
   exploredCells: string[];
   registrySnapshot: ItemEntity[];
@@ -171,6 +173,7 @@ export function serializeLevelSnapshot(snapshot: LevelSnapshot): SerializedLevel
     pitTraps: snapshot.pitTraps ? mapToRecord(snapshot.pitTraps) : {},
     spawners: snapshot.spawners ? mapToRecord(snapshot.spawners) : {},
     boulders: snapshot.boulders ? mapToRecord(snapshot.boulders) : {},
+    boulderSpawners: snapshot.boulderSpawners ? mapToRecord(snapshot.boulderSpawners) : {},
     destroyedWalls: setToArray(snapshot.destroyedWalls),
     exploredCells: setToArray(snapshot.exploredCells),
     registrySnapshot: snapshot.registrySnapshot,
@@ -207,6 +210,7 @@ export function deserializeLevelSnapshot(data: SerializedLevelSnapshot): LevelSn
     pitTraps: recordToMap(data.pitTraps ?? {}),
     spawners: recordToMap(data.spawners ?? {}),
     boulders: recordToMap(data.boulders ?? {}),
+    boulderSpawners: recordToMap(data.boulderSpawners ?? {}),
     destroyedWalls: arrayToSet(data.destroyedWalls),
     exploredCells: arrayToSet(data.exploredCells),
     registrySnapshot: data.registrySnapshot,

@@ -397,6 +397,30 @@ function validateEntity(
       }
       break;
     }
+    case 'boulder_spawner': {
+      if (e.direction !== undefined && !['N', 'S', 'E', 'W'].includes(e.direction as string)) {
+        return `${pfx} boulder_spawner direction must be 'N', 'S', 'E', or 'W'`;
+      }
+      if (e.interval !== undefined && (typeof e.interval !== 'number' || (e.interval as number) <= 0)) {
+        return `${pfx} boulder_spawner interval must be a positive number`;
+      }
+      if (e.rollDamage !== undefined && (typeof e.rollDamage !== 'number' || (e.rollDamage as number) < 0)) {
+        return `${pfx} boulder_spawner rollDamage must be >= 0`;
+      }
+      if (e.fallDamage !== undefined && (typeof e.fallDamage !== 'number' || (e.fallDamage as number) < 0)) {
+        return `${pfx} boulder_spawner fallDamage must be >= 0`;
+      }
+      if (e.instaKillEnemies !== undefined && typeof e.instaKillEnemies !== 'boolean') {
+        return `${pfx} boulder_spawner instaKillEnemies must be a boolean`;
+      }
+      if (e.pushable !== undefined && typeof e.pushable !== 'boolean') {
+        return `${pfx} boulder_spawner pushable must be a boolean`;
+      }
+      if (e.gateMode !== undefined && !['or', 'and', 'xor'].includes(e.gateMode as string)) {
+        return `${pfx} boulder_spawner gateMode must be 'or', 'and', or 'xor'`;
+      }
+      break;
+    }
   }
 
   return null;
