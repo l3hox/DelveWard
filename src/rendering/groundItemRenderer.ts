@@ -62,18 +62,22 @@ export function addSingleGroundItemMesh(
 
   const mapKey = layerIndex !== undefined ? `${layerIndex}:${doorKey(col, row)}` : doorKey(col, row);
 
-  // Count existing meshes at this cell to determine spread index.
+  // Find a unique storeKey for this cell. The spread suffixes are #1, #2, ...
+  // so the count of existing meshes at this cell IS the next index. Walk
+  // forward until we find a free slot — guarantees no map overwrites that
+  // would orphan the previous mesh (still in the scene, not in the map, so
+  // it would never be billboarded or removed on pickup).
   let itemIndex = 0;
-  for (const key of meshMap.keys()) {
-    if (key === mapKey || key.endsWith(':' + doorKey(col, row))) itemIndex++;
+  let storeKey = mapKey;
+  while (meshMap.has(storeKey)) {
+    itemIndex++;
+    storeKey = `${mapKey}#${itemIndex}`;
   }
 
   const { dx, dz } = itemOffset(col, row, itemIndex);
   const yOffset = (layerIndex ?? 0) * LAYER_HEIGHT;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
   mesh.position.set(cx + dx, height + yOffset, cz + dz);
-
-  const storeKey = itemIndex === 0 ? mapKey : `${mapKey}#${itemIndex}`;
   // Enable all rendering layers so dynamically added items are visible in all zone passes.
   mesh.layers.enableAll();
   group.add(mesh);
