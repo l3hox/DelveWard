@@ -566,11 +566,13 @@ async function init(): Promise<void> {
       const newPrefKey = layerDoorKey(newLi, newKey);
 
       gameState.activeLayerIndex = oldLi;
+      deactivateBoulderTriggers(boulder.col, boulder.row);
       gameState.boulders.delete(oldKey);
       gameState.activeLayerIndex = newLi;
       boulder.col = newCol;
       boulder.row = newRow;
       gameState.boulders.set(newKey, boulder);
+      activateBoulderTriggers(newCol, newRow);
 
       const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
       if (mesh) {
@@ -586,10 +588,12 @@ async function init(): Promise<void> {
       const oldPrefKey = layerDoorKey(li, oldKey);
       const newKey = doorKey(newCol, newRow);
       const newPrefKey = layerDoorKey(li, newKey);
+      deactivateBoulderTriggers(boulder.col, boulder.row);
       gameState.boulders.delete(oldKey);
       boulder.col = newCol;
       boulder.row = newRow;
       gameState.boulders.set(newKey, boulder);
+      activateBoulderTriggers(newCol, newRow);
       const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
       if (mesh) {
         ls.boulderMeshes.meshMap.delete(oldPrefKey);
@@ -597,6 +601,26 @@ async function init(): Promise<void> {
       }
       ls.boulderAnimator.rekey(oldPrefKey, newPrefKey);
       return newKey;
+    }
+
+    // Mirror player-on-cell signal handling. Caller must set activeLayerIndex first.
+    function activateBoulderTriggers(col: number, row: number): void {
+      gameState.activateTrigger(col, row);
+      if (gameState.activateTripwire(col, row)) {
+        hideTripwire(ls.tripwireMeshes.meshMap, layerKey(doorKey(col, row)));
+      }
+      const plateTargets = gameState.activatePressurePlate(col, row);
+      if (plateTargets) {
+        const plate = gameState.plates.get(doorKey(col, row));
+        if (plate?.activated) {
+          pressPlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
+        }
+      }
+    }
+
+    function deactivateBoulderTriggers(col: number, row: number): void {
+      gameState.deactivatePressurePlate(col, row);
+      gameState.deactivateTrigger(col, row);
     }
 
     // Decide and execute the next step for a boulder at rest whose game state != idle.
