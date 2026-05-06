@@ -2019,6 +2019,19 @@ export class GameState {
     }
   }
 
+  /** Destroy a chest (e.g., crashed by a boulder). Returns its drops if any.
+   *  Fires the chest's signal if it was still closed. */
+  destroyChest(col: number, row: number): { drops?: DropsOverride } | undefined {
+    const key = doorKey(col, row);
+    const chest = this.chests.get(key);
+    if (!chest) return undefined;
+    if (chest.state !== 'open') {
+      this._activateChestSignal(chest);
+    }
+    this.chests.delete(key);
+    return { drops: chest.drops };
+  }
+
   // --- Sign helpers ---
 
   getSign(col: number, row: number): SignInstance | undefined {

@@ -42,7 +42,7 @@ import { updateProjectileMeshes, warmUpGPUShaders, FireballExplosions } from './
 import { tickEffects, applyEffect, getSlowMultiplier, hasEffect } from './core/statusEffects';
 import type { StatusEffectType } from './core/statusEffects';
 import { animateBlockPush } from './rendering/blockRenderer';
-import { openChestMesh, closeChestMesh } from './rendering/chestRenderer';
+import { openChestMesh, closeChestMesh, destroyChestMesh } from './rendering/chestRenderer';
 import { markFountainUsed } from './rendering/fountainRenderer';
 import { markAltarUsed } from './rendering/altarRenderer';
 import { SignOverlay } from './hud/signOverlay';
@@ -572,6 +572,7 @@ async function init(): Promise<void> {
       boulder.col = newCol;
       boulder.row = newRow;
       gameState.boulders.set(newKey, boulder);
+      crashChestIfAny(newCol, newRow);
       activateBoulderTriggers(newCol, newRow);
 
       const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
@@ -593,6 +594,7 @@ async function init(): Promise<void> {
       boulder.col = newCol;
       boulder.row = newRow;
       gameState.boulders.set(newKey, boulder);
+      crashChestIfAny(newCol, newRow);
       activateBoulderTriggers(newCol, newRow);
       const mesh = ls.boulderMeshes.meshMap.get(oldPrefKey);
       if (mesh) {
@@ -621,6 +623,17 @@ async function init(): Promise<void> {
     function deactivateBoulderTriggers(col: number, row: number): void {
       gameState.deactivatePressurePlate(col, row);
       gameState.deactivateTrigger(col, row);
+    }
+
+    // Destroy any chest at (col, row) on the active layer — drops spill onto
+    // the cell, mesh is removed. Caller must set activeLayerIndex first.
+    function crashChestIfAny(col: number, row: number): void {
+      const result = gameState.destroyChest(col, row);
+      if (!result) return;
+      destroyChestMesh(ls.chestMeshes.meshMap, layerKey(doorKey(col, row)));
+      if (result.drops) {
+        spawnLoot('', result.drops, col, row, gameState, ls);
+      }
     }
 
     // Decide and execute the next step for a boulder at rest whose game state != idle.

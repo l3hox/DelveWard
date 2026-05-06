@@ -141,6 +141,16 @@ export function openChestMesh(
   requestAnimationFrame(animate);
 }
 
+export function destroyChestMesh(
+  meshMap: Map<string, THREE.Group>,
+  key: string,
+): void {
+  const chestGroup = meshMap.get(key);
+  if (!chestGroup) return;
+  chestGroup.parent?.remove(chestGroup);
+  meshMap.delete(key);
+}
+
 export function closeChestMesh(
   meshMap: Map<string, THREE.Group>,
   key: string,
