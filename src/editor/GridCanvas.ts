@@ -913,6 +913,16 @@ export class GridCanvas {
     ctx.stroke();
   }
 
+  /** Return the position to render an entity at — honors active drag (so the
+   *  dragged entity tracks the cursor instead of staying at its stored cell). */
+  private getEntityRenderPos(entity: Entity): { col: number; row: number } {
+    const ds = this.entityDragState;
+    if (ds && ds.entity === entity) {
+      return { col: ds.currentCol, row: ds.currentRow };
+    }
+    return { col: entity.col, row: entity.row };
+  }
+
   private drawEntityOverlays(
     firstCol: number,
     firstRow: number,
@@ -923,14 +933,14 @@ export class GridCanvas {
     tileSize: number,
   ): void {
     const level = this.app.level!;
-    const { ctx } = this;
 
     for (const entity of level.entities) {
-      if (entity.col < firstCol || entity.col > lastCol) continue;
-      if (entity.row < firstRow || entity.row > lastRow) continue;
+      const pos = this.getEntityRenderPos(entity);
+      if (pos.col < firstCol || pos.col > lastCol) continue;
+      if (pos.row < firstRow || pos.row > lastRow) continue;
 
-      const px = Math.floor(offsetX + entity.col * tileSize);
-      const py = Math.floor(offsetY + entity.row * tileSize);
+      const px = Math.floor(offsetX + pos.col * tileSize);
+      const py = Math.floor(offsetY + pos.row * tileSize);
       const tw = Math.ceil(tileSize);
       const th = Math.ceil(tileSize);
 
@@ -2114,16 +2124,18 @@ export class GridCanvas {
     const ds = this.entityDragState;
     if (!ds) return;
     if (ds.currentCol === ds.startCol && ds.currentRow === ds.startRow) return;
+    // Only flag invalid drop targets — the entity itself follows the cursor
+    // so a valid drop needs no extra indicator.
+    if (this.app.canMoveEntityTo(ds.entity, ds.currentCol, ds.currentRow)) return;
     const { ctx } = this;
     const px = Math.floor(offsetX + ds.currentCol * tileSize);
     const py = Math.floor(offsetY + ds.currentRow * tileSize);
     const tw = Math.ceil(tileSize);
     const th = Math.ceil(tileSize);
-    const valid = this.app.canMoveEntityTo(ds.entity, ds.currentCol, ds.currentRow);
     ctx.save();
-    ctx.fillStyle = valid ? 'rgba(0, 255, 255, 0.18)' : 'rgba(255, 80, 80, 0.18)';
+    ctx.fillStyle = 'rgba(255, 80, 80, 0.22)';
     ctx.fillRect(px, py, tw, th);
-    ctx.strokeStyle = valid ? '#00ffff' : '#ff5050';
+    ctx.strokeStyle = '#ff5050';
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 3]);
     ctx.strokeRect(px + 1, py + 1, tw - 2, th - 2);
@@ -2136,9 +2148,10 @@ export class GridCanvas {
     // Don't draw highlight if entity is on a different level
     if (this.app.level && !this.app.level.entities.includes(entity)) return;
 
+    const pos = this.getEntityRenderPos(entity);
     const { ctx } = this;
-    const px = Math.floor(offsetX + entity.col * tileSize);
-    const py = Math.floor(offsetY + entity.row * tileSize);
+    const px = Math.floor(offsetX + pos.col * tileSize);
+    const py = Math.floor(offsetY + pos.row * tileSize);
     const tw = Math.ceil(tileSize);
     const th = Math.ceil(tileSize);
 
@@ -2155,9 +2168,10 @@ export class GridCanvas {
     // Only highlight if the entity is on the current level
     if (this.app.level && !this.app.level.entities.includes(entity)) return;
 
+    const pos = this.getEntityRenderPos(entity);
     const { ctx } = this;
-    const px = Math.floor(offsetX + entity.col * tileSize);
-    const py = Math.floor(offsetY + entity.row * tileSize);
+    const px = Math.floor(offsetX + pos.col * tileSize);
+    const py = Math.floor(offsetY + pos.row * tileSize);
     const tw = Math.ceil(tileSize);
     const th = Math.ceil(tileSize);
 
@@ -2333,38 +2347,40 @@ export class GridCanvas {
     const arrows: Arrow[] = [];
 
     for (const e of level.entities) {
+      const epos = this.getEntityRenderPos(e);
       const hasTargetsArray = e.type === 'lever' || e.type === 'pressure_plate' || e.type === 'trigger' || e.type === 'tripwire' || e.type === 'gate' || e.type === 'chest';
       if (hasTargetsArray && Array.isArray(e.targets)) {
         // Lever arrows originate from the bar center, not cell center
-        let fromCol = e.col;
-        let fromRow = e.row;
+        let fromCol = epos.col;
+        let fromRow = epos.row;
         if (e.type === 'lever') {
           const wall = (e.wall as string) || 'N';
           const barOffset = 0.35; // bar center offset from wall edge
-          if (wall === 'N') fromRow = e.row + barOffset - 0.5;
-          else if (wall === 'S') fromRow = e.row + 0.5 - barOffset;
-          else if (wall === 'W') fromCol = e.col + barOffset - 0.5;
-          else if (wall === 'E') fromCol = e.col + 0.5 - barOffset;
+          if (wall === 'N') fromRow = epos.row + barOffset - 0.5;
+          else if (wall === 'S') fromRow = epos.row + 0.5 - barOffset;
+          else if (wall === 'W') fromCol = epos.col + barOffset - 0.5;
+          else if (wall === 'E') fromCol = epos.col + 0.5 - barOffset;
         }
         for (const targetId of e.targets as string[]) {
           const targetEntity = level.entities.find(t => t.id === targetId);
           if (!targetEntity) continue;
+          const tpos = this.getEntityRenderPos(targetEntity);
           // Highlight if either endpoint is in the signal chain
           const isActive = selected !== null && (
             (e.id !== undefined && signalChain.has(e.id)) ||
             (targetEntity.id !== undefined && signalChain.has(targetEntity.id!))
           );
           // Trap launcher arrows end at the wall-mounted position
-          let toCol = targetEntity.col;
-          let toRow = targetEntity.row;
+          let toCol = tpos.col;
+          let toRow = tpos.row;
           if (targetEntity.type === 'trap_launcher') {
             const facing = (targetEntity.facing as string) || 'S';
             const wallOffset = 0.35;
             // Mount wall is opposite of facing
-            if (facing === 'S') toRow = targetEntity.row + wallOffset - 0.5;
-            else if (facing === 'N') toRow = targetEntity.row + 0.5 - wallOffset;
-            else if (facing === 'E') toCol = targetEntity.col + wallOffset - 0.5;
-            else if (facing === 'W') toCol = targetEntity.col + 0.5 - wallOffset;
+            if (facing === 'S') toRow = tpos.row + wallOffset - 0.5;
+            else if (facing === 'N') toRow = tpos.row + 0.5 - wallOffset;
+            else if (facing === 'E') toCol = tpos.col + wallOffset - 0.5;
+            else if (facing === 'W') toCol = tpos.col + 0.5 - wallOffset;
           }
           arrows.push({ fromCol, fromRow, toCol, toRow, active: isActive });
         }
@@ -2373,16 +2389,18 @@ export class GridCanvas {
         const targetId = e.target as string;
         const targetEntity = level.entities.find(t => t.id === targetId);
         if (targetEntity) {
+          const tpos = this.getEntityRenderPos(targetEntity);
           const isActive = selected !== null && (e === selected || targetEntity === selected);
-          arrows.push({ fromCol: e.col, fromRow: e.row, toCol: targetEntity.col, toRow: targetEntity.row, active: isActive });
+          arrows.push({ fromCol: epos.col, fromRow: epos.row, toCol: tpos.col, toRow: tpos.row, active: isActive });
         }
       }
       if (e.type === 'key' && (e as Record<string, unknown>).keyId) {
         const keyId = (e as Record<string, unknown>).keyId as string;
         for (const other of level.entities) {
           if ((other.type === 'door' || other.type === 'chest') && (other as Record<string, unknown>).keyId === keyId) {
+            const opos = this.getEntityRenderPos(other);
             const isActive = selected !== null && (e === selected || other === selected);
-            arrows.push({ fromCol: e.col, fromRow: e.row, toCol: other.col, toRow: other.row, active: isActive });
+            arrows.push({ fromCol: epos.col, fromRow: epos.row, toCol: opos.col, toRow: opos.row, active: isActive });
           }
         }
       }
