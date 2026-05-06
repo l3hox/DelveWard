@@ -2,7 +2,7 @@ import { MINIMAP } from './hudLayout';
 import { HUD_COLORS } from './hudColors';
 import { FACING_DELTA, type Facing } from '../core/grid';
 import type { EnemyInstance } from '../enemies/enemyTypes';
-import type { SecretWallInstance } from '../core/gameState';
+import type { SecretWallInstance, BoulderInstance } from '../core/gameState';
 
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,
@@ -15,6 +15,7 @@ export function drawMinimap(
   doors?: Map<string, unknown>,
   stairs?: Map<string, unknown>,
   secretWalls?: Map<string, SecretWallInstance>,
+  boulders?: Map<string, BoulderInstance>,
 ): void {
   const { x, y, w, h, cellSize } = MINIMAP;
 
@@ -66,6 +67,18 @@ export function drawMinimap(
       const ex = x + (enemy.col - startCol) * cellSize + cellSize / 2;
       const ey = y + (enemy.row - startRow) * cellSize + cellSize / 2;
       ctx.fillRect(ex - 1, ey - 1, 3, 3);
+    }
+  }
+
+  // Boulder dots (brown)
+  if (boulders) {
+    ctx.fillStyle = '#7a4a26';
+    for (const boulder of boulders.values()) {
+      const key = `${boulder.col},${boulder.row}`;
+      if (!exploredCells.has(key)) continue;
+      const bx = x + (boulder.col - startCol) * cellSize + cellSize / 2;
+      const by = y + (boulder.row - startRow) * cellSize + cellSize / 2;
+      ctx.fillRect(bx - 1, by - 1, 3, 3);
     }
   }
 

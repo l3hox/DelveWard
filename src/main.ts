@@ -495,7 +495,7 @@ async function init(): Promise<void> {
     }
 
     // Can boulder enter (nc, nr) on current layer? Returns the action to take.
-    type EnterResult = 'enter' | 'kill_enemy' | 'damage_player' | 'blocked';
+    type EnterResult = 'enter' | 'kill_enemy' | 'damage_enemy' | 'damage_player' | 'blocked';
     function canBoulderEnter(nc: number, nr: number, li: number, boulder: import('./core/gameState').BoulderInstance): EnterResult {
       const layerGrid = ls.layerGrids[li];
       if (!layerGrid) return 'blocked';
@@ -508,12 +508,26 @@ async function init(): Promise<void> {
       if (gameState.isBlockAt(nc, nr)) return 'blocked';
       // Another boulder — always blocks (chain transfer handled separately in decideNext)
       if (gameState.isBoulderAt(nc, nr)) return 'blocked';
-      // Enemy
+      // Enemy — boulder rolls over (kill if instakill, else damage once)
       const enemy = gameState.enemies.get(doorKey(nc, nr));
-      if (enemy) return boulder.instaKillEnemies ? 'kill_enemy' : 'blocked';
+      if (enemy) return boulder.instaKillEnemies ? 'kill_enemy' : 'damage_enemy';
       // Player (only on player's layer)
       if (li === savedLayer && ps.col === nc && ps.row === nr) return 'damage_player';
       return 'enter';
+    }
+
+    function damageEnemyByBoulder(col: number, row: number, damage: number): void {
+      const key = doorKey(col, row);
+      const enemy = gameState.enemies.get(key);
+      if (!enemy) return;
+      enemy.hp -= damage;
+      enemyDamageFlash(ls.enemyMeshes.meshMap, layerKey(key));
+      damageNumbers.spawn(col, row, damage, gameState.activeLayerIndex * LAYER_HEIGHT);
+      if (enemy.hp <= 0) {
+        handleEnemyKill(key, col, row, enemy);
+      } else {
+        ls.healthBarManager.update(layerKey(key), enemy.hp, enemy.maxHp);
+      }
     }
 
     // Check ramp descent: boulder at (col, row) on layer li, rolling in `direction`.
@@ -594,7 +608,11 @@ async function init(): Promise<void> {
           gameState.hp = Math.max(0, gameState.hp - (debugFullbright ? 0 : boulder.fallDamage));
           playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
         }
-        if (boulder.instaKillEnemies) killEnemyAt(boulder.col, boulder.row);
+        if (boulder.instaKillEnemies) {
+          killEnemyAt(boulder.col, boulder.row);
+        } else {
+          damageEnemyByBoulder(boulder.col, boulder.row, boulder.fallDamage);
+        }
         boulder.state = 'rolling';
       }
 
@@ -664,12 +682,13 @@ async function init(): Promise<void> {
       const result = canBoulderEnter(nc, nr, li, boulder);
 
       if (result === 'kill_enemy') killEnemyAt(nc, nr);
+      if (result === 'damage_enemy') damageEnemyByBoulder(nc, nr, boulder.rollDamage);
       if (result === 'damage_player') {
         gameState.hp = Math.max(0, gameState.hp - (debugFullbright ? 0 : boulder.rollDamage));
         playerDamageFlashTimer = PLAYER_DAMAGE_FLASH_DURATION;
       }
 
-      if (result === 'enter' || result === 'kill_enemy' || result === 'damage_player') {
+      if (result === 'enter' || result === 'kill_enemy' || result === 'damage_enemy' || result === 'damage_player') {
         const newKey = moveBoulderSameLayer(boulder, key, li, nc, nr);
         const newPrefKey = layerDoorKey(li, newKey);
         ls.boulderAnimator.startRoll(newPrefKey, nc, nr, li * LAYER_HEIGHT, boulder.direction);
