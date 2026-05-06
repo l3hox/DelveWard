@@ -1031,6 +1031,39 @@ export class EditorApp {
     return this.walkableSet.has(char);
   }
 
+  /** Like canPlaceEntityType, but excludes the given entity from the
+   *  uniqueness check (used when moving an entity to a new cell). */
+  canMoveEntityTo(entity: Entity, col: number, row: number): boolean {
+    if (!this.level) return false;
+    const grid = this.level.grid;
+    if (row < 0 || row >= grid.length) return false;
+    if (col < 0 || col >= grid[row].length) return false;
+    const char = grid[row][col];
+    const type = entity.type;
+    if (type === 'door') {
+      if (!this.walkableSet.has(char)) return false;
+      return !this.getEntitiesAt(col, row).some(e => e !== entity && e.type === 'door');
+    }
+    if (type === 'stairs') {
+      if (!this.walkableSet.has(char)) return false;
+      return !this.getEntitiesAt(col, row).some(e => e !== entity && e.type === 'stairs');
+    }
+    if (type === 'gate') return char !== ' ';
+    if (type === 'breakable_wall' || type === 'secret_wall') {
+      return !this.walkableSet.has(char) && char !== ' ';
+    }
+    return this.walkableSet.has(char);
+  }
+
+  /** Move an entity to a new cell. Returns true on success. */
+  moveEntity(entity: Entity, col: number, row: number): boolean {
+    if (entity.col === col && entity.row === row) return false;
+    if (!this.canMoveEntityTo(entity, col, row)) return false;
+    entity.col = col;
+    entity.row = row;
+    return true;
+  }
+
   enterPickMode(entity: Entity, field: string, validChar?: string, validEntityType?: string): void {
     this.pickMode = { entity, field, validChar, validEntityType };
   }

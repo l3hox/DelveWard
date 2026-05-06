@@ -68,6 +68,8 @@ export class GridCanvas {
   onPreviewBlur: (() => void) | null = null;
   previewCameraMode: 'noclip' | 'freefly' = 'noclip';
   private potentialWireSource: { entity: Entity; col: number; row: number } | null = null;
+  private entityDragState: { entity: Entity; startCol: number; startRow: number; currentCol: number; currentRow: number } | null = null;
+  private shiftHeld = false;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement, app: EditorApp) {
     this.canvas = canvas;
@@ -117,6 +119,21 @@ export class GridCanvas {
 
   private setupEvents(): void {
     const canvas = this.canvas;
+
+    // Track Shift held → switches the select tool's mousedown into wire-drag
+    // mode, and updates the cursor as a hint.
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Shift' && !this.shiftHeld) {
+        this.shiftHeld = true;
+        this.updateCursor();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'Shift' && this.shiftHeld) {
+        this.shiftHeld = false;
+        this.updateCursor();
+      }
+    });
 
     canvas.addEventListener('mousemove', (e) => {
       // Handle preview window drag/resize
@@ -172,6 +189,13 @@ export class GridCanvas {
       if (this.app.areaDragState && this.app.hover) {
         this.app.areaDragState.currentCol = this.app.hover.col;
         this.app.areaDragState.currentRow = this.app.hover.row;
+        this.dirty = true;
+      }
+
+      // Update entity drag hover position
+      if (this.entityDragState && this.app.hover) {
+        this.entityDragState.currentCol = this.app.hover.col;
+        this.entityDragState.currentRow = this.app.hover.row;
         this.dirty = true;
       }
 
@@ -360,18 +384,27 @@ export class GridCanvas {
 
           const entity = this.app.selectEntityAt(col, row);
           if (!entity) this.app.deselectEntity();
-          // Record potential wire drag source — try selected entity first,
-          // then fall back to any wirable entity at this cell
-          let wireSource: Entity | null = null;
-          if (entity && this.app.getWireSourceInfo(entity)) {
-            wireSource = entity;
-          } else {
-            const allAt = this.app.getEntitiesAt(col, row);
-            for (const e of allAt) {
-              if (this.app.getWireSourceInfo(e)) { wireSource = e; break; }
+
+          if (e.shiftKey) {
+            // Shift+drag → wire mode. Record potential wire drag source —
+            // try selected entity first, then fall back to any wirable
+            // entity at this cell.
+            let wireSource: Entity | null = null;
+            if (entity && this.app.getWireSourceInfo(entity)) {
+              wireSource = entity;
+            } else {
+              const allAt = this.app.getEntitiesAt(col, row);
+              for (const e of allAt) {
+                if (this.app.getWireSourceInfo(e)) { wireSource = e; break; }
+              }
             }
+            this.potentialWireSource = wireSource ? { entity: wireSource, col, row } : null;
+          } else if (entity) {
+            // Plain drag → move the entity. Drag state activates on cell
+            // change in mousemove; mouseup commits the move.
+            this.entityDragState = { entity, startCol: col, startRow: row, currentCol: col, currentRow: row };
           }
-          this.potentialWireSource = wireSource ? { entity: wireSource, col, row } : null;
+
           this.onSelectionChange?.();
           this.dirty = true;
         } else if (tool === 'entity') {
@@ -429,6 +462,17 @@ export class GridCanvas {
       }
       if (e.button === 0) {
         this.potentialWireSource = null;
+        if (this.entityDragState) {
+          const ds = this.entityDragState;
+          this.entityDragState = null;
+          if (ds.currentCol !== ds.startCol || ds.currentRow !== ds.startRow) {
+            this.onBeforeEntityAdd?.();
+            const moved = this.app.moveEntity(ds.entity, ds.currentCol, ds.currentRow);
+            if (moved) this.onSelectionChange?.();
+          }
+          this.dirty = true;
+          return;
+        }
         if (this.app.wireDragState) {
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
@@ -525,6 +569,7 @@ export class GridCanvas {
       this.thinWallDrawEdges = [];
       this.hoveredEdge = null;
       this.potentialWireSource = null;
+      this.entityDragState = null;
       if (this.app.wireDragState) {
         this.app.wireDragState = null;
         this.updateCursor();
@@ -692,6 +737,9 @@ export class GridCanvas {
 
     // Draw drag rectangle for area selection
     this.drawDragRectangle(offsetX, offsetY, tileSize);
+
+    // Draw entity-drag drop target
+    this.drawEntityDragGhost(offsetX, offsetY, tileSize);
 
     // Draw selection highlight
     this.drawSelectionHighlight(offsetX, offsetY, tileSize);
@@ -2062,6 +2110,26 @@ export class GridCanvas {
     ctx.restore();
   }
 
+  private drawEntityDragGhost(offsetX: number, offsetY: number, tileSize: number): void {
+    const ds = this.entityDragState;
+    if (!ds) return;
+    if (ds.currentCol === ds.startCol && ds.currentRow === ds.startRow) return;
+    const { ctx } = this;
+    const px = Math.floor(offsetX + ds.currentCol * tileSize);
+    const py = Math.floor(offsetY + ds.currentRow * tileSize);
+    const tw = Math.ceil(tileSize);
+    const th = Math.ceil(tileSize);
+    const valid = this.app.canMoveEntityTo(ds.entity, ds.currentCol, ds.currentRow);
+    ctx.save();
+    ctx.fillStyle = valid ? 'rgba(0, 255, 255, 0.18)' : 'rgba(255, 80, 80, 0.18)';
+    ctx.fillRect(px, py, tw, th);
+    ctx.strokeStyle = valid ? '#00ffff' : '#ff5050';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(px + 1, py + 1, tw - 2, th - 2);
+    ctx.restore();
+  }
+
   private drawSelectionHighlight(offsetX: number, offsetY: number, tileSize: number): void {
     const entity = this.app.selectedEntity;
     if (!entity) return;
@@ -2109,6 +2177,11 @@ export class GridCanvas {
     }
     const tool = this.app.activeTool;
     if (tool === 'thin_wall') {
+      this.canvas.style.cursor = 'crosshair';
+      return;
+    }
+    // Shift held over the canvas while in select tool → wire-mode hint
+    if (tool === 'select' && this.shiftHeld) {
       this.canvas.style.cursor = 'crosshair';
       return;
     }
