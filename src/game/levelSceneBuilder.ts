@@ -369,7 +369,9 @@ export function buildLevelScene(
     const ldAllWallEntities = new Map<string, { col: number; row: number }>();
     for (const [k, v] of gameState.breakableWalls) ldAllWallEntities.set(k, v);
     for (const [k, v] of gameState.secretWalls) ldAllWallEntities.set(k, v);
-    const ldWallEntityMeshes = buildWallEntityMeshes(ldAllWallEntities, ld.grid, ldDefaults, ldAreas, level.charDefs);
+    const wallEntAboveGrid = level.layers[li + 1]?.grid;
+    const wallEntBelowGrid = level.layers[li - 1]?.grid;
+    const ldWallEntityMeshes = buildWallEntityMeshes(ldAllWallEntities, ld.grid, ldDefaults, ldAreas, level.charDefs, undefined, wallEntAboveGrid, wallEntBelowGrid);
     ldWallEntityMeshes.group.position.y = yOffset;
     sharedWallEntityGroup.add(ldWallEntityMeshes.group);
     mergeMap(sharedWallEntityMeshMap, ldWallEntityMeshes.meshMap, li);

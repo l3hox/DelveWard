@@ -150,7 +150,10 @@ export function buildLayerEntityMeshes(
   for (const [k, v] of gs.breakableWalls) wallEntityCells.set(k, v);
   for (const [k, v] of gs.secretWalls) wallEntityCells.set(k, v);
   if (wallEntityCells.size > 0) {
-    const wem = buildWallEntityMeshes(wallEntityCells, ld.grid, defaults, areas, level.charDefs);
+    const li = gs.activeLayerIndex;
+    const aboveGrid = level.layers[li + 1]?.grid;
+    const belowGrid = level.layers[li - 1]?.grid;
+    const wem = buildWallEntityMeshes(wallEntityCells, ld.grid, defaults, areas, level.charDefs, undefined, aboveGrid, belowGrid);
     wem.group.position.y = yOffset;
     group.add(wem.group);
   }

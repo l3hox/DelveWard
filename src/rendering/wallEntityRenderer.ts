@@ -29,6 +29,8 @@ export function buildWallEntityMeshes(
   areas?: TextureArea[],
   charDefs?: CharDef[],
   textureOverride?: WallTextureName,
+  layerAboveGrid?: string[],
+  layerBelowGrid?: string[],
 ): WallEntityMeshes {
   const group = new THREE.Group();
   const meshMap = new Map<string, { wallGroup: THREE.Group; floorCeilGroup: THREE.Group }>();
@@ -120,16 +122,46 @@ export function buildWallEntityMeshes(
       }
     }
 
-    // Floor and ceiling revealed when this entity cell is opened
-    const floor = new THREE.Mesh(tileGeo, getFloorMat(fallbackTex.floor));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(cx, 0, cz);
-    floorCeilGroup.add(floor);
+    // Floor and ceiling revealed when this entity cell is opened — but skip
+    // the surface that's vertically open (mirrors buildDungeon's
+    // isOpenTop/isOpenBottom logic so an opened secret wall under a
+    // walkable layer above doesn't render an unwanted ceiling).
+    let isOpenBottom = false;
+    let isOpenTop = false;
+    if (layerBelowGrid && row < layerBelowGrid.length && col < layerBelowGrid[0].length) {
+      const belowChar = layerBelowGrid[row][col];
+      const belowDef = charDefMap.get(belowChar);
+      const belowIsSolidWall = belowChar === '#' || (belowDef !== undefined && belowDef.solid && !belowDef.seeThrough);
+      if (!belowIsSolidWall) isOpenBottom = true;
+    }
+    if (layerAboveGrid && row < layerAboveGrid.length && col < layerAboveGrid[0].length) {
+      const aboveChar = layerAboveGrid[row][col];
+      const aboveDef = charDefMap.get(aboveChar);
+      const aboveIsSolidWall = aboveChar === '#' || (aboveDef !== undefined && aboveDef.solid && !aboveDef.seeThrough);
+      if (!aboveIsSolidWall) isOpenTop = true;
+    }
+    if (areas) {
+      for (const area of areas) {
+        if (col >= area.fromCol && col <= area.toCol && row >= area.fromRow && row <= area.toRow) {
+          if (area.openBottom !== undefined) isOpenBottom = area.openBottom;
+          if (area.openTop !== undefined) isOpenTop = area.openTop;
+        }
+      }
+    }
 
-    const ceil = new THREE.Mesh(tileGeo, getCeilMat(fallbackTex.ceiling));
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.set(cx, WALL_HEIGHT, cz);
-    floorCeilGroup.add(ceil);
+    if (!isOpenBottom) {
+      const floor = new THREE.Mesh(tileGeo, getFloorMat(fallbackTex.floor));
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(cx, 0, cz);
+      floorCeilGroup.add(floor);
+    }
+
+    if (!isOpenTop) {
+      const ceil = new THREE.Mesh(tileGeo, getCeilMat(fallbackTex.ceiling));
+      ceil.rotation.x = Math.PI / 2;
+      ceil.position.set(cx, WALL_HEIGHT, cz);
+      floorCeilGroup.add(ceil);
+    }
 
     group.add(wallGroup);
     group.add(floorCeilGroup);
