@@ -135,6 +135,11 @@ export function buildDungeon(grid: string[], defaults?: TextureSet, areas?: Text
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       if (!renderable.has(grid[row][col]) && !forceRenderable?.has(doorKey(col, row))) continue;
+      // Wall-entity cells (secret/breakable walls) own their own floor + ceiling
+      // via wallEntityRenderer's floorCeilGroup. Skip them here so we don't
+      // render a second set on top after a secret wall has been opened (which
+      // mutates the grid char from '#' to '.').
+      if (wallEntityCells?.has(doorKey(col, row))) continue;
 
       const cx = col * CELL_SIZE + CELL_SIZE / 2;
       const cz = row * CELL_SIZE + CELL_SIZE / 2;
