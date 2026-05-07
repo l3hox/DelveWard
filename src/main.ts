@@ -1371,33 +1371,80 @@ async function init(): Promise<void> {
       releasePlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
     };
 
-    // Secret wall detection — walking into a wall cell with a secret wall entity
-    ls.player.setOnMoveBlocked((col, row) => {
-      // Secret wall — walk through
-      const sw = gameState.getSecretWall(col, row);
-      if (sw && !sw.opened) {
-        const result = gameState.openSecretWall(col, row, activeGrid());
-        if (result.opened) {
-          const entry = ls.wallEntityMeshes.meshMap.get(layerKey(doorKey(col, row)));
-          if (entry) {
-            if (!result.persistent) {
-              entry.wallGroup.visible = false;
+    // Convert a movement delta back to a Facing for boulder.direction.
+    function directionFromDelta(dc: number, dr: number): Facing {
+      if (dr === -1) return 'N';
+      if (dr === 1) return 'S';
+      if (dc === 1) return 'E';
+      return 'W';
+    }
+
+    // Can a boulder roll from (fromCol,fromRow) to (toCol,toRow) on the
+    // player's current layer? Mirrors the wall/door/block/boulder/edge rules
+    // used during boulder physics — used to validate a push attempt up-front.
+    function canBoulderRollTo(fromCol: number, fromRow: number, toCol: number, toRow: number): boolean {
+      const li = gameState.activeLayerIndex;
+      const grid = ls.layerGrids[li];
+      if (!grid) return false;
+      if (toRow < 0 || toRow >= grid.length || toCol < 0 || toCol >= grid[0].length) return false;
+      if (!ls.walkable.has(grid[toRow][toCol])) return false;
+      const door = gameState.getDoor(toCol, toRow);
+      if (door && !gameState.isDoorOpen(toCol, toRow)) return false;
+      if (gameState.isBlockAt(toCol, toRow)) return false;
+      if (gameState.isBoulderAt(toCol, toRow)) return false;
+      if (gameState.isEdgeBlocked(fromCol, fromRow, toCol, toRow)) return false;
+      return true;
+    }
+
+    // Secret wall / block-push / boulder-push handler. Fires for any blocked
+    // movement (forward, back, strafe). dc/dr is the actual movement delta;
+    // retry() re-runs the same movement method.
+    ls.player.setOnMoveBlocked((col, row, dc, dr, retry) => {
+      const ps = ls.player.getState();
+      const [fdc, fdr] = FACING_DELTA[ps.facing];
+      const isForward = (dc === fdc && dr === fdr);
+
+      // Secret wall — only revealable by walking face-first into it.
+      if (isForward) {
+        const sw = gameState.getSecretWall(col, row);
+        if (sw && !sw.opened) {
+          const result = gameState.openSecretWall(col, row, activeGrid());
+          if (result.opened) {
+            const entry = ls.wallEntityMeshes.meshMap.get(layerKey(doorKey(col, row)));
+            if (entry) {
+              if (!result.persistent) entry.wallGroup.visible = false;
+              entry.floorCeilGroup.visible = true;
             }
-            entry.floorCeilGroup.visible = true;
+            hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
+            retry();
+            return;
           }
-          hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
-          ls.player.moveForward();
-          return;
         }
       }
 
-      // Block push — walk into pushable block
+      // Block push — pushable block in the blocked cell.
       const block = gameState.getBlock(col, row);
       if (block) {
-        const ps = ls.player.getState();
-        const [dc, dr] = FACING_DELTA[ps.facing];
         const destCol = col + dc;
         const destRow = row + dr;
+
+        // Boulder at destination — try to push the boulder instead of the
+        // block. If the boulder can roll in (dc,dr), it starts rolling; the
+        // block stays put on this turn (matches direct boulder-push semantics
+        // — the player stays put too, like walking into a boulder).
+        if (gameState.isBoulderAt(destCol, destRow)) {
+          const destBoulder = gameState.boulders.get(doorKey(destCol, destRow));
+          if (destBoulder && destBoulder.pushable && destBoulder.state === 'idle') {
+            const beyondCol = destCol + dc;
+            const beyondRow = destRow + dr;
+            if (canBoulderRollTo(destCol, destRow, beyondCol, beyondRow)) {
+              destBoulder.direction = directionFromDelta(dc, dr);
+              destBoulder.state = 'rolling';
+            }
+          }
+          return;
+        }
+
         if (
           isWalkable(activeGrid(), destCol, destRow, ls.walkable, gameState.isDoorOpen.bind(gameState)) &&
           !gameState.isBlockedByEnemy(destCol, destRow) &&
@@ -1421,15 +1468,15 @@ async function init(): Promise<void> {
             gameState.deactivatePressurePlate(col, row);
             releasePlate(ls.plateMeshes.meshMap, layerKey(doorKey(col, row)));
           }
-          // Re-attempt the move now that the block cell is free
-          ls.player.moveForward();
+          retry();
         }
+        return;
       }
 
-      // Boulder push — walk into pushable idle boulder
+      // Boulder push — walking directly into a pushable idle boulder.
       const boulder = gameState.boulders.get(doorKey(col, row));
       if (boulder && boulder.pushable && boulder.state === 'idle') {
-        boulder.direction = ls.player.getState().facing;
+        boulder.direction = directionFromDelta(dc, dr);
         boulder.state = 'rolling';
       }
     });

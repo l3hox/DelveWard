@@ -33,7 +33,7 @@ export class Player {
   private targetPitch: number;
 
   private onMoveCallback?: (col: number, row: number) => void;
-  private onMoveBlocked?: (col: number, row: number) => void;
+  private onMoveBlocked?: (col: number, row: number, dc: number, dr: number, retry: () => void) => void;
   private onTurnCallback?: () => void;
   private onFallLandCallback?: (landingLayer: number) => void;
   private commandQueue: Array<() => void> = [];
@@ -140,7 +140,7 @@ export class Player {
     this.onMoveCallback = callback;
   }
 
-  setOnMoveBlocked(callback: (col: number, row: number) => void): void {
+  setOnMoveBlocked(callback: (col: number, row: number, dc: number, dr: number, retry: () => void) => void): void {
     this.onMoveBlocked = callback;
   }
 
@@ -185,7 +185,7 @@ export class Player {
       this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
     } else if (!this.debugNoClip) {
-      this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr);
+      this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr, dc, dr, () => this.moveForward());
     }
   }
 
@@ -198,6 +198,8 @@ export class Player {
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
+    } else if (!this.debugNoClip) {
+      this.onMoveBlocked?.(this.state.col - dc, this.state.row - dr, -dc, -dr, () => this.moveBack());
     }
   }
 
@@ -210,6 +212,8 @@ export class Player {
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
+    } else if (!this.debugNoClip) {
+      this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr, dc, dr, () => this.strafeLeft());
     }
   }
 
@@ -222,6 +226,8 @@ export class Player {
       this.targetPitch = this.pitchForCell(this.state.col, this.state.row);
       this.trackMoveStart();
       this.onMoveCallback?.(this.state.col, this.state.row);
+    } else if (!this.debugNoClip) {
+      this.onMoveBlocked?.(this.state.col + dc, this.state.row + dr, dc, dr, () => this.strafeRight());
     }
   }
 
