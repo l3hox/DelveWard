@@ -475,12 +475,15 @@ async function init(): Promise<void> {
       const pit = gameState.pitTraps.get(doorKey(col, row));
       gameState.activeLayerIndex = savedIdx;
       if (pit && pit.state === 'open') hole = true;
-      // A standing boulder directly below provides solid support — falling boulders
-      // stack on top of it rather than falling through.
+      // A standing boulder OR a block directly below provides solid support —
+      // a boulder above stacks on top rather than falling through. When that
+      // support is removed (boulder rolls away, block is pushed), the per-tick
+      // support check transitions the upper boulder to falling.
       if (hole) {
         const sIdx = gameState.activeLayerIndex;
         gameState.activeLayerIndex = li - 1;
         if (gameState.boulders.has(doorKey(col, row))) hole = false;
+        else if (gameState.isBlockAt(col, row)) hole = false;
         gameState.activeLayerIndex = sIdx;
       }
       return hole;
@@ -758,10 +761,38 @@ async function init(): Promise<void> {
       boulder.state = 'idle';
     }
 
+    // Pass 1: idle boulders whose support has been removed (pit opened, a
+    // boulder/block beneath rolled or was pushed away) → transition to
+    // falling. After landing, decideNext sets state='rolling' so the boulder
+    // resumes rolling in its stored direction on the next tick.
     for (let li = 0; li < gameState.layers.length; li++) {
       gameState.activeLayerIndex = li;
       const boulderKeys = Array.from(gameState.boulders.keys());
       for (const key of boulderKeys) {
+        // Re-pin activeLayerIndex per iteration: a previous transfer in this
+        // pass may have advanced it to a landing layer, which would make the
+        // next gameState.boulders.get(key) read the wrong layer.
+        gameState.activeLayerIndex = li;
+        const boulder = gameState.boulders.get(key);
+        if (!boulder) continue;
+        if (boulder.state !== 'idle') continue;
+        const prefKey = layerDoorKey(li, key);
+        if (ls.boulderAnimator.getMode(prefKey) !== 'rest') continue;
+        if (!isHoleAt(boulder.col, boulder.row, li)) continue;
+        const landingLi = computeLandingLayer(boulder.col, boulder.row, li);
+        const newKey = transferBoulderToLayer(boulder, key, li, boulder.col, boulder.row, landingLi);
+        boulder.state = 'falling';
+        const newPrefKey = layerDoorKey(landingLi, newKey);
+        ls.boulderAnimator.startFall(newPrefKey, landingLi * LAYER_HEIGHT);
+      }
+    }
+
+    // Pass 2: rolling/falling boulders advance on cell-transition boundaries.
+    for (let li = 0; li < gameState.layers.length; li++) {
+      gameState.activeLayerIndex = li;
+      const boulderKeys = Array.from(gameState.boulders.keys());
+      for (const key of boulderKeys) {
+        gameState.activeLayerIndex = li;
         const boulder = gameState.boulders.get(key);
         if (!boulder) continue; // moved to another layer during this tick
         if (boulder.state === 'idle') continue;
