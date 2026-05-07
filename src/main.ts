@@ -1420,26 +1420,33 @@ async function init(): Promise<void> {
               if (!result.persistent) entry.wallGroup.visible = false;
               entry.floorCeilGroup.visible = true;
             }
-            // Rebuild the layer above so its openBottom auto-detect picks up
-            // the now-mutated grid char ('#' → '.') and skips its floor at
-            // this cell — otherwise a walkable cell on layer N+1 would still
-            // render a floor across what's now an open vertical passage,
-            // visible from above.
-            const aboveLayer = gameState.activeLayerIndex + 1;
-            if (aboveLayer < ls.level.layers.length && ls.layerDungeonGroups[aboveLayer]) {
-              const oldGroup = ls.layerDungeonGroups[aboveLayer];
+            // Rebuild the neighboring dungeon layers so their open-top /
+            // open-bottom auto-detect picks up the now-mutated grid char
+            // ('#' → '.') at this column. Without these rebuilds:
+            //   - a walkable cell on layer N+1 would still render a floor
+            //     across what's now an open vertical passage (visible from
+            //     above);
+            //   - a walkable cell on layer N-1 would still render a ceiling
+            //     across the column, blocking a fall through the opened
+            //     secret wall.
+            const rebuildLayer = (layerIdx: number) => {
+              if (layerIdx < 0 || layerIdx >= ls.level.layers.length) return;
+              if (!ls.layerDungeonGroups[layerIdx]) return;
+              const oldGroup = ls.layerDungeonGroups[layerIdx];
               oldGroup.removeFromParent();
               oldGroup.traverse(child => { if (child instanceof THREE.Mesh) child.geometry?.dispose(); });
               const savedIdx = gameState.activeLayerIndex;
-              gameState.activeLayerIndex = aboveLayer;
-              const ldAbove = ls.level.layers[aboveLayer];
+              gameState.activeLayerIndex = layerIdx;
+              const ld = ls.level.layers[layerIdx];
               const { group: newGroup } = buildLayerDungeonGeometry(
-                gameState, aboveLayer, ldAbove, ls.level, ls.level.layers.length,
+                gameState, layerIdx, ld, ls.level, ls.level.layers.length,
               );
               gameState.activeLayerIndex = savedIdx;
               ls.dungeonGroup.add(newGroup);
-              ls.layerDungeonGroups[aboveLayer] = newGroup;
-            }
+              ls.layerDungeonGroups[layerIdx] = newGroup;
+            };
+            rebuildLayer(gameState.activeLayerIndex + 1);
+            rebuildLayer(gameState.activeLayerIndex - 1);
             hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
             retry();
             return;
