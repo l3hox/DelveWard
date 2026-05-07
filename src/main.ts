@@ -1420,6 +1420,26 @@ async function init(): Promise<void> {
               if (!result.persistent) entry.wallGroup.visible = false;
               entry.floorCeilGroup.visible = true;
             }
+            // Rebuild the layer above so its openBottom auto-detect picks up
+            // the now-mutated grid char ('#' → '.') and skips its floor at
+            // this cell — otherwise a walkable cell on layer N+1 would still
+            // render a floor across what's now an open vertical passage,
+            // visible from above.
+            const aboveLayer = gameState.activeLayerIndex + 1;
+            if (aboveLayer < ls.level.layers.length && ls.layerDungeonGroups[aboveLayer]) {
+              const oldGroup = ls.layerDungeonGroups[aboveLayer];
+              oldGroup.removeFromParent();
+              oldGroup.traverse(child => { if (child instanceof THREE.Mesh) child.geometry?.dispose(); });
+              const savedIdx = gameState.activeLayerIndex;
+              gameState.activeLayerIndex = aboveLayer;
+              const ldAbove = ls.level.layers[aboveLayer];
+              const { group: newGroup } = buildLayerDungeonGeometry(
+                gameState, aboveLayer, ldAbove, ls.level, ls.level.layers.length,
+              );
+              gameState.activeLayerIndex = savedIdx;
+              ls.dungeonGroup.add(newGroup);
+              ls.layerDungeonGroups[aboveLayer] = newGroup;
+            }
             hud.showMessage(result.persistent ? 'An illusionary wall!' : 'A secret passage!');
             retry();
             return;
