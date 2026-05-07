@@ -813,8 +813,13 @@ async function init(): Promise<void> {
       for (const [, bs] of gameState.boulderSpawners) {
         if (!bs.active) continue;
         bs.spawnTimer += delta;
-        if (bs.spawnTimer < bs.interval) continue;
-        bs.spawnTimer -= bs.interval;
+        if (bs.spawnTimer < bs.nextInterval) continue;
+        bs.spawnTimer -= bs.nextInterval;
+        // Regenerate the interval for the next spawn — random mode picks a
+        // fresh value in [min, max] each cycle; fixed mode just re-uses interval.
+        bs.nextInterval = bs.intervalMode === 'random'
+          ? bs.intervalMin + Math.random() * Math.max(0, bs.intervalMax - bs.intervalMin)
+          : bs.interval;
 
         const cellKey = doorKey(bs.col, bs.row);
         // Cell already has a boulder — skip this tick

@@ -401,8 +401,23 @@ function validateEntity(
       if (e.direction !== undefined && !['N', 'S', 'E', 'W'].includes(e.direction as string)) {
         return `${pfx} boulder_spawner direction must be 'N', 'S', 'E', or 'W'`;
       }
+      if (e.intervalMode !== undefined && !['fixed', 'random'].includes(e.intervalMode as string)) {
+        return `${pfx} boulder_spawner intervalMode must be 'fixed' or 'random'`;
+      }
       if (e.interval !== undefined && (typeof e.interval !== 'number' || (e.interval as number) <= 0)) {
         return `${pfx} boulder_spawner interval must be a positive number`;
+      }
+      if (e.intervalMin !== undefined && (typeof e.intervalMin !== 'number' || (e.intervalMin as number) <= 0)) {
+        return `${pfx} boulder_spawner intervalMin must be a positive number`;
+      }
+      if (e.intervalMax !== undefined && (typeof e.intervalMax !== 'number' || (e.intervalMax as number) <= 0)) {
+        return `${pfx} boulder_spawner intervalMax must be a positive number`;
+      }
+      if (
+        e.intervalMin !== undefined && e.intervalMax !== undefined &&
+        (e.intervalMax as number) < (e.intervalMin as number)
+      ) {
+        return `${pfx} boulder_spawner intervalMax must be >= intervalMin`;
       }
       if (e.rollDamage !== undefined && (typeof e.rollDamage !== 'number' || (e.rollDamage as number) < 0)) {
         return `${pfx} boulder_spawner rollDamage must be >= 0`;

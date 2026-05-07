@@ -45,7 +45,7 @@ const ENTITY_DEFAULTS: Record<string, Record<string, unknown>> = {
   pit_trap:       { state: 'closed' },
   spawner:        { enemyType: 'rat', maxActive: 3, interval: 10, spawnRadius: 2, active: true, visible: true },
   boulder:        { direction: 'N', state: 'rolling', rollDamage: 30, fallDamage: 60, instaKillEnemies: true, pushable: true },
-  boulder_spawner: { direction: 'N', interval: 5, active: true, rollDamage: 30, fallDamage: 60, instaKillEnemies: true, pushable: true },
+  boulder_spawner: { direction: 'N', intervalMode: 'fixed', interval: 5, intervalMin: 3, intervalMax: 8, active: true, rollDamage: 30, fallDamage: 60, instaKillEnemies: true, pushable: true },
   prop:           { propId: 'pillar' },
   thin_wall:      { wall: 'S', solid: true, height: 'full', texture: 'stone_thin' },
 };
@@ -153,7 +153,10 @@ export class EditorApp {
   };
   selectedBoulderSpawnerConfig = {
     direction: 'N' as import('../core/grid').Facing,
+    intervalMode: 'fixed' as 'fixed' | 'random',
     interval: 5,
+    intervalMin: 3,
+    intervalMax: 8,
     active: true,
     rollDamage: 30,
     fallDamage: 60,

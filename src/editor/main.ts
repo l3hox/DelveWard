@@ -690,7 +690,10 @@ inspector.setEntityChangedCallback(() => {
     if (e.type === 'boulder_spawner') {
       const c = app.selectedBoulderSpawnerConfig;
       if (typeof e.direction === 'string') c.direction = e.direction as import('../core/grid').Facing;
+      if (e.intervalMode === 'fixed' || e.intervalMode === 'random') c.intervalMode = e.intervalMode;
       if (typeof e.interval === 'number') c.interval = e.interval;
+      if (typeof e.intervalMin === 'number') c.intervalMin = e.intervalMin;
+      if (typeof e.intervalMax === 'number') c.intervalMax = e.intervalMax;
       if (typeof e.active === 'boolean') c.active = e.active;
       if (typeof e.rollDamage === 'number') c.rollDamage = e.rollDamage;
       if (typeof e.fallDamage === 'number') c.fallDamage = e.fallDamage;

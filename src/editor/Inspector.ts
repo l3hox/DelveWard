@@ -599,10 +599,28 @@ export class Inspector {
           entity.direction = val;
           this.onEntityChanged?.();
         });
-        this.addNumberField('interval', (entity.interval as number) ?? 5, (val) => {
-          entity.interval = Math.max(0.5, val);
+        const intervalMode = ((entity.intervalMode as string) ?? 'fixed') as 'fixed' | 'random';
+        this.addDropdownField('intervalMode', intervalMode, ['fixed', 'random'], (val) => {
+          entity.intervalMode = val;
+          // Re-render so the right interval fields appear for the chosen mode
           this.onEntityChanged?.();
-        }, { step: '0.5' });
+          this.refresh();
+        });
+        if (intervalMode === 'random') {
+          this.addNumberField('intervalMin', (entity.intervalMin as number) ?? 3, (val) => {
+            entity.intervalMin = Math.max(0.5, val);
+            this.onEntityChanged?.();
+          }, { step: '0.5' });
+          this.addNumberField('intervalMax', (entity.intervalMax as number) ?? 8, (val) => {
+            entity.intervalMax = Math.max(0.5, val);
+            this.onEntityChanged?.();
+          }, { step: '0.5' });
+        } else {
+          this.addNumberField('interval', (entity.interval as number) ?? 5, (val) => {
+            entity.interval = Math.max(0.5, val);
+            this.onEntityChanged?.();
+          }, { step: '0.5' });
+        }
         this.addDropdownField('active', String((entity.active as boolean) ?? true), ['true', 'false'], (val) => {
           entity.active = val === 'true';
           this.onEntityChanged?.();

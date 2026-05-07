@@ -286,10 +286,14 @@ export interface BoulderSpawnerInstance {
   col: number;
   row: number;
   direction: Facing;        // direction inherited by spawned boulders
-  interval: number;         // seconds between spawn attempts
+  intervalMode: 'fixed' | 'random';
+  interval: number;         // fixed-mode interval (seconds)
+  intervalMin: number;      // random-mode lower bound (seconds)
+  intervalMax: number;      // random-mode upper bound (seconds)
   active: boolean;          // signal-controllable; default true
   gateMode?: GateMode;
   spawnTimer: number;       // accumulator, persisted
+  nextInterval: number;     // current target interval (regenerated after each spawn in random mode)
 
   // Boulder template — spawned boulders inherit these
   rollDamage: number;
@@ -929,15 +933,26 @@ export class GameState {
       return true;
     }
     if (e.type === 'boulder_spawner') {
+      const intervalMode = (e.intervalMode as 'fixed' | 'random') ?? 'fixed';
+      const interval = (e.interval as number) ?? 5;
+      const intervalMin = (e.intervalMin as number) ?? 3;
+      const intervalMax = (e.intervalMax as number) ?? 8;
+      const nextInterval = intervalMode === 'random'
+        ? intervalMin + Math.random() * Math.max(0, intervalMax - intervalMin)
+        : interval;
       this.boulderSpawners.set(doorKey(e.col, e.row), {
         id: e.id as string | undefined,
         col: e.col,
         row: e.row,
         direction: (e.direction as Facing) ?? 'N',
-        interval: (e.interval as number) ?? 5,
+        intervalMode,
+        interval,
+        intervalMin,
+        intervalMax,
         active: (e.active as boolean) !== false,
         gateMode: e.gateMode as GateMode | undefined,
         spawnTimer: 0,
+        nextInterval,
         rollDamage: (e.rollDamage as number) ?? 30,
         fallDamage: (e.fallDamage as number) ?? 60,
         instaKillEnemies: (e.instaKillEnemies as boolean) !== false,
