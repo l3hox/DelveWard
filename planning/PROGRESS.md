@@ -42,6 +42,15 @@ Plan — see `planning/m4/PLAN.md`. ADRs — see `planning/m4/ADR.md`.
 - [ ] Phase H: Sub-grid positioning + item billboards (nice-to-have)
 - [ ] Phase I: Content — "The Cliffside Keep"
 
+### M4.5 Implementation (Upcoming — Architecture Cleanup, v0.4.5)
+- [x] A1: Refresh `planning/ARCHITECTURE.md`
+- [ ] A2: Invert `core/ → enemies/, npcs/` imports so `core/` compiles standalone
+- [ ] A3: Extract per-frame systems from `main.ts` into `src/game/` (boulder, spawner, projectile, status, transition, input, gameLoop)
+- [ ] A4: Split `core/gameState.ts` by domain behind a facade (inventoryState, combatState, statusEffectState, worldEntityState)
+- [ ] A5: Consolidate save-state sources (`signalManager` + `questManager` flow through a single getSaveData/applySaveData seam)
+- [ ] A6: (Stretch) Entity-kind registry — one module per kind exposing parse/snapshot/restore/tick/buildMesh
+- [ ] A7: Pull controller logic into `core/` for testability (torch drain, hunger drain, transition state machine, HUD hit-tests)
+
 ### M3 Implementation
 - [x] Phase A: NPC foundation (NpcDatabase, NPC entity, billboard rendering, flags, interaction, save/load)
 - [x] Phase B: Dialog system (DialogManager, DialogOverlay, per-NPC dialog trees, conditions, effects)

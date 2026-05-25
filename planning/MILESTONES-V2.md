@@ -120,6 +120,45 @@ The visual leap. Multiple levels visible at once. Outdoor sections. Decorative 3
 
 ---
 
+## Milestone 4.5: Architecture Cleanup
+
+**Theme:** "Pay down the engine debt before magic lands on top of it."
+
+Not a playable milestone. A focused refactor pass between the visual-leap milestone (M4) and the systems-heavy magic milestone (M5). The goal is to make M5 (and every milestone after) cheaper to land by carving up the two god modules — `main.ts` and `core/gameState.ts` — before they grow another subsystem on top.
+
+### Why now
+
+By the end of M4, `main.ts` is ~2,400 lines and `core/gameState.ts` is ~2,700 lines. M5 introduces mana, spell schools, casting mechanics, ranged combat, and spell-world interactions — each of which currently lands as another block in `main.ts` and another set of Maps + methods in `gameState`. Refactoring after M5 means refactoring across a bigger surface; doing it now keeps the cost contained.
+
+### Deliverables
+
+| # | Work | Outcome |
+|---|---|---|
+| A1 | Refresh `planning/ARCHITECTURE.md` to match the codebase | Onboarding doc stops misleading readers |
+| A2 | Invert `core/ → enemies/, npcs/` imports | `core/` compiles standalone again |
+| A3 | Extract per-frame systems from `main.ts` into `src/game/` | One module per system: `boulderSystem`, `spawnerSystem`, `projectileSystem`, `statusEffectSystem`, `transitionSystem`, `inputSystem`, plus a thin `gameLoop` that calls them in order |
+| A4 | Split `core/gameState.ts` by domain | At minimum: `inventoryState`, `combatState`, `statusEffectState`, `worldEntityState` behind a `GameState` facade. Existing call sites unaffected. |
+| A5 | Consolidate save-state sources | `signalManager` and `questManager` state flow through a single `getSaveData()` / `applySaveData()` seam, not three parallel ones |
+| A6 | (Stretch) Entity-kind registry | One module per entity kind exposing `parse / snapshot / restore / tick / buildMesh`. `gameState`, `levelLoader`, `interaction`, and `main.ts` discover behavior by lookup instead of switch statements. Worth doing if A3/A4 expose the fan-out clearly. |
+| A7 | Pull controller logic into `core/` for testability | Torch drain, hunger drain, transition state machine, HUD hit-tests become unit-testable without DOM/Three.js |
+
+### Acceptance criteria
+
+- `main.ts` under ~800 lines, and each extracted system has a focused unit test.
+- `core/gameState.ts` under ~1,000 lines per file after the split, with the facade preserving the current external API.
+- `npx vitest run` green throughout — no behavior change is the contract.
+- `ARCHITECTURE.md` matches reality on disk; the "Architectural Debt" section either shrinks or is rewritten to reflect what's left.
+
+### Non-goals
+
+- No new game features.
+- No editor changes beyond what the refactor mechanically requires.
+- No file moves driven purely by aesthetics — only moves that change a dependency edge or shrink a god module count.
+
+**Ships as:** v0.4.5.
+
+---
+
 ## Milestone 5: The Arcane Arts
 
 **Theme:** "I froze the water, walked across, and fireballed the archers."
@@ -245,6 +284,7 @@ No milestone should take more than a few weeks of sessions. If one feels endless
 | 2 | The Dangerous Dungeon | Traps, signals, secrets, puzzles, save/load |
 | 3 | The Living World | NPCs, dialog, trading, quests |
 | 4 | The Vertical World | Multi-level rendering, outdoor, decorative meshes |
+| 4.5 | Architecture Cleanup | Carve up `main.ts` and `gameState.ts` before M5 |
 | 5 | The Arcane Arts | Magic, ranged combat, spell-world interaction |
 | 6 | The Toolmaker | Level editor (COMPLETE — pulled forward) |
 | 7 | Scripting & Advanced | Script system, boss encounters, advanced AI |

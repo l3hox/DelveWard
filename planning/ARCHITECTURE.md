@@ -1,6 +1,6 @@
 # DelveWard — Architecture Guide
 
-Quick reference for navigating and understanding the codebase. Read this before diving into implementation.
+Quick reference for navigating the codebase. Read this before diving into implementation. Pair with `DUNGEON-DESIGNER.md` when working on level JSON.
 
 ---
 
@@ -8,259 +8,202 @@ Quick reference for navigating and understanding the codebase. Read this before 
 
 ```
 src/
-├── main.ts                  # Entry point — scene, renderer, input, game loop
-├── core/                    # Pure game logic (no Three.js dependency)
-│   ├── types.ts             # Shared types: DungeonLevel, Entity, TextureSet, CharDef
-│   ├── grid.ts              # Facing, PlayerState, walkability, direction tables
-│   ├── gameState.ts         # Runtime state: doors, keys, levers, plates, inventory
-│   ├── interaction.ts       # Player interaction logic (Space key → doors, levers)
-│   ├── levelLoader.ts       # Fetch + validate level JSON files
-│   ├── textureNames.ts      # Texture name constants and type-safe sets
-│   └── *.test.ts            # Co-located tests (vitest)
-├── hud/                     # 2D canvas HUD overlay (no Three.js)
-│   ├── hudCanvas.ts         # HudOverlay class — canvas setup, resize, orchestrates draw
-│   ├── hudLayout.ts         # Layout constants (positions, sizes, 640x360 internal res)
-│   ├── hudColors.ts         # Shared pixel-art color palette
-│   ├── hudFont.ts           # Minimal 3x5 pixel font (digits, letters, symbols)
-│   ├── compassRose.ts       # Facing indicator (top-left)
-│   ├── minimapRenderer.ts   # Explored-cell minimap (top-right)
-│   ├── healthBar.ts         # HP bar with heart icon (bottom-left)
-│   ├── torchIndicator.ts    # Torch fuel bar with flame icon (bottom-center-left)
-│   └── inventoryPanel.ts    # Key count + equipment/backpack slots (bottom-right)
-├── rendering/               # Three.js rendering and visual representation
-│   ├── dungeon.ts           # Builds wall/floor/ceiling geometry from grid
-│   ├── textures.ts          # Procedural pixelart texture generators + cache
-│   ├── player.ts            # Player class — camera tween, world position
-│   ├── doorRenderer.ts      # Door frames + panels, orientation detection
-│   ├── doorAnimator.ts      # Sliding door panel animation
-│   ├── keyRenderer.ts       # Gold key billboard sprites
-│   ├── leverRenderer.ts     # Wall levers + LeverAnimator
-│   ├── plateRenderer.ts     # Pressure plate meshes + press state
-│   ├── particles.ts         # Particle effects: DustMotes, SconceEmbers, WaterDrips
-│   └── transitionOverlay.ts # Fade-to-black overlay for level transitions
+├── main.ts                  # Entry point — boots scene/renderer, owns game loop, wires input, orchestrates transitions
+├── core/                    # Game logic — no Three.js imports
+├── level/                   # Level loading, validation, and player interaction with the level
+├── enemies/                 # Enemy types, database, AI, pathfinding
+├── npcs/                    # NPC database
+├── game/                    # Game-systems glue that needs both core state and rendering hooks
+├── rendering/               # Three.js: meshes, materials, animators, particles
+├── hud/                     # 2D canvas HUD + DOM overlays — no Three.js
+└── editor/                  # Standalone level editor (entry: editor.html)
+
 public/
-└── levels/                  # Level JSON files (level1–7.json) + dungeon1.json (multi-level)
+├── levels/                  # Dungeon JSON files
+├── data/                    # enemies.json, items.json, npcs.json, dialogs/, quests/
+└── sprites/                 # PNG sprites (enemies, NPCs, items, props)
 ```
 
 ---
 
-## Core Module (`src/core/`)
+## Layering Intent
 
-Zero Three.js imports. Safe for unit testing and pure logic.
+```
+hud           main.ts
+   \         /  |  \
+    \       /   |   \
+     rendering  |    editor
+        |      / \
+       game   /   \
+          \  /    level
+         core ───── enemies, npcs
+```
 
-### types.ts
-- `DungeonLevel` — single level structure (grid, entities, playerStart, textures, optional `id`)
-- `Dungeon` — multi-level container: `{ name, levels: DungeonLevel[] }`
-- `Entity` — generic entity with col/row/type + arbitrary props
-- `TextureSet`, `CharDef`, `TextureArea` — texture configuration types
+The intended dependency direction is downward: `main.ts` may import from anywhere, `rendering/`/`game/`/`level/` may import from `core/`, and `core/` should depend only on itself.
 
-### grid.ts
-- `Facing` — `'N' | 'E' | 'S' | 'W'`
-- `FACING_DELTA`, `FACING_ANGLE`, `TURN_LEFT`, `TURN_RIGHT` — direction lookup tables
-- `WALKABLE_CELLS` — default walkable characters: `.`, `D`, `S`, `U`, `O`
-- `buildWalkableSet(charDefs?)` — extends walkable set with custom charDef chars
-- `isWalkable(grid, col, row, walkable?, isDoorOpen?)` — bounds + cell check
-- `PlayerState` — grid position + facing, movement methods (forward/back/strafe/turn)
-- `getFacingCell(state)` — returns col/row of the cell the player faces
-
-### gameState.ts
-- `GameState` — constructed from `Entity[]` + optional grid
-  - `doors: Map<string, DoorInstance>` — keyed by `"col,row"`
-  - `keys: Map<string, KeyInstance>` — keyed by `"col,row"`
-  - `levers: Map<string, LeverInstance>` — keyed by `"col,row"`, has `wall: Facing`
-  - `plates: Map<string, PlateInstance>` — keyed by `"col,row"`, one-time use
-  - `inventory: Set<string>` — collected key IDs
-  - `hp` / `maxHp` — health (default 20/20)
-  - `torchFuel` / `maxTorchFuel` — torch fuel (default 100/100)
-  - `exploredCells: Set<string>` — explored minimap cells, `"col,row"` keys
-- Auto-creates doors for `D` cells with no entity
-- Marks doors as `mechanical` when targeted by levers/plates
-- `LevelSnapshot` — snapshot of level-specific state (doors, keys, levers, plates, exploredCells)
-- `saveLevelState()` / `loadLevelState(snapshot)` — deep-copy save/restore for level transitions
-- `loadNewLevel(entities, grid)` — resets level maps, re-parses entities, preserves hp/torchFuel/inventory
-- `drainTorchFuel(amount)` — reduces torchFuel, clamps at 0
-- Key methods: `isDoorOpen()`, `openDoor()`, `closeDoor()`, `toggleDoor()`, `activateLever()`, `activatePressurePlate()`, `pickupKeyAt()`, `revealAround()`
-
-### interaction.ts
-- `interact(playerState, grid, gameState)` → `InteractionResult`
-- Handles: door open/close/unlock, lever pull (player on cell, facing wall)
-- Returns type + message + optional targetDoor for mesh updates
-
-### levelLoader.ts
-- `loadLevel(url)` — fetch + validate → `DungeonLevel` (single-level backward compat)
-- `loadDungeon(url)` — fetch + validate → `Dungeon` (multi-level)
-- `validateLevel(data, source)` — comprehensive validation: grid, charDefs, entities, textures, bounds
-- `validateDungeon(data, source)` — validates dungeon wrapper, unique level ids, cross-level stair references
-- Entity-specific validation: doors on `D` cells, key keyIds, lever targetDoor format, plate on walkable, stairs direction/targetLevel/targetCol/targetRow
-
-### textureNames.ts
-- Constant arrays + Sets for wall/floor/ceiling texture names
-- Type aliases: `WallTextureName`, `FloorTextureName`, `CeilingTextureName`
+This is mostly upheld. The exception worth knowing about: `core/gameState.ts` and `core/assetCheck.ts` currently import from `../enemies/` and `../npcs/` for type definitions and registries. `core/` no longer compiles in isolation as a result. See "Architectural Debt" below — this is one of the items M4.5 addresses.
 
 ---
 
-## Rendering Module (`src/rendering/`)
+## Module Reference
 
-All files depend on Three.js. Import core types via `../core/`.
+### `core/` — Game logic (no Three.js)
 
-### dungeon.ts
-- `CELL_SIZE = 2`, `WALL_HEIGHT = 2.5`, `EYE_HEIGHT = 1.0` — grid constants (used everywhere)
-- `buildDungeon(grid, defaults?, areas?, charDefs?)` → `THREE.Group`
-- 4-layer texture resolution: hard-coded → defaults → charDefs → areas
-- Generates walls only where walkable cell borders solid cell
+| File | Role |
+|---|---|
+| `types.ts` | Shared types: `DungeonLevel`, `LayerDef`, `Entity`, `TextureSet`, `CharDef`, `TextureArea` |
+| `grid.ts` | `Facing`, `PlayerState`, direction tables, walkability, layer/cell helpers |
+| `gameState.ts` | Runtime state for the active dungeon — every entity Map (doors, keys, levers, plates, triggers, tripwires, gates, stairs, launchers, sconces, breakables, secrets, blocks, chests, signs, npcs, fountains, bookshelves, altars, barrels, thin walls, ramps, pit traps, spawners, …), inventory, hp, torch, hunger, xp, status effects, save/load snapshotting. Layer-aware via `LayerState[]`. **God class — see Architectural Debt.** |
+| `signalManager.ts` | Signal propagation, gate evaluation, absolute-time scheduling, cycle detection |
+| `questManager.ts` | Quest state machine (undiscovered → active → complete), reward application, dialog condition evaluator hook |
+| `dialogManager.ts` | Dialog tree traversal, choice resolution, condition + effect evaluators |
+| `combat.ts` | Damage calculation, hit resolution, kill helper, breakable/barrel/chest hit handling |
+| `projectileManager.ts` | Projectile tick, collision, layer-scoped updates |
+| `statusEffects.ts` | Poison/slow/burning tick + array-based effect storage |
+| `entities.ts` | Entity-id helpers, ID generation |
+| `itemDatabase.ts` | Item registry loaded from `public/data/items.json` |
+| `lootTable.ts` | Loot roll logic shared by enemies, chests, breakables |
+| `saveSystem.ts` | `SaveData` model, slot management, JSON export/import, threading quest/signal state |
+| `random.ts` | `mulberry32` PRNG |
+| `textureNames.ts` | Texture name constants + type-safe sets |
+| `textureResolver.ts` | 4-layer texture resolution (hard-coded → defaults → charDefs → areas) |
+| `assetCheck.ts` | Startup asset existence checks |
 
-### textures.ts
-- Procedural 64x64 canvas texture generators for all surface types
-- Wall: stone, brick, mossy, wood | Floor: stone_tile, dirt, cobblestone | Ceiling: dark_rock, wooden_beams
-- Door textures: normal, locked (iron-banded), door frame (stone)
-- All cached — `getWallTexture(name)`, `getFloorTexture(name)`, `getCeilingTexture(name)`
-- `getDoorTexture()`, `getLockedDoorTexture()`, `getDoorFrameTexture()`
+### `level/` — Level loading and player interaction
 
-### player.ts
-- `Player` — wraps `PlayerState` with Three.js camera
-- Tween-based smooth movement (lerp position + angle)
-- `TWEEN_SPEED = 20` — controls animation speed
-- Blocks input during animation (`isAnimating()`)
-- `setOnMove(callback)` — fires after grid position changes (key pickup, plates, exploration)
-- `setOnTurn(callback)` — fires after facing changes (exploration)
-- `getState()` → `PlayerState`, `getWorldPosition()` → `THREE.Vector3`
+| File | Role |
+|---|---|
+| `levelLoader.ts` | `loadLevel` / `loadDungeon`, full validation, cross-level stair reference checks |
+| `interaction.ts` | `interact(playerState, gameState)` → `InteractionResult`. Handles door, lever, chest, sign, fountain, bookshelf, altar, NPC dialog open, trade open. |
 
-### doorRenderer.ts
-- `buildDoorMeshes(grid, gameState, walkable)` → `{ group, panelMap }`
-- Auto-detects door orientation from surrounding walls (NS vs EW)
-- Builds 3D stone frame (pillars + lintel) + door panel
-- Interactive doors get brass buttons on frame; mechanical doors don't
-- `updateDoorMesh(panelMap, col, row, isOpen, animator?)` — triggers animation or toggles visibility
+### `enemies/` — Enemy types, database, AI
 
-### doorAnimator.ts
-- `DoorAnimator` — slides door panels up (open) / down (close)
-- `register(key, panel, isOpen)` / `setOpen(key, isOpen)` / `update(delta)`
+| File | Role |
+|---|---|
+| `enemyTypes.ts` | `EnemyInstance` and per-enemy runtime fields |
+| `enemyDatabase.ts` | Data-driven enemy registry loaded from `public/data/enemies.json` |
+| `enemyAI.ts` | Per-tick decisions: chase, regen, flee, erratic, attack |
+| `pathfinding.ts` | BFS over walkable cells, hole-aware (flying enemies exempt) |
 
-### leverRenderer.ts
-- `buildLeverMeshes(gameState)` → `{ group, handleMap }`
-- Metal base plate + handle rod + knob, positioned against wall based on `lever.wall`
-- `LeverAnimator` — rotates handle pivot up/down around X axis
-- `ANGLE_UP = -1.047` (~60° up), `ANGLE_DOWN = 1.047` (~60° down)
+### `npcs/` — NPC database
 
-### keyRenderer.ts
-- `buildKeyMeshes(gameState)` → `{ group, meshMap }`
-- Gold key billboard sprite flat on floor
-- `hideKeyMesh(meshMap, col, row)` — hides on pickup
+| File | Role |
+|---|---|
+| `npcDatabase.ts` | NPC registry loaded from `public/data/npcs.json` (name, sprite, dialog file, merchant stock) |
 
-### plateRenderer.ts
-- `buildPlateMeshes(gameState)` → `{ group, meshMap }`
-- Box geometry with beveled texture, sinks + darkens on press
-- `pressPlate(meshMap, col, row)` — visual press state
+### `game/` — Systems glue
 
----
+Underused today. Holds `levelSceneBuilder.ts` (assembles every per-level Three.js group from `GameState` + level data) and `lootSpawner.ts` (loot roll wrapper called by combat/chest/breakable kill sites). The natural home for systems extracted from `main.ts` in M4.5.
 
-## HUD Module (`src/hud/`)
+### `rendering/` — Three.js meshes, animators, particles
 
-Separate 2D canvas overlay on top of the Three.js canvas. Fixed 640x360 internal resolution scaled with `image-rendering: pixelated`. No Three.js — pure 2D canvas rendering.
+All files import Three.js. Two organizing patterns hold across the directory:
 
-### hudCanvas.ts
-- `HudOverlay` — creates a fixed-position canvas, orchestrates all HUD component drawing
-- `attach(parent?)` — appends canvas to DOM
-- `draw(gameState, playerState, grid, delta)` — clears and redraws all components each frame
+- **Builder pattern**: `buildXxxMeshes(gameState, …)` returns `{ group: THREE.Group, meshMap: Map<key, Mesh> }`. Used by door, key, lever, plate, chest, barrel, fountain, bookshelf, altar, sign, NPC, enemy, item, prop, breakable/secret wall, thin wall, ramp, stair, spawner, pit trap, trap launcher, tripwire, sconce, block.
+- **Animator pattern**: `register(key, mesh, state)` / `setState(key, state)` / `update(delta)`. Used by door, lever, enemy, boulder.
 
-### hudLayout.ts
-- Internal resolution: `HUD_WIDTH = 640`, `HUD_HEIGHT = 360`
-- Component positions: `COMPASS` (top-left 48x48), `MINIMAP` (top-right 128x128), `HEALTH_BAR` (bottom-left 160x24), `TORCH_BAR` (bottom-center-left 120x24), `INVENTORY` (bottom-right 144x120)
+Notable files: `dungeon.ts` (wall/floor/ceiling geometry + `CELL_SIZE` / `WALL_HEIGHT` / `LAYER_HEIGHT` / `EYE_HEIGHT` constants), `textures.ts` (procedural pixelart texture generators + cache), `sceneUtils.ts` (shared layer-build helpers used by both game and editor preview), `player.ts` (camera tween + falling), `environment.ts` (fog/ambient blending), `skybox.ts` (procedural skybox textures), `forestRenderer.ts` (instanced tree billboards), `particles.ts` (dust, embers, water drips, fireflies, explosions), `billboardMaterial.ts` (shared billboard shader), `enemyHealthBar.ts` + `damageNumbers.ts` (combat overlays).
 
-### hudFont.ts
-- 3x5 pixel bitmap font rendered via `fillRect` calls
-- `drawPixelText(ctx, text, x, y, color, scale)` / `measurePixelText(text, scale)`
-- Supports: 0-9, N/E/S/W, H/P/T/K/A/R, x, /
+### `hud/` — 2D canvas HUD + DOM overlays (no Three.js)
 
-### Component files
-- `compassRose.ts` — N/E/S/W letters, active direction highlighted gold
-- `minimapRenderer.ts` — top-down grid centered on player, explored cells only, player dot + facing line
-- `healthBar.ts` — horizontal bar with heart icon, low-HP pulse effect
-- `torchIndicator.ts` — horizontal bar with flame icon, low-fuel flicker effect
-- `inventoryPanel.ts` — key count with icon, 3 equipment slots (W/A/R), 8 backpack slots (empty placeholders)
+Fixed 640×360 internal resolution scaled with `image-rendering: pixelated`.
+
+Two flavors:
+
+- **Canvas overlay**: `hudCanvas.ts` (`HudOverlay` — orchestrates draw), `hudLayout.ts`, `hudColors.ts`, `hudFont.ts` (3×5 pixel bitmap). Components: compass rose, minimap, health bar, torch indicator, hunger bar, xp bar, inventory mini-panel, status effect icons, paperdoll icons.
+- **DOM overlays** (z-layered above the canvas): inventory overlay, save/load overlay, sign overlay, dialog overlay, quest log overlay, trading overlay, character creation, attribute panel, stats panel, item tooltip, level-up notification.
+
+### `editor/` — Standalone level editor
+
+Separate Vite entry (`editor.html`). Multi-mode (level edit ⇄ dialog graph). Uses `sceneUtils.ts` and the rendering builders for its live 3D preview. Files: `EditorApp.ts`, `EditorPreview.ts`, `FreeFlyCamera.ts`, `GridCanvas.ts`, `Inspector.ts`, `LayerList.ts`, `LevelList.ts`, `LevelProperties.ts`, `Toolbar.ts`, `UndoManager.ts`, `io.ts`, `treeOverlay.ts`, plus the dialog editor subsystem: `DialogEditorState.ts`, `DialogGraphCanvas.ts`, `DialogInspector.ts`, `DialogNodeLayout.ts`, `dialogIO.ts`. Also `QuestEditorPanel.ts`.
+
+### `main.ts` — Entry point
+
+Boots scene/camera/renderer/lighting, loads dungeon, builds the first level via `levelSceneBuilder`, constructs `GameState`, attaches HUD + transition overlays, wires input, owns the animation loop, drives all per-frame ticks (enemy AI, projectiles, signal propagation, status effects, hunger drain, torch drain, temp buffs, environment lerp, particle updates, animator updates, falling), handles level transitions and save/load. **Currently a god orchestrator — see Architectural Debt.**
 
 ---
 
-### transitionOverlay.ts
-- `TransitionOverlay` — full-screen black `<div>` overlay (z-index 20, above HUD at 10)
-- `startTransition(onMidpoint?, onComplete?)` — fade to black → call onMidpoint → fade back in → call onComplete
-- `update(delta)` — drives opacity tween from game loop
-- `isActive` getter — blocks input during transitions
+## Game Loop (per frame, in `main.ts`)
 
----
-
-## main.ts — Entry Point
-
-Orchestrates everything with multi-level dungeon support:
-1. Creates scene, camera, renderer, lighting (ambient + torch with fuel-scaled flicker)
-2. Loads dungeon JSON → builds first level scene
-3. Constructs `GameState` from first level entities
-4. Creates `HudOverlay` + `TransitionOverlay`
-5. `LevelScene` interface groups level-specific objects (dungeon geometry, entity meshes, animators, player)
-6. `buildLevelScene()` / `teardownLevelScene()` — construct/destroy level-specific Three.js objects
-7. Wires input (WASD/arrows/QE for movement, Space for interact), blocked during transitions
-8. `wireCallbacks()` — sets up onMove (key pickup, plates, torch drain, stair detection) + onTurn (exploration)
-9. `triggerLevelTransition()` — saves level snapshot, fades to black, swaps level scene, restores/parses new level
-10. Torch fuel drains 1 per step; light distance (3–8) and flicker intensity scale with fuel ratio
-11. Runs animation loop: player tween, door/lever animation, transition overlay, torch flicker, HUD draw, render
+```
+player.update(delta)               # camera tween + falling
+enemies.tick(delta) on every layer # AI, attack, regen
+projectiles.tick(delta)            # layer-scoped
+signalManager.tick(now)            # gates, delays, repeats
+statusEffects.tick(delta)          # poison/slow/burning
+torch + hunger accumulators        # drain rates per second
+tempBuffs.tick(delta)              # altar buffs expire
+environment.lerp(delta)            # fog/ambient between zones
+animators.update(delta)            # doors, levers, enemies, boulders
+particles.update(delta)            # dust, embers, drips, fireflies
+transition.update(delta)
+hud.draw(gameState, playerState, grid, delta)
+renderer.render(scene, camera)     # multi-pass for environment zones
+```
 
 ---
 
 ## Data Flow
 
 ```
-Dungeon JSON → loadDungeon() → Dungeon { levels[] }
-                                  └→ per level: buildLevelScene()
-                                       ├→ buildDungeon(grid) → THREE.Group
-                                       ├→ buildDoorMeshes() → door visuals
-                                       ├→ buildKeyMeshes() → key sprites
-                                       ├→ buildLeverMeshes() → lever visuals
-                                       ├→ buildPlateMeshes() → plate visuals
-                                       └→ Player(camera, grid, start)
+Dungeon JSON → loadDungeon() → Dungeon { name, levels[] }
+                                   └→ per level: buildLevelScene()
+                                        ├→ buildDungeon(grid) per layer
+                                        ├→ buildLayerEntityMeshes() per layer (every renderer)
+                                        └→ Player(camera, grid, start)
 
 GameState (persists across levels)
-  ├→ saveLevelState() → LevelSnapshot (stored in levelSnapshots Map)
-  ├→ loadLevelState(snapshot) ← on revisiting a level
-  └→ loadNewLevel(entities, grid) ← on first visit to a level
+  ├→ saveLevelState() → LevelSnapshot (Map in levelSnapshots)
+  ├→ loadLevelState(snapshot) ← revisit
+  └→ loadNewLevel(layerDefs, levelId) ← first visit
 
-Input → Player movement / interact()
-         ├→ GameState mutation (door/lever/key state)
-         ├→ Mesh updates (animator.setOpen, hideKey, pressPlate)
-         └→ Stair detection → triggerLevelTransition()
+Input → PlayerState mutation → interact() / movement
+   ├→ GameState mutation (door/lever/chest/etc.)
+   ├→ mesh updates via animators or visibility toggles
+   └→ stair / pit-trap / fall → triggerLevelTransition()
 
-Level Transition → save snapshot → fade to black → teardown old scene
-                 → load/restore level state → build new scene → fade in
+Level Transition: save snapshot → fade to black → teardown → load → build → fade in
 
-Game Loop → player.update(delta)
-          → doorAnimator.update(delta)
-          → leverAnimator.update(delta)
-          → transition.update(delta)
-          → torch flicker (fuel-scaled)
-          → hud.draw(gameState, playerState, grid, delta)
-          → renderer.render()
+Save/Load: SaveData carries player state + per-level snapshots + quest state + signal state
 ```
 
 ---
 
 ## Key Patterns
 
-- **Map keying**: All entity maps use `"col,row"` string keys
-- **Mesh builder pattern**: `buildXxxMeshes(gameState)` → `{ group, meshMap/panelMap/handleMap }`
-- **Animator pattern**: `register()` → `setState/setOpen()` → `update(delta)` per frame
-- **Texture caching**: Generate once, cache by name, return cached on subsequent calls
-- **Grid constants**: `CELL_SIZE`, `WALL_HEIGHT`, `EYE_HEIGHT` exported from `dungeon.ts`
-- **Tests**: Co-located in `src/core/`, run with `npx vitest run`
+- **Map keying**: cell-keyed Maps use `"col,row"`. Multi-layer keys prefix the layer index: `"layerIndex:col,row"`. Use `layerKey()` from `core/gameState.ts`.
+- **Builder + animator** in `rendering/` (see above).
+- **Absolute-time scheduling**: `SignalManager.now` is the monotonic clock for all timed gates, launchers, levers. No countdowns; only `firedAt + duration` style timestamps. See ADR-M2-05.
+- **Layer-aware everything**: `LayerState[]` inside `GameState`, per-layer ticks for enemies and trap launchers, layer-aware mesh keys, layer-aware item scoping.
+- **Texture resolution**: hard-coded → defaults → charDefs → areas. Last match wins for areas.
+- **Co-located tests**: `*.test.ts` next to source. Run with `npm test`.
+
+---
+
+## Architectural Debt
+
+These are known issues. M4.5 (Architecture Cleanup) is the planned remediation — see `MILESTONES-V2.md`.
+
+1. **`main.ts` is a 2,300+-line god orchestrator.** Owns the loop, input, every per-frame tick, save/load wiring, transition state machine, combat resolution, quest wiring, torch/hunger drain, inventory action handling. New milestones land as another 200-line block here.
+
+2. **`core/gameState.ts` is a 2,700+-line god class.** Holds ~20+ entity Maps and every per-entity-type method. Every new entity type touches it. Adding NPC schedules, faction state, or time-of-day will multiply the surface area.
+
+3. **`core/` is not pure.** `gameState.ts` and `assetCheck.ts` import from `../enemies/` and `../npcs/`. `core` is a peer of these directories, not a foundation.
+
+4. **State source-of-truth is split**. `gameState`, `signalManager` (instance inside gameState but ticked from `main.ts`), and `questManager` (module-level singleton in `core/`) each own a slice of save state. Save/load has to know about all three.
+
+5. **Entity dispatch is fan-out**. A new entity type touches `gameState` (Map + parse + snapshot + load), a renderer in `rendering/`, an interaction branch in `level/interaction.ts`, validation in `level/levelLoader.ts`, and a per-frame block in `main.ts`. There's no compiler help if you forget one.
+
+6. **Test coverage is uneven**. `core/`, `level/`, and `enemies/` are well-tested. `rendering/`, `hud/`, `editor/`, `main.ts`, and `game/levelSceneBuilder.ts` are largely uncovered. The fix is architectural (pull controller logic into `core/`), not "write more renderer tests."
 
 ---
 
 ## Dungeon JSON Format
 
-Multi-level dungeon: `{ name, levels: DungeonLevel[] }`. Each level has a unique `id`.
+Multi-level dungeon: `{ name, levels: DungeonLevel[] }`. Each level has a unique `id` and one or more layers (`layers: LayerDef[]`, layer ids are numeric coordinates: `"0"`, `"1"`, `"-1"`, …).
 
-Single level: see `DUNGEON-DESIGNER.md` for full schema. Key points:
-- `grid: string[]` — each string is a row, each char is a cell
-- Cell chars: `#` wall, `.` floor, `D` door, `S` stairs down, `U` stairs up, `O` object, ` ` void
-- `entities: Entity[]` — typed objects with col/row/type + type-specific props
-- Stairs entity: `{ type: "stairs", direction: "up"|"down", targetLevel, targetCol, targetRow }`
-- `charDefs` — custom single-char cell types with solid flag + textures
-- `defaults` / `areas` — texture overrides at level or region scope
+See `DUNGEON-DESIGNER.md` for the full schema. Key points:
+- `grid: string[]` per layer — each string is a row, each char a cell. `#` solid, `.` floor, ` ` void.
+- `entities: Entity[]` per layer — typed objects with `col`, `row`, `type`, `id`, plus type-specific props.
+- `charDefs` — custom single-char cell types with solid flag, textures, optional `seeThrough` and `openTop`/`openBottom` for hollow areas.
+- `defaults` / `areas` — texture and environment overrides at level or region scope.
