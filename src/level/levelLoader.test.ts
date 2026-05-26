@@ -789,7 +789,7 @@ describe('validateDungeon', () => {
         validDungeonLevel('level2'),
       ],
     }), 'test')).not.toThrow();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('target "nonexistent_stair" does not match any stair entity on another level'));
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('target "nonexistent_stair" does not match any stair entity in the dungeon'));
     spy.mockRestore();
   });
 
@@ -810,6 +810,24 @@ describe('validateDungeon', () => {
       ],
     }), 'test')).not.toThrow();
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('target "some_door" is not a stairs entity'));
+    spy.mockRestore();
+  });
+
+  it('accepts a stair pair on the same level (no warning)', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const grid = ['#####', '#...#', '#...#', '#...#', '#####'];
+    const entities = [
+      { col: 2, row: 1, type: 'stairs', direction: 'down', facing: 'S', target: 'stair_b', id: 'stair_a' },
+      { col: 2, row: 3, type: 'stairs', direction: 'up', facing: 'N', target: 'stair_a', id: 'stair_b' },
+    ];
+    expect(() => validateDungeon({
+      name: 'Test Dungeon',
+      playerStart: { levelId: 'level1', col: 1, row: 1, facing: 'S' },
+      levels: [
+        { id: 'level1', name: 'Level level1', grid, entities, layers: [{ id: '0', grid, entities }] },
+      ],
+    }, 'test')).not.toThrow();
+    expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 

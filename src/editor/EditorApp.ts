@@ -723,12 +723,11 @@ export class EditorApp {
         const targetId = e.target as string;
         if (!targetId) continue;
 
-        // Find target stair on another level (search all layers)
+        // Resolve target stair anywhere in the dungeon (same level or different, any layer)
         let targetStair: Entity | undefined;
         let targetLevel: DungeonLevel | undefined;
         let targetLayerIdx = 0;
         for (const otherLevel of this.dungeon.levels) {
-          if (otherLevel === level) continue;
           const otherEntities = getAllLevelEntities(otherLevel);
           targetStair = otherEntities.find(oe => oe.id === targetId);
           if (targetStair) {

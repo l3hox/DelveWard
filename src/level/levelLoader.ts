@@ -913,9 +913,9 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
     };
   }
 
-  // Cross-level validation: stairs must reference valid stair entities on other levels
-  // and the spawn cell (one step in facing direction from target) must be walkable.
-  // Searches all layers' entities for layered levels.
+  // Stair validation: target must resolve to a stairs entity anywhere in the dungeon
+  // (same level or different), and the spawn cell (one step in facing direction from
+  // target) must be walkable. Searches all layers' entities for layered levels.
   for (let i = 0; i < levels.length; i++) {
     const level = levels[i];
     const allEntities = getAllLevelEntities(level);
@@ -924,12 +924,10 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
       if (e.type === 'stairs') {
         const targetId = e.target as string;
 
-        // Find the target stair entity across all OTHER levels (search all layers)
         let targetStair: Entity | undefined;
         let targetLevel: DungeonLevel | undefined;
         let targetLayerIndex = 0;
         for (const otherLevel of levels) {
-          if (otherLevel === level) continue; // target must be on a different level
           targetStair = getAllLevelEntities(otherLevel).find(oe => oe.id === targetId);
           if (targetStair) {
             targetLevel = otherLevel;
@@ -939,7 +937,7 @@ export function validateDungeon(data: unknown, source: string): Dungeon {
         }
 
         if (!targetStair || !targetLevel) {
-          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" does not match any stair entity on another level — stair will not function`);
+          console.warn(`Dungeon ${source}: levels[${i}] stairs "${e.id}" target "${targetId}" does not match any stair entity in the dungeon — stair will not function`);
           continue;
         }
         if (targetStair.type !== 'stairs') {
