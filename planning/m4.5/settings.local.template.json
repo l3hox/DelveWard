@@ -1,0 +1,33 @@
+{
+    "//": "M4.5 worker settings. Driver copies this into each worktree's .claude/settings.local.json at spawn.",
+    "permissions": {
+        "deny": [
+            "Bash(git push:*)",
+            "Bash(git remote:*)",
+            "Bash(git config:*)",
+            "Bash(gh auth:*)",
+            "Bash(rm -rf:*)",
+            "Bash(rm -fr:*)",
+            "Bash(find:* -delete)",
+            "Bash(env)",
+            "Bash(printenv:*)",
+            "Read(//Users/*/.ssh/**)",
+            "Read(//Users/*/.config/gh/**)",
+            "Read(//Users/*/.netrc)",
+            "Read(//Users/*/.aws/**)"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash {REPO_ROOT}/planning/m4.5/hooks/sandbox.sh"
+                    }
+                ]
+            }
+        ]
+    }
+}

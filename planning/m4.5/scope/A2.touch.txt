@@ -1,0 +1,8 @@
+# Throwaway scope file used by sandbox.sh self-tests.
+# Real A2 touch list will be written when A2-spec.md is sealed.
+src/core/gameState.ts
+src/core/assetCheck.ts
+src/core/types.ts
+src/enemies/enemyTypes.ts
+src/npcs/npcDatabase.ts
+src/*/*.test.ts
