@@ -58,8 +58,9 @@ The runner reads these inputs from the environment. They are the **only** projec
 | `RUN_BRANCH` | yes | (none) | The throwaway branch the runner operates on (e.g. `m4.5-run-1`). |
 | `PLAN_PATH` | yes | `planning/m4.5/PLAN.md` | Operational plan. Sections §Shape, §Auto-remediation, §Verification gates, §Safety hatches, §Worker selection are the runner's bible. |
 | `STATUS_PATH` | yes | `planning/m4.5/STATUS.md` | Mutable run state. Heartbeat, per-phase status, cumulative spend. |
-| `MAX_USD` | no | `300` | Hard ceiling on cumulative API spend across the run. |
-| `COUNCIL_DEPTH` | no | `quick` | `quick` = Round 1 + synthesis; `full` = 3-round debate. Quick is the default for cost reasons. |
+| `MAX_USD` | no | `0` | Hard ceiling on cumulative API spend. `0` (default) disables the cap — spend is still tracked for stats, but never triggers a stop. Set a positive number to enforce a budget. |
+| `USD_PER_MTOKEN` | no | `8` | Blended rate used for the `estimated_usd` stat. Approximate; treat as order-of-magnitude. |
+| `COUNCIL_DEPTH` | no | `quick` | `quick` = Round 1 + synthesis; `full` = 3-round debate. |
 
 If any required variable is missing, abort pre-flight with `NOTIFY=BLOCKED missing-config` and exit.
 
@@ -81,10 +82,12 @@ For each iteration, in order:
 1. **Reconcile.** `git worktree prune`; abort if any `.git/worktrees/*/locked` exists; abort if free disk < 2 GB; verify HEAD == last `m4.5-A{N}-done` (or `m4.5-start`).
 2. **Heartbeat.** Write `last_heartbeat_at` (UTC ISO 8601) to `STATUS.md`. Update every iteration and every 30 s of in-iteration work.
 3. **Pick the next phase.** Read `STATUS.md`. Take the first phase whose `status: pending` and whose dependencies are all `done`. Skip `blocked-by-X` and `skipped`. If none, jump to §Wrap-up.
-4. **Budget check.** If `cumulative_spend_usd >= MAX_USD`, write `BLOCKED budget-exceeded` to `NOTIFY`, exit.
+4. **Budget check.** If `MAX_USD > 0` and `stats.estimated_usd >= MAX_USD`, write `BLOCKED budget-exceeded` to `NOTIFY`, exit. When `MAX_USD == 0`, skip this check and keep going — the run will only stop on its own terms (all phases done/skipped/blocked, integrity failure, or driver crash).
 5. **Resolve or author the spec.** If `planning/m4.5/A{N}-spec.md` does not exist or is unsealed, spawn `SystemArchitect` with the spec-authoring template (`planning/m4.5/templates/spec-author.md`). When it returns, spawn `ArchitectReviewer` to review. Auto-remediate critical/high findings up to 3 rounds. Seal by appending `<!-- sealed: <timestamp> -->` at the bottom. Render the touch list from the sealed spec into `planning/m4.5/scope/A{N}.touch.txt`.
 6. **Special case — A6.** If the current phase is A6, first run `planning/m4.5/scripts/a6-gate.sh`. If the gate says `skip`, record A6 as `skipped` with the reason and continue. If `queue`, proceed with authoring.
 7. **Spawn the worker.** Agent tool, `subagent_type` per §Worker selection in `PLAN_PATH`, `isolation: "worktree"`, `team_name: "m4.5"`, `name: "m4.5-A{N}"`, `mode: "default"`, `max_turns: 40`. The worker session's `settings.local.json` must include the static deny-list (template at `planning/m4.5/settings.local.template.json`) AND the PreToolUse hook at `planning/m4.5/hooks/sandbox.sh` with `M45_ACTIVE_PHASE=A{N}` exported. Prompt the worker via `planning/m4.5/templates/worker.md` + the sealed spec.
+After every Agent spawn (worker, spec author, reviewer, council member, remediation worker), the runner reads the spawn's return `usage.total_tokens` and updates `STATUS.md`'s `stats` block: increment `agents_spawned`, add tokens to `total_tokens` and to the matching `by_role` bucket, recompute `estimated_usd` as `total_tokens * USD_PER_MTOKEN / 1_000_000`. Persist atomically (`.tmp` then rename). This bookkeeping runs even when `MAX_USD == 0`.
+
 8. **Compute the diff.** When the worker returns, IGNORE its self-reported numbers. Run `git -C <worktree> diff --stat <base>..HEAD`, `git -C <worktree> diff <base>..HEAD | sha256sum` for the diff-hash, and `git -C <worktree> diff <base>..HEAD -- src/core/*.ts | grep '^-export'` for the public-API guard. Compare against the spec's `Budget` and `After` blocks. Over budget or surprise removals → remediation.
 9. **Verify.** Inside the worktree, run vitest, tsc, vite build, smoke (`planning/m4.5/scripts/smoke.mjs`), and the goldens check. Any failure → remediation.
 10. **Council review.** Invoke the `DeveloperCouncil` skill via Skill tool with the diff as the target and `COUNCIL_DEPTH` as the mode. Critical or high findings → remediation; medium and low log only.
@@ -114,9 +117,18 @@ run_branch: m4.5-run-1
 base_branch: m4.5-preflight
 started_at: 2026-05-27T08:30:00Z
 last_heartbeat_at: 2026-05-27T09:14:22Z
-cumulative_spend_usd: 12.40
-max_usd: 300
+max_usd: 0           # 0 = unlimited; spend tracked but no cap
 council_depth: quick
+stats:
+    agents_spawned: 17
+    total_tokens: 482_140
+    estimated_usd: 3.86       # at USD_PER_MTOKEN=8; approximate
+    by_role:
+        spec_author:       { spawned: 2, tokens:  61_400 }
+        spec_review:       { spawned: 2, tokens:  28_800 }
+        phase_worker:      { spawned: 2, tokens: 184_500 }
+        phase_remediation: { spawned: 1, tokens:  72_300 }
+        council:           { spawned: 10, tokens: 135_140 }
 phases:
     A1: { status: done, finished_at: 2026-05-26T22:00:00Z, spend_usd: 0 }
     A2: { status: in_progress, started_at: 2026-05-27T08:31:00Z, attempts: 2 }

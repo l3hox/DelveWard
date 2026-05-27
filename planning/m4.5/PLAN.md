@@ -634,7 +634,8 @@ The runner refuses to start unless all of these hold. Specs themselves are no lo
 
 - [ ] `planning/m4.5/STATUS.md` exists with every phase in `pending` (except A1: `done`) and `last_heartbeat_at` set.
 - [ ] `RUN_BASE_BRANCH`, `RUN_BRANCH` exported in the runner's environment.
-- [ ] `MAX_USD` exported (default: `300`).
+- [ ] `MAX_USD` exported (default: `0` — unlimited; spend is still tracked for stats).
+- [ ] `USD_PER_MTOKEN` exported if a non-default rate is desired (default: `8`).
 - [ ] `COUNCIL_DEPTH` exported (`quick` recommended; `full` for high-stakes phases).
 - [ ] `planning/m4.5/VERIFY-MODE.md` records the empirical result for `mode: "default"` under bypass.
 
@@ -647,7 +648,7 @@ The runner is invoked through its agent definition. The launch script lives at `
 ```bash
 RUN_BASE_BRANCH=m4.5-preflight \
 RUN_BRANCH=m4.5-run-1 \
-MAX_USD=300 \
+MAX_USD=0 \
 COUNCIL_DEPTH=quick \
 PLAN_PATH=planning/m4.5/PLAN.md \
 STATUS_PATH=planning/m4.5/STATUS.md \
@@ -656,6 +657,8 @@ claude --dangerously-skip-permissions \
        --name "m4.5-run-1" \
        -p "Start the autonomous run per ${PLAN_PATH}."
 ```
+
+`MAX_USD=0` runs unlimited (spend still tracked in `STATUS.md` stats). To enforce a cap on later runs, set it to a positive USD amount.
 
 The user cuts `RUN_BRANCH` from `RUN_BASE_BRANCH` before launch:
 
