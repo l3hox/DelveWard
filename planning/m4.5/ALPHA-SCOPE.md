@@ -6,6 +6,17 @@ Validate the bookkeeping mechanization (PostToolUse hook) and the thin-script of
 
 This is **not** the redesign. It's a deliberate intermediate step that fixes the specific bugs we observed in run-1 while keeping the agent-based architecture intact. Cheap, learns something, validates assumptions that the β spec depends on.
 
+## Resolved decisions
+
+Decisions captured before implementation begins. All four resolved on 2026-05-27.
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Carry A2-spec.md forward from `m4.5-run-1` to `m4.5-preflight`, or re-author from scratch? | **Re-author from scratch.** Lab-pure. Tests whether spec authoring is reproducible across model versions. |
+| 2 | How to handle the unknown about PostToolUse hooks receiving `<usage>` token data? | **Verify first, then build.** A tiny test confirms the hook input shape before committing to the design. If `<usage>` is delivered, the hook handles tokens; if not, fall back to post-hoc tokens (heartbeat and spawn count still work). |
+| 3 | How to fix the pre-existing tsc errors in `itemDatabase.test.ts` and `enemyTypes.test.ts`? | **Add `@types/node` properly.** Idiomatic: configure tsconfig types so browser code excludes node types but test files include them. |
+| 4 | Do alpha (run-2) before beta bootstrap? | **Yes, alpha first.** Run-2 produces data that informs β (PostToolUse semantics, thin-script behavior). |
+
 ## Out of scope for alpha
 
 - Replacing the autonomous-runner agent with an orchestrator. That's β.
@@ -18,7 +29,12 @@ This is **not** the redesign. It's a deliberate intermediate step that fixes the
 
 Each item below is a discrete commit on `m4.5-preflight`.
 
-### 1. PostToolUse hook for bookkeeping
+### 1. PostToolUse hook for bookkeeping (preceded by a verification step)
+
+**Verification step (precursor)**: before building the hook design that depends on parsing `<usage>` data, write a tiny PostToolUse hook that just echoes its stdin to a debug file and run one Agent-spawning interaction. Inspect the debug file: does the tool result for an Agent call include the `<usage>total_tokens: N tool_uses: M duration_ms: K</usage>` trailer?
+
+- If **yes**: build the hook as designed below (heartbeat + spawn count + token total).
+- If **no**: build the hook for heartbeat + spawn count only. Token totals come from `run-stats.sh` post-hoc, no hook-side parsing.
 
 Path: `planning/m4.5/hooks/post-tool.sh`
 
@@ -111,20 +127,22 @@ PLAN.md is ~600 lines today. Most of it is reference detail the runner doesn't r
 
 Target: PLAN.md under 250 lines.
 
-### 6. Decide A2 spec carryforward
+### 6. A2 spec: re-author each run (decided)
 
-The user's choice, made once before run-2:
+Per the resolved decisions table above: **no carryforward.** Run-2's runner authors `A2-spec.md` fresh. Tests whether spec authoring is reproducible across model versions and produces a fair comparison baseline against run-1. Cost: ~$5-10 extra; value: another data point on spec authoring reliability.
 
-- **A**: copy `planning/m4.5/A2-spec.md` from `m4.5-run-1` to `m4.5-preflight`. Run-2's runner finds the spec already sealed, skips authoring (saves 2 spawns: SystemArchitect + ArchitectReviewer rounds). The worker still re-runs from a clean state. Reduces lab-purity but saves $5-10 of the $30 run.
-- **B**: don't carry forward. Authoring re-runs from scratch every time. Lab-pure but expensive.
+No action required for this item — it's the default behavior. Just confirm that no `A2-spec.md` is staged on `m4.5-preflight` before launching run-2.
 
-**Recommendation for alpha**: A. The spec is already validated by run-1's council. Re-authoring it gains no information; it costs tokens. β can revisit if needed.
+### 7. Pre-fix the `tsc` test-file errors on preflight — add `@types/node` properly
 
-### 7. Pre-fix the `tsc` test-file errors on preflight
+Edit `tsconfig.json` so `npx tsc --noEmit` is green on `m4.5-preflight`. Run-1's runner made an ad-hoc fix itself (commit `6f55e2a` on `m4.5-run-1`, also cherry-picked to `main` as `cd8cad5`). Doing the idiomatic fix on preflight upstream means run-2 starts with a clean tsc gate and the runner doesn't have to invent anything.
 
-Edit `tsconfig.json` (or the test files) so `npx tsc --noEmit` is green on `m4.5-preflight`. Run-1's runner had to make this fix itself (commit `6f55e2a` on `m4.5-run-1`). Doing it on preflight upstream means run-2 starts with a clean tsc gate.
+Specific fix (per resolved decision): add `@types/node` to `devDependencies`. Configure the tsconfig types array so browser source excludes node types but test files include them. Either:
 
-Specific fix: `src/core/itemDatabase.test.ts` and `src/enemies/enemyTypes.test.ts` import `fs`, `path`, and use `__dirname` without Node types in the browser tsconfig. Either add `@types/node` to `devDependencies` and the tsconfig types array (browser-safe via `lib: ["DOM"]` + `types: ["node"]`), or exclude test files from the browser tsconfig as run-1's hack did. The latter is what the runner picked; the former is cleaner.
+- A single tsconfig with `types: ["node", "vitest"]` and an explicit narrow `lib`, OR
+- Two configs: `tsconfig.json` for production browser code, `tsconfig.test.json` for tests with node types.
+
+The two-config approach is cleaner if vite's build picks up the production config and vitest picks up the test config separately. Decide on the precise shape during implementation.
 
 ### 8. Gitignore hygiene
 
