@@ -167,15 +167,24 @@ async function init(): Promise<void> {
   // Verify all referenced PNG assets exist (non-blocking, logs errors)
   checkAssets();
 
-  // --- Dungeon (auto-load most recently modified level) ---
-  let levelPath = '/levels/ruins.json'; // fallback
-  try {
-    const resp = await fetch('/api/levels/latest');
-    if (resp.ok) {
-      const { file } = await resp.json();
-      if (file) levelPath = `/levels/${file}`;
-    }
-  } catch { /* dev server not available — use fallback */ }
+  // --- Dungeon ---
+  // URL param ?level=NAME loads /levels/NAME.json directly. Otherwise the
+  // dev server's /api/levels/latest endpoint picks the most recently modified
+  // level. Production fallback is ruins.json.
+  const urlParams = new URLSearchParams(location.search);
+  const levelParam = urlParams.get('level');
+  let levelPath = '/levels/ruins.json';
+  if (levelParam) {
+    levelPath = `/levels/${levelParam}.json`;
+  } else {
+    try {
+      const resp = await fetch('/api/levels/latest');
+      if (resp.ok) {
+        const { file } = await resp.json();
+        if (file) levelPath = `/levels/${file}`;
+      }
+    } catch { /* dev server not available — use fallback */ }
+  }
   console.log(`Loading level: ${levelPath}`);
   const dungeon: Dungeon = await loadDungeon(levelPath);
   const startLevelId = dungeon.playerStart.levelId;
@@ -1652,7 +1661,16 @@ async function init(): Promise<void> {
   // Show character creation FIRST so the browser can paint it,
   // then start shader compilation in the background.
   const hudCanvas = hud.getCanvas();
+  // DEV escape hatch: ?devsmoke=1 skips character creation with neutral stats.
+  // Headless drivers (planning/m4.5/scripts/smoke.mjs) use this to drive the
+  // game past the creation screen without a UI.
+  const skipCharForSmoke = import.meta.env.DEV && urlParams.get('devsmoke') === '1';
   const charCreationDone = new Promise<void>((resolve) => {
+    if (skipCharForSmoke) {
+      gameState.applyCharacterSetup(10, 10, 10, 10, 'Smoke');
+      resolve();
+      return;
+    }
     const charCreation = new CharacterCreationScreen(hudCanvas, (setup) => {
       gameState.applyCharacterSetup(setup.str, setup.dex, setup.vit, setup.wis, setup.name);
       resolve();
@@ -2056,6 +2074,7 @@ async function init(): Promise<void> {
 
   // --- Loop ---
   let lastTime = 0;
+  let smokeFrameTickFn: ((dt: number) => void) | null = null;
 
   function animate(time: number): void {
     const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
@@ -2362,7 +2381,53 @@ async function init(): Promise<void> {
       camera.layers.enableAll();
     }
 
+    if (import.meta.env.DEV && smokeFrameTickFn) smokeFrameTickFn(delta);
+
     requestAnimationFrame(animate);
+  }
+
+  if (import.meta.env.DEV) {
+    import('./main.dev-smoke').then(m => {
+      m.installSmokeApi({
+        moveForward: () => ls.player.moveForward(),
+        moveBack: () => ls.player.moveBack(),
+        turnLeft: () => ls.player.turnLeft(),
+        turnRight: () => ls.player.turnRight(),
+        strafeLeft: () => ls.player.strafeLeft(),
+        strafeRight: () => ls.player.strafeRight(),
+        toggleInventory: () => hud.getInventoryOverlay().toggle(),
+        saveSlot: (i: number) => saveGame(SAVE_SLOT_KEYS[i]),
+        loadSlot: (i: number) => {
+          const data = loadFromSlot(SAVE_SLOT_KEYS[i]);
+          if (data) loadGame(data);
+        },
+        getSaveData: () => {
+          const ps = ls.player.getState();
+          return buildSaveData({
+            gameState,
+            playerCol: ps.col,
+            playerRow: ps.row,
+            playerFacing: ps.facing,
+            currentLevelId,
+            levelSnapshots,
+            dungeon,
+            questState: questManager.getSerializableState(),
+          });
+        },
+        getLevelState: () => {
+          const level = dungeon.levels.find(l => (l.id ?? l.name) === currentLevelId) ?? dungeon.levels[0];
+          return {
+            levelId: level.id ?? level.name,
+            layers: level.layers.map(layer => ({
+              id: layer.id,
+              grid: [...layer.grid],
+              entities: [...layer.entities].sort((a, b) => String(a.id ?? '').localeCompare(String(b.id ?? ''))),
+            })),
+          };
+        },
+      });
+      smokeFrameTickFn = m.smokeFrameTick;
+    });
   }
 
   requestAnimationFrame(animate);

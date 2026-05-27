@@ -15,17 +15,63 @@
 // pre-flight checklist surfaces them clearly.
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
+const WRITE_GOLDENS = process.argv.includes("--write-goldens");
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
-const FIXTURE = "m4.5-smoke";
+const FIXTURE = "fixture1";
+const GOLDEN_DIR = resolve(__dirname, "..", "goldens");
+const LEVEL_INIT_GOLDEN = resolve(GOLDEN_DIR, "level-init.json");
+const SAVE_FIXTURE_GOLDEN = resolve(GOLDEN_DIR, "save-fixture.json");
 
 function preflightFail(msg) {
     process.stderr.write(`smoke: ${msg}\n`);
     process.exit(2);
+}
+
+// Fields that vary between runs but are not behaviorally meaningful.
+// Stripped from goldens so byte-equal comparison is stable.
+const VOLATILE_KEYS = new Set([
+    "timestamp",   // SaveData.timestamp is wall-clock at save
+    "now",         // SignalManager.now is a monotonic clock; drifts by frame timing
+]);
+
+function redact(value) {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(redact);
+    const result = {};
+    for (const [k, v] of Object.entries(value)) {
+        if (VOLATILE_KEYS.has(k)) continue;
+        result[k] = redact(v);
+    }
+    return result;
+}
+
+function serializeGolden(value) {
+    return JSON.stringify(redact(value), null, 2) + "\n";
+}
+
+async function checkGolden(path, value, issues) {
+    const serialized = serializeGolden(value);
+    if (WRITE_GOLDENS) {
+        mkdirSync(dirname(path), { recursive: true });
+        await writeFile(path, serialized);
+        process.stdout.write(`smoke: wrote ${path}\n`);
+        return;
+    }
+    if (!existsSync(path)) {
+        issues.push(`golden missing: ${path} (run with --write-goldens to create)`);
+        return;
+    }
+    const expected = await readFile(path, "utf8");
+    if (expected !== serialized) {
+        issues.push(`golden mismatch: ${path}`);
+    }
 }
 
 const fixturePath = resolve(REPO_ROOT, "public/levels", `${FIXTURE}.json`);
@@ -41,11 +87,16 @@ try {
 }
 
 const PORT = 5180;
-const URL = `http://localhost:${PORT}/?level=${FIXTURE}`;
+const URL = `http://localhost:${PORT}/?level=${FIXTURE}&devsmoke=1`;
 const SMOKE_TIMEOUT_MS = 60_000;
 const FRAME_BUDGET_P95_MS = 25;
 const CONSOLE_ALLOWLIST = [
-    // populate as needed; keep tight
+    // Headless Chromium GPU driver noise. Not a code defect; surfaces only
+    // in headless WebGL contexts and is irrelevant to the game's behavior.
+    /GL Driver Message.*ReadPixels/,
+    // Three.js logs this when running in a context without async shader
+    // compilation. Browser-capability difference, not a regression.
+    /KHR_parallel_shader_compile extension not supported/,
 ];
 
 let server, browser;
@@ -97,6 +148,10 @@ async function runSmoke() {
     await page.goto(URL, { waitUntil: "domcontentloaded", timeout: SMOKE_TIMEOUT_MS });
     await page.waitForFunction("window.__delveward_ready === true", null, { timeout: SMOKE_TIMEOUT_MS });
 
+    const levelInit = await page.evaluate(() => /** @type any */ (window).__delveward.getLevelState());
+    const goldenIssues = [];
+    await checkGolden(LEVEL_INIT_GOLDEN, levelInit, goldenIssues);
+
     // Scripted input. Mirrors the save-fixture golden's recorded sequence.
     await page.evaluate(async () => {
         const dw = /** @type any */ (window).__delveward;
@@ -110,11 +165,19 @@ async function runSmoke() {
         }
     });
 
+    const saveData = await page.evaluate(() => /** @type any */ (window).__delveward.getSaveData());
+    await checkGolden(SAVE_FIXTURE_GOLDEN, saveData, goldenIssues);
+
     // Crude frame-budget sample: read the average since boot, if exposed.
     const frame = await page.evaluate(() => /** @type any */ (window).__delveward?.frameStats?.() ?? null);
     const p95 = frame?.p95Ms ?? null;
 
     await cleanup();
+
+    if (goldenIssues.length) {
+        for (const issue of goldenIssues) process.stderr.write(`smoke: ${issue}\n`);
+        process.exit(1);
+    }
 
     if (errors.length || warnings.length) {
         process.stderr.write(`smoke: console errors=${errors.length} warnings=${warnings.length}\n`);

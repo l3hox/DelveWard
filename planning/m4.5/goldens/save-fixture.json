@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "dungeonName": "fixture1",
+  "currentLevelId": "level_1",
+  "player": {
+    "col": 6,
+    "row": 2,
+    "facing": "S",
+    "hp": 90,
+    "maxHp": 90,
+    "str": 10,
+    "dex": 10,
+    "vit": 10,
+    "wis": 10,
+    "xp": 0,
+    "level": 1,
+    "attributePoints": 0,
+    "playerName": "Smoke",
+    "gold": 0,
+    "torchFuel": 197,
+    "maxTorchFuel": 200,
+    "statusEffects": [],
+    "hunger": 100,
+    "maxHunger": 100,
+    "tempBuffs": []
+  },
+  "keys": [],
+  "entityRegistry": [
+    {
+      "instanceId": "item_0",
+      "itemId": "sword_iron",
+      "quality": "common",
+      "modifiers": [],
+      "location": {
+        "kind": "world",
+        "levelId": "level_1",
+        "col": 1,
+        "row": 3,
+        "layerIndex": 0
+      }
+    }
+  ],
+  "flags": [],
+  "levelSnapshots": {
+    "level_1": {
+      "layers": [
+        {
+          "doors": {},
+          "keys": {},
+          "levers": {},
+          "plates": {},
+          "triggers": {},
+          "tripwires": {},
+          "gates": {},
+          "trapLaunchers": {},
+          "sconces": {
+            "2,1": {
+              "id": "torch_sconce_1",
+              "col": 2,
+              "row": 1,
+              "wall": "N",
+              "lit": true
+            },
+            "6,4": {
+              "id": "torch_sconce_2",
+              "col": 6,
+              "row": 4,
+              "wall": "S",
+              "lit": true
+            }
+          },
+          "stairs": {
+            "2,5": {
+              "id": "stairs_1",
+              "col": 2,
+              "row": 5,
+              "direction": "down",
+              "facing": "N"
+            },
+            "6,1": {
+              "id": "stairs_2",
+              "col": 6,
+              "row": 1,
+              "direction": "up",
+              "facing": "S"
+            }
+          },
+          "enemies": {},
+          "breakableWalls": {},
+          "secretWalls": {},
+          "blocks": {},
+          "chests": {},
+          "signs": {},
+          "npcs": {},
+          "fountains": {},
+          "bookshelves": {},
+          "altars": {},
+          "barrels": {},
+          "thinWalls": {},
+          "ramps": {},
+          "props": {},
+          "pitTraps": {},
+          "spawners": {},
+          "boulders": {},
+          "boulderSpawners": {},
+          "destroyedWalls": [],
+          "exploredCells": [
+            "2,2",
+            "2,1",
+            "2,3",
+            "1,2",
+            "3,2",
+            "2,4",
+            "2,5",
+            "2,6",
+            "1,3",
+            "3,3",
+            "1,4",
+            "3,4",
+            "1,5",
+            "3,5",
+            "6,2",
+            "6,1",
+            "6,3",
+            "5,2",
+            "7,2",
+            "6,4",
+            "6,5"
+          ],
+          "registrySnapshot": [
+            {
+              "instanceId": "item_0",
+              "itemId": "sword_iron",
+              "quality": "common",
+              "modifiers": [],
+              "location": {
+                "kind": "world",
+                "levelId": "level_1",
+                "col": 1,
+                "row": 3,
+                "layerIndex": 0
+              }
+            }
+          ],
+          "signalState": {
+            "sources": [],
+            "receivers": [],
+            "gates": []
+          }
+        }
+      ],
+      "activeLayerIndex": 0
+    }
+  },
+  "levelGrids": {
+    "level_1": [
+      "###########",
+      "#...##.####",
+      "#...#...###",
+      "#...#...###",
+      "##.##...###",
+      "##.########",
+      "###########",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ]
+  },
+  "quests": {}
+}
