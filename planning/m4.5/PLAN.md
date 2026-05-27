@@ -593,32 +593,75 @@ the option that minimizes the diff.
 
 ## Pre-flight checklist
 
-The driver refuses to start unless all of these hold:
+The runner refuses to start unless all of these hold. Specs themselves are no longer pre-flight artifacts — they are authored in-loop by `SystemArchitect`.
+
+### Branch state
 
 - [ ] Working tree clean (`git status --porcelain` empty).
-- [ ] On `main`, up to date with `origin/main`.
-- [ ] Phase specs `A2-spec.md`, `A3-spec.md`, `A4-spec.md`, `A5-spec.md`, `A7-spec.md` exist and are sealed. (`A6-spec.md` is authored mid-run if its gate trips.)
-- [ ] Each sealed spec passes ArchitectReviewer review with zero critical/high open findings.
-- [ ] `planning/m4.5/hooks/sandbox.sh` exists, is executable, and passes its own self-test.
-- [ ] `planning/m4.5/scripts/push.sh` exists and is executable.
-- [ ] `planning/m4.5/scripts/smoke.mjs` exists; `window.__delveward_ready` hook is wired in `src/main.ts`.
-- [ ] `planning/m4.5/goldens/save-fixture.json` and `goldens/level-init.json` exist and were generated from the current `main`.
-- [ ] `node_modules` installed, `npm test` green on `main`, `npm run build` green on `main`, `node scripts/smoke.mjs` green on `main`.
-- [ ] `gh auth status` shows logged-in.
-- [ ] `m4.5-start` tag does not already exist (or has been intentionally moved with confirmation).
-- [ ] STATUS.md exists with every required phase in `pending` state and `last_heartbeat_at` set.
-- [ ] `MAX_USD` exported in the driver's environment (default: $200).
-- [ ] `planning/m4.5/VERIFY-MODE.md` exists and records the result of the empirical verification gate.
+- [ ] On `RUN_BRANCH` (e.g. `m4.5-run-1`), with `RUN_BASE_BRANCH` (`m4.5-preflight`) as an ancestor.
+- [ ] Not on `main`. The runner aborts immediately if HEAD is `main`.
+- [ ] `m4.5-start` tag does not already exist on this branch.
+
+### Runner artifact
+
+- [ ] `.claude/agents/autonomous-runner.md` exists and is loaded by Claude Code.
+
+### Loop-scaffolding artifacts
+
+- [ ] `planning/m4.5/hooks/sandbox.sh` exists, executable, self-test green.
+- [ ] `planning/m4.5/settings.local.template.json` exists.
+- [ ] `planning/m4.5/scripts/push.sh` exists, executable.
+- [ ] `planning/m4.5/scripts/smoke.mjs` exists; `window.__delveward_ready` is wired in `src/main.ts`.
+- [ ] `planning/m4.5/scripts/integrate-phase.sh` exists, executable.
+- [ ] `planning/m4.5/scripts/a6-gate.sh` exists, executable.
+- [ ] `planning/m4.5/templates/spec-author.md` exists.
+- [ ] `planning/m4.5/templates/worker.md` exists.
+- [ ] `planning/m4.5/templates/council.md` exists.
+- [ ] `planning/m4.5/templates/remediation.md` exists.
+
+### Goldens and fixtures
+
+- [ ] `planning/m4.5/goldens/save-fixture.json` and `goldens/level-init.json` exist and were captured on `RUN_BASE_BRANCH`.
+- [ ] `public/levels/fixture1.json` exists (smoke fixture).
+
+### Verifications green on the base branch
+
+- [ ] `npm test` green on `RUN_BASE_BRANCH`.
+- [ ] `npm run build` green on `RUN_BASE_BRANCH`.
+- [ ] `node planning/m4.5/scripts/smoke.mjs` green on `RUN_BASE_BRANCH`.
+
+### State and configuration
+
+- [ ] `planning/m4.5/STATUS.md` exists with every phase in `pending` (except A1: `done`) and `last_heartbeat_at` set.
+- [ ] `RUN_BASE_BRANCH`, `RUN_BRANCH` exported in the runner's environment.
+- [ ] `MAX_USD` exported (default: `300`).
+- [ ] `COUNCIL_DEPTH` exported (`quick` recommended; `full` for high-stakes phases).
+- [ ] `planning/m4.5/VERIFY-MODE.md` records the empirical result for `mode: "default"` under bypass.
 
 ---
 
 ## Launch command
 
+The runner is invoked through its agent definition. The launch script lives at `planning/m4.5/scripts/launch-run.sh` (TBD) but reduces to:
+
 ```bash
-MAX_USD=200 \
+RUN_BASE_BRANCH=m4.5-preflight \
+RUN_BRANCH=m4.5-run-1 \
+MAX_USD=300 \
+COUNCIL_DEPTH=quick \
+PLAN_PATH=planning/m4.5/PLAN.md \
+STATUS_PATH=planning/m4.5/STATUS.md \
 claude --dangerously-skip-permissions \
-       --name "m4.5-driver" \
-       -p "$(cat planning/m4.5/PLAN.md and follow the driver prompt template)"
+       --agent autonomous-runner \
+       --name "m4.5-run-1" \
+       -p "Start the autonomous run per ${PLAN_PATH}."
 ```
 
-(Exact invocation finalized once the driver agent definition lands in `.claude/agents/`.)
+The user cuts `RUN_BRANCH` from `RUN_BASE_BRANCH` before launch:
+
+```bash
+git checkout m4.5-preflight
+git checkout -b m4.5-run-1
+```
+
+The runner verifies branch state in its first-turn pre-flight and aborts if anything is off.
