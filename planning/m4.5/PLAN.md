@@ -1,5 +1,38 @@
 # M4.5 — Autonomous Architecture Cleanup Run
 
+## Framing: this is a laboratory
+
+The primary deliverable of M4.5 is **the autonomous-run system itself**, not the architectural cleanup of DelveWard. The refactor is the test workload; the loop, hook, templates, agents, scripts, and gates are the product. Whatever lands here is intended to be **generalized and extracted** for use on other projects.
+
+There is no expectation that the first N runs succeed. The expectation is that each failed run sharpens the system.
+
+### Branch discipline
+
+- The driver and all worker agents operate on a **throwaway branch only**. Never on `main`.
+- `m4.5-preflight` is the **iteration basis**. It holds the plan, scripts, hooks, templates, goldens, and any framework-level changes (like the DEV smoke API). Plan revisions land here.
+- For each autonomous-run attempt, a new branch is cut from `m4.5-preflight`:
+
+    ```
+    git checkout m4.5-preflight
+    git checkout -b m4.5-run-N
+    # launch driver on m4.5-run-N
+    ```
+
+  The driver operates fully on `m4.5-run-N`. All worktrees, commits, tags, and logs land there.
+
+- After the run, the user inspects results and decides:
+    - **Keep**: queue for eventual merge back into `m4.5-preflight`, and from there ultimately to `main`.
+    - **Scrap**: delete `m4.5-run-N`, iterate on `m4.5-preflight` to fix what went wrong, cut a fresh `m4.5-run-N+1`, try again.
+- `main` is only touched once the user is satisfied with both the autonomous-run system AND the resulting refactor.
+
+### Generalization stance
+
+When authoring the driver agent, hook, templates, and scripts: prefer **parameterized inputs over hardcoded DelveWard references** wherever the cost is similar. The eventual extraction creates a standalone tool; M4.5 is its first end-to-end test, not its specification. Where DelveWard-specific assumptions are unavoidable (file paths, fixture names, milestone labels), keep them in clearly-marked configuration blocks at the top of each artifact, not scattered through prose.
+
+---
+
+## Operational plan
+
 This document is the operational plan for running Milestone 4.5 (Architecture Cleanup) as one continuous autonomous session. The session is launched with `claude --dangerously-skip-permissions` and never asks the user for input. Decisions are made by the driver from the existing architecture, the phase specs, and the council verdicts already on file.
 
 Companion files in this directory:

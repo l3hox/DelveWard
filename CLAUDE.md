@@ -91,3 +91,13 @@ Developer background: senior backend/cloud engineer (20 years), VR/AR background
 - Keep solutions simple — avoid over-engineering
 - Don't over-explain JS/WebGL internals unless asked
 - Keep code clean and commit-ready
+
+---
+
+## M4.5 — Autonomous-run laboratory
+
+Active workstream: building an autonomous Claude Code driver that executes multi-phase refactoring runs end-to-end. The primary deliverable is the **run system itself** (intended for later generalization), not the M4.5 refactor outcome.
+
+**Workflow rule**: autonomous runs operate on **throwaway branches** cut from `m4.5-preflight`. Never run the driver on `main`. Plan revisions, scripts, hooks, and templates live on `m4.5-preflight`; each run attempt gets its own `m4.5-run-N` branch that is either kept (and eventually merged back) or scrapped wholesale.
+
+Full design and branch lifecycle in `planning/m4.5/PLAN.md` (§Framing).
