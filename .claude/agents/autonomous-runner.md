@@ -33,7 +33,7 @@ hooks:
         - matcher: ""
           hooks:
               - type: command
-                command: "bash {{REPO_ROOT}}/planning/m4.5/hooks/post-tool.sh"
+                command: "bash planning/m4.5/hooks/post-tool.sh"
 color: orange
 ---
 
