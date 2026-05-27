@@ -69,58 +69,76 @@ A single **driver session** runs a self-pacing loop. Each iteration:
      git worktree prune
      fail loud on any locked ref under .git/worktrees/*/locked
      fail loud on < 2 GB free disk
-     verify HEAD == last m4.5-A{N}-done tag (or m4.5-start if nothing done yet)
+     verify HEAD on RUN_BRANCH == last m4.5-A{N}-done tag (or m4.5-start if nothing done yet)
+     heartbeat: write last_heartbeat_at to STATUS.md
 
 2. Pick next phase from STATUS.md
-     skip phases marked done, skipped, or blocked-by-X
+     skip phases: done, skipped, blocked-by-X
      stalled phases revisited at end of run with a fresh worker
 
-3. Pre-spawn checks
-     spec exists and is sealed
-     "Before" anchors in the spec match the current HEAD (anchor verification)
-     goldens are present
-     cumulative spend < MAX_USD
+3. Budget guard (skipped if MAX_USD == 0)
+     if stats.estimated_usd >= MAX_USD: NOTIFY BLOCKED budget-exceeded, exit
 
-4. Spawn worker
-     Agent tool, subagent_type per §Worker selection
+4. Author the spec if missing
+     if planning/m4.5/A{N}-spec.md is absent or unsealed:
+        spawn SystemArchitect with templates/spec-author.md ({{PHASE}}, {{SPEC_PATH}},
+           {{MILESTONE_DELIVERABLE}}, {{DEBT_ITEM}}, {{WORKER_AGENT_TYPE}})
+        spawn ArchitectReviewer to review the spec
+        auto-remediate critical/high findings (up to 3 rounds)
+        seal: append <!-- sealed: <timestamp> --> to A{N}-spec.md
+        render touch list to planning/m4.5/scope/A{N}.touch.txt
+     A6 special case: first run scripts/a6-gate.sh; on "skip" mark phase skipped
+        with reason "switch_sites=N below threshold", continue.
+
+5. Pre-spawn checks
+     spec sealed, anchor lines from "Before" still match HEAD
+     goldens are present
+     touch list rendered
+
+6. Spawn worker
+     Agent tool, subagent_type per STATUS.md phases[A{N}].worker_agent
      isolation: "worktree" → .worktrees/m4.5-A{N}
      team_name: "m4.5"
      name: "m4.5-A{N}"
      mode: "default"  (see Empirical verification gate)
-     PreToolUse hook from hooks/sandbox.sh active
-     prompt: §Worker prompt template + spec contents
+     PreToolUse hook from hooks/sandbox.sh active (M45_ACTIVE_PHASE=A{N})
+     prompt: templates/worker.md with spec content inlined
 
-5. Worker returns; ignore worker-reported numbers
+7. Worker returns
+     read usage.total_tokens; update STATUS.md.stats (phase_worker bucket)
+     ignore worker-reported file/line numbers
 
-6. Driver computes its own diff
+8. Driver computes its own diff
      git -C .worktrees/m4.5-A{N} diff --stat <base>..HEAD
      git -C .worktrees/m4.5-A{N} diff <base>..HEAD | sha256sum → diff-hash
-     check budget gates against the computed diff
+     check budget gates and public-API guard against the computed diff
 
-7. Verification suite (in the worktree)
+9. Verification suite (in the worktree)
      npx vitest run
      npx tsc --noEmit
      npm run build
      node planning/m4.5/scripts/smoke.mjs
      golden checks (save-fixture, level-init)
 
-8. DeveloperCouncil review of the diff
+10. DeveloperCouncil review of the diff
+     spawn via Skill (templates/council.md, COUNCIL_DEPTH)
+     update STATUS.md.stats (council bucket)
 
-9. If any check failed OR council found critical/high
+11. If any check failed OR council found critical/high
      run auto-remediation loop (§Auto-remediation)
+     update STATUS.md.stats (phase_remediation bucket) on each retry
 
-10. On clean
-      integrate to main:
-        git -C <repo> fetch origin
-        git -C <repo> merge --ff-only refs/heads/m4.5-A{N}   (worktree branch)
-        if FF fails: rebase the worktree branch on origin/main then retry
-      commit lands on main; tag m4.5-A{N}-done
-      update STATUS.md, append LOG/A{N}.md, advance
+12. On clean
+     run planning/m4.5/scripts/integrate-phase.sh A{N}
+       commits worker output, ff-merges worktree branch into RUN_BRANCH,
+       tags m4.5-A{N}-done, appends LOG/A{N}.md
+     remove the worktree: git worktree remove .worktrees/m4.5-A{N}
+     mark STATUS.md phases[A{N}] as done
 
-11. Sleep briefly via ScheduleWakeup (dynamic /loop) and re-enter
+13. Sleep briefly via ScheduleWakeup (dynamic /loop) and re-enter
 ```
 
-The push to `origin main` happens once at the very end of the run, via `scripts/push.sh`.
+The driver never pushes. Per §Framing, RUN_BRANCH stays local until the user inspects results and chooses to merge it back into RUN_BASE_BRANCH manually.
 
 ---
 
