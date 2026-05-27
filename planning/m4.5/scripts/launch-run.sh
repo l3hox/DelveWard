@@ -5,11 +5,12 @@
 # validates branch state, exports run config, and execs `claude`.
 #
 # Usage:
-#   RUN_BRANCH=m4.5-run-1 planning/m4.5/scripts/launch-run.sh
+#   planning/m4.5/scripts/launch-run.sh                       # adopts current branch
+#   RUN_BRANCH=m4.5-run-3 planning/m4.5/scripts/launch-run.sh # explicit override
 #
 # Required env (or hardcoded defaults):
 #   RUN_BASE_BRANCH      default m4.5-preflight — the basis branch
-#   RUN_BRANCH           default m4.5-run-1     — the throwaway run branch (must already exist + be checked out)
+#   RUN_BRANCH           default current branch — the throwaway run branch (must already exist + be checked out)
 #   PLAN_PATH            default planning/m4.5/PLAN.md
 #   STATUS_PATH          default planning/m4.5/STATUS.md
 #   MAX_USD              default 0              — 0 = unlimited; spend still tracked
@@ -19,7 +20,7 @@
 set -euo pipefail
 
 RUN_BASE_BRANCH="${RUN_BASE_BRANCH:-m4.5-preflight}"
-RUN_BRANCH="${RUN_BRANCH:-m4.5-run-1}"
+RUN_BRANCH="${RUN_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 PLAN_PATH="${PLAN_PATH:-planning/m4.5/PLAN.md}"
 STATUS_PATH="${STATUS_PATH:-planning/m4.5/STATUS.md}"
 MAX_USD="${MAX_USD:-0}"
