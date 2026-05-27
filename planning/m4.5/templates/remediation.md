@@ -21,17 +21,13 @@ Same as the original worker:
 
 ## The spec
 
-The full sealed spec is reproduced below for reference. You execute against it, but you do **not** restart from step 1. The diff already encodes prior progress; you add the missing or corrected work on top.
+The sealed spec is at: **`{{SPEC_PATH}}`**
 
----
-
-{{SPEC_CONTENT}}
-
----
+Read it for reference. You execute against it, but you do **not** restart from step 1. The diff already encodes prior progress; you add the missing or corrected work on top.
 
 ## How to remediate
 
-1. Read every item in `{{FAILURE_LOG}}` and `{{FINDINGS}}`. Make a tight mental list of exactly what to fix.
+1. Read `{{SPEC_PATH}}` (once, for context) and every item in `{{FAILURE_LOG}}` and `{{FINDINGS}}`. Make a tight mental list of exactly what to fix.
 2. For each item, identify the minimal edit that fixes it without expanding scope. Stay inside the `Scope: touch` allowlist.
 3. After each fix, run the relevant Accept check (`tsc --noEmit`, the failing vitest subset, etc.). Confirm the fix actually closes the issue before moving on.
 4. When every listed issue has a corresponding fix, run the full Accept block. If anything still fails, return with `accept_checks` marked accordingly and `notes` explaining what could not be fixed inside scope.

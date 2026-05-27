@@ -12,20 +12,19 @@ You are the worker for phase **{{PHASE}}** of the M4.5 autonomous run. The runne
 
 ## The spec
 
-The full sealed spec follows. Do exactly what it says.
+The sealed spec is at: **`{{SPEC_PATH}}`**
 
----
+Read it now (single Read call). Do exactly what it says.
 
-{{SPEC_CONTENT}}
-
----
+The runner has already validated the spec's `Before` anchors against HEAD. Your job is to execute the `Steps` and produce the diff that satisfies the `After`, `Accept`, `Budget`, and `DO NOT` sections.
 
 ## How to work
 
-1. Read the Before anchors to confirm the file state matches what the spec assumed.
-2. Walk the Steps in order. Each step is independently verifiable. After each step, run the relevant subset of the Accept checks if cheap (`tsc --noEmit` after a type-touching step, `vitest run --reporter=verbose <file>` after a test-adjacent edit). Don't bother running the full smoke after every step — that's the runner's job at the end.
-3. When all steps are done, run the full Accept block yourself once. If anything fails, you have one chance: fix it inside scope, then re-run. Don't expand scope to "make tests pass" — if a test outside the touch list is failing, that's the runner's signal to remediate, not yours to silently fix.
-4. Return the structured JSON contract described below.
+1. Read `{{SPEC_PATH}}` (once). Re-read specific sections later if needed.
+2. Verify the Before anchors locally: spot-check a couple of the quoted snippets against the live files. If any anchor is missing, halt and report in `notes`.
+3. Walk the Steps in order. Each step is independently verifiable. After each step, run the relevant subset of the Accept checks if cheap (`tsc --noEmit` after a type-touching step, `vitest run <file>` after a test-adjacent edit). Don't bother running the full smoke after every step — that's the runner's job.
+4. When all steps are done, run the full Accept block yourself once. If anything fails, you have one chance: fix it inside scope, then re-run. Don't expand scope to "make tests pass" — if a test outside the touch list is failing, that's the runner's signal to remediate, not yours to silently fix.
+5. Return the structured JSON contract described below.
 
 ## Return contract
 
