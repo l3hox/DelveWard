@@ -22,7 +22,8 @@ There is no expectation that the first N runs succeed. The expectation is that e
 
 - After the run, the user inspects results and decides:
     - **Keep**: queue for eventual merge back into `m4.5-preflight`, and from there ultimately to `main`.
-    - **Scrap**: delete `m4.5-run-N`, iterate on `m4.5-preflight` to fix what went wrong, cut a fresh `m4.5-run-N+1`, try again.
+    - **Iterate**: leave `m4.5-run-N` in place as a study artifact (never deleted), iterate on `m4.5-preflight` to fix what went wrong, cut a fresh `m4.5-run-N+1` from the improved basis, try again.
+- **No run branch is ever deleted.** Each `m4.5-run-N` is preserved indefinitely as a record of what the system did at that iteration; comparing runs across N is itself part of the laboratory.
 - `main` is only touched once the user is satisfied with both the autonomous-run system AND the resulting refactor.
 
 ### Generalization stance
