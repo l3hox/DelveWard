@@ -78,4 +78,4 @@ exec env \
     claude --dangerously-skip-permissions \
            --agent autonomous-runner \
            --name "$RUN_BRANCH" \
-           -p "Start the autonomous run per ${PLAN_PATH}."
+           "Start the autonomous run per ${PLAN_PATH}."
