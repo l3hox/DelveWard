@@ -5,3 +5,5 @@ dist/
 .worktrees/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+planning/m4.5/scope/ACTIVE
+planning/m4.5/scope/ACTIVE_WORKTREE

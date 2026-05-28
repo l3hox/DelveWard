@@ -33,6 +33,7 @@
 #   LAUNCHER          default planning/m4.5/scripts/launch-run.sh
 #   NOTIFY_PATH       default planning/m4.5/NOTIFY
 #   LOG_PATH          default planning/m4.5/LOG/supervise.log
+#   ACTIVE_WORKTREE_FILE default planning/m4.5/scope/ACTIVE_WORKTREE — runner-written; scopes the watchdog
 
 set -uo pipefail
 
@@ -46,6 +47,7 @@ TMUX_SESSION="${TMUX_SESSION:-m45-supervised}"
 LAUNCHER="${LAUNCHER:-planning/m4.5/scripts/launch-run.sh}"
 NOTIFY_PATH="${NOTIFY_PATH:-planning/m4.5/NOTIFY}"
 LOG_PATH="${LOG_PATH:-planning/m4.5/LOG/supervise.log}"
+ACTIVE_WORKTREE_FILE="${ACTIVE_WORKTREE_FILE:-planning/m4.5/scope/ACTIVE_WORKTREE}"
 
 log() {
     printf '%s supervise: %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$LOG_PATH" >&2
@@ -74,12 +76,21 @@ find_transcript() {
     find "$HOME/.claude/projects" -name "$1.jsonl" 2>/dev/null | head -1
 }
 
-# Newest activity across the parent transcript and any active worker worktree.
+# Newest activity across the parent transcript and the ACTIVE worker worktree.
+# Scoped to the active worktree only (the runner writes its path to
+# ACTIVE_WORKTREE_FILE): a leaked/orphaned worktree's stale mtimes must not keep
+# the liveness clock falsely fresh and mask a real hang.
 composite_last_activity() {
-    local sid="$1" tx tx_m wt_m
+    local sid="$1" tx tx_m wt_m active
     tx=$(find_transcript "$sid")
     tx_m=$(mtime "$tx")
-    wt_m=$(newest_under ".claude/worktrees")
+    wt_m=0
+    if [ -f "$ACTIVE_WORKTREE_FILE" ]; then
+        active=$(cat "$ACTIVE_WORKTREE_FILE" 2>/dev/null)
+        if [ -n "$active" ] && [ -d "$active" ]; then
+            wt_m=$(newest_under "$active")
+        fi
+    fi
     if [ "$wt_m" -gt "$tx_m" ]; then echo "$wt_m"; else echo "$tx_m"; fi
 }
 
@@ -102,6 +113,50 @@ mode_for_attempt() {
 }
 
 new_session_id() { uuidgen | tr 'A-Z' 'a-z'; }
+
+# Remove leaked Agent worktrees + their branches. Run before each (re)launch,
+# when no runner/worker is active: a killed worker leaves an orphan whose stale
+# files corrupt the next liveness window and whose checkout accumulates on disk.
+gc_worktrees() {
+    local wt branch
+    git worktree prune 2>/dev/null
+    for wt in .claude/worktrees/agent-*; do
+        [ -d "$wt" ] || continue
+        branch=$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null)
+        git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
+        case "$branch" in
+            worktree-agent-*) git branch -D "$branch" 2>/dev/null ;;
+        esac
+        log "gc: removed orphan worktree $wt (branch ${branch:-unknown})"
+    done
+    git worktree prune 2>/dev/null
+}
+
+# On resume, the runner's legitimate uncommitted changes live under
+# planning/m4.5/. Any other main-tree change is unexpected (e.g. worker-planted
+# before the deny-by-default sandbox, or leftover) — stash it aside rather than
+# let the resumed runner integrate it silently. Relies on planning/m4.5/ being a
+# tracked directory so new files inside show with full paths (git collapses only
+# fully-untracked dirs); avoids `-uall`, which the repo bans for large-repo cost.
+quarantine_main_tree() {
+    local line path
+    local unexpected=()
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        path="${line:3}"
+        case "$path" in
+            planning/m4.5/*) ;;
+            *) unexpected+=("$path") ;;
+        esac
+    done < <(git status --porcelain 2>/dev/null)
+    if [ "${#unexpected[@]}" -gt 0 ]; then
+        log "quarantine: unexpected main-tree changes on resume; stashing aside"
+        printf '  %s\n' "${unexpected[@]}" | tee -a "$LOG_PATH" >&2
+        git stash push -u -m "m4.5-quarantine-$(date -u +%FT%TZ)" -- "${unexpected[@]}" >/dev/null 2>&1 \
+            && log "quarantine: stashed (recover via 'git stash list')" \
+            || log "quarantine: stash failed; left in place"
+    fi
+}
 
 run_supervisor() {
     mkdir -p "$(dirname "$LOG_PATH")"
@@ -128,6 +183,11 @@ run_supervisor() {
             resume)    resume=1 ;;
             fresh-new) sid="$(new_session_id)" ;;
         esac
+
+        # No runner/worker is active here — safe to reclaim orphans and (on a
+        # resume) quarantine unexpected main-tree changes before relaunch.
+        gc_worktrees
+        [ "$resume" = "1" ] && quarantine_main_tree
 
         log "launch attempt=$attempt mode=$mode session=$sid branch=$RUN_BRANCH"
         tmux new-session -d -s "$TMUX_SESSION" \
