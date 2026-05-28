@@ -45,7 +45,7 @@ A local git probe (render an uncommitted file in the main repo, add a detached w
 
 ## Council review (2026-05-28): NO-GO until blockers land
 
-A four-specialist review (Dev, QA, Ops, Security) found two failures the offline tests masked. Binding status: **NO-GO as-is; run attended, not unattended, until the blockers below and the live gate pass.**
+A four-specialist review (Dev, QA, Ops, Security) found two failures the offline tests masked. Binding status: **the three blockers below have landed and are offline-verified; the one remaining gate is an attended live A2 dry run. Run that gate attended; only go unattended after it passes all five assertions.**
 
 Criticals:
 - **The Conform gate is inert at runtime.** Workers leave changes uncommitted; `phase-diff.sh` diffs `BASE..HEAD` → zero files → `out_of_scope=none`, so scope/budget/council all pass on nothing and a no-op worker integrates as "done." The earlier "flagged entityTypes.ts" result was a false green (it ran against *committed* run-2 data).
