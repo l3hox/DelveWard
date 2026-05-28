@@ -3,9 +3,14 @@
 
 On every tool call: refresh STATUS.md.last_heartbeat_at.
 On Agent tool calls: increment agents_spawned + bucket.spawned in
-STATUS.md.stats. If the tool result text contains the
-<usage>total_tokens: N tool_uses: M ...</usage> trailer, also add N to
-bucket.tokens and to stats.total_tokens, and refresh estimated_usd.
+STATUS.md.stats, read the subagent's token count from the structured
+tool_response (totalTokens), add it to bucket.tokens and
+stats.total_tokens, refresh estimated_usd, and append a granular record
+to the subagent-tokens ledger.
+
+The token count comes from tool_response.totalTokens (a JSON field on the
+Agent result), with the per-iteration split under tool_response.usage.
+There is no <usage> text trailer.
 
 Always exits 0. Empty stdout = continue normally. Side-effects only.
 
@@ -21,12 +26,13 @@ import shutil
 from datetime import datetime, timezone
 
 STATUS_PATH_DEFAULT = "planning/m4.5/STATUS.md"
+LEDGER_PATH_DEFAULT = "planning/m4.5/LOG/subagent-tokens.jsonl"
 USD_PER_MTOKEN_DEFAULT = 8.0
 
 # Bucket names in STATUS.md.stats.by_role
 BUCKETS = ("spec_author", "spec_review", "phase_worker", "phase_remediation", "council")
 
-USAGE_RE = re.compile(r"<usage>\s*total_tokens:\s*(\d+)", re.S)
+PHASE_RE = re.compile(r"A\d+")
 
 
 def now_iso() -> str:
@@ -55,6 +61,67 @@ def classify_subagent(subagent_type: str, name: str, team_name: str) -> str:
     if subagent_type == "QaTester":
         return "council"
     return "phase_worker"  # safe default
+
+
+def extract_phase(name: str):
+    """Phase id (e.g. A2) parsed from a worker name like m4.5-A2, else None."""
+    match = PHASE_RE.search(name or "")
+    return match.group(0) if match else None
+
+
+def extract_agent_telemetry(tool_input: dict, tool_response):
+    """From an Agent call's input + structured response, return
+    (bucket, total_tokens, ledger_record)."""
+    subagent_type = tool_input.get("subagent_type", "")
+    name = tool_input.get("name") or tool_input.get("description", "")
+    team_name = tool_input.get("team_name", "")
+    bucket = classify_subagent(subagent_type, name, team_name)
+
+    response = tool_response
+    if isinstance(response, str):
+        try:
+            response = json.loads(response)
+        except Exception:
+            response = {}
+    if not isinstance(response, dict):
+        response = {}
+
+    try:
+        total_tokens = int(response.get("totalTokens") or 0)
+    except (TypeError, ValueError):
+        total_tokens = 0
+
+    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    tool_stats = response.get("toolStats") if isinstance(response.get("toolStats"), dict) else {}
+
+    record = {
+        "ts": now_iso(),
+        "phase": extract_phase(name),
+        "bucket": bucket,
+        "subagent_type": subagent_type,
+        "name": name,
+        "total_tokens": total_tokens,
+        "usage": usage,
+        "duration_ms": response.get("totalDurationMs"),
+        "tool_stats": tool_stats,
+    }
+    return bucket, total_tokens, record
+
+
+def append_ledger(path: str, record: dict) -> bool:
+    """Append one JSON line to the subagent-tokens ledger. Best effort:
+    on I/O failure, log to stderr (invisible to Claude Code) and continue,
+    since the hook must never break the run."""
+    try:
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(path, "a") as handle:
+            handle.write(json.dumps(record) + "\n")
+        return True
+    except OSError as error:
+        print(f"post-tool: ledger append failed: {error}", file=sys.stderr)
+        return False
 
 
 def update_status_md(
@@ -144,6 +211,7 @@ def main():
         return
 
     status_path = os.environ.get("STATUS_PATH", STATUS_PATH_DEFAULT)
+    ledger_path = os.environ.get("LEDGER_PATH", LEDGER_PATH_DEFAULT)
     usd_per_mtoken = float(os.environ.get("USD_PER_MTOKEN", USD_PER_MTOKEN_DEFAULT))
 
     try:
@@ -153,35 +221,13 @@ def main():
 
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {}) or {}
-    # PostToolUse field name may vary across Claude Code versions
-    tool_result = payload.get("tool_response", payload.get("tool_result", ""))
-    if isinstance(tool_result, list):
-        pieces = [
-            p.get("text", "")
-            for p in tool_result
-            if isinstance(p, dict) and p.get("type") == "text"
-        ]
-        tool_result = "\n".join(pieces)
-    if not isinstance(tool_result, str):
-        try:
-            tool_result = json.dumps(tool_result)
-        except Exception:
-            tool_result = str(tool_result)
+    tool_response = payload.get("tool_response", payload.get("tool_result"))
 
     bucket = None
     add_tokens = 0
     if tool_name == "Agent":
-        bucket = classify_subagent(
-            tool_input.get("subagent_type", ""),
-            tool_input.get("name") or tool_input.get("description", ""),
-            tool_input.get("team_name", ""),
-        )
-        m = USAGE_RE.search(tool_result)
-        if m:
-            try:
-                add_tokens = int(m.group(1))
-            except Exception:
-                add_tokens = 0
+        bucket, add_tokens, record = extract_agent_telemetry(tool_input, tool_response)
+        append_ledger(ledger_path, record)
 
     update_status_md(
         status_path,
@@ -253,6 +299,57 @@ def run_self_test():
         assert classify_subagent("RefactoringSpecialist", "remediation 1/10", "") == "phase_remediation"
         assert classify_subagent("SoftwareDeveloper", "council-dev", "dev-council") == "council"
         assert classify_subagent("QaTester", "council-qa", "dev-council") == "council"
+
+        # Structured Agent telemetry (precursor-1 response shape)
+        sample_response = {
+            "status": "completed",
+            "totalDurationMs": 4573,
+            "totalTokens": 39686,
+            "totalToolUseCount": 1,
+            "usage": {
+                "input_tokens": 2,
+                "cache_read_input_tokens": 39591,
+                "cache_creation_input_tokens": 88,
+                "output_tokens": 5,
+            },
+            "toolStats": {"bashCount": 1, "editFileCount": 0},
+        }
+        bucket, tokens, record = extract_agent_telemetry(
+            {"subagent_type": "RefactoringSpecialist", "name": "m4.5-A2"},
+            sample_response,
+        )
+        assert bucket == "phase_worker", f"bucket wrong: {bucket}"
+        assert tokens == 39686, f"tokens wrong: {tokens}"
+        assert record["phase"] == "A2", f"phase wrong: {record['phase']}"
+        assert record["usage"]["cache_read_input_tokens"] == 39591, "usage split lost"
+        assert record["tool_stats"]["bashCount"] == 1, "tool_stats lost"
+
+        # tool_response delivered as a JSON string still parses
+        _, tokens_from_string, _ = extract_agent_telemetry(
+            {"subagent_type": "SystemArchitect", "name": "spec author"},
+            json.dumps(sample_response),
+        )
+        assert tokens_from_string == 39686, f"string-parse tokens wrong: {tokens_from_string}"
+
+        # missing totalTokens -> 0, no crash; council classification preserved
+        _, tokens_missing, record_missing = extract_agent_telemetry(
+            {"subagent_type": "QaTester", "name": "council-qa", "team_name": "dev-council"},
+            {"status": "completed"},
+        )
+        assert tokens_missing == 0, "missing-token fallback wrong"
+        assert record_missing["bucket"] == "council", "missing-token bucket wrong"
+
+        assert extract_phase("m4.5-A2") == "A2"
+        assert extract_phase("council-dev") is None
+
+        # ledger append round-trips to JSON lines
+        ledger = os.path.join(workdir, "subagent-tokens.jsonl")
+        assert append_ledger(ledger, record) is True
+        assert append_ledger(ledger, record_missing) is True
+        ledger_lines = open(ledger).read().splitlines()
+        assert len(ledger_lines) == 2, f"ledger line count wrong: {len(ledger_lines)}"
+        first_record = json.loads(ledger_lines[0])
+        assert first_record["total_tokens"] == 39686 and first_record["phase"] == "A2", "ledger content wrong"
 
         print("self-test: ok")
     finally:

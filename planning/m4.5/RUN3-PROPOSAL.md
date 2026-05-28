@@ -80,6 +80,8 @@ Precursor 1 makes this simpler than first proposed: the data is live in the hook
 
 Net: granular, mechanical, exact-cost per-subagent accounting from the hook's own stdin. Main-session tokens remain a post-hoc `run-stats.sh` artifact (they have the same subagent blind spot live).
 
+Built and tested. `post-tool.py` now reads `tool_response.totalTokens` plus the `usage` split, updates STATUS, and appends to `LOG/subagent-tokens.jsonl`. Verified by `--self-test` (structured extraction, JSON-string fallback, phase parsing, ledger round-trip) and an end-to-end stdin test with a realistic Agent payload: STATUS went to `total_tokens: 39686` and the ledger captured the per-subagent record with its cache-read split. This fixes the run-2 `tokens=0` bug.
+
 ### 2.2 Composite liveness signal
 
 The watchdog (1.3) needs a signal that distinguishes a working subagent from a hang. No parent-side channel can: heartbeat, parent-JSONL mtime, and token usage all freeze identically during a legitimate subagent (run-2's A2 worker ran 9.4 minutes with zero parent events). Add the one signal that does move during worker execution:
@@ -123,7 +125,7 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [ ] `supervise-run.sh` exists: launches, restarts on crash with a cap, writes NOTIFY on give-up.
 - [ ] Stale-watchdog kills + restarts on composite-signal staleness; dry-run verified against a simulated hang.
 - [ ] Per-operation wall-clock cap wired into worker dispatch.
-- [ ] Token harvest from transcript at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
+- [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
 - [ ] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty.
 - [ ] `templates/spec-author.md` carries the house-style constraints.
 - [ ] All existing preflight gates still green (tsc, vitest, smoke).
