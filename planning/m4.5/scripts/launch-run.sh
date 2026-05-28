@@ -59,6 +59,18 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 5
 fi
 
+# Keep the machine awake for the whole run. An idle laptop sleeps and severs the
+# in-flight API socket, killing the run with no recovery. caffeinate (macOS) and
+# systemd-inhibit (Linux) each hold an anti-sleep lock for the wrapped command's
+# lifetime. Empty when neither exists (e.g. a server that never idle-sleeps);
+# the unquoted expansion then vanishes and the run proceeds unwrapped.
+KEEPAWAKE=""
+if command -v caffeinate >/dev/null 2>&1; then
+    KEEPAWAKE="caffeinate -ims"
+elif command -v systemd-inhibit >/dev/null 2>&1; then
+    KEEPAWAKE="systemd-inhibit --what=sleep:idle --who=launch-run --why=autonomous-run"
+fi
+
 echo "launch-run: launching autonomous-runner"
 echo "  RUN_BASE_BRANCH = $RUN_BASE_BRANCH"
 echo "  RUN_BRANCH      = $RUN_BRANCH"
@@ -67,8 +79,9 @@ echo "  STATUS_PATH     = $STATUS_PATH"
 echo "  MAX_USD         = $MAX_USD  (0 = unlimited)"
 echo "  USD_PER_MTOKEN  = $USD_PER_MTOKEN"
 echo "  COUNCIL_DEPTH   = $COUNCIL_DEPTH"
+echo "  KEEPAWAKE       = ${KEEPAWAKE:-(none; relying on system power settings)}"
 
-exec env \
+exec ${KEEPAWAKE} env \
     RUN_BASE_BRANCH="$RUN_BASE_BRANCH" \
     RUN_BRANCH="$RUN_BRANCH" \
     PLAN_PATH="$PLAN_PATH" \
