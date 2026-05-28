@@ -1,11 +1,20 @@
 #!/bin/bash
 # planning/m4.5/hooks/sandbox.sh
 #
-# PreToolUse hook for M4.5 autonomous-run workers.
-# Enforces a write-path allowlist (per phase) and a Bash/Read deny-list.
+# PreToolUse hook for the M4.5 autonomous run. Installed in the RUNNER session's
+# frontmatter; Claude Code propagates it to worker subagents (precursor 2). It
+# enforces a per-phase write allowlist for writes INSIDE a worker worktree, and
+# a Bash/Read deny-list for every session.
 #
-# Per Claude Code hook contract: always exit 0. Empty stdout = allow.
-# Block by writing {"decision":"block","reason":"..."} to stdout.
+# The runner's own writes (specs, STATUS, scope files) land outside any worktree
+# and are not scope-restricted. Only writes under .claude/worktrees/<agent>/ are
+# checked, against the active phase's touch list in the MAIN repo (a worktree
+# never sees the uncommitted rendered list, per precursor 3). The active phase is
+# read from <main-repo>/planning/m4.5/scope/ACTIVE, which the runner writes
+# before spawning each worker.
+#
+# Per Claude Code hook contract: always exit 0. Empty stdout = allow. Block by
+# writing {"decision":"block","reason":"..."} to stdout.
 
 set +e
 
@@ -18,45 +27,44 @@ block() {
     exit 0
 }
 
-PHASE="${M45_ACTIVE_PHASE:-}"
-[ -n "$PHASE" ] || block "sandbox: M45_ACTIVE_PHASE not set; refusing without scope context"
-
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-[ -n "$REPO_ROOT" ] || block "sandbox: not inside a git repository"
-
-TOUCH_LIST="$REPO_ROOT/planning/m4.5/scope/${PHASE}.touch.txt"
-
-# Match a path against the per-phase touch list. One pattern per line.
-# Lines starting with # are comments. Patterns use shell glob syntax.
+# Match a path against a touch-list file. One glob pattern per line; blank lines
+# and #-comments ignored. Mirrors phase-diff.sh scope matching.
 path_allowed() {
-    local path="$1"
-    [ -f "$TOUCH_LIST" ] || return 1
+    local path="$1" list="$2" pattern
+    [ -f "$list" ] || return 1
     while IFS= read -r pattern || [ -n "$pattern" ]; do
         case "$pattern" in
             ''|\#*) continue ;;
         esac
-        # shellcheck disable=SC2053
+        # shellcheck disable=SC2254
         case "$path" in
             $pattern) return 0 ;;
         esac
-    done < "$TOUCH_LIST"
+    done < "$list"
     return 1
-}
-
-normalize_path() {
-    local path="$1"
-    case "$path" in
-        "$REPO_ROOT"/*) printf '%s' "${path#$REPO_ROOT/}" ;;
-        *) printf '%s' "$path" ;;
-    esac
 }
 
 case "$tool_name" in
     Write|Edit|MultiEdit|NotebookEdit)
         file_path=$(printf '%s' "$tool_input" | jq -r '.file_path // .notebook_path // empty')
         [ -n "$file_path" ] || block "sandbox: $tool_name missing file_path"
-        rel=$(normalize_path "$file_path")
-        path_allowed "$rel" || block "sandbox: $tool_name to '$rel' is outside phase $PHASE allowlist"
+
+        case "$file_path" in
+            */.claude/worktrees/*/*)
+                # Worker write inside a worktree: enforce the active phase allowlist.
+                main_repo="${file_path%%/.claude/worktrees/*}"
+                rel="${file_path#*/.claude/worktrees/*/}"
+                active_file="$main_repo/planning/m4.5/scope/ACTIVE"
+                phase=""
+                [ -f "$active_file" ] && phase=$(tr -d '[:space:]' < "$active_file")
+                [ -n "$phase" ] || block "sandbox: no active phase at $active_file; refusing worker write to '$rel'"
+                touch_list="$main_repo/planning/m4.5/scope/${phase}.touch.txt"
+                path_allowed "$rel" "$touch_list" || block "sandbox: $tool_name to '$rel' is outside phase $phase allowlist"
+                ;;
+            *)
+                # Runner's own write (outside any worktree): allowed.
+                ;;
+        esac
         ;;
 
     Bash)

@@ -52,14 +52,14 @@ Prefer parameterized inputs over hardcoded DelveWard references wherever the cos
 | `scripts/launch-run.sh` | Convenience launcher for the runner |
 | `scripts/run-stats.sh` | Post-hoc transcript analyzer |
 | `scripts/smoke.mjs` | Playwright smoke driver |
-| `settings.local.template.json` | Static deny-list materialized into each worker's worktree |
+| `runner-settings.json` | Loaded via `--settings`; PreToolUse sandbox + native deny-list, inherited by worker subagents |
 | `goldens/*.json` | Save-fixture and level-init baselines |
 
 ---
 
 ## Empirical verification gate
 
-Per-spawn `mode` is **overridden** when the parent runs under `--dangerously-skip-permissions`. See `VERIFY-MODE.md`. The PreToolUse hook at `hooks/sandbox.sh` is the **only** worker-level enforcement layer; the static deny-list in `settings.local.template.json` is the backup.
+Per-spawn `mode` is **overridden** when the parent runs under `--dangerously-skip-permissions`. See `VERIFY-MODE.md`. The PreToolUse hook at `hooks/sandbox.sh` is the **only** worker-level enforcement layer; it is inherited by worker subagents from the runner session via `--settings runner-settings.json` (verified: `--settings` hooks reach `isolation:"worktree"` subagents). The native deny-list in `runner-settings.json` is the backup.
 
 ---
 
@@ -249,7 +249,7 @@ The runner refuses to start unless all of these hold. Specs are authored in-loop
 
 - [ ] `.claude/agents/autonomous-runner.md` exists.
 - [ ] `hooks/sandbox.sh` (executable, self-test green), `hooks/post-tool.{sh,py}` (executable, `--self-test` green).
-- [ ] `settings.local.template.json` exists.
+- [ ] `runner-settings.json` exists (PreToolUse sandbox + native deny-list, loaded via `--settings`).
 - [ ] `scripts/*` all executable: push, phase-verify, phase-diff, integrate-phase, a6-gate, launch-run, run-stats.{sh,py}, smoke.mjs.
 - [ ] `templates/*` all present: spec-author, worker, council, remediation.
 

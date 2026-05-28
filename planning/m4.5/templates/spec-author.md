@@ -24,6 +24,14 @@ Concrete requirements:
 - **DO NOT** lists anti-patterns specific to this phase. Examples: "do not change any public API not listed in After", "do not introduce new dependencies", "do not move existing tests".
 - **Rollback signal** describes the symptom that aborts the phase. Example: "test count drops below baseline", "build fails after 3 remediation attempts".
 
+## House style — keep authoring consistent
+
+Specs for the same phase must come out the same way run to run. Authoring variance, not worker error, is the main cause of phases that pass once and fail the next time. Anchor every design choice to the existing codebase, not to your own preference:
+
+- **Prefer existing files.** Put new types and functions in the most natural existing file already in scope. Introduce a new file only when no existing file is a sensible home, and when you do, justify it in one line in the Goal. Default bias: extend, do not create.
+- **Match existing patterns.** Before prescribing a decoupling or dependency-inversion mechanism, read how the touched modules already do it and prescribe the least-invasive option consistent with that style. Do not invent a new pattern (a new factory, a different injection style) when an existing one fits. Name the existing pattern you are matching in the spec.
+- **Minimize the touch list.** List the smallest set of files that achieves the goal. If you are unsure a file needs editing, leave it out; the worker's scope gate will surface it rather than letting it pass silently.
+
 ## Context you must read
 
 1. `{{PLAN_PATH}}` — full plan, especially §Framing, §Spec template, §Anti-creativity controls, §Verification gates, §Worker selection.

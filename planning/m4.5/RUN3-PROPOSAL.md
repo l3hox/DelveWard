@@ -92,16 +92,20 @@ The watchdog (1.3) needs a signal that distinguishes a working subagent from a h
 
 Spec authoring is non-reproducible (run-2's fresh A2 spec flipped the same worker output from pass to three violations). Full stabilization is long work; these are the cheap first measures, plus fixing the enforcement that silently failed.
 
-### 3.1 Make worker scope enforcement actually work
+### 3.1 Make worker scope enforcement actually work (built, tested)
 
-Precursor 2 shows the sandbox is reachable; precursor 3 shows why run-2's wiring failed. The fix has two layers, prevention and detection:
+Two layers, prevention and detection, both built and verified offline.
 
-**Prevention (the real fix): wire the sandbox into the runner session.** Move the PreToolUse sandbox from per-worktree injection (which never loaded) into the runner agent's frontmatter hooks, where every worker subagent inherits it. Two adjustments the precursors mandate:
+**Prevention: the sandbox is loaded via `--settings`, not frontmatter.** A placement finding surfaced while wiring this: agent-frontmatter hooks fire only in the runner's own session (run-2's frontmatter PostToolUse never tracked the worker), while hooks in `--settings` (and project settings) propagate to `isolation:"worktree"` subagents. Verified directly: a `--settings` PreToolUse hook fired inside a worker worktree and blocked the write. So the sandbox lives in `runner-settings.json`, loaded by `launch-run.sh` via `--settings`, scoped to the run (not global dev) and inherited by workers. Two precursor-mandated adjustments, both implemented in `sandbox.sh`:
 
-- Enforce the write allowlist only for writes whose path is inside a worktree (`.claude/worktrees/agent-*`), so the runner's own main-repo writes (specs, STATUS) are not blocked. The hook can discriminate on the file path it already receives.
-- Source the touch list from the main repo, not the worktree (which never sees the uncommitted list). The runner writes the active phase plus its rendered touch list to a fixed main-repo path; the hook reads from there rather than from `git rev-parse --show-toplevel` (which resolves to the worktree). Env vars do not work here because the active phase changes per spawn and cannot be re-exported into a long-running session's hooks.
+- Enforce the allowlist only for writes whose path is inside `.claude/worktrees/<agent>/`; the runner's own main-repo writes pass. Verified: runner write allowed, worker in-scope write allowed, worker out-of-scope write blocked.
+- Source the active phase from `planning/m4.5/scope/ACTIVE` and the touch list from the main repo (derived from the worktree path), since the worktree never sees the uncommitted list (precursor 3). The runner writes `ACTIVE` before each spawn. Env vars don't work here (the phase changes per spawn, can't be re-exported into a live session's hooks).
 
-**Detection (defense in depth): a deterministic post-worker gate.** Extend `phase-diff.sh` to compare changed files against the touch list and emit `out_of_scope=<comma-list>`. The runner treats a non-empty value as an automatic remediation trigger (same path as over-budget). Today scope violations are caught only by the runner's ad-hoc reasoning, which is exactly what failed silently in run-2 before the crash.
+**Detection: `phase-diff.sh` emits `out_of_scope`.** It compares changed files against the touch list (same glob matching as the sandbox) and emits `out_of_scope=none | <comma-list> | no-touch-list`. The runner remediates on any non-`none` value. Verified against real run-2 data: against the actual A2 worker output it flagged exactly `src/core/entityTypes.ts,src/enemies/enemyAI.test.ts` — the two files run-2 caught only by ad-hoc reasoning.
+
+### 3.1c Worktree integration mismatch (run-3 blocker, not yet fixed)
+
+Surfaced while wiring the above. The Agent tool's `isolation:"worktree"` manages its own worktree path (`.claude/worktrees/agent-<id>`), branch (`worktree-agent-<id>`), and base commit — none of which the runner chooses. But `integrate-phase.sh` assumes a runner-created worktree at `.worktrees/m4.5-A{N}` on branch `m4.5-A{N}` based on the run HEAD, and the loop steps hardcoded the same path. The diff/verify/cleanup steps are fixed to discover the real path (`WT` from `git worktree list`), but integration still cannot ff-merge an opaque agent branch off a possibly-stale base. **Run-3 cannot integrate a phase until this is resolved.** The fix needs design plus its own test (either teach `integrate-phase.sh` to take the discovered branch/path and handle the base, or stop using Agent isolation and have the runner create its own worktree at a known path). Tracked as the next blocker.
 
 ### 3.2 Constrain the spec-author template
 
@@ -126,9 +130,11 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] Stale-watchdog kills + restarts on composite-signal staleness; verified against simulated hangs (grace and stale branches).
 - [x] Hang handling: watchdog covers the run-level case; finer per-subagent cap deferred (see 1.4).
 - [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
-- [ ] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty.
-- [ ] `templates/spec-author.md` carries the house-style constraints.
-- [ ] All existing preflight gates still green (tsc, vitest, smoke).
+- [x] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty (verified against real run-2 A2 output).
+- [x] `templates/spec-author.md` carries the house-style constraints.
+- [x] Sandbox loaded via `--settings runner-settings.json`, scoped to worktree writes, sourcing scope from the main repo (verified with a child-session test).
+- [ ] **BLOCKER:** worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` handles the Agent-managed worktree branch/path/base.
+- [x] tsc + vitest green after the Conform changes (778 tests). Smoke not re-run (no `src/` changes); re-run at launch.
 
 When met, cut `m4.5-run-3` from `m4.5-preflight` and launch under the supervisor.
 

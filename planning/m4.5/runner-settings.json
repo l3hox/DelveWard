@@ -1,5 +1,5 @@
 {
-    "//": "M4.5 worker settings. Driver copies this into each worktree's .claude/settings.local.json at spawn.",
+    "//": "Loaded by launch-run.sh via --settings. Scopes the worker sandbox to the runner launch and propagates to worker subagents (verified: --settings hooks reach isolation:worktree subagents). The PreToolUse hook enforces the per-phase write allowlist for worktree writes and the Bash/Read deny-list; the permissions.deny array is a native backstop.",
     "permissions": {
         "deny": [
             "Bash(git push:*)",
@@ -24,7 +24,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash {REPO_ROOT}/planning/m4.5/hooks/sandbox.sh"
+                        "command": "bash planning/m4.5/hooks/sandbox.sh"
                     }
                 ]
             }

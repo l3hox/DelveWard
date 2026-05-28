@@ -30,6 +30,7 @@ USD_PER_MTOKEN="${USD_PER_MTOKEN:-8}"
 COUNCIL_DEPTH="${COUNCIL_DEPTH:-quick}"
 RUN_SESSION_ID="${RUN_SESSION_ID:-$(uuidgen | tr 'A-Z' 'a-z')}"
 RUN_RESUME="${RUN_RESUME:-0}"
+RUNNER_SETTINGS="${RUNNER_SETTINGS:-planning/m4.5/runner-settings.json}"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
@@ -80,10 +81,12 @@ fi
 # name, so pass only --resume and a kick prompt that re-enters the loop.
 if [ "$RUN_RESUME" = "1" ]; then
     CLAUDE_ARGS=(--dangerously-skip-permissions
+        --settings "$RUNNER_SETTINGS"
         --resume "$RUN_SESSION_ID"
         "Resume the autonomous run. Reconcile state from ${STATUS_PATH} per the Stricter Resume Gates in planning/m4.5/SAFETY-HATCHES.md, then continue the loop.")
 else
     CLAUDE_ARGS=(--dangerously-skip-permissions
+        --settings "$RUNNER_SETTINGS"
         --agent autonomous-runner
         --session-id "$RUN_SESSION_ID"
         --name "$RUN_BRANCH"
@@ -101,6 +104,7 @@ echo "  COUNCIL_DEPTH   = $COUNCIL_DEPTH"
 echo "  KEEPAWAKE       = ${KEEPAWAKE:-(none; relying on system power settings)}"
 echo "  RUN_SESSION_ID  = $RUN_SESSION_ID"
 echo "  RUN_RESUME      = $RUN_RESUME"
+echo "  RUNNER_SETTINGS = $RUNNER_SETTINGS"
 
 exec ${KEEPAWAKE} env \
     RUN_BASE_BRANCH="$RUN_BASE_BRANCH" \
