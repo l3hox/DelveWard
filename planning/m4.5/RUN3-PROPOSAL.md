@@ -18,6 +18,31 @@ Alpha defined a "verify first, then build" discipline and then skipped it twice.
 
 The precursor results decide the exact shape of the Measure and Conform work below. Do not build on assumptions these probes can settle in minutes.
 
+## Precursor results
+
+### Precursor 1 (resolved 2026-05-28): PostToolUse stdin is rich and structured
+
+A controlled child `claude` session with a stdin-dump hook settled this. Findings:
+
+- `transcript_path` **is** present in hook stdin (alongside `session_id`, `cwd`, `permission_mode`, `tool_use_id`, `duration_ms`).
+- The result field is `tool_response` (a dict), not `tool_result`.
+- The `<usage>` **text trailer does not exist.** Run-2's `total_tokens` stayed 0 because the hook regexed for `<usage>total_tokens: N`, a format the payload never had.
+- An Agent call's `tool_response` is a structured object carrying everything we wanted, live: `totalTokens`, a full `usage` breakdown (`input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `output_tokens`), `totalToolUseCount`, `totalDurationMs`, and `toolStats` (`bashCount`, `editFileCount`, `linesAdded`, `linesRemoved`).
+
+Consequence: token harvest is **live in the hook**, no transcript read required. Read `tool_response.totalTokens` directly and the `usage` split for exact (not blended) cost. Still to confirm on an `isolation:"worktree"` worker that the shape holds (precursor 2 covers that worker).
+
+### Precursor 2 (resolved 2026-05-28): PreToolUse hooks DO reach worktree subagents
+
+A child git repo with a PreToolUse hook (logs every fire, blocks any path containing `FORBIDDEN`) spawned an `isolation:"worktree"` subagent that attempted to write `FORBIDDEN.txt`. The hook fired for the subagent's Write, with the file path inside `.claude/worktrees/agent-<id>/`, and blocked it; the file was never created. So a sandbox **is** reachable inside workers, overturning the run-2 inference.
+
+The run-2 failure was the wiring channel, not unreachability. The sandbox was meant to be injected into the worktree's `settings.local.json`, but hooks propagate from the **runner session's** settings (proven here), and the runner's frontmatter carried only a PostToolUse hook, no PreToolUse sandbox. The fix is to wire the sandbox into the runner session's hooks, where every worker subagent inherits it.
+
+Two caveats this surfaces: (a) a parent-session hook also fires for the runner's own writes, so it must enforce the allowlist only for writes whose path is inside a worktree; (b) the hook must source the touch list from the main repo, since (per precursor 3) the worker never sees the uncommitted rendered list.
+
+### Precursor 3 (resolved 2026-05-28): worktrees see only committed state
+
+A local git probe (render an uncommitted file in the main repo, add a detached worktree at HEAD, check visibility) confirmed the uncommitted file is **not visible** in the worktree. This validates the run-2 mechanism: the runner renders `scope/A{N}.touch.txt` uncommitted in the main repo, so a worker in its worktree never sees it. Even if the sandbox loaded, its allowlist would be stale or absent. Conform 3.1's "commit or inject the touch list before the worker spawns" is therefore required, not optional.
+
 ## Theme 1 — Survive (the gate for a longer run)
 
 Without this, run-3 dies on the next transport blip and teaches nothing new.
@@ -46,14 +71,13 @@ Cap any single subagent or API call at a hard ceiling. A worker that exceeds it 
 
 ### 2.1 Token harvest at each subagent boundary
 
-The approach you proposed, and the robust one. The live PostToolUse hook does not receive usable `<usage>` in its stdin, but the trailer is reliably in the transcript (proven by `run-stats.sh`). So:
+Precursor 1 makes this simpler than first proposed: the data is live in the hook's `tool_response`, so no transcript read is needed.
 
-- On `tool_name == "Agent"`, the PostToolUse hook reads `transcript_path` (from its own stdin) and extracts the most recent Agent tool_result's `total_tokens` from its `<usage>` trailer, reusing the parse `run-stats.sh` already implements.
-- Append a granular record to `planning/m4.5/LOG/subagent-tokens.jsonl`: timestamp, phase, bucket, subagent_type, name, total_tokens. This is a per-subagent ledger gathered *as each subagent finishes*.
-- Feed the same number into the existing STATUS.md `stats.by_role.<bucket>.tokens` and `total_tokens` update logic, which already works once given real numbers.
-- Gated on precursor 1 confirming transcript timing (the Agent result is in the transcript when the hook fires). If timing is unreliable, fall back to reconciling the previous subagent's tokens on the next hook fire, or sweep at integrate-time.
+- On `tool_name == "Agent"`, the PostToolUse hook reads `tool_response.totalTokens` directly, plus the `usage` split (`input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `output_tokens`) for exact rather than blended cost.
+- Append a granular record to `planning/m4.5/LOG/subagent-tokens.jsonl`: timestamp, phase, bucket, subagent_type, name, totalTokens, the usage split, `totalDurationMs`, and `toolStats`. A per-subagent ledger written as each subagent finishes.
+- Feed the number into the existing STATUS.md `stats.by_role.<bucket>.tokens` and `total_tokens` update logic, which already works once given real numbers. The fix to the run-2 bug is to read the structured field instead of regexing a non-existent text trailer.
 
-Net: granular, mechanical, per-subagent token accounting without depending on the broken stdin path. Main-session tokens remain a post-hoc `run-stats.sh` artifact (they have the same subagent blind spot live).
+Net: granular, mechanical, exact-cost per-subagent accounting from the hook's own stdin. Main-session tokens remain a post-hoc `run-stats.sh` artifact (they have the same subagent blind spot live).
 
 ### 2.2 Composite liveness signal
 
@@ -67,11 +91,14 @@ Spec authoring is non-reproducible (run-2's fresh A2 spec flipped the same worke
 
 ### 3.1 Make worker scope enforcement actually work
 
-Two failures compound today: the sandbox does not load in the worker, and even if it did it would read a stale touch list. Until the sandbox is proven reachable (precursor 2), make enforcement deterministic at the gate the runner *does* control:
+Precursor 2 shows the sandbox is reachable; precursor 3 shows why run-2's wiring failed. The fix has two layers, prevention and detection:
 
-- Extend `phase-diff.sh` to compare changed files against `scope/A{N}.touch.txt` and emit `out_of_scope=<comma-list>` on its summary line. Today the runner notices scope violations by ad-hoc reasoning; this makes it a mechanical fact.
-- The runner treats a non-empty `out_of_scope` as an automatic remediation trigger (same path as over-budget). A worker that strays is forced back into scope rather than relying on the runner happening to notice.
-- If precursor 2 shows the sandbox can be made to load, also commit (or inject) the rendered touch list before the worker spawns so the PreToolUse allowlist is correct. Belt and suspenders.
+**Prevention (the real fix): wire the sandbox into the runner session.** Move the PreToolUse sandbox from per-worktree injection (which never loaded) into the runner agent's frontmatter hooks, where every worker subagent inherits it. Two adjustments the precursors mandate:
+
+- Enforce the write allowlist only for writes whose path is inside a worktree (`.claude/worktrees/agent-*`), so the runner's own main-repo writes (specs, STATUS) are not blocked. The hook can discriminate on the file path it already receives.
+- Source the touch list from the main repo, not the worktree (which never sees the uncommitted list). The runner writes the active phase plus its rendered touch list to a fixed main-repo path; the hook reads from there rather than from `git rev-parse --show-toplevel` (which resolves to the worktree). Env vars do not work here because the active phase changes per spawn and cannot be re-exported into a long-running session's hooks.
+
+**Detection (defense in depth): a deterministic post-worker gate.** Extend `phase-diff.sh` to compare changed files against the touch list and emit `out_of_scope=<comma-list>`. The runner treats a non-empty value as an automatic remediation trigger (same path as over-budget). Today scope violations are caught only by the runner's ad-hoc reasoning, which is exactly what failed silently in run-2 before the crash.
 
 ### 3.2 Constrain the spec-author template
 
@@ -91,7 +118,7 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 
 ## Acceptance criteria for "preflight ready for run-3"
 
-- [ ] Precursors 1 to 3 run and their results recorded in this file.
+- [x] Precursors 1 to 3 run and their results recorded in this file.
 - [ ] `supervise-run.sh` exists: launches, restarts on crash with a cap, writes NOTIFY on give-up.
 - [ ] Stale-watchdog kills + restarts on composite-signal staleness; dry-run verified against a simulated hang.
 - [ ] Per-operation wall-clock cap wired into worker dispatch.
