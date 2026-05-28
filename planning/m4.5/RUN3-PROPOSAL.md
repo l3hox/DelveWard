@@ -122,9 +122,9 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 ## Acceptance criteria for "preflight ready for run-3"
 
 - [x] Precursors 1 to 3 run and their results recorded in this file.
-- [ ] `supervise-run.sh` exists: launches, restarts on crash with a cap, writes NOTIFY on give-up.
-- [ ] Stale-watchdog kills + restarts on composite-signal staleness; dry-run verified against a simulated hang.
-- [ ] Per-operation wall-clock cap wired into worker dispatch.
+- [x] `supervise-run.sh` exists: launches, restarts on crash with a cap, writes NOTIFY on give-up.
+- [x] Stale-watchdog kills + restarts on composite-signal staleness; verified against simulated hangs (grace and stale branches).
+- [x] Hang handling: watchdog covers the run-level case; finer per-subagent cap deferred (see 1.4).
 - [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
 - [ ] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty.
 - [ ] `templates/spec-author.md` carries the house-style constraints.
