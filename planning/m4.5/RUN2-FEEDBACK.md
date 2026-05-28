@@ -23,7 +23,7 @@ The runner crashed with `API Error: The socket connection was closed unexpectedl
 
 The session ended on that error. The CLI process did **not** exit: it lingered as a zombie (PID 6930) for ~9 h 53 m until killed during this post-mortem.
 
-**Fix landed:** `launch-run.sh` now wraps the run in `caffeinate -ims` when available, holding the no-idle-sleep / no-disk-sleep / no-system-sleep-on-AC assertion for the lifetime of the run. Recommended additionally: run on AC power.
+**Fix landed:** `launch-run.sh` now wraps the run in a keep-awake lock for its whole lifetime: `caffeinate -ims` on macOS, `systemd-inhibit --what=sleep:idle` on Linux, nothing if neither exists (a server that never idle-sleeps). Recommended additionally: run on AC power. This removes the *sleep* trigger but not the general class of transport drops (see Candidate fixes).
 
 ## What worked
 
@@ -75,6 +75,43 @@ The A2 worker output (`run-2-A2-wip`, +76 / -45 across seven files) deviated fro
 The notable finding: run-1's A2 worker did **the same things** (new `entityTypes.ts`, constructor injection) and run-1 integrated it cleanly. The difference is the spec. Each run re-authors the A2 spec from scratch (the lab-purity decision), and run-2's spec happened to be stricter and more prescriptive than run-1's, reclassifying the worker's natural approach as violations.
 
 This is a real property of in-loop spec authoring: it is non-deterministic, and spec strictness varies run to run. The same worker behavior can pass one run and fail the next. Worth deciding whether spec authoring should be constrained toward a house style, or whether this variance is acceptable lab signal.
+
+## Liveness and telemetry: what signal would have caught this
+
+Reconstructed from the runner's session JSONL (285 timestamped events). The question: is any telemetry channel a reliable "the runner is alive and progressing" signal? Answer: not on its own, and the reason is structural.
+
+**Every parent-side channel froze at the same instant.** The last real activity was 20:23:52 (an assistant turn ending "Let me run the diff script"). The next event is the socket error at 21:28:25. So across the 64.5-minute death window: the STATUS.md heartbeat (last tool call 20:23:16), the JSONL mtime (last event 20:23:52), and the token counter (cache-read frozen at 126,753) all stopped within 36 seconds of each other. No parent channel was meaningfully earlier than the heartbeat.
+
+**The subagent blind spot is the core problem.** While a subagent runs, the parent session emits *zero* events to its own transcript. Evidence: the A2 worker ran from 20:11:21 (Agent tool_use) to 20:20:48 (its tool_result) with no parent events in between, a legitimate 9.4-minute silence. Heartbeat, parent-JSONL mtime, and token usage all freeze identically during a normal subagent as during a hang. None of them can tell "deep in a 9-minute worker" apart from "dead."
+
+Consequences for a liveness design:
+
+| Signal | Advances on | Blind during | Verdict |
+|---|---|---|---|
+| STATUS.md heartbeat | parent tool call | subagent exec, long reasoning, hung API | weak |
+| Parent JSONL mtime | any parent event | subagent exec, hung API | same blind spots as heartbeat |
+| Parent token usage | per parent turn | subagent exec, hung API | same again |
+| Worktree file mtime | worker writing files | only when no worker is active | the missing worker-liveness signal |
+| Process liveness (`ps`) | always | a hung process still looks alive | detects exit, not hang |
+
+The robust design is not a better single channel but a **composite staleness watchdog plus a per-operation wall-clock cap**: declare stalled when nothing across {parent transcript, active worktree files} advances for longer than the longest legitimate operation, and hard-cap any single subagent or API call. Run-2 also shows the watchdog must *act*, not just observe: the hung request did not self-surface an error for 65 minutes, and the monitor that did see the stale heartbeat had no mandate to intervene.
+
+Token telemetry specifically: usage is present on every parent turn (input≈1, the rest cache-read), so a live reader *could* track per-turn deltas, but it inherits the same subagent blind spot. This confirms the decision to keep token totals as a post-hoc `run-stats.sh` artifact rather than a live signal.
+
+## Alpha hypotheses: how they held
+
+Alpha (run-2) was a designed experiment, not just another run. Scoring its hypotheses against the evidence:
+
+| Hypothesis (from ALPHA-SCOPE) | Verdict | Evidence |
+|---|---|---|
+| Bookkeeping mechanization fixes run-1's heartbeat/stats drift | **validated** | Spawn count exact: STATUS recorded 3 with correct by-role split, vs run-1's prose approach losing ~60%. Heartbeat fired on every tool call until the hang. The hook owns it reliably. |
+| PostToolUse hook receives `<usage>` token data | **failed (answer: no)** | `total_tokens` stayed 0. The hook fires and gets tool_name + tool_input (so spawn counting works) but no tool_result carrying the `<usage>` trailer. The "verify first" precursor was deferred, not run; the defensive both-paths hook meant the run still worked via post-hoc tokens. β must read tokens from the transcript. |
+| Thin-script offloading reduces context/cost | **largely untested** | Only `phase-diff.sh` ran (once). `phase-verify.sh`, `integrate-phase.sh`, `run-stats.sh`, `a6-gate.sh` never executed; the run died before any verification gate. The mechanism we wanted to validate barely ran. |
+| Slim runner prompt doesn't break behavior | **partial pass** | The runner authored + sealed the spec, ran the worker, and crucially did not trust the worker's self-reported PASS, catching three violations independently. That core behavior survived the slimming. Short run limits confidence. |
+| Token/cost drop (47M→10-15M, $22→$5-8) | **inconclusive** | 12.96M / $6.50 lands in the predicted range, but run-2 reached only A2 where run-1 reached A2+A4. Not apples-to-apples; the saving owes more to the slim prompt and early death than to thin scripts. Cache-read share identical (97%). |
+| A2 spec re-authoring is reproducible | **failed (answer: no)** | Run-2's fresh spec mandated the *existing* `types.ts` and a module-level factory; run-1's spec allowed a *new* `entityTypes.ts` and constructor injection. The worker's near-identical output passed run-1 and was flagged as three violations in run-2. Authoring variance is large enough to flip pass/fail. |
+
+The last row is the most consequential for β: in-loop spec authoring is non-deterministic enough to change outcomes, so β needs either spec stabilization (house-style constraints, worked examples in the authoring prompt) or a human seal before workers run.
 
 ## Candidate fixes for the run system
 
