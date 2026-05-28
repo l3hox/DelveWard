@@ -1,5 +1,12 @@
 #!/bin/bash
-# planning/m4.5/scripts/integrate-phase.sh A{N}
+# planning/m4.5/scripts/integrate-phase.sh <phase> <worktree-branch> <worktree-path>
+#
+#   e.g. integrate-phase.sh A2 worktree-agent-abc123 .claude/worktrees/agent-abc123
+#
+# The worktree branch and path are not derivable: Agent isolation:"worktree"
+# creates an opaque branch (worktree-agent-<id>) at .claude/worktrees/agent-<id>,
+# based on the run branch HEAD at spawn time. The runner discovers both from
+# `git worktree list` and passes them in.
 #
 # Atomic phase integration:
 #   1. Commit worker-left changes in the phase worktree (worker contract says it doesn't commit).
@@ -7,8 +14,9 @@
 #   3. Tag m4.5-A{N}-done at the merged HEAD.
 #   4. Append a structured `done` block to planning/m4.5/LOG/A{N}.md.
 #
-# Refuses to run on main/master. Refuses if the worktree branch diverges from
-# the run branch (the runner is supposed to keep them aligned).
+# Refuses on main/master. Refuses if the worktree branch diverges from the run
+# branch — which happens only if the run branch advanced after the worker spawned,
+# so the runner must not commit to the run branch mid-phase.
 #
 # STATUS.md updates are the runner's job, not this script's — the runner reads
 # the structured stdout below ("integrate: ok ...") and updates STATUS.md atomically.
@@ -16,12 +24,16 @@
 set -euo pipefail
 
 PHASE="${1:-}"
-[ -n "$PHASE" ] || { echo "usage: $0 A{N}" >&2; exit 2; }
+WORKTREE_BRANCH="${2:-}"
+WORKTREE_PATH="${3:-}"
+[ -n "$PHASE" ] && [ -n "$WORKTREE_BRANCH" ] && [ -n "$WORKTREE_PATH" ] || {
+    echo "usage: $0 <phase> <worktree-branch> <worktree-path>" >&2
+    echo "  e.g.: $0 A2 worktree-agent-abc123 .claude/worktrees/agent-abc123" >&2
+    exit 2
+}
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 RUN_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)"
-WORKTREE_BRANCH="m4.5-${PHASE}"
-WORKTREE_PATH="${REPO_ROOT}/.worktrees/${WORKTREE_BRANCH}"
 TAG="m4.5-${PHASE}-done"
 
 if [ "$RUN_BRANCH" = "main" ] || [ "$RUN_BRANCH" = "master" ]; then

@@ -3,4 +3,5 @@ dist/
 .DS_Store
 *.local
 .worktrees/
+.claude/worktrees/
 .claude/scheduled_tasks.lock

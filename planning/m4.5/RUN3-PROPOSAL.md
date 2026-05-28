@@ -103,9 +103,16 @@ Two layers, prevention and detection, both built and verified offline.
 
 **Detection: `phase-diff.sh` emits `out_of_scope`.** It compares changed files against the touch list (same glob matching as the sandbox) and emits `out_of_scope=none | <comma-list> | no-touch-list`. The runner remediates on any non-`none` value. Verified against real run-2 data: against the actual A2 worker output it flagged exactly `src/core/entityTypes.ts,src/enemies/enemyAI.test.ts` — the two files run-2 caught only by ad-hoc reasoning.
 
-### 3.1c Worktree integration mismatch (run-3 blocker, not yet fixed)
+### 3.1c Worktree integration mismatch (resolved)
 
-Surfaced while wiring the above. The Agent tool's `isolation:"worktree"` manages its own worktree path (`.claude/worktrees/agent-<id>`), branch (`worktree-agent-<id>`), and base commit — none of which the runner chooses. But `integrate-phase.sh` assumes a runner-created worktree at `.worktrees/m4.5-A{N}` on branch `m4.5-A{N}` based on the run HEAD, and the loop steps hardcoded the same path. The diff/verify/cleanup steps are fixed to discover the real path (`WT` from `git worktree list`), but integration still cannot ff-merge an opaque agent branch off a possibly-stale base. **Run-3 cannot integrate a phase until this is resolved.** The fix needs design plus its own test (either teach `integrate-phase.sh` to take the discovered branch/path and handle the base, or stop using Agent isolation and have the runner create its own worktree at a known path). Tracked as the next blocker.
+The Agent tool's `isolation:"worktree"` manages its own path (`.claude/worktrees/agent-<id>`) and branch (`worktree-agent-<id>`), but a probe settled the base question: it bases the worktree on the **run branch HEAD at spawn time**, not a stale commit. Run-2's apparent stale base was the run branch advancing *after* the worker spawned.
+
+Fixed (Option A, adapt):
+- `integrate-phase.sh` now takes the discovered branch + path as arguments instead of assuming `m4.5-A{N}` / `.worktrees/m4.5-A{N}`; the runner reads both from `git worktree list` (step 6) and passes them (step 11). The done-tag stays `m4.5-A{N}-done`.
+- A new runner constraint forbids committing to the run branch between spawn and integrate, so run-HEAD stays equal to the worktree base and the ff-merge always holds; `integrate-phase.sh` keeps its divergence guard as a backstop.
+- `.claude/worktrees/` is gitignored so an Agent worktree can't be embedded or trip the clean-tree check.
+
+Verified offline against a faithful Agent-style worktree: happy-path ff-merge with the discovered branch (tag + LOG written), and the divergence guard refusing (exit 6, no tag) when the run branch advanced.
 
 ### 3.2 Constrain the spec-author template
 
@@ -133,7 +140,7 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty (verified against real run-2 A2 output).
 - [x] `templates/spec-author.md` carries the house-style constraints.
 - [x] Sandbox loaded via `--settings runner-settings.json`, scoped to worktree writes, sourcing scope from the main repo (verified with a child-session test).
-- [ ] **BLOCKER:** worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` handles the Agent-managed worktree branch/path/base.
+- [x] Worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` takes the discovered branch/path; runner keeps HEAD stable; verified offline.
 - [x] tsc + vitest green after the Conform changes (778 tests). Smoke not re-run (no `src/` changes); re-run at launch.
 
 When met, cut `m4.5-run-3` from `m4.5-preflight` and launch under the supervisor.
