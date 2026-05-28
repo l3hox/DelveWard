@@ -393,6 +393,6 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', '.worktrees/**'],
+    exclude: ['node_modules/**', 'dist/**', '.worktrees/**', '.claude/worktrees/**'],
   },
 });
