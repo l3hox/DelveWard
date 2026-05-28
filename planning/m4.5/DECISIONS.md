@@ -1,6 +1,8 @@
 # M4.5 — Architecture Decision Record
 
-Consolidated decisions made during the M4.5 autonomous-run-system design and run-1. Each entry follows ADR shape: context, decision, alternatives, consequences. Intended for future maintainers, for the eventual extraction to a standalone autonomous-run tool, and for integration into the forge-* ecosystem.
+Consolidated decisions made during the M4.5 autonomous-run-system design, run-1, run-2, and the pre-run-3 council review. Each entry follows ADR shape: context, decision, alternatives, consequences. Intended for future maintainers, for the eventual extraction to a standalone autonomous-run tool, and for integration into the forge-* ecosystem.
+
+ADR-M45-0001 through 0012 are the design/run-1 decisions; 0013 through 0023 capture run-2's failure analysis (idle-sleep, resilience), the empirically-corrected harness facts (hook placement, token shape, worktree mechanics), the council's run-3 blockers (gate-sees-uncommitted, deny-by-default sandbox, watchdog hardening), the tiered threat model, the live-A2 launch gate, and the StrongDM Attractor reference.
 
 ID format: `ADR-M45-NNNN`. Dates are in 2026 unless noted.
 
@@ -484,6 +486,347 @@ C. Soft cap (warn but don't stop). Rejected per Ops council ("soft caps that war
 
 ---
 
+## ADR-M45-0013 — Host must not idle-sleep during a run; keep-awake wrapper
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+Run-2 died at ~92 min when the laptop (on battery, `pmset sleep 1`) idle-slept and severed the in-flight API socket (`socket connection closed unexpectedly`). macOS idle-sleep keys on user (HID) inactivity, not CPU/network, so a busy `claude` process does not prevent it without a power assertion. The process lingered as a zombie for ~9h with no signal. A `pmset -g log` check confirmed the sleep.
+
+### Decision
+
+`launch-run.sh` wraps the run in a keep-awake lock for its whole lifetime: `caffeinate -ims` (macOS), `systemd-inhibit --what=sleep:idle` (Linux), nothing if neither exists (a server that never idle-sleeps). Recommended additionally: run on AC power.
+
+### Alternatives considered
+
+A. Rely on the process being busy. Rejected: idle-sleep ignores process activity.
+B. Disable system sleep globally. Rejected: too invasive; scoped keep-awake is cleaner and reverts on exit.
+
+### Consequences
+
+**Positive**: removes the run-2 failure trigger; cross-platform; no-op where unneeded; crash-safe (empty expansion under `set -u`).
+**Negative**: does not address other transport drops (general API blips) — that needs the supervisor (ADR-M45-0014).
+
+### References
+
+- `scripts/launch-run.sh`
+- `RUN2-FEEDBACK.md` root cause
+
+---
+
+## ADR-M45-0014 — External supervisor: watchdog + configurable resume-then-fresh restart
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+A multi-hour run will hit transient API drops. Run-2 had no recovery: one socket error ended the run, left a zombie, and wrote no terminal signal. The runner cannot resurrect itself.
+
+### Decision
+
+`supervise-run.sh` owns the run lifecycle from outside, in detached tmux (the runner is an interactive ScheduleWakeup loop; headless `-p` would not re-fire the loop). It restarts on crash or hang and stops on a terminal NOTIFY.
+
+- Restart cadence is configurable via `RESUME_RETRIES` (default 1): the first N restarts `claude --resume` the same session (cheap continuity, verified to retain context); subsequent restarts scratch and launch a fresh runner that reconciles from STATUS.md.
+- `MAX_RESTARTS` (default 5) caps the loop; on exhaustion the supervisor writes `BLOCKED supervisor-give-up` to NOTIFY (closing run-2's silent-death gap).
+- Crash detection is primarily the stale-liveness watchdog, not process exit: an API drop leaves the runner idle-not-exited (run-2's zombie). tmux-session-ended is the secondary signal.
+
+### Alternatives considered
+
+A. In-runner retry. Rejected: the runner can't recover its own dead session.
+B. Headless runner. Rejected: the ScheduleWakeup loop needs an interactive REPL.
+C. Resume-always or fresh-always. Rejected in favor of a configurable knob (a future UI can set it).
+
+### Consequences
+
+**Positive**: survives transport drops; bounded restarts; terminal signal on give-up; scoped to the run via tmux, not global. Restart cadence verified with a fake-launcher loop test.
+**Negative**: tmux dependency; the watchdog must act (kill + restart), so a misconfigured threshold could kill wrongly (see ADR-M45-0020).
+
+### References
+
+- `scripts/supervise-run.sh`
+- `scripts/launch-run.sh` (`RUN_SESSION_ID` / `RUN_RESUME` / `--settings`)
+- `RUN2-FEEDBACK.md` candidate fixes
+
+---
+
+## ADR-M45-0015 — Token accounting from structured `tool_response`, not a `<usage>` trailer
+
+**Status**: accepted (refines ADR-M45-0004)
+**Date**: 2026-05-28
+
+### Context
+
+ADR-M45-0004 left open whether the PostToolUse hook receives token data. Run-2 logged `total_tokens: 0`. A precursor probe (dump the hook's stdin on an Agent spawn) showed the `<usage>total_tokens: N` text trailer the hook regexed for **never existed**. The Agent `tool_response` is a structured dict: `totalTokens`, a full `usage` split (input / cache-read / cache-create / output), `totalToolUseCount`, `totalDurationMs`, `toolStats`. The hook stdin also carries `transcript_path`, `cwd`, `tool_use_id`.
+
+### Decision
+
+The PostToolUse hook reads `tool_response.totalTokens` (and the `usage` split for exact cost) directly from its stdin — no transcript read. It appends a per-subagent record to `LOG/subagent-tokens.jsonl` and updates STATUS. Main-session tokens remain a post-hoc `run-stats.sh` artifact.
+
+### Alternatives considered
+
+A. Regex a text trailer (run-2 design). Rejected: the trailer does not exist.
+B. Read the transcript at each subagent boundary. Rejected as unnecessary — the data is live in the hook's stdin.
+
+### Consequences
+
+**Positive**: granular, exact-cost per-subagent accounting from the hook's own input; fixes the run-2 `tokens=0` bug; verified by `--self-test` and a live stdin test.
+**Negative**: relies on the structured `tool_response` shape, which is empirically verified but may drift across Claude Code versions — re-verify on upgrade.
+
+### References
+
+- `hooks/post-tool.py`
+- `RUN3-PROPOSAL.md` precursor 1
+
+---
+
+## ADR-M45-0016 — Hook placement: frontmatter is parent-only; `--settings` propagates to workers
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+Run-2's worker wrote out-of-scope files despite a PreToolUse sandbox meant to constrain it. A precursor showed why: agent-frontmatter hooks fire only for the runner's own tool calls (run-2's frontmatter PostToolUse never tracked the worker), while hooks loaded via `--settings` (and project settings) **do** propagate to `isolation:"worktree"` subagents. The two co-exist without overriding each other (verified directly).
+
+### Decision
+
+- The worker sandbox (PreToolUse) lives in `runner-settings.json`, loaded via `launch-run.sh --settings`, so it reaches workers and is scoped to the run (not global dev).
+- Bookkeeping (PostToolUse) stays in the runner agent frontmatter — it fires for the runner's own Agent calls (where `tool_response.totalTokens` is available) and not inside workers (whose cwd would mis-resolve `STATUS_PATH`).
+
+### Alternatives considered
+
+A. Inject the sandbox into each worktree's `settings.local.json` (run-2 design). Rejected: hooks load from session settings, not the worktree, and a worktree is a separate committed-state checkout that never sees the uncommitted file (ADR-M45-0017).
+B. Put the sandbox in project settings. Rejected: too global — the Bash deny-list would block normal `git push` during ordinary dev.
+
+### Consequences
+
+**Positive**: the sandbox actually reaches workers; co-existence with frontmatter bookkeeping verified; run-scoped. The obsolete `settings.local.template.json` was removed.
+**Negative**: relies on `--settings` propagation semantics (verified empirically; re-verify on upgrade).
+
+### References
+
+- `runner-settings.json`, `hooks/sandbox.sh`, `scripts/launch-run.sh`
+- `RUN3-PROPOSAL.md` precursor 2
+
+---
+
+## ADR-M45-0017 — Integration adapts to Agent-managed worktrees
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+`Agent(isolation:"worktree")` creates a worktree at `.claude/worktrees/agent-<id>` on branch `worktree-agent-<id>` — paths and branch the runner does not choose. The original `integrate-phase.sh` assumed a runner-created `.worktrees/m4.5-A{N}` on branch `m4.5-A{N}`. A probe established the base: the worktree is based on the **run branch HEAD at spawn time** (run-2's apparent "stale base" was the run branch advancing after spawn).
+
+### Decision
+
+- `integrate-phase.sh` takes the discovered branch + path as arguments; the runner reads both from `git worktree list` (loop step 6) and passes them (step 11). The done-tag stays `m4.5-A{N}-done`.
+- New runner constraint: **never commit to the run branch between spawn and integrate**, so run-HEAD stays equal to the worktree base and the ff-merge always holds. The divergence guard remains as a backstop.
+- `.claude/worktrees/` is gitignored.
+
+### Alternatives considered
+
+A. Have the runner create its own worktree at a known path (drop Agent isolation). Rejected: more invasive; loses the clean `.claude/worktrees/` discriminator the sandbox relies on (ADR-M45-0019).
+
+### Consequences
+
+**Positive**: integration works with Agent-managed worktrees; ff-merge guaranteed by the HEAD-stability constraint. Verified by a functional git test (happy-path ff + divergence refusal).
+**Negative**: a runner that violates HEAD-stability gets a refused integration — caught by the guard, but it halts the phase.
+
+### References
+
+- `scripts/integrate-phase.sh`, `.claude/agents/autonomous-runner.md`
+- `RUN3-PROPOSAL.md` precursor 3 + section 3.1c
+
+---
+
+## ADR-M45-0018 — The scope/verification gate must see uncommitted worker output
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+A four-specialist council review found the Conform gate inert at runtime. Workers leave changes uncommitted (worker contract); `phase-diff.sh` used `git diff BASE..HEAD` (commit-to-commit), so HEAD still equalled base → `files=0`, `out_of_scope=none`, empty patch → scope, budget, and council all passed on nothing, and a no-op worker would integrate as "done." The earlier "flagged exactly entityTypes.ts" check was a false green: it ran against committed run-2 data, the one path that won't recur live.
+
+### Decision
+
+`phase-diff.sh` stages the worker's output (`git add -A`) and diffs `--cached` against base, capturing modifications and new files. `files=0` now means a no-op worker → the runner remediates and never integrates a zero-diff phase. Scope matching is delegated to `scope-check.py --match` (shared with the sandbox, ADR-M45-0019).
+
+### Alternatives considered
+
+A. Commit in the worktree before diffing. Equivalent; staging is lighter and integrate-phase still commits.
+B. Diff the working tree without staging (`git diff BASE`). Rejected: misses new files.
+
+### Consequences
+
+**Positive**: the gate sees real changes; no-op workers caught; verified on an uncommitted worktree (`files=4`, deep + evil flagged) and a no-op worktree (`files=0`).
+**Negative**: phase-diff now mutates the worktree index (benign; integrate re-stages).
+
+### References
+
+- `scripts/phase-diff.sh`
+- `RUN3-PROPOSAL.md` Council review (blocker 2)
+
+---
+
+## ADR-M45-0019 — Worker sandbox is deny-by-default, discriminated by writer cwd, canonicalized
+
+**Status**: accepted (supersedes the alpha allow-by-default sandbox)
+**Date**: 2026-05-28
+
+### Context
+
+The council found the worker sandbox open: it enforced the allowlist only for paths containing `.claude/worktrees/`, so a worker writing an absolute path elsewhere (main repo, its own `scope/ACTIVE` / `sandbox.sh`, `~/.claude`, `~/.zshrc`) hit a default-*allow* branch, with no Write deny backstop. The bash `case` glob also let `*` cross `/`, granting whole subtrees. With the post-hoc gate inert (ADR-M45-0018), this PreToolUse hook was the sole runtime containment — and it was bypassable.
+
+### Decision
+
+`scope-check.py` decides Write/Edit by **writer context** (the session `cwd`): a worker (cwd inside a worktree) may only write paths that canonicalize (`realpath`, resolving `..` and symlinks) INSIDE its worktree AND match a slash-respecting, segment-wise matcher against the committed touch list; everything else is denied. The runner's own writes (cwd in the main repo) pass. `sandbox.sh` delegates to it. `runner-settings.json` adds native Write denies for `~/.ssh` / `~/.claude` / etc. as a backstop. The active phase is read from `scope/ACTIVE` (a file), not an env var (the phase changes per spawn and can't be re-exported into a live session's hooks).
+
+### Alternatives considered
+
+A. Allow-by-default outside worktrees (alpha design). Rejected: the escape above.
+B. Tighten the bash command deny-list as the containment. Rejected: a denylist can't contain an adversarial shell (ADR-M45-0021).
+
+### Consequences
+
+**Positive**: closes the write escape and the glob-leak in one change; matcher shared with phase-diff; verified live (in-scope allowed; deep-out-of-scope, outside-worktree, and `..`-escape all blocked) plus `--self-test`.
+**Negative**: a worktree subdir cwd must resolve to the worktree root; relies on the hook receiving `cwd` (verified).
+
+### References
+
+- `hooks/scope-check.py`, `hooks/sandbox.sh`, `runner-settings.json`
+- `RUN3-PROPOSAL.md` Council review (blocker 1)
+
+---
+
+## ADR-M45-0020 — Watchdog scoped to the active worktree; orphan GC; resume quarantine
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+The supervisor's composite-liveness signal scanned all of `.claude/worktrees`, so a leaked worktree's stale mtimes kept the liveness clock falsely fresh and could mask a real hang. Watchdog kills also orphaned worktrees/branches (reconcile only `prune`s), leaking disk and corrupting the next liveness window; and the resume path tolerated a dirty tree, which could silently integrate worker-planted main-tree files.
+
+### Decision
+
+- The watchdog scopes liveness to the active worktree only — the runner writes its path to `scope/ACTIVE_WORKTREE`; the supervisor reads it.
+- `gc_worktrees` reclaims orphan agent worktrees + branches before each (re)launch (no runner active then).
+- `quarantine_main_tree` stashes unexpected main-tree changes (anything outside `planning/m4.5/`) on resume instead of integrating them. Relies on `planning/m4.5/` being tracked so untracked files inside show with full paths (avoids `-uall`, which the repo bans).
+
+### Alternatives considered
+
+A. Scan all worktrees (original). Rejected: false liveness.
+B. Identify the active worktree by newest ctime. Rejected: fragile; the explicit pointer file is unambiguous.
+
+### Consequences
+
+**Positive**: trustworthy liveness; bounded disk; planted files don't silently integrate. Verified by a functional git test.
+**Negative**: depends on the runner maintaining `scope/ACTIVE_WORKTREE`; a long quiet worker operation (build/test, council) can still approach `STALE_SECONDS` — tune the threshold.
+
+### References
+
+- `scripts/supervise-run.sh`, `.claude/agents/autonomous-runner.md`
+- `RUN3-PROPOSAL.md` Council review (blocker 3)
+
+---
+
+## ADR-M45-0021 — Threat model: tiered containment; a denylist can't contain an adversarial LLM
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+The run launches under `--dangerously-skip-permissions`; the sandbox is the only worker-level enforcement. Security raised that a Bash denylist (exfil via python/cp/curl, `git -C . push`, env indirection) is unwinnable against an adversarial LLM with full shell.
+
+### Decision
+
+Tier the containment to the use case:
+
+- **Own repo, throwaway branch, cooperative sealed-spec workers (run-3 now):** deny-by-default writes (ADR-M45-0019) is the real boundary; the command deny-list is defense-in-depth; recommended hardening is OS-level network-egress block + read-only `$HOME` / `~/.claude` / `~/.ssh`.
+- **Generalized / untrusted-input goal (post-β):** OS isolation — container + seccomp + network policy — and drop `--dangerously-skip-permissions` for an explicit allowlist.
+
+### Alternatives considered
+
+A. Treat regex hardening as the containment. Rejected: false confidence.
+B. Require full OS isolation before run-3. Rejected: disproportionate for the user's own throwaway-branch run.
+
+### Consequences
+
+**Positive**: honest about what the sandbox does and doesn't guarantee; a cheap bar now, a clear bar later.
+**Negative**: the cheap bar relies on workers being cooperative (sealed specs, not adversarial prompts) — true today, not for the generalized goal.
+
+### References
+
+- `hooks/sandbox.sh`, `SAFETY-HATCHES.md`
+- `RUN3-PROPOSAL.md` Council review (disagreement resolution)
+
+---
+
+## ADR-M45-0022 — Pre-launch gate: one attended live A2 dry run
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+Every run-3 fix was proven on offline proxies (self-tests, fake launchers, child-session hook tests). The full live chain — real runner → worker → sandbox → diff → council → integrate — has never executed once, and the empty-diff false green showed offline proxies can mislead.
+
+### Decision
+
+Before any unattended run-3, run one **attended A2-only dry run** that must show all five: (1) uncommitted worker → `files>0`; (2) a deep out-of-scope / outside-worktree write blocked by the sandbox AND flagged by phase-diff; (3) clean path `out_of_scope=none`, integrate produces a non-empty diff + `m4.5-A2-done`; (4) heartbeat + `subagent-tokens.jsonl` advance (both hooks fire); (5) no spurious watchdog kill during a normal-length council. All green → proceed unattended.
+
+### Alternatives considered
+
+A. Launch unattended on the strength of offline tests. Rejected: the live integration is the one untested surface, and a wasted multi-hour run is expensive.
+
+### Consequences
+
+**Positive**: cheap insurance (one phase) against a wasted run; validates the live integration once.
+**Negative**: requires an attended session for the gate.
+
+### References
+
+- `RUN3-PROPOSAL.md` Acceptance criteria + Council review (QA's gate)
+
+---
+
+## ADR-M45-0023 — StrongDM Attractor as the post-β architecture reference
+
+**Status**: proposed
+**Date**: 2026-05-28
+
+### Context
+
+StrongDM's Attractor is a non-interactive coding-agent spec: a run is a directed graph (Graphviz DOT), nodes are work phases with prompts, edges are NL-evaluated transitions, with an Interviewer abstraction for any human frontend. It is the same problem space as this orchestrator, more mature on workflow modeling.
+
+### Decision
+
+Adopt Attractor's **patterns** (not a dependency) as the reference for the post-β orchestrator: a declarative graph pipeline (vs. the current imperative loop), and the Interviewer seam (orchestrator headless, frontend pluggable — aligns with the β GUI). Model/agent-agnostic by design. Not now; a β→post-β direction.
+
+### Alternatives considered
+
+A. Adopt Attractor's spec/implementation directly. Premature; it is a spec, not a drop-in library (a third-party TS implementation exists).
+B. Ignore it. Rejected: it validates the spec-as-design bet and offers a stronger workflow model.
+
+### Consequences
+
+**Positive**: a proven external reference for the graph + Interviewer model; possible fidelity measurement via attractorbench.
+**Negative**: integration is real work, not `npm install`; revisit when β stabilizes.
+
+### References
+
+- github.com/strongdm/attractor
+- `RUN3-PROPOSAL.md` (StrongDM note), `BETA-ARCHITECTURE.md`
+
+---
+
 ## Decisions not formally captured
 
 These are smaller / technical / already documented elsewhere; included as a cross-reference for completeness.
@@ -492,13 +835,14 @@ These are smaller / technical / already documented elsewhere; included as a cros
 |---|---|
 | Fix same-level stair pair validators | `src/level/levelLoader.ts`, `src/editor/EditorApp.ts` (cherry-picked to `main` as `cd8cad5`) |
 | Add `@types/node` properly, split test tsconfig | `tsconfig.json`, `tsconfig.test.json`, `package.json` typecheck script |
-| `.gitignore` `.worktrees/` + `.claude/scheduled_tasks.lock` | `.gitignore` |
-| Drop `-p` from `launch-run.sh` | `scripts/launch-run.sh` |
+| `.gitignore` `.worktrees/`, `.claude/worktrees/`, `.claude/scheduled_tasks.lock`, `scope/ACTIVE`, `scope/ACTIVE_WORKTREE` | `.gitignore` |
+| `launch-run.sh` adopts the current branch by default (no stale `RUN_BRANCH`) | `scripts/launch-run.sh` |
 | PostToolUse hook path is relative (`bash planning/m4.5/hooks/post-tool.sh`) | `.claude/agents/autonomous-runner.md` frontmatter |
-| Vitest excludes `.worktrees/**` | `vite.config.ts` test section |
-| `run-stats.sh` autodetects latest JSONL transcript | `scripts/run-stats.sh` |
+| Vitest excludes `.worktrees/**` and `.claude/worktrees/**` | `vite.config.ts` test section |
+| `run-stats.sh` autodetects latest JSONL transcript; takes an explicit path arg | `scripts/run-stats.sh` |
 | Tail script for live JSONL monitoring | `scripts/tail-runner.sh` |
-| `phase-verify.sh` and `phase-diff.sh` default `REPO_ROOT=$(pwd)` | their scripts |
+| `phase-verify.sh` / `phase-diff.sh` default `REPO_ROOT=$(pwd)` | their scripts |
+| run-2 worker outputs preserved as tags `run-1-A2-wip`, `run-1-A4-wip`, `run-2-A2-wip` | git tags |
 
 ---
 
@@ -507,8 +851,11 @@ These are smaller / technical / already documented elsewhere; included as a cros
 When extracting this work for the forge-* ecosystem or a standalone autonomous-runner tool:
 
 - **ADR-M45-0001, 0002, 0007**: laboratory framing, branch discipline, and the separate-repo decision become the foundational principles of the standalone tool. Bring them along.
-- **ADR-M45-0004, 0005, 0008**: bookkeeping mechanization, thin scripts, spec-by-path are concrete patterns for "thin orchestrator + heavy subprocesses." Generalize.
-- **ADR-M45-0006, 0009, 0010**: β-specific design decisions; carry over as β is built.
+- **ADR-M45-0004, 0005, 0008, 0015**: bookkeeping mechanization, thin scripts, spec-by-path, and token-from-`tool_response` are concrete patterns for "thin orchestrator + heavy subprocesses." Generalize.
+- **ADR-M45-0006, 0009, 0010, 0023**: β-specific design decisions and the Attractor reference; carry over as β is built.
+- **ADR-M45-0013, 0014, 0020**: resilience — keep-awake, external supervisor, scoped watchdog with GC/quarantine — are the operational backbone of any unattended run; generalize directly.
+- **ADR-M45-0016, 0017, 0018, 0019**: the empirically-corrected harness facts (hook placement, Agent-worktree mechanics, gate-sees-uncommitted, deny-by-default sandbox). These are Claude-Code-specific; re-verify against the harness version when extracting, but the *principles* (verify harness behavior; deny-by-default; gate the real flow) carry over.
+- **ADR-M45-0021, 0022**: the tiered threat model and the live-gate discipline generalize as launch-readiness policy.
 - **ADR-M45-0003, 0011, 0012**: project-instance specifics. The general principle (specs-as-runtime-artifacts, lab purity, observable-but-unlimited budget) generalizes; the exact values may not.
 
 The `MarkdownSchema` skill in forge could validate this file's structure if a schema is authored later.
