@@ -57,12 +57,19 @@ if ! git merge-base --is-ancestor "$RUN_BASE_BRANCH" HEAD 2>/dev/null; then
     exit 4
 fi
 
-# Working tree must be clean on a fresh start. A resume reconciles in-progress
-# state itself (Stricter Resume Gates), so a dirty tree is expected there.
-if [ "$RUN_RESUME" != "1" ] && [ -n "$(git status --porcelain)" ]; then
-    echo "launch-run: working tree is dirty; commit or stash first" >&2
-    git status --short >&2
-    exit 5
+# Fresh start must be free of uncommitted SOURCE changes, which would
+# contaminate the phase diffs. The runner's own workspace under planning/m4.5/
+# is exempt: the supervisor writes supervise.log there before launch, and the
+# runner writes STATUS, scope, LOG, and NOTIFY throughout the run (the same
+# paths the supervisor's quarantine treats as expected). A resume reconciles
+# in-progress state itself, so its tree is dirty by design and skips the check.
+if [ "$RUN_RESUME" != "1" ]; then
+    UNCOMMITTED_SOURCE="$(git status --porcelain | grep -vE '^.. planning/m4\.5/' || true)"
+    if [ -n "$UNCOMMITTED_SOURCE" ]; then
+        echo "launch-run: uncommitted source changes; commit or stash first" >&2
+        echo "$UNCOMMITTED_SOURCE" >&2
+        exit 5
+    fi
 fi
 
 # Keep the machine awake for the whole run. An idle laptop sleeps and severs the
