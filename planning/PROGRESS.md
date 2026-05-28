@@ -6,6 +6,17 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ---
 
+## Active workstream: M4.5 autonomous-run system (run-3 prep)
+
+The live work is the autonomous-run system (see `CLAUDE.md` §M4.5), built/iterated on branch `m4.5-preflight`.
+
+- **run-1, run-2 done** — both preserved as study branches; run-2 died on host idle-sleep.
+- **run-3 prep hardened.** A pre-launch council found two criticals (a vacuous-pass scope gate; an open worker sandbox); all three blockers are fixed, tested, and committed on `m4.5-preflight`.
+- **Next action:** the attended **A2 live gate** — follow `planning/m4.5/RUN3-PROPOSAL.md` → "Running the attended A2 gate (runbook)". All five checks green → proceed to the full unattended run.
+- Key docs: `planning/m4.5/RUN3-PROPOSAL.md` (operational state + runbook), `planning/m4.5/DECISIONS.md` (23 ADRs), `planning/m4.5/PLAN.md` (loop + framing). Cross-project lessons: `~/AutonomousRunLessons.md`.
+
+---
+
 ## Versioning
 
 `0.milestone` — e.g. `0.1` when Milestone 1 ships. Current tag: **v0.3.0**.
