@@ -43,6 +43,24 @@ Two caveats this surfaces: (a) a parent-session hook also fires for the runner's
 
 A local git probe (render an uncommitted file in the main repo, add a detached worktree at HEAD, check visibility) confirmed the uncommitted file is **not visible** in the worktree. This validates the run-2 mechanism: the runner renders `scope/A{N}.touch.txt` uncommitted in the main repo, so a worker in its worktree never sees it. Even if the sandbox loaded, its allowlist would be stale or absent. Conform 3.1's "commit or inject the touch list before the worker spawns" is therefore required, not optional.
 
+## Council review (2026-05-28): NO-GO until blockers land
+
+A four-specialist review (Dev, QA, Ops, Security) found two failures the offline tests masked. Binding status: **NO-GO as-is; run attended, not unattended, until the blockers below and the live gate pass.**
+
+Criticals:
+- **The Conform gate is inert at runtime.** Workers leave changes uncommitted; `phase-diff.sh` diffs `BASE..HEAD` → zero files → `out_of_scope=none`, so scope/budget/council all pass on nothing and a no-op worker integrates as "done." The earlier "flagged entityTypes.ts" result was a false green (it ran against *committed* run-2 data).
+- **The sandbox write-allowlist is open.** It enforces only inside `.claude/worktrees/`; a worker writing an absolute path to the main repo, its own `scope/ACTIVE`/`sandbox.sh`, or `$HOME` hits default-*allow*. With the post-hoc gate inert, this PreToolUse hook is the sole runtime containment, and it is bypassable. The bash `case` glob also lets `*` cross `/`, granting whole subtrees.
+- **The watchdog corrupts its own liveness.** `newest_under` scans all worktrees, so a leaked worktree's stale mtimes mask a real hang; quiet long work false-kills; kills orphan worktrees; resume tolerates a dirty tree → silently integrates worker-planted files.
+
+Blockers (must land):
+1. Sandbox deny-by-default, discriminating by writer context (cwd in a worktree = worker → canonicalize target, require inside the active worktree AND in the touch list; deny otherwise); slash-respecting matcher against the committed list.
+2. Commit worker changes in the worktree before diffing (not bare `git add -A`); match `out_of_scope` with the anchored matcher.
+3. Watchdog: scope liveness to the active worktree; GC orphaned worktrees/branches on restart; quarantine (do not silently integrate) unexpected main-tree changes on resume.
+
+Live gate (before cutting run-3): one **attended A2-only dry run** proving all five — uncommitted worker → diff commits → files>0; deep out-of-scope write blocked by sandbox AND flagged by phase-diff; outside-worktree write blocked; integrate yields non-empty diff + done-tag; watchdog survives a >15-min council pause.
+
+Cheap hardening for unattended: OS egress block + read-only `~/.claude`/`~/.ssh`; supervisor PushNotification on terminal exit; `MAX_RESTARTS` progress-reset per done-tag. Generalized/untrusted goal (post-β): container + seccomp + network policy; drop `--dangerously-skip-permissions` for an allowlist.
+
 ## Theme 1 — Survive (the gate for a longer run)
 
 Without this, run-3 dies on the next transport blip and teaches nothing new.
@@ -137,9 +155,13 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] Stale-watchdog kills + restarts on composite-signal staleness; verified against simulated hangs (grace and stale branches).
 - [x] Hang handling: watchdog covers the run-level case; finer per-subagent cap deferred (see 1.4).
 - [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
-- [x] `phase-diff.sh` emits `out_of_scope`; runner remediates on non-empty (verified against real run-2 A2 output).
+- [~] `phase-diff.sh` emits `out_of_scope` — but the council found it is a runtime **false green** (diffs `BASE..HEAD` on an uncommitted worktree → zero files). The run-2 verification used committed data. Needs blocker 2 (commit-then-diff) + anchored matcher before this counts.
 - [x] `templates/spec-author.md` carries the house-style constraints.
-- [x] Sandbox loaded via `--settings runner-settings.json`, scoped to worktree writes, sourcing scope from the main repo (verified with a child-session test).
+- [~] Sandbox is *loaded* via `--settings` and reaches workers (verified), but the council found the *policy* unsafe: default-allow outside `.claude/worktrees/` + `*`-crosses-`/` globs. Needs blocker 1 (deny-by-default + anchored matcher) before this counts.
+- [ ] **BLOCKER 1:** sandbox deny-by-default by writer context (canonicalized, inside active worktree + touch list), anchored matcher.
+- [ ] **BLOCKER 2:** commit worker changes in the worktree before `phase-diff`/verify/council; no-op worker caught.
+- [ ] **BLOCKER 3:** watchdog scoped to active worktree; orphan GC on restart; quarantine unexpected main-tree changes on resume.
+- [ ] **LIVE GATE:** one attended A2-only dry run passing all five assertions (see Council review section).
 - [x] Worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` takes the discovered branch/path; runner keeps HEAD stable; verified offline.
 - [x] tsc + vitest green after the Conform changes (778 tests). Smoke not re-run (no `src/` changes); re-run at launch.
 
