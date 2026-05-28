@@ -121,16 +121,15 @@ Two layers, prevention and detection, both built and verified offline.
 
 **Detection: `phase-diff.sh` emits `out_of_scope`.** It compares changed files against the touch list (same glob matching as the sandbox) and emits `out_of_scope=none | <comma-list> | no-touch-list`. The runner remediates on any non-`none` value. Verified against real run-2 data: against the actual A2 worker output it flagged exactly `src/core/entityTypes.ts,src/enemies/enemyAI.test.ts` — the two files run-2 caught only by ad-hoc reasoning.
 
-### 3.1c Worktree integration mismatch (resolved)
+### 3.1c Worktree integration mismatch (REFUTED by run-3 — see ADR-M45-0024)
 
-The Agent tool's `isolation:"worktree"` manages its own path (`.claude/worktrees/agent-<id>`) and branch (`worktree-agent-<id>`), but a probe settled the base question: it bases the worktree on the **run branch HEAD at spawn time**, not a stale commit. Run-2's apparent stale base was the run branch advancing *after* the worker spawned.
+The earlier offline probe claimed `isolation:"worktree"` bases the worktree on run-branch HEAD at spawn. **Run-3 disproved this live.** The A2 worker's worktree was based on `a8c5c85`, which is exactly `merge-base(m4.5-run-3, main)` — the fork point with `main`, 41 commits behind run HEAD and missing all of `planning/m4.5/` plus 6 `src/` files. The probe was a false positive: on a branch that had not yet diverged from `main`, HEAD and the merge-base coincide, so "bases on run HEAD" was indistinguishable from "bases on the merge-base." Working hypothesis: the Agent tool bases the worktree on the default-branch fork point, not the current branch. A dedicated probe (spawn an `isolation:"worktree"` Agent from a branch well ahead of `main`, inspect the worktree base) must confirm the mechanism before run-4.
 
-Fixed (Option A, adapt):
-- `integrate-phase.sh` now takes the discovered branch + path as arguments instead of assuming `m4.5-A{N}` / `.worktrees/m4.5-A{N}`; the runner reads both from `git worktree list` (step 6) and passes them (step 11). The done-tag stays `m4.5-A{N}-done`.
-- A new runner constraint forbids committing to the run branch between spawn and integrate, so run-HEAD stays equal to the worktree base and the ff-merge always holds; `integrate-phase.sh` keeps its divergence guard as a backstop.
-- `.claude/worktrees/` is gitignored so an Agent worktree can't be embedded or trip the clean-tree check.
+Consequences observed live:
+- `phase-diff.sh A{N} <WT> <m4.5-start>` against run HEAD shows ~49 **phantom deletions** (every commit `m4.5-start` has that the stale worktree lacks). The runner worked around this by diffing against the worktree's own base, yielding the clean `files=6, out_of_scope=none`. The base passed to `phase-diff` must be the worktree base, not run HEAD.
+- **ff-integration is broken**: the worktree branch is an *ancestor* of run HEAD, so `integrate-phase.sh`'s ff-merge is a no-op ("already up to date") and the worker's edits (uncommitted in the worktree) never reach the run branch. The HEAD-stability constraint does not help when the base is already 41 commits behind.
 
-Verified offline against a faithful Agent-style worktree: happy-path ff-merge with the discovered branch (tag + LOG written), and the divergence guard refusing (exit 6, no tag) when the run branch advanced.
+The `integrate-phase.sh` argument-passing adaptation (discovered branch + path from `git worktree list`) and the gitignore of `.claude/worktrees/` remain correct and stay. What was wrong is the base assumption. Run-4 cannot integrate any phase until the worktree-base mechanism is understood and the diff/integrate base is sourced from the worktree itself.
 
 ### 3.2 Constrain the spec-author template
 
@@ -161,8 +160,8 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] **BLOCKER 1 (done):** `scope-check.py` decides writes by writer context — runner writes pass; worker writes must canonicalize (realpath, resolves `..`/symlinks) INSIDE the active worktree AND match a slash-respecting matcher against the committed touch list; else denied. Native Write denies for `~/.ssh`/`~/.claude`/etc. as backstop. Verified by `--self-test` and a live child-session test (in-scope allowed; deep-out-of-scope and outside-worktree blocked).
 - [x] **BLOCKER 2 (done):** `phase-diff` stages worker changes before diffing; no-op worker caught (files=0); shared anchored matcher.
 - [x] **BLOCKER 3 (done):** watchdog scoped to the active worktree (runner writes `scope/ACTIVE_WORKTREE`); `gc_worktrees` reclaims orphan agent worktrees/branches before each (re)launch; `quarantine_main_tree` stashes unexpected main-tree changes on resume. Verified by self-test + a functional git test (gc removes orphan, quarantine stashes the unexpected file while preserving `planning/m4.5/` changes, watchdog counts only the active worktree).
-- [ ] **LIVE GATE:** one attended A2-only dry run passing all five assertions (see Council review section).
-- [x] Worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` takes the discovered branch/path; runner keeps HEAD stable; verified offline.
+- [~] **LIVE GATE:** attended A2-only dry run executed 2026-05-28 (see "Run-3 attended A2 gate: result" below). Chain ran end-to-end; checks 1/2/4/5 green, check 3 not reached (phase correctly STALLED on a spec defect). Surfaced three blockers for run-4; not a clean pass.
+- [ ] Worktree integration mismatch (3.1c) — **REFUTED live**: the worktree is based on `merge-base(run, main)`, 41 commits stale; ff-integration is broken. Needs a real fix before run-4 (see ADR-M45-0024).
 - [x] tsc + vitest green after the Conform changes (778 tests). Smoke not re-run (no `src/` changes); re-run at launch.
 
 When met, cut `m4.5-run-3` from `m4.5-preflight` and launch under the supervisor.
@@ -191,6 +190,26 @@ All five green → the chain is sound; proceed to the full unattended run (conti
 ### Abort / cleanup
 `tmux kill-session -t m45-supervised` stops the supervisor; the next supervised launch GCs orphan worktrees. The run branch is a study artifact — never deleted.
 
+## Run-3 attended A2 gate: result (2026-05-28)
+
+Two launch bugs were fixed before the run could start (both on `m4.5-preflight`, ADR-M45-0025): the launcher's clean-tree guard counted the runner's own `planning/m4.5/` artifacts as dirt and `exit 5`d before `claude` started; and an invalid `runner-settings.json` permission rule (`Bash(find:* -delete)`, `:*` not at end) raised an interactive Settings Warning that hangs a detached-tmux run. Once fixed, the chain ran end-to-end and the worker's A2 phase **STALLED** on a spec defect. Artifacts conserved on `m4.5-run-3` (`LOG/A2.md`, `LOG/A2-diff.patch`, `LOG/subagent-tokens.jsonl`, sealed `A2-spec.md`).
+
+### Scorecard
+
+| Check | Result |
+|---|---|
+| 1 — DIFF files>0 | green — `files=6`, all in-scope |
+| 2 — out_of_scope=none | green — clean (against the worktree base) |
+| 3 — integrate (`A2-done`) | not reached — phase STALLED on failing tests; **correctly refused to integrate a red phase** (non-vacuous) |
+| 4 — token harvest | green — per-subagent ledger with full usage split; the run-2 `tokens=0` bug is fixed live |
+| 5 — watchdog no spurious restart | green — single launch, clean exit on terminal NOTIFY |
+
+### Three blockers for run-4 (fixes land on `m4.5-preflight`)
+
+1. **Spec defect — the A2 spec breaks the vitest mock chain.** A2 removes `core/`→`enemies/` imports; `combat.test.ts` / `enemyAI.test.ts` rely on `vi.mock('./enemyDatabase')` intercepting that transitive import, so once it is gone the spec's no-op default deps drop enemy entities and 14 tests fail. The spec's two constraints (don't touch test files; no `enemies/` imports in `core/`) are mutually exclusive — no in-scope fix exists. Two fixes (from `LOG/A2.md`): **(A)** add the two test files to `Scope: touch`, bump budget 6→8, update `makeGameStateWithEnemy()` / `makeState()` to pass `GameStateDeps`; or **(B)** keep `createEnemyInstance` as a default impl registered at module load by `enemies/enemyTypes.ts`, preserving the mock chain, with the grep accept-check scoped to exclude the registration. The spec-author template (§3.2) should grow a "preserve existing test mock/DI seams" rule so this class of defect is caught at authoring.
+2. **`phase-verify.sh` silent-green (ADR-M45-0025).** `declare -A RESULTS` needs bash 4+; macOS ships 3.2, so the array init fails and **every check reports green regardless of exit code**. The runner only caught the real vitest RED by reading raw output. Decision: keep bash, make scripts bash-3.2-safe (plain variables, no `declare -A`); do **not** switch to zsh (zsh is not a bash drop-in and is not guaranteed on Linux CI). Audit all `.sh` for bash-4-isms (`declare -A`, `${x^^}`, `mapfile`). Verify must fail loud, never default-green.
+3. **Stale worktree base (§3.1c, ADR-M45-0024).** `isolation:"worktree"` based the worker on `merge-base(run, main)`, 41 commits stale; integration cannot ff-merge. Probe the base-selection mechanism and source the diff/integrate base from the worktree itself before run-4.
+
 ## What run-3 should produce that run-2 could not
 
-A run that survives transport blips and reaches multiple phases: the first real exercise of `phase-verify.sh`, `integrate-phase.sh`, council review, and remediation; a granular per-subagent token ledger; and a second data point on spec-authoring variance now that the template carries constraints.
+A run that survives transport blips and reaches multiple phases: the first real exercise of `phase-verify.sh`, `integrate-phase.sh`, council review, and remediation; a granular per-subagent token ledger; and a second data point on spec-authoring variance now that the template carries constraints. Run-3 delivered the first three (survived, exercised the chain through verify, produced the granular ledger) and a sharp third data point: the spec-authoring process can emit a spec that is internally valid yet breaks the existing test harness.

@@ -615,12 +615,12 @@ B. Put the sandbox in project settings. Rejected: too global — the Bash deny-l
 
 ## ADR-M45-0017 — Integration adapts to Agent-managed worktrees
 
-**Status**: accepted
+**Status**: accepted; base assumption superseded by ADR-M45-0024 (run-3 live finding)
 **Date**: 2026-05-28
 
 ### Context
 
-`Agent(isolation:"worktree")` creates a worktree at `.claude/worktrees/agent-<id>` on branch `worktree-agent-<id>` — paths and branch the runner does not choose. The original `integrate-phase.sh` assumed a runner-created `.worktrees/m4.5-A{N}` on branch `m4.5-A{N}`. A probe established the base: the worktree is based on the **run branch HEAD at spawn time** (run-2's apparent "stale base" was the run branch advancing after spawn).
+`Agent(isolation:"worktree")` creates a worktree at `.claude/worktrees/agent-<id>` on branch `worktree-agent-<id>` — paths and branch the runner does not choose. The original `integrate-phase.sh` assumed a runner-created `.worktrees/m4.5-A{N}` on branch `m4.5-A{N}`. The argument-passing adaptation below (discover branch + path from `git worktree list`) is correct and stands. The accompanying base assumption — that the worktree is based on run-branch HEAD at spawn — was a false positive from an undiverged probe branch; run-3 showed the base is `merge-base(run, main)`, 41 commits stale, so the ff-merge cannot carry worker edits. See ADR-M45-0024.
 
 ### Decision
 
@@ -634,8 +634,8 @@ A. Have the runner create its own worktree at a known path (drop Agent isolation
 
 ### Consequences
 
-**Positive**: integration works with Agent-managed worktrees; ff-merge guaranteed by the HEAD-stability constraint. Verified by a functional git test (happy-path ff + divergence refusal).
-**Negative**: a runner that violates HEAD-stability gets a refused integration — caught by the guard, but it halts the phase.
+**Positive**: the discovered-branch/path plumbing works with Agent-managed worktrees; verified by a functional git test (happy-path ff + divergence refusal).
+**Negative**: the offline test assumed the worktree base equals run HEAD. Live, it does not (ADR-M45-0024), so the ff-merge is a no-op against an ancestor branch and integration does not yet carry worker edits. HEAD-stability is necessary but not sufficient; the base mechanism must be fixed first.
 
 ### References
 
@@ -827,6 +827,101 @@ B. Ignore it. Rejected: it validates the spec-as-design bet and offers a stronge
 
 ---
 
+## ADR-M45-0024 — Agent worktree base is the merge-base with `main`, not run HEAD (run-3 live finding)
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+The run-3 attended A2 gate produced the first live evidence of where `Agent(isolation:"worktree")` bases its worktree. The A2 worker's worktree was based on `a8c5c85`, which is exactly `merge-base(m4.5-run-3, main)` — the fork point with `main`, 41 commits behind run HEAD, missing all of `planning/m4.5/` and 6 `src/` files. This refutes ADR-M45-0017's base assumption (and RUN3-PROPOSAL §3.1c), which came from an offline probe on a branch that had not diverged from `main`, where HEAD and the merge-base coincide, making the two indistinguishable.
+
+### Decision
+
+Treat the worktree base as **unknown-but-not-run-HEAD** until a dedicated probe confirms the mechanism. Working hypothesis: `isolation:"worktree"` bases on the default-branch fork point. Before run-4:
+
+- Probe: spawn an `isolation:"worktree"` Agent from a branch well ahead of `main` and inspect `git -C <wt> rev-parse HEAD`. Confirm whether the base is the merge-base, `main` HEAD, or something else.
+- Source the diff and integrate base from the **worktree's own base** (`git -C <wt> merge-base HEAD <wt>` or the worktree's recorded base), never run HEAD. Against run HEAD, `phase-diff` shows phantom deletions of every commit the run branch has beyond the fork point (run-3 saw ~49; the runner worked around it by diffing against the worktree base, yielding clean `files=6`).
+- Integration must account for the stale base: an ff-merge of an ancestor branch is a no-op and drops the worker's edits. Either rebase/replay the worker's diff onto run HEAD, or apply the captured patch directly, rather than relying on ff-merge.
+
+### Alternatives considered
+
+A. Keep assuming run-HEAD base and rely on the divergence guard. Rejected: the guard sees an *ancestor* (not divergence), so it passes and silently integrates nothing.
+B. Drop Agent isolation and have the runner create its own worktree at run HEAD. Strongest fix; reconsider if the probe shows the base is not controllable. Trades away the `.claude/worktrees/` discriminator the sandbox uses (ADR-M45-0019).
+
+### Consequences
+
+**Positive**: integration correctness is now grounded in observed behavior, not an undiverged-branch artifact. The diff-against-worktree-base workaround already yields clean scope results.
+**Negative**: no phase can integrate until this is fixed; run-3 only reached integration's doorstep (the A2 phase stalled first, on ADR-M45-0026's spec defect, so the broken ff-merge was never exercised).
+
+### References
+
+- `LOG/A2.md` (worktree base recorded), `RUN3-PROPOSAL.md` §3.1c + "Run-3 attended A2 gate: result"
+- supersedes the base claim in ADR-M45-0017
+
+---
+
+## ADR-M45-0025 — Run-system scripts must be bash-3.2-safe; verify must fail loud
+
+**Status**: accepted
+**Date**: 2026-05-28
+
+### Context
+
+Two macOS-bash defects surfaced at the run-3 launch and in `phase-verify.sh`. (1) `phase-verify.sh` uses `declare -A RESULTS`; associative arrays need bash 4+, but macOS ships bash 3.2.57 (GPLv2-frozen), so the init fails silently and **every check reports green regardless of exit code** — a false all-green that would let a red phase integrate. The runner only caught the real vitest RED by reading raw output. (2) The launcher's clean-tree guard treated the runner's own `planning/m4.5/` artifacts (the supervisor's `supervise.log`, `NOTIFY`) as a dirty tree and `exit 5`d before `claude` started; and an invalid `runner-settings.json` rule raised an interactive prompt that hangs detached-tmux runs.
+
+### Decision
+
+- Run-system shell scripts target bash 3.2. No bash-4-only features: replace `declare -A` with plain per-check variables; avoid `${x^^}`/`${x,,}`, `mapfile`/`readarray`. Audit every `.sh`.
+- **Do not switch to zsh.** zsh is not a bash drop-in (1-based arrays, no implicit word-splitting, different `read`/glob/`setopt`) and is not guaranteed on Linux CI; porting risks subtle cross-platform bugs. The fix is to avoid bash-4 features, not to change interpreter.
+- Verify must fail loud: a check's result derives from its actual exit code, never a default-green.
+- The launcher's fresh clean-tree guard exempts `planning/m4.5/` (the runner's own workspace, matching the supervisor's quarantine) and blocks only uncommitted source. `runner-settings.json` carries no invalid permission rules (validated at author time).
+
+### Alternatives considered
+
+A. Detect bash < 4 and re-exec under zsh on macOS. Rejected: the zsh port risk and Linux-CI gap outweigh the one-feature fix.
+B. Require Homebrew bash 5 via `#!/usr/bin/env bash`. Rejected: adds an environment dependency and a PATH-order assumption; avoiding the feature is simpler and universal.
+
+### Consequences
+
+**Positive**: scripts run identically on macOS 3.2, bash 5, and Linux CI; the silent-green failure mode is removed; the runner launches under the supervisor.
+**Negative**: a one-time audit of existing scripts for bash-4-isms; mild verbosity from plain variables vs. an associative array.
+
+### References
+
+- `scripts/phase-verify.sh`, `scripts/launch-run.sh`, `runner-settings.json`, `LOG/A2.md` (verify-bug note)
+
+---
+
+## ADR-M45-0026 — Specs must preserve existing test mock/DI seams
+
+**Status**: proposed
+**Date**: 2026-05-28
+
+### Context
+
+Run-3's A2 spec was internally valid yet broke the existing test harness. A2 inverts `core/`→`enemies/` dependencies; `combat.test.ts` and `enemyAI.test.ts` rely on `vi.mock('./enemyDatabase')` intercepting that *transitive* import. Once `core/` stops importing `enemies/`, the mock no longer applies, the spec's no-op default deps drop enemy entities, and 14 tests fail. The spec's two constraints (do not touch test files; no `enemies/` imports in `core/`) are mutually exclusive, so no in-scope change can pass — a guaranteed STALL the author did not foresee.
+
+### Decision
+
+The spec-author template (RUN3-PROPOSAL §3.2) gains a house rule: when a phase changes an import graph, identify existing test mock/DI seams that depend on the old graph and either keep them working (default impl registered at load) or bring the affected test files into `Scope: touch` with a budget bump. For A2 specifically, `LOG/A2.md` records two concrete fixes (A: add the 2 test files to scope, budget 6→8, pass `GameStateDeps` in the helpers; B: load-time-registered `createEnemyInstance` default preserving the mock chain, grep accept-check scoped to exclude the registration). A spec linter (β, §3.3) could later reject specs whose touch list cannot satisfy their own accept-checks.
+
+### Alternatives considered
+
+A. Treat it as a worker failure. Rejected: the worker executed all 14 steps correctly; the defect is in the spec's constraints.
+B. Loosen the "no `enemies/` imports in `core/`" accept-check. Rejected: that is the actual A2 goal; loosening it defeats the phase.
+
+### Consequences
+
+**Positive**: a concrete data point on spec-authoring variance (the Conform theme), with a reusable authoring rule.
+**Negative**: the fix is not yet chosen (A vs B) — left to run-4 prep; this ADR is `proposed` until then.
+
+### References
+
+- `LOG/A2.md` (root cause + fix options), `RUN3-PROPOSAL.md` §3.2 + "Run-3 attended A2 gate: result"
+
+---
+
 ## Decisions not formally captured
 
 These are smaller / technical / already documented elsewhere; included as a cross-reference for completeness.
@@ -843,6 +938,7 @@ These are smaller / technical / already documented elsewhere; included as a cros
 | Tail script for live JSONL monitoring | `scripts/tail-runner.sh` |
 | `phase-verify.sh` / `phase-diff.sh` default `REPO_ROOT=$(pwd)` | their scripts |
 | run-2 worker outputs preserved as tags `run-1-A2-wip`, `run-1-A4-wip`, `run-2-A2-wip` | git tags |
+| run-3 attended-gate artifacts (`A2.md`, `A2-diff.patch`, sealed `A2-spec.md`, token ledger, `NOTIFY`) preserved | commit `5a64669` on `m4.5-run-3` |
 
 ---
 
@@ -853,9 +949,9 @@ When extracting this work for the forge-* ecosystem or a standalone autonomous-r
 - **ADR-M45-0001, 0002, 0007**: laboratory framing, branch discipline, and the separate-repo decision become the foundational principles of the standalone tool. Bring them along.
 - **ADR-M45-0004, 0005, 0008, 0015**: bookkeeping mechanization, thin scripts, spec-by-path, and token-from-`tool_response` are concrete patterns for "thin orchestrator + heavy subprocesses." Generalize.
 - **ADR-M45-0006, 0009, 0010, 0023**: β-specific design decisions and the Attractor reference; carry over as β is built.
-- **ADR-M45-0013, 0014, 0020**: resilience — keep-awake, external supervisor, scoped watchdog with GC/quarantine — are the operational backbone of any unattended run; generalize directly.
-- **ADR-M45-0016, 0017, 0018, 0019**: the empirically-corrected harness facts (hook placement, Agent-worktree mechanics, gate-sees-uncommitted, deny-by-default sandbox). These are Claude-Code-specific; re-verify against the harness version when extracting, but the *principles* (verify harness behavior; deny-by-default; gate the real flow) carry over.
-- **ADR-M45-0021, 0022**: the tiered threat model and the live-gate discipline generalize as launch-readiness policy.
+- **ADR-M45-0013, 0014, 0020, 0025**: resilience and portability — keep-awake, external supervisor, scoped watchdog with GC/quarantine, and bash-3.2-safe / fail-loud scripts — are the operational backbone of any unattended run; generalize directly.
+- **ADR-M45-0016, 0017, 0018, 0019, 0024**: the empirically-corrected harness facts (hook placement, Agent-worktree mechanics, gate-sees-uncommitted, deny-by-default sandbox, worktree-base-is-merge-base). These are Claude-Code-specific and the most version-fragile; re-verify each against the harness version when extracting (0024 especially: the run-3 live finding overturned the 0017 offline probe). The *principles* (verify harness behavior against the real flow, never an undiverged probe; deny-by-default; gate the real flow) carry over.
+- **ADR-M45-0021, 0022, 0026**: the tiered threat model, live-gate discipline, and spec-must-preserve-test-seams generalize as launch-readiness and spec-authoring policy.
 - **ADR-M45-0003, 0011, 0012**: project-instance specifics. The general principle (specs-as-runtime-artifacts, lab purity, observable-but-unlimited budget) generalizes; the exact values may not.
 
 The `MarkdownSchema` skill in forge could validate this file's structure if a schema is authored later.
