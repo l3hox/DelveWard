@@ -16,6 +16,8 @@
 #   MAX_USD              default 0              — 0 = unlimited; spend still tracked
 #   USD_PER_MTOKEN       default 8              — for the estimated_usd stat
 #   COUNCIL_DEPTH        default quick          — alternative: full
+#   RUN_SESSION_ID       default a fresh uuid   — known session id so a supervisor can --resume it
+#   RUN_RESUME           default 0              — 1 = resume RUN_SESSION_ID instead of a fresh start (supervisor use)
 
 set -euo pipefail
 
@@ -26,6 +28,8 @@ STATUS_PATH="${STATUS_PATH:-planning/m4.5/STATUS.md}"
 MAX_USD="${MAX_USD:-0}"
 USD_PER_MTOKEN="${USD_PER_MTOKEN:-8}"
 COUNCIL_DEPTH="${COUNCIL_DEPTH:-quick}"
+RUN_SESSION_ID="${RUN_SESSION_ID:-$(uuidgen | tr 'A-Z' 'a-z')}"
+RUN_RESUME="${RUN_RESUME:-0}"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
@@ -52,8 +56,9 @@ if ! git merge-base --is-ancestor "$RUN_BASE_BRANCH" HEAD 2>/dev/null; then
     exit 4
 fi
 
-# Working tree must be clean.
-if [ -n "$(git status --porcelain)" ]; then
+# Working tree must be clean on a fresh start. A resume reconciles in-progress
+# state itself (Stricter Resume Gates), so a dirty tree is expected there.
+if [ "$RUN_RESUME" != "1" ] && [ -n "$(git status --porcelain)" ]; then
     echo "launch-run: working tree is dirty; commit or stash first" >&2
     git status --short >&2
     exit 5
@@ -71,6 +76,20 @@ elif command -v systemd-inhibit >/dev/null 2>&1; then
     KEEPAWAKE="systemd-inhibit --what=sleep:idle --who=launch-run --why=autonomous-run"
 fi
 
+# Fresh start vs resume. On resume the session already carries the agent and
+# name, so pass only --resume and a kick prompt that re-enters the loop.
+if [ "$RUN_RESUME" = "1" ]; then
+    CLAUDE_ARGS=(--dangerously-skip-permissions
+        --resume "$RUN_SESSION_ID"
+        "Resume the autonomous run. Reconcile state from ${STATUS_PATH} per the Stricter Resume Gates in planning/m4.5/SAFETY-HATCHES.md, then continue the loop.")
+else
+    CLAUDE_ARGS=(--dangerously-skip-permissions
+        --agent autonomous-runner
+        --session-id "$RUN_SESSION_ID"
+        --name "$RUN_BRANCH"
+        "Start the autonomous run per ${PLAN_PATH}.")
+fi
+
 echo "launch-run: launching autonomous-runner"
 echo "  RUN_BASE_BRANCH = $RUN_BASE_BRANCH"
 echo "  RUN_BRANCH      = $RUN_BRANCH"
@@ -80,6 +99,8 @@ echo "  MAX_USD         = $MAX_USD  (0 = unlimited)"
 echo "  USD_PER_MTOKEN  = $USD_PER_MTOKEN"
 echo "  COUNCIL_DEPTH   = $COUNCIL_DEPTH"
 echo "  KEEPAWAKE       = ${KEEPAWAKE:-(none; relying on system power settings)}"
+echo "  RUN_SESSION_ID  = $RUN_SESSION_ID"
+echo "  RUN_RESUME      = $RUN_RESUME"
 
 exec ${KEEPAWAKE} env \
     RUN_BASE_BRANCH="$RUN_BASE_BRANCH" \
@@ -89,7 +110,5 @@ exec ${KEEPAWAKE} env \
     MAX_USD="$MAX_USD" \
     USD_PER_MTOKEN="$USD_PER_MTOKEN" \
     COUNCIL_DEPTH="$COUNCIL_DEPTH" \
-    claude --dangerously-skip-permissions \
-           --agent autonomous-runner \
-           --name "$RUN_BRANCH" \
-           "Start the autonomous run per ${PLAN_PATH}."
+    RUN_SESSION_ID="$RUN_SESSION_ID" \
+    claude "${CLAUDE_ARGS[@]}"

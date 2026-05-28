@@ -51,21 +51,22 @@ Without this, run-3 dies on the next transport blip and teaches nothing new.
 
 `launch-run.sh` now wraps the run in `caffeinate -ims` (macOS) or `systemd-inhibit` (Linux). Removes the *sleep* trigger that killed run-2. Does not address other transport drops.
 
-### 1.2 External supervisor with restart
+### 1.2 External supervisor with restart (built, tested)
 
-A `supervise-run.sh` wrapper that owns the run lifecycle from outside the runner (the runner cannot resurrect itself):
+`supervise-run.sh` owns the run lifecycle from outside the runner (the runner cannot resurrect itself). It runs the runner in a detached tmux session, restarts on crash or hang, and stops on a terminal NOTIFY.
 
-- Launch the runner. On non-zero exit or session-end-with-error, check STATUS.md: if the run is not `DONE`/`BLOCKED`, relaunch via `claude --resume` (or a fresh runner that reconciles from STATUS.md per the existing Stricter Resume Gates in SAFETY-HATCHES).
-- Cap restarts (e.g. 5) to avoid a crash loop; on cap exhaustion, write `BLOCKED supervisor-give-up` to NOTIFY.
-- This also closes the silent-death gap: the supervisor writes NOTIFY on crash, which run-2's unhandled error never did.
+- Restart cadence is configurable via `RESUME_RETRIES` (default 1): the first restart resumes the same session (`claude --resume`, verified to retain context); subsequent restarts scratch the session and launch a fresh runner that reconciles from STATUS.md per the Stricter Resume Gates. `RESUME_RETRIES=0` always scratches; a higher value resumes more first. (A future UI can set this.)
+- `MAX_RESTARTS` (default 5) caps the crash loop; on exhaustion the supervisor writes `BLOCKED supervisor-give-up` to NOTIFY, closing the silent-death gap that run-2's unhandled error left open.
+- `launch-run.sh` gained `RUN_SESSION_ID` (a known id so the supervisor can `--resume` it) and `RUN_RESUME` (fresh vs resume command), reusing one launch path.
+- Validated with real executions against fake launchers (no tokens spent): `--self-test` (helpers + cadence across `RESUME_RETRIES`); a loop test confirming fresh → resume(same id) → fresh(new id), give-up NOTIFY, and clean exit on terminal `DONE`; and two watchdog tests that actually trip the kill paths — no-activity/grace kill+restart, and active-then-stale kill driven off a worktree file (proving the composite signal's worktree arm). The only path left for run-3 itself is the full live integration (real `claude` runner, real transcript), whose components are each verified by the precursors.
 
-### 1.3 Stale-watchdog that acts
+### 1.3 Stale-watchdog that acts (built, tested)
 
-A watchdog (inside the supervisor, or a sibling) that declares the run hung when **no observable activity** advances for longer than the longest legitimate operation, and then kills + triggers restart. "Observable activity" must be composite (see Theme 2), because no single parent-side signal is reliable. Run-2's hung request did not surface an error for 65 minutes; only an actor watching staleness would have caught it.
+The supervisor's watchdog declares the run hung when **no observable activity** advances past `STALE_SECONDS` (default 900), then kills the tmux session and triggers restart. Activity is composite (Theme 2.2): `max(transcript mtime, newest active-worktree file mtime)`, because no single parent-side signal is reliable. A `GRACE_SECONDS` (default 180) window covers startup before the transcript exists. Run-2's hung request did not surface an error for 65 minutes; the watchdog is the actor that catches exactly this.
 
-### 1.4 Per-operation wall-clock cap
+### 1.4 Per-operation wall-clock cap (scoped down for run-3)
 
-Cap any single subagent or API call at a hard ceiling. A worker that exceeds it is killed and remediated rather than blocking the whole run indefinitely.
+A true per-subagent wall-clock cap needs runner-side support: a subagent cannot be killed from outside the runner, and the Agent tool's `max_turns` bounds turns, not wall-clock. For run-3 the composite-staleness watchdog (1.3) covers the hang case at the run level: a wedged subagent freezes both the transcript and its worktree files, trips staleness, and the supervisor restarts the whole run from the last done-tag. Finer per-subagent caps are deferred until they prove necessary.
 
 ## Theme 2 — Measure (token granularity and real liveness)
 
