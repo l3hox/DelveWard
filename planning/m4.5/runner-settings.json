@@ -14,7 +14,16 @@
             "Read(//Users/*/.ssh/**)",
             "Read(//Users/*/.config/gh/**)",
             "Read(//Users/*/.netrc)",
-            "Read(//Users/*/.aws/**)"
+            "Read(//Users/*/.aws/**)",
+            "Write(//Users/*/.ssh/**)",
+            "Write(//Users/*/.aws/**)",
+            "Write(//Users/*/.netrc)",
+            "Write(//Users/*/.config/**)",
+            "Write(//Users/*/.claude/**)",
+            "Write(//Users/*/.zshrc)",
+            "Write(//Users/*/.bashrc)",
+            "Write(//Users/*/.zprofile)",
+            "Write(//Users/*/.bash_profile)"
         ]
     },
     "hooks": {

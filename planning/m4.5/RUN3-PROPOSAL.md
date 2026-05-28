@@ -157,8 +157,8 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
 - [~] `phase-diff.sh` emits `out_of_scope` — but the council found it is a runtime **false green** (diffs `BASE..HEAD` on an uncommitted worktree → zero files). The run-2 verification used committed data. Needs blocker 2 (commit-then-diff) + anchored matcher before this counts.
 - [x] `templates/spec-author.md` carries the house-style constraints.
-- [~] Sandbox is *loaded* via `--settings` and reaches workers (verified), but the council found the *policy* unsafe: default-allow outside `.claude/worktrees/` + `*`-crosses-`/` globs. Needs blocker 1 (deny-by-default + anchored matcher) before this counts.
-- [ ] **BLOCKER 1:** sandbox deny-by-default by writer context (canonicalized, inside active worktree + touch list), anchored matcher.
+- [x] Sandbox is loaded via `--settings`, reaches workers, and now enforces deny-by-default (the policy fix below).
+- [x] **BLOCKER 1 (done):** `scope-check.py` decides writes by writer context — runner writes pass; worker writes must canonicalize (realpath, resolves `..`/symlinks) INSIDE the active worktree AND match a slash-respecting matcher against the committed touch list; else denied. Native Write denies for `~/.ssh`/`~/.claude`/etc. as backstop. Verified by `--self-test` and a live child-session test (in-scope allowed; deep-out-of-scope and outside-worktree blocked).
 - [ ] **BLOCKER 2:** commit worker changes in the worktree before `phase-diff`/verify/council; no-op worker caught.
 - [ ] **BLOCKER 3:** watchdog scoped to active worktree; orphan GC on restart; quarantine unexpected main-tree changes on resume.
 - [ ] **LIVE GATE:** one attended A2-only dry run passing all five assertions (see Council review section).
