@@ -167,6 +167,30 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 
 When met, cut `m4.5-run-3` from `m4.5-preflight` and launch under the supervisor.
 
+## Running the attended A2 gate (runbook)
+
+Goal: confirm the live integration chain (real runner → worker → sandbox → `phase-diff` → council → integrate) on the clean A2 path, with hooks and watchdog behaving — the one surface no offline test covers. The enforcement *blocking* (out-of-scope, escape) is offline-proven (`scope-check.py --self-test` + the child-session test); the live gate confirms the clean path is end-to-end sound and the gate is non-vacuous.
+
+### Setup
+1. From `m4.5-preflight`: `git checkout -b m4.5-run-3`.
+2. Limit to A2 so the run stops cleanly after one phase: in `planning/m4.5/STATUS.md` set `status: skipped` for A3, A4, A5, A6, A7 (A1 stays `done`, A2 `pending`). The runner does A2, finds no further viable phase, writes `DONE`, and the supervisor stops. (Continuation: to run the rest afterward, un-skip those phases and relaunch — the supervisor resumes — or, lab-pure, cut a fresh branch with all phases pending.)
+3. Launch under the supervisor (this also exercises the watchdog/restart path):
+   `./planning/m4.5/scripts/supervise-run.sh`
+   In a second pane watch `planning/m4.5/STATUS.md`, `planning/m4.5/LOG/`, and `planning/m4.5/LOG/supervise.log` (or tail the session JSONL via `scripts/tail-runner.sh`).
+
+### The five checks
+1. **Gate non-vacuous** — when the A2 worker returns, the `DIFF phase=A2 files=N ... out_of_scope=...` line shows `files>0` (and `LOG/A2-diff.patch` is non-empty). `files=0` ⇒ the staging fix regressed → STOP (ADR-M45-0018).
+2. **Enforcement live** — clean path is `out_of_scope=none`; if the worker strayed, `phase-diff` flags it AND the runner remediates. (Blocking itself is offline-proven; optionally spot-check live with a throwaway out-of-scope write under the active sandbox.) (ADR-M45-0019)
+3. **Integration** — `git tag -l m4.5-A2-done` appears, `git log m4.5-run-3` shows the ff-merged worker commit, `LOG/A2.md` is written. (ADR-M45-0017)
+4. **Hooks fire** — `last_heartbeat_at` advances, `stats` spawn counts climb, and `LOG/subagent-tokens.jsonl` gains records with real `total_tokens`. (ADR-M45-0015/0016)
+5. **Watchdog behaves** — no "killing for restart" in `supervise.log` during a normal-length council; the run reaches `DONE` with no spurious restart. (ADR-M45-0020)
+
+### Decision
+All five green → the chain is sound; proceed to the full unattended run (continue this branch or cut a fresh one). Any red → the parenthetical ADR names the piece to revisit. Reminder (ADR-M45-0017): never commit to the run branch between spawn and integrate, or the ff-merge is refused.
+
+### Abort / cleanup
+`tmux kill-session -t m45-supervised` stops the supervisor; the next supervised launch GCs orphan worktrees. The run branch is a study artifact — never deleted.
+
 ## What run-3 should produce that run-2 could not
 
 A run that survives transport blips and reaches multiple phases: the first real exercise of `phase-verify.sh`, `integrate-phase.sh`, council review, and remediation; a granular per-subagent token ledger; and a second data point on spec-authoring variance now that the template carries constraints.
