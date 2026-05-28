@@ -27,17 +27,24 @@ BASE_REF="${3:-}"
 [ -d "$WORKTREE" ] || { echo "phase-diff: worktree '$WORKTREE' not a directory" >&2; exit 2; }
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
+SCOPE_CHECK="$REPO_ROOT/planning/m4.5/hooks/scope-check.py"
 LOG_DIR="$REPO_ROOT/planning/m4.5/LOG"
 mkdir -p "$LOG_DIR"
 PATCH="$LOG_DIR/${PHASE}-diff.patch"
 
-git -C "$WORKTREE" diff "$BASE_REF"..HEAD > "$PATCH"
+# Workers leave changes UNCOMMITTED (worker contract), so diff the staged
+# working tree against base, not BASE..HEAD (which would be empty and make the
+# whole gate a false green). Staging also captures new files; integrate-phase
+# re-stages and commits later. files=0 here means a no-op worker — the runner
+# must remediate, never integrate a zero-diff phase.
+git -C "$WORKTREE" add -A >/dev/null 2>&1 || true
+git -C "$WORKTREE" diff --cached "$BASE_REF" > "$PATCH"
 
 # Parse shortstat. Format examples:
 #   ` 7 files changed, 99 insertions(+), 44 deletions(-)`
 #   ` 1 file changed, 5 insertions(+)`
 #   `` (empty)
-SHORTSTAT="$(git -C "$WORKTREE" diff --shortstat "$BASE_REF"..HEAD || true)"
+SHORTSTAT="$(git -C "$WORKTREE" diff --cached --shortstat "$BASE_REF" || true)"
 FILES=0
 ADDED=0
 REMOVED=0
@@ -48,22 +55,18 @@ if [ -n "$SHORTSTAT" ]; then
 fi
 NET=$((ADDED - REMOVED))
 
-# Scope check: changed files not matched by the phase touch list. The list is
-# rendered in the main repo (REPO_ROOT), not the worktree, which only ever sees
-# committed state. Glob matching mirrors hooks/sandbox.sh path_allowed().
+# Scope check: staged changed files not matched by the phase touch list, using
+# the same slash-respecting matcher as the live sandbox (scope-check.py --match).
+# The list is read from the main repo (REPO_ROOT), not the worktree.
 TOUCH_LIST="$REPO_ROOT/planning/m4.5/scope/${PHASE}.touch.txt"
 if [ -f "$TOUCH_LIST" ]; then
     OUT_OF_SCOPE=""
     while IFS= read -r changed; do
         [ -n "$changed" ] || continue
-        in_scope=1
-        while IFS= read -r pattern || [ -n "$pattern" ]; do
-            case "$pattern" in ''|\#*) continue ;; esac
-            # shellcheck disable=SC2254
-            case "$changed" in $pattern) in_scope=0; break ;; esac
-        done < "$TOUCH_LIST"
-        [ "$in_scope" -eq 0 ] || OUT_OF_SCOPE="${OUT_OF_SCOPE:+$OUT_OF_SCOPE,}$changed"
-    done < <(git -C "$WORKTREE" diff --name-only "$BASE_REF"..HEAD || true)
+        if ! python3 "$SCOPE_CHECK" --match "$TOUCH_LIST" "$changed"; then
+            OUT_OF_SCOPE="${OUT_OF_SCOPE:+$OUT_OF_SCOPE,}$changed"
+        fi
+    done < <(git -C "$WORKTREE" diff --cached --name-only "$BASE_REF" || true)
     [ -n "$OUT_OF_SCOPE" ] || OUT_OF_SCOPE="none"
 else
     OUT_OF_SCOPE="no-touch-list"

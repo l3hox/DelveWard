@@ -98,6 +98,13 @@ def main():
     if "--self-test" in sys.argv:
         run_self_test()
         return
+    # --match <touch_list> <rel_path>: exit 0 if rel matches the list (used by
+    # phase-diff.sh so the post-hoc gate shares this slash-respecting matcher).
+    if len(sys.argv) >= 2 and sys.argv[1] == "--match":
+        if len(sys.argv) != 4:
+            print("usage: scope-check.py --match <touch_list> <rel_path>", file=sys.stderr)
+            sys.exit(2)
+        sys.exit(0 if path_allowed(sys.argv[3], sys.argv[2]) else 1)
     if len(sys.argv) != 3:
         print("usage: scope-check.py <cwd> <file_path>", file=sys.stderr)
         sys.exit(2)

@@ -155,11 +155,11 @@ The orchestrator rewrite, the GUI, the per-step subprocess model, and live budge
 - [x] Stale-watchdog kills + restarts on composite-signal staleness; verified against simulated hangs (grace and stale branches).
 - [x] Hang handling: watchdog covers the run-level case; finer per-subagent cap deferred (see 1.4).
 - [x] Token harvest from the hook's `tool_response` at subagent boundaries; `LOG/subagent-tokens.jsonl` populated in a dry run.
-- [~] `phase-diff.sh` emits `out_of_scope` — but the council found it is a runtime **false green** (diffs `BASE..HEAD` on an uncommitted worktree → zero files). The run-2 verification used committed data. Needs blocker 2 (commit-then-diff) + anchored matcher before this counts.
+- [x] `phase-diff.sh` stages the worker's uncommitted output (`git add -A` + `diff --cached`) so it sees real changes, and matches via `scope-check.py --match` (the same slash-respecting matcher). Verified live on an uncommitted worktree: `files=4, out_of_scope=src/core/sub/deep.ts,src/evil.ts`; a no-op worker yields `files=0` (runner remediates).
 - [x] `templates/spec-author.md` carries the house-style constraints.
 - [x] Sandbox is loaded via `--settings`, reaches workers, and now enforces deny-by-default (the policy fix below).
 - [x] **BLOCKER 1 (done):** `scope-check.py` decides writes by writer context — runner writes pass; worker writes must canonicalize (realpath, resolves `..`/symlinks) INSIDE the active worktree AND match a slash-respecting matcher against the committed touch list; else denied. Native Write denies for `~/.ssh`/`~/.claude`/etc. as backstop. Verified by `--self-test` and a live child-session test (in-scope allowed; deep-out-of-scope and outside-worktree blocked).
-- [ ] **BLOCKER 2:** commit worker changes in the worktree before `phase-diff`/verify/council; no-op worker caught.
+- [x] **BLOCKER 2 (done):** `phase-diff` stages worker changes before diffing; no-op worker caught (files=0); shared anchored matcher.
 - [ ] **BLOCKER 3:** watchdog scoped to active worktree; orphan GC on restart; quarantine unexpected main-tree changes on resume.
 - [ ] **LIVE GATE:** one attended A2-only dry run passing all five assertions (see Council review section).
 - [x] Worktree integration mismatch (3.1c) resolved — `integrate-phase.sh` takes the discovered branch/path; runner keeps HEAD stable; verified offline.
