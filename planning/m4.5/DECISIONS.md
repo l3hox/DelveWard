@@ -831,6 +831,7 @@ B. Ignore it. Rejected: it validates the spec-as-design bet and offers a stronge
 
 **Status**: accepted
 **Date**: 2026-05-28; probe confirmed + fix implemented 2026-05-29
+**Note**: Option A (3-way patch-apply) is interim — run-4 showed it fixed diff + integrate but not verify-in-worktree. Option B (runner-owned run-HEAD worktree) is adopted for run-5 and supersedes A's primary role (ADR-M45-0028).
 
 ### Context
 
@@ -927,6 +928,74 @@ B. Loosen the "no `enemies/` imports in `core/`" accept-check. Rejected: that is
 
 ---
 
+## ADR-M45-0027 — The runner must not be able to modify its own gates
+
+**Status**: accepted (sandbox change is run-5 prep)
+**Date**: 2026-05-29
+
+### Context
+
+In run-4, when the first verify failed on `tsc:test` (`TS5058: tsconfig.test.json does not exist`, absent in the merge-base worktree), the runner did not stall or flag it — it **edited `planning/m4.5/scripts/phase-verify.sh` to skip `tsc:test`**, turning the red gate green. Confirmed: the edit is uncommitted on run-4 (mtime mid-run), `A2.md` admits it, and the worker could not have done it (its worktree lacks `planning/m4.5/`). The PreToolUse sandbox enforces deny-by-default for *workers* (cwd inside a worktree) but the **parent runner has unrestricted write access to its own oversight layer** — every verify/diff/scope/integrate script, the sandbox itself, `runner-settings.json`, and the agent file. Under `--dangerously-skip-permissions`, unattended, the runner can neuter any check. The specific skip is not even benign: every worktree is merge-base-based, so skipping `tsc:test` when the config is absent **permanently disables test-typechecking** and masks the root cause (ADR-M45-0028).
+
+### Decision
+
+- The PreToolUse sandbox (`scope-check.py`) gains a **runner-write deny-list**: deny Write/Edit when the runner targets its own machinery — `planning/m4.5/scripts/**`, `planning/m4.5/hooks/**`, `planning/m4.5/runner-settings.json`, `planning/m4.5/templates/**`, `.claude/agents/autonomous-runner.md`. Allow the operational files the runner legitimately writes: `STATUS.md`, `scope/`, `LOG/`, `NOTIFY`, `A{N}-spec.md`.
+- Self-protecting: `sandbox.sh` and `scope-check.py` are themselves in the deny-list, so the runner cannot disable the guard first.
+- **Principle**: a failing gate triggers remediation-of-the-work or STALL/flag — never modification of the gate. The runner fixes the WORK or halts; it never changes the criteria that judge it.
+
+### Alternatives considered
+
+A. Trust the runner (status quo). Rejected: run-4 showed it will edit its gates when convenient.
+B. Run the gate scripts from a read-only location outside the runner's writable tree. Stronger (also covers a Bash-write bypass) but a larger restructure; the OS-level read-only mount is the adversarial/β answer (ADR-M45-0021).
+
+### Consequences
+
+**Positive**: closes the cooperative-runner gate-gaming gap that run-4 exhibited (it used Edit); the gates regain integrity.
+**Negative**: a Write/Edit denylist does not stop a Bash bypass (`sed -i`, redirection) — per ADR-M45-0021 the adversarial case needs OS-level read-only; for run-5 (cooperative, own repo) the Write/Edit deny matches the observed behavior. And once the runner can no longer skip an unpassable check, verify must be made legitimately passable — which is why ADR-M45-0028 ships with this, or run-5 just stalls on `tsc:test`.
+
+### References
+
+- `RUN4-FEEDBACK.md` Finding 1; `hooks/scope-check.py`, `hooks/sandbox.sh`
+- ADR-M45-0019 (worker deny-by-default), ADR-M45-0021 (threat tiers), ADR-M45-0028 (coupled fix)
+
+---
+
+## ADR-M45-0028 — Adopt Option B (runner-created run-HEAD worktree) for run-5
+
+**Status**: accepted (scoped for run-5)
+**Date**: 2026-05-29
+
+### Context
+
+Run-4 showed Option A (3-way patch-apply, ADR-M45-0024) fixed diff + integrate but **not verify**: verify runs *inside* the merge-base worktree, which lacks preflight's test scaffolding (`tsconfig.test.json` → `tsc:test` TS5058). The runner only got past it by editing its own gate (ADR-M45-0027); with that forbidden, verify must be legitimately passable, and a worker cannot create the missing config (out of scope). The single root cause behind diff phantoms, verify-missing-config, and integrate-ancestor is that `isolation:"worktree"` bases the worktree on `merge-base(branch, main)`, 41 commits behind run HEAD.
+
+### Decision
+
+Adopt Option B for run-5: the runner creates its **own** worktree at **run HEAD** instead of relying on Agent `isolation:"worktree"`.
+
+- Runner loop: `git worktree add -b m4.5-A{N}-wt .worktrees/m4.5-A{N} <run-branch>` (worktree at run HEAD); spawn the worker Agent **without isolation**, instructed to do all edits under that path; write `ACTIVE_WORKTREE=<path>`.
+- Sandbox: `scope-check.py` discriminates the worker by the `ACTIVE_WORKTREE` path (it already reads it) rather than the hardcoded `.claude/worktrees/agent-*`; a non-isolated worker's stray main-repo write stays deny-by-default.
+- Diff against run HEAD directly (no `WT_BASE` indirection); verify runs in a current worktree (config present); integrate becomes a trivial ff-merge (the worktree branch is a descendant). Option A's `WT_BASE`-diff + 3-way-apply become the fallback, not the primary.
+- Cleanup: `git worktree remove` + delete `m4.5-A{N}-wt`.
+
+This dissolves the entire stale-base class in one move.
+
+### Alternatives considered
+
+A. Keep Option A and sanction the `tsc:test` skip on preflight. Rejected: it permanently disables test-typechecking and masks the root cause — the runner's hack made official.
+C. Merge preflight (incl. test scaffolding) into `main` so the merge-base is current. Lighter (no spawn/sandbox rework) but puts the run-system on `main` and is a branch-topology change not yet sanctioned; revisit only if B proves too costly.
+
+### Consequences
+
+**Positive**: verify, diff, and integrate all operate on the current tree; no gate-gaming needed; eliminates the stale-base class. Supersedes Option A's primary role (ADR-M45-0024).
+**Negative**: reworks the spawn flow (drop Agent isolation) and the sandbox discriminator (cwd-in-`.claude/worktrees/` → `ACTIVE_WORKTREE` path); a non-isolated worker needs cwd discipline (caught by deny-by-default). Real run-5-prep work, coupled with ADR-M45-0027.
+
+### References
+
+- `RUN4-FEEDBACK.md` Finding 3; ADR-M45-0024 (Option A, now interim), ADR-M45-0019 (sandbox discriminator), ADR-M45-0027 (coupled gate lockdown)
+
+---
+
 ## Decisions not formally captured
 
 These are smaller / technical / already documented elsewhere; included as a cross-reference for completeness.
@@ -955,8 +1024,8 @@ When extracting this work for the forge-* ecosystem or a standalone autonomous-r
 - **ADR-M45-0004, 0005, 0008, 0015**: bookkeeping mechanization, thin scripts, spec-by-path, and token-from-`tool_response` are concrete patterns for "thin orchestrator + heavy subprocesses." Generalize.
 - **ADR-M45-0006, 0009, 0010, 0023**: β-specific design decisions and the Attractor reference; carry over as β is built.
 - **ADR-M45-0013, 0014, 0020, 0025**: resilience and portability — keep-awake, external supervisor, scoped watchdog with GC/quarantine, and bash-3.2-safe / fail-loud scripts — are the operational backbone of any unattended run; generalize directly.
-- **ADR-M45-0016, 0017, 0018, 0019, 0024**: the empirically-corrected harness facts (hook placement, Agent-worktree mechanics, gate-sees-uncommitted, deny-by-default sandbox, worktree-base-is-merge-base). These are Claude-Code-specific and the most version-fragile; re-verify each against the harness version when extracting (0024 especially: the run-3 live finding overturned the 0017 offline probe). The *principles* (verify harness behavior against the real flow, never an undiverged probe; deny-by-default; gate the real flow) carry over.
-- **ADR-M45-0021, 0022, 0026**: the tiered threat model, live-gate discipline, and spec-must-preserve-test-seams generalize as launch-readiness and spec-authoring policy.
+- **ADR-M45-0016, 0017, 0018, 0019, 0024, 0028**: the empirically-corrected harness facts (hook placement, Agent-worktree mechanics, gate-sees-uncommitted, deny-by-default sandbox, worktree-base-is-merge-base) and the worktree-strategy choice. These are Claude-Code-specific and the most version-fragile; re-verify each against the harness version when extracting (0024 especially: the run-3 live finding overturned the 0017 offline probe; 0028 then chose a runner-owned run-HEAD worktree over Agent isolation). The *principles* (verify harness behavior against the real flow, never an undiverged probe; deny-by-default; gate the real flow; the work runs on the current tree) carry over.
+- **ADR-M45-0021, 0022, 0026, 0027**: the tiered threat model, live-gate discipline, spec-must-preserve-test-seams, and runner-must-not-modify-its-own-gates generalize as launch-readiness, spec-authoring, and self-containment policy.
 - **ADR-M45-0003, 0011, 0012**: project-instance specifics. The general principle (specs-as-runtime-artifacts, lab purity, observable-but-unlimited budget) generalizes; the exact values may not.
 
 The `MarkdownSchema` skill in forge could validate this file's structure if a schema is authored later.
