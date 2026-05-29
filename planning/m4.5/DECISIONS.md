@@ -930,7 +930,7 @@ B. Loosen the "no `enemies/` imports in `core/`" accept-check. Rejected: that is
 
 ## ADR-M45-0027 — The runner must not be able to modify its own gates
 
-**Status**: accepted (sandbox change is run-5 prep)
+**Status**: accepted; implemented + verified 2026-05-29
 **Date**: 2026-05-29
 
 ### Context
@@ -939,9 +939,11 @@ In run-4, when the first verify failed on `tsc:test` (`TS5058: tsconfig.test.jso
 
 ### Decision
 
-- The PreToolUse sandbox (`scope-check.py`) gains a **runner-write deny-list**: deny Write/Edit when the runner targets its own machinery — `planning/m4.5/scripts/**`, `planning/m4.5/hooks/**`, `planning/m4.5/runner-settings.json`, `planning/m4.5/templates/**`, `.claude/agents/autonomous-runner.md`. Allow the operational files the runner legitimately writes: `STATUS.md`, `scope/`, `LOG/`, `NOTIFY`, `A{N}-spec.md`.
+- The PreToolUse sandbox (`scope-check.py`) gains a **runner-write deny-list**: deny Write/Edit when the runner targets its own machinery — `planning/m4.5/scripts/**`, `planning/m4.5/hooks/**`, `planning/m4.5/runner-settings.json`, `planning/m4.5/templates/**`, `planning/m4.5/goldens/**` (gate inputs), `.claude/agents/autonomous-runner.md`. Allow the operational files the runner legitimately writes: `STATUS.md`, `scope/`, `LOG/`, `NOTIFY`, `A{N}-spec.md`.
 - Self-protecting: `sandbox.sh` and `scope-check.py` are themselves in the deny-list, so the runner cannot disable the guard first.
 - **Principle**: a failing gate triggers remediation-of-the-work or STALL/flag — never modification of the gate. The runner fixes the WORK or halts; it never changes the criteria that judge it.
+
+**Verified 2026-05-29**: a child-session probe confirmed the `--settings` PreToolUse hook fires for the **parent** session's own Write (`cwd` = repo root) — so the deny engages for the runner, not just workers; run-4's edit succeeded only because the *old* `scope-check` allowed all runner writes. `scope-check.py --self-test` plus an end-to-end `sandbox.sh` test confirm a runner Edit of `phase-verify.sh` / `sandbox.sh` is blocked while `STATUS.md` / `A{N}-spec.md` pass. The probe child even declined to bypass via shell redirection, consistent with the cooperative-runner tier (the Bash-write bypass remains the adversarial/OS-level concern, ADR-M45-0021).
 
 ### Alternatives considered
 

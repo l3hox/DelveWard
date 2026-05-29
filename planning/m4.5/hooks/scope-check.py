@@ -4,7 +4,10 @@
 Given the writing session's cwd and the target file_path, decide whether a
 Write/Edit is allowed:
 
-  - cwd NOT inside a worktree  -> runner's own write -> ALLOW.
+  - cwd NOT inside a worktree -> runner / non-isolated subagent -> ALLOW its
+    operational files but DENY writes to its own gate/machinery (scripts, hooks,
+    runner-settings.json, templates, goldens, the agent file): the runner must
+    not edit the gates that judge it (ADR-M45-0027).
   - cwd inside .claude/worktrees/<id>/ -> worker write -> the canonicalized
     target must be INSIDE that worktree AND match the active phase's touch
     list; otherwise DENY.
@@ -64,11 +67,39 @@ def path_allowed(rel: str, touch_list_path: str) -> bool:
     return False
 
 
+# The runner's own oversight machinery. A runner-context write to any of these
+# is denied (ADR-M45-0027): a failing gate must trigger remediation or STALL,
+# never a patch to the gate itself. sandbox.sh and scope-check.py are in the
+# list, so the runner cannot disable the guard first. goldens are gate inputs.
+RUNNER_DENY_PREFIXES = (
+    "planning/m4.5/scripts/",
+    "planning/m4.5/hooks/",
+    "planning/m4.5/templates/",
+    "planning/m4.5/goldens/",
+)
+RUNNER_DENY_EXACT = (
+    "planning/m4.5/runner-settings.json",
+    ".claude/agents/autonomous-runner.md",
+)
+
+
+def decide_runner(cwd: str, file_path: str):
+    """Runner / non-isolated subagent (cwd = repo root). Allow operational
+    writes; deny writes to the runner's own gate machinery."""
+    abs_target = file_path if os.path.isabs(file_path) else os.path.join(cwd, file_path)
+    canonical = os.path.realpath(abs_target)
+    rel = os.path.relpath(canonical, os.path.realpath(cwd))
+    norm = rel.replace(os.sep, "/")
+    if norm in RUNNER_DENY_EXACT or any(norm.startswith(p) for p in RUNNER_DENY_PREFIXES):
+        return False, f"runner may not modify its own gate/machinery '{norm}' (ADR-M45-0027)"
+    return True, "runner write (operational, outside machinery)"
+
+
 def decide(cwd: str, file_path: str):
     """Return (allowed: bool, reason: str)."""
     main_repo, worktree_root = split_worktree(cwd)
     if worktree_root is None:
-        return True, "runner write (outside any worktree)"
+        return decide_runner(cwd, file_path)
 
     abs_target = file_path if os.path.isabs(file_path) else os.path.join(cwd, file_path)
     canonical = os.path.realpath(abs_target)
@@ -138,8 +169,23 @@ def run_self_test():
                 print(f"FAIL {name}: allowed={allowed} reason={reason}")
                 fail = 1
 
-        # runner write (cwd = main repo) -> allow
+        # runner write (cwd = main repo) -> allow non-machinery
         check("runner-main-write", main_repo, os.path.join(main_repo, "src/x.ts"), True)
+        # runner operational writes -> allow
+        check("runner-status", main_repo, "planning/m4.5/STATUS.md", True)
+        check("runner-scope", main_repo, "planning/m4.5/scope/ACTIVE", True)
+        check("runner-spec", main_repo, "planning/m4.5/A2-spec.md", True)
+        check("runner-log", main_repo, "planning/m4.5/LOG/A2.md", True)
+        # runner gate/machinery writes -> DENY (ADR-M45-0027; the run-4 attack)
+        check("runner-deny-verify", main_repo, "planning/m4.5/scripts/phase-verify.sh", False)
+        check("runner-deny-sandbox", main_repo, "planning/m4.5/hooks/sandbox.sh", False)
+        check("runner-deny-scopecheck", main_repo, "planning/m4.5/hooks/scope-check.py", False)
+        check("runner-deny-settings", main_repo, "planning/m4.5/runner-settings.json", False)
+        check("runner-deny-template", main_repo, "planning/m4.5/templates/worker.md", False)
+        check("runner-deny-golden", main_repo, "planning/m4.5/goldens/level-init.json", False)
+        check("runner-deny-agent", main_repo, ".claude/agents/autonomous-runner.md", False)
+        # internal ../ can't dodge the deny (realpath normalizes; cwd = repo root)
+        check("runner-deny-dotdot", main_repo, "planning/m4.5/hooks/../hooks/sandbox.sh", False)
         # worker in-scope -> allow
         check("worker-in-scope", worktree, "src/core/types.ts", True)
         check("worker-in-scope-glob", worktree, "src/core/helper.ts", True)
