@@ -1,32 +1,11 @@
 // Enemy type definitions and registry — pure data, no Three.js
 
-import type { DropsOverride } from '../core/lootTable';
 import { enemyDatabase } from './enemyDatabase';
-import type { StatusEffect } from '../core/statusEffects';
+import { registerEnemyRegistry } from '../core/typeRegistries';
+import type { EnemyAIState, EnemyInstance } from '../core/entities';
 
 export type { EnemyDef } from './enemyDatabase';
-
-export type EnemyAIState = 'idle' | 'chase' | 'attack' | 'flee';
-
-export interface EnemyInstance {
-  col: number;
-  row: number;
-  type: string;
-  hp: number;
-  maxHp: number;
-  atk: number;
-  def: number;
-  aggroRange: number;
-  moveInterval: number;
-  blocksMovement: boolean;
-  aiState: EnemyAIState;
-  moveTimer: number;      // accumulates delta, resets on action
-  regenTimer?: number;       // accumulates time for HP regen
-  regenPauseTimer?: number;  // remaining seconds of regen pause after taking damage
-  drops?: DropsOverride;  // per-entity override from dungeon JSON
-  statusEffects: StatusEffect[];
-  spawnerId?: string;
-}
+export type { EnemyAIState, EnemyInstance } from '../core/entities';
 
 export function createEnemyInstance(
   col: number,
@@ -56,3 +35,12 @@ export function createEnemyInstance(
   }
   return instance;
 }
+
+registerEnemyRegistry({
+    createEnemy: (col, row, type) => {
+        if (!enemyDatabase.getEnemy(type)) return undefined;
+        return createEnemyInstance(col, row, type);
+    },
+    getEnemyBehavior: (type, name) => enemyDatabase.getBehavior(type, name),
+    getAllEnemySpritePaths: () => enemyDatabase.getAllEnemies().map(e => e.sprite.path),
+});

@@ -1,7 +1,7 @@
 // Startup asset checker — verifies all referenced PNG files exist.
 
 import { itemDatabase } from './itemDatabase';
-import { enemyDatabase } from '../enemies/enemyDatabase';
+import { getEnemyRegistry } from './typeRegistries';
 
 /**
  * Check all referenced PNG assets exist on the server.
@@ -11,8 +11,8 @@ export async function checkAssets(): Promise<void> {
   const paths = new Set<string>();
 
   // Enemy sprites
-  for (const def of enemyDatabase.getAllEnemies()) {
-    paths.add(def.sprite.path);
+  for (const spritePath of getEnemyRegistry().getAllEnemySpritePaths()) {
+    paths.add(spritePath);
   }
 
   // Item sprites (derived from item database icons)

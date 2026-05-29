@@ -2,6 +2,8 @@
 // Owns all item instances (ground, backpack, equipped) as a single source of truth.
 
 import type { ItemQuality } from './itemDatabase';
+import type { DropsOverride } from './lootTable';
+import type { StatusEffect } from './statusEffects';
 
 // EquipSlot — 10-slot system (replaces 3-slot definition in gameState.ts once migrated).
 export type EquipSlot =
@@ -229,4 +231,26 @@ export class EntityRegistry {
     }
     this._nextId = maxId + 1;
   }
+}
+
+export type EnemyAIState = 'idle' | 'chase' | 'attack' | 'flee';
+
+export interface EnemyInstance {
+    col: number;
+    row: number;
+    type: string;
+    hp: number;
+    maxHp: number;
+    atk: number;
+    def: number;
+    aggroRange: number;
+    moveInterval: number;
+    blocksMovement: boolean;
+    aiState: EnemyAIState;
+    moveTimer: number;
+    regenTimer?: number;
+    regenPauseTimer?: number;
+    drops?: DropsOverride;
+    statusEffects: StatusEffect[];
+    spawnerId?: string;
 }

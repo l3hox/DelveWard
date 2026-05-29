@@ -2,10 +2,8 @@ import type { Entity, LayerDef } from './types';
 import type { Facing } from './grid';
 import type { DropsOverride } from './lootTable';
 import { FACING_DELTA } from './grid';
-import { createEnemyInstance } from '../enemies/enemyTypes';
-import { enemyDatabase } from '../enemies/enemyDatabase';
-import { npcDatabase } from '../npcs/npcDatabase';
-import type { EnemyInstance } from '../enemies/enemyTypes';
+import type { EnemyInstance } from './entities';
+import { getEnemyRegistry, getNpcRegistry } from './typeRegistries';
 import { EntityRegistry } from './entities';
 import type { ItemEntity, ItemLocation } from './entities';
 import { itemDatabase } from './itemDatabase';
@@ -967,7 +965,7 @@ export class GameState {
   private _parseNpcEntity(e: Entity, grid?: string[]): boolean {
     if (e.type === 'npc') {
       const npcId = e.npcId as string;
-      if (npcDatabase.getNpc(npcId)) {
+      if (getNpcRegistry().hasNpc(npcId)) {
         this.npcs.set(doorKey(e.col, e.row), {
           id: e.id as string | undefined,
           col: e.col,
@@ -1030,8 +1028,8 @@ export class GameState {
   private _parseItemEntity(e: Entity): boolean {
     if (e.type === 'enemy') {
       const enemyType = e.enemyType as string;
-      if (enemyDatabase.getEnemy(enemyType)) {
-        const instance = createEnemyInstance(e.col, e.row, enemyType);
+      const instance = getEnemyRegistry().createEnemy(e.col, e.row, enemyType);
+      if (instance) {
         if (e.drops) {
           instance.drops = e.drops as DropsOverride;
         }
@@ -2199,7 +2197,7 @@ export class GameState {
     enemy.hp -= amount;
     // Pause regen on hit
     if (enemy.regenPauseTimer !== undefined) {
-      enemy.regenPauseTimer = (enemyDatabase.getBehavior(enemy.type, 'regen')?.params.pauseOnDamage as number | undefined) ?? 3;
+      enemy.regenPauseTimer = (getEnemyRegistry().getEnemyBehavior(enemy.type, 'regen')?.params.pauseOnDamage as number | undefined) ?? 3;
     }
     if (enemy.hp <= 0) {
       this.enemies.delete(doorKey(col, row));

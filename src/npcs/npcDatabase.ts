@@ -1,6 +1,8 @@
 // NPC database — typed loader and query module.
 // Loads from /data/npcs.json at runtime via fetch.
 
+import { registerNpcRegistry } from '../core/typeRegistries';
+
 export interface NpcSpriteData {
   path: string;
   size?: number;
@@ -64,3 +66,7 @@ export class NpcDatabase {
 }
 
 export const npcDatabase = new NpcDatabase();
+
+registerNpcRegistry({
+    hasNpc: (id) => npcDatabase.getNpc(id) !== undefined,
+});

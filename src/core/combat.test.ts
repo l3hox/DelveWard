@@ -26,6 +26,8 @@ vi.mock('../enemies/enemyDatabase', () => {
   };
 });
 
+import '../enemies/enemyTypes'; // register enemy factory via module side-effect
+
 vi.mock('./itemDatabase', () => ({
   itemDatabase: {
     isLoaded: () => true,

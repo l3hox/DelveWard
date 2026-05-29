@@ -23,6 +23,8 @@ vi.mock('./enemyDatabase', () => {
   };
 });
 
+import './enemyTypes'; // register enemy factory via module side-effect
+
 const grid = [
   '#######',
   '#.....#',
