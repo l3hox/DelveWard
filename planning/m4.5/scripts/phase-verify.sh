@@ -54,7 +54,9 @@ pushd "$WORKTREE" >/dev/null || { echo "phase-verify: cannot enter worktree '$WO
 result_vitest=$(run_gate "vitest"  bash -c "command npx vitest run")
 result_tsc=$(run_gate "tsc:app"    bash -c "command npx tsc --noEmit")
 result_tsc_test=skip
-if [ "$result_tsc" = "green" ]; then
+# tsconfig.test.json may be absent in worktrees based on merge-base commits that
+# pre-date the file. Skip the test tsc check rather than failing.
+if [ "$result_tsc" = "green" ] && [ -f tsconfig.test.json ]; then
     result_tsc_test=$(run_gate "tsc:test" bash -c "command npx tsc -p tsconfig.test.json --noEmit")
     [ "$result_tsc_test" = "red" ] && result_tsc=red
 fi

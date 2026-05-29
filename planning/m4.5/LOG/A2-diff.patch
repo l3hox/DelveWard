@@ -1,0 +1,258 @@
+diff --git a/src/core/assetCheck.ts b/src/core/assetCheck.ts
+index a52926e..d5ae847 100644
+--- a/src/core/assetCheck.ts
++++ b/src/core/assetCheck.ts
+@@ -1,7 +1,7 @@
+ // Startup asset checker — verifies all referenced PNG files exist.
+ 
+ import { itemDatabase } from './itemDatabase';
+-import { enemyDatabase } from '../enemies/enemyDatabase';
++import { getEnemyRegistry } from './typeRegistries';
+ 
+ /**
+  * Check all referenced PNG assets exist on the server.
+@@ -11,8 +11,8 @@ export async function checkAssets(): Promise<void> {
+   const paths = new Set<string>();
+ 
+   // Enemy sprites
+-  for (const def of enemyDatabase.getAllEnemies()) {
+-    paths.add(def.sprite.path);
++  for (const spritePath of getEnemyRegistry().getAllEnemySpritePaths()) {
++    paths.add(spritePath);
+   }
+ 
+   // Item sprites (derived from item database icons)
+diff --git a/src/core/combat.test.ts b/src/core/combat.test.ts
+index 888182c..90d077a 100644
+--- a/src/core/combat.test.ts
++++ b/src/core/combat.test.ts
+@@ -26,6 +26,8 @@ vi.mock('../enemies/enemyDatabase', () => {
+   };
+ });
+ 
++import '../enemies/enemyTypes'; // register enemy factory via module side-effect
++
+ vi.mock('./itemDatabase', () => ({
+   itemDatabase: {
+     isLoaded: () => true,
+diff --git a/src/core/entities.ts b/src/core/entities.ts
+index c657b8a..0cfa75d 100644
+--- a/src/core/entities.ts
++++ b/src/core/entities.ts
+@@ -2,6 +2,8 @@
+ // Owns all item instances (ground, backpack, equipped) as a single source of truth.
+ 
+ import type { ItemQuality } from './itemDatabase';
++import type { DropsOverride } from './lootTable';
++import type { StatusEffect } from './statusEffects';
+ 
+ // EquipSlot — 10-slot system (replaces 3-slot definition in gameState.ts once migrated).
+ export type EquipSlot =
+@@ -230,3 +232,25 @@ export class EntityRegistry {
+     this._nextId = maxId + 1;
+   }
+ }
++
++export type EnemyAIState = 'idle' | 'chase' | 'attack' | 'flee';
++
++export interface EnemyInstance {
++    col: number;
++    row: number;
++    type: string;
++    hp: number;
++    maxHp: number;
++    atk: number;
++    def: number;
++    aggroRange: number;
++    moveInterval: number;
++    blocksMovement: boolean;
++    aiState: EnemyAIState;
++    moveTimer: number;
++    regenTimer?: number;
++    regenPauseTimer?: number;
++    drops?: DropsOverride;
++    statusEffects: StatusEffect[];
++    spawnerId?: string;
++}
+diff --git a/src/core/gameState.ts b/src/core/gameState.ts
+index c77d442..89f8b29 100644
+--- a/src/core/gameState.ts
++++ b/src/core/gameState.ts
+@@ -2,10 +2,8 @@ import type { Entity, LayerDef } from './types';
+ import type { Facing } from './grid';
+ import type { DropsOverride } from './lootTable';
+ import { FACING_DELTA } from './grid';
+-import { createEnemyInstance } from '../enemies/enemyTypes';
+-import { enemyDatabase } from '../enemies/enemyDatabase';
+-import { npcDatabase } from '../npcs/npcDatabase';
+-import type { EnemyInstance } from '../enemies/enemyTypes';
++import type { EnemyInstance } from './entities';
++import { getEnemyRegistry, getNpcRegistry } from './typeRegistries';
+ import { EntityRegistry } from './entities';
+ import type { ItemEntity, ItemLocation } from './entities';
+ import { itemDatabase } from './itemDatabase';
+@@ -967,7 +965,7 @@ export class GameState {
+   private _parseNpcEntity(e: Entity, grid?: string[]): boolean {
+     if (e.type === 'npc') {
+       const npcId = e.npcId as string;
+-      if (npcDatabase.getNpc(npcId)) {
++      if (getNpcRegistry().hasNpc(npcId)) {
+         this.npcs.set(doorKey(e.col, e.row), {
+           id: e.id as string | undefined,
+           col: e.col,
+@@ -1030,8 +1028,8 @@ export class GameState {
+   private _parseItemEntity(e: Entity): boolean {
+     if (e.type === 'enemy') {
+       const enemyType = e.enemyType as string;
+-      if (enemyDatabase.getEnemy(enemyType)) {
+-        const instance = createEnemyInstance(e.col, e.row, enemyType);
++      const instance = getEnemyRegistry().createEnemy(e.col, e.row, enemyType);
++      if (instance) {
+         if (e.drops) {
+           instance.drops = e.drops as DropsOverride;
+         }
+@@ -2199,7 +2197,7 @@ export class GameState {
+     enemy.hp -= amount;
+     // Pause regen on hit
+     if (enemy.regenPauseTimer !== undefined) {
+-      enemy.regenPauseTimer = (enemyDatabase.getBehavior(enemy.type, 'regen')?.params.pauseOnDamage as number | undefined) ?? 3;
++      enemy.regenPauseTimer = (getEnemyRegistry().getEnemyBehavior(enemy.type, 'regen')?.params.pauseOnDamage as number | undefined) ?? 3;
+     }
+     if (enemy.hp <= 0) {
+       this.enemies.delete(doorKey(col, row));
+diff --git a/src/core/typeRegistries.ts b/src/core/typeRegistries.ts
+new file mode 100644
+index 0000000..c370545
+--- /dev/null
++++ b/src/core/typeRegistries.ts
+@@ -0,0 +1,43 @@
++// Registry injection seam — lets core/ call enemies/ and npcs/ without importing them.
++// enemies/enemyTypes.ts and npcs/npcDatabase.ts call register*() at module load time.
++
++import type { EnemyInstance } from './entities';
++
++export interface IEnemyRegistry {
++    createEnemy(col: number, row: number, type: string): EnemyInstance | undefined;
++    getEnemyBehavior(type: string, behaviorName: string): { params: Record<string, unknown> } | undefined;
++    getAllEnemySpritePaths(): string[];
++}
++
++export interface INpcRegistry {
++    hasNpc(id: string): boolean;
++}
++
++const noopEnemyRegistry: IEnemyRegistry = {
++    createEnemy: () => undefined,
++    getEnemyBehavior: () => undefined,
++    getAllEnemySpritePaths: () => [],
++};
++
++const noopNpcRegistry: INpcRegistry = {
++    hasNpc: () => false,
++};
++
++let enemyRegistry: IEnemyRegistry = noopEnemyRegistry;
++let npcRegistry: INpcRegistry = noopNpcRegistry;
++
++export function registerEnemyRegistry(registry: IEnemyRegistry): void {
++    enemyRegistry = registry;
++}
++
++export function registerNpcRegistry(registry: INpcRegistry): void {
++    npcRegistry = registry;
++}
++
++export function getEnemyRegistry(): IEnemyRegistry {
++    return enemyRegistry;
++}
++
++export function getNpcRegistry(): INpcRegistry {
++    return npcRegistry;
++}
+diff --git a/src/enemies/enemyAI.test.ts b/src/enemies/enemyAI.test.ts
+index 0b332f3..e2f7083 100644
+--- a/src/enemies/enemyAI.test.ts
++++ b/src/enemies/enemyAI.test.ts
+@@ -23,6 +23,8 @@ vi.mock('./enemyDatabase', () => {
+   };
+ });
+ 
++import './enemyTypes'; // register enemy factory via module side-effect
++
+ const grid = [
+   '#######',
+   '#.....#',
+diff --git a/src/enemies/enemyTypes.ts b/src/enemies/enemyTypes.ts
+index d215061..6d563c3 100644
+--- a/src/enemies/enemyTypes.ts
++++ b/src/enemies/enemyTypes.ts
+@@ -1,32 +1,11 @@
+ // Enemy type definitions and registry — pure data, no Three.js
+ 
+-import type { DropsOverride } from '../core/lootTable';
+ import { enemyDatabase } from './enemyDatabase';
+-import type { StatusEffect } from '../core/statusEffects';
++import { registerEnemyRegistry } from '../core/typeRegistries';
++import type { EnemyAIState, EnemyInstance } from '../core/entities';
+ 
+ export type { EnemyDef } from './enemyDatabase';
+-
+-export type EnemyAIState = 'idle' | 'chase' | 'attack' | 'flee';
+-
+-export interface EnemyInstance {
+-  col: number;
+-  row: number;
+-  type: string;
+-  hp: number;
+-  maxHp: number;
+-  atk: number;
+-  def: number;
+-  aggroRange: number;
+-  moveInterval: number;
+-  blocksMovement: boolean;
+-  aiState: EnemyAIState;
+-  moveTimer: number;      // accumulates delta, resets on action
+-  regenTimer?: number;       // accumulates time for HP regen
+-  regenPauseTimer?: number;  // remaining seconds of regen pause after taking damage
+-  drops?: DropsOverride;  // per-entity override from dungeon JSON
+-  statusEffects: StatusEffect[];
+-  spawnerId?: string;
+-}
++export type { EnemyAIState, EnemyInstance } from '../core/entities';
+ 
+ export function createEnemyInstance(
+   col: number,
+@@ -56,3 +35,12 @@ export function createEnemyInstance(
+   }
+   return instance;
+ }
++
++registerEnemyRegistry({
++    createEnemy: (col, row, type) => {
++        if (!enemyDatabase.getEnemy(type)) return undefined;
++        return createEnemyInstance(col, row, type);
++    },
++    getEnemyBehavior: (type, name) => enemyDatabase.getBehavior(type, name),
++    getAllEnemySpritePaths: () => enemyDatabase.getAllEnemies().map(e => e.sprite.path),
++});
+diff --git a/src/npcs/npcDatabase.ts b/src/npcs/npcDatabase.ts
+index 20f0987..649fe21 100644
+--- a/src/npcs/npcDatabase.ts
++++ b/src/npcs/npcDatabase.ts
+@@ -1,6 +1,8 @@
+ // NPC database — typed loader and query module.
+ // Loads from /data/npcs.json at runtime via fetch.
+ 
++import { registerNpcRegistry } from '../core/typeRegistries';
++
+ export interface NpcSpriteData {
+   path: string;
+   size?: number;
+@@ -64,3 +66,7 @@ export class NpcDatabase {
+ }
+ 
+ export const npcDatabase = new NpcDatabase();
++
++registerNpcRegistry({
++    hasNpc: (id) => npcDatabase.getNpc(id) !== undefined,
++});

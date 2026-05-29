@@ -1,0 +1,60 @@
+
+==== vitest ====
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/jlehotsky/prog/DelveWard/.claude/worktrees/agent-a81699d32e756ad06[39m
+
+ [32m✓[39m src/core/signalManager.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/projectileManager.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/grid.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/itemDatabase.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/saveSystem.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/entities.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/lootTable.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/rendering/enemyHealthBar.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/questManager.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/level/interaction.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/hud/itemTooltip.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/hud/attributePanel.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/enemies/enemyAI.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/combat.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/level/levelLoader.test.ts [2m([22m[2m99 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/core/gameState.test.ts [2m([22m[2m194 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/hud/inventoryOverlay.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/enemies/enemyTypes.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/enemies/pathfinding.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/statusEffects.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/gameStateInventory.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/hud/tradingOverlay.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m22 passed[39m[22m[90m (22)[39m
+[2m      Tests [22m [1m[32m777 passed[39m[22m[90m (777)[39m
+[2m   Start at [22m 13:00:02
+[2m   Duration [22m 369ms[2m (transform 2.08s, setup 0ms, import 2.59s, tests 117ms, environment 1ms)[22m
+
+
+==== tsc:app ====
+
+==== build ====
+
+> delveward@0.0.1 build
+> tsc && vite build
+
+vite v6.4.2 building for production...
+transforming...
+✓ 120 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.54 kB │ gzip:   0.35 kB
+dist/editor.html                 21.29 kB │ gzip:   3.63 kB
+dist/assets/main-YAC-e9FC.js    163.37 kB │ gzip:  47.98 kB
+dist/assets/editor-BGIZtMi_.js  241.87 kB │ gzip:  56.91 kB
+dist/assets/skybox-C6NXT3WY.js  636.47 kB │ gzip: 161.73 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 660ms
+
+==== smoke ====
+smoke: ok (errors=0 warnings=0 p95=8.799999999999955ms)
