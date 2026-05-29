@@ -46,8 +46,10 @@ run_gate() {
 }
 
 # Run from the worktree so vitest/tsc/build pick up its files. Each $(...) runs
-# run_gate in a subshell that inherits this cwd.
-pushd "$WORKTREE" >/dev/null
+# run_gate in a subshell that inherits this cwd. Guard the cd: under `set +e` a
+# failed pushd would otherwise run every gate at the repo root and score phantom
+# green.
+pushd "$WORKTREE" >/dev/null || { echo "phase-verify: cannot enter worktree '$WORKTREE'" >&2; exit 2; }
 
 result_vitest=$(run_gate "vitest"  bash -c "command npx vitest run")
 result_tsc=$(run_gate "tsc:app"    bash -c "command npx tsc --noEmit")

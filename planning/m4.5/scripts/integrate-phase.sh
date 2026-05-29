@@ -48,15 +48,27 @@ if git -C "$REPO_ROOT" rev-parse --verify "$TAG" >/dev/null 2>&1; then
 fi
 
 RUN_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-PATCH_FILES="$(git -C "$REPO_ROOT" apply --numstat "$PATCH" | awk '{print $3}')"
+# File list for restore-on-failure, parsed from the patch's own header lines.
+# `git apply --numstat` mangles renames as `{old => new}`, so derive paths from
+# the +++/--- lines instead (covers modifies, adds, renames; /dev/null lines for
+# pure adds/deletes don't match `+++ b/` or `--- a/` and are naturally excluded).
+PATCH_FILES="$(
+    { grep '^+++ b/' "$PATCH" | sed 's|^+++ b/||'
+      grep '^--- a/' "$PATCH" | sed 's|^--- a/||'; } | sort -u
+)"
 
-# 1. Apply the scope-verified patch onto run HEAD (3-way).
-if ! git -C "$REPO_ROOT" apply --3way --index "$PATCH"; then
-    echo "integrate-phase: 3-way apply failed for $PHASE — restoring src files, refusing" >&2
-    for f in $PATCH_FILES; do
-        git -C "$REPO_ROOT" restore --staged --worktree -- "$f" 2>/dev/null \
-            || git -C "$REPO_ROOT" checkout HEAD -- "$f" 2>/dev/null || true
-    done
+# 1. Apply the scope-verified patch onto run HEAD (3-way). Capture output: a
+# missing base blob makes git fall back to a non-3-way apply and still exit 0,
+# silently losing conflict detection, so treat that case as a failure too.
+set +e
+APPLY_OUT="$(git -C "$REPO_ROOT" apply --3way --index "$PATCH" 2>&1)"
+APPLY_RC=$?
+set -e
+if [ "$APPLY_RC" -ne 0 ] || printf '%s' "$APPLY_OUT" | grep -q 'lacks the necessary blob'; then
+    [ -n "$APPLY_OUT" ] && printf '%s\n' "$APPLY_OUT" >&2
+    echo "integrate-phase: 3-way apply failed or degraded for $PHASE; restoring, refusing" >&2
+    IFS=$'\n'
+    git -C "$REPO_ROOT" restore --source=HEAD --staged --worktree -- $PATCH_FILES 2>/dev/null || true
     exit 6
 fi
 
