@@ -47,7 +47,7 @@ Prefer parameterized inputs over hardcoded DelveWard references wherever the cos
 | `hooks/post-tool.py` | PostToolUse hook for runner (heartbeat + stats bookkeeping) |
 | `scripts/phase-verify.sh` | Verification gate runner (vitest, tsc, build, smoke, goldens) |
 | `scripts/phase-diff.sh` | Driver-computed diff stats + content hash |
-| `scripts/integrate-phase.sh` | Atomic ff-merge + tag + log update |
+| `scripts/integrate-phase.sh` | Atomic 3-way patch-apply onto run HEAD + tag + log |
 | `scripts/a6-gate.sh` | A6 queue/skip decision based on switch-site grep |
 | `scripts/launch-run.sh` | Convenience launcher for the runner |
 | `scripts/run-stats.sh` | Post-hoc transcript analyzer |
@@ -88,7 +88,7 @@ loop (per phase, dependency-ordered):
          spawn remediation worker (up to 10 attempts, no-progress detector)
          on stall: log STALL, mark transitively-dependent phases blocked
     10. on clean:
-          run scripts/integrate-phase.sh A{N}  (ff-merge + tag + log)
+          run scripts/integrate-phase.sh A{N}  (3-way apply patch onto run HEAD + tag + log)
           remove worktree
           mark phase done in STATUS.md
     11. sleep briefly (ScheduleWakeup); re-enter
@@ -111,7 +111,7 @@ wrap-up:
 3. **Post-phase review**: full `DeveloperCouncil` runs against every phase's computed diff. Critical/high auto-remediate; medium/low log only.
 4. **Push policy**: the runner never pushes. The user merges keepers back to `RUN_BASE_BRANCH` manually after inspection.
 5. **Halt policy**: never halt. See `SAFETY-HATCHES.md` for recovery rules.
-6. **Worktree-per-phase**: `.worktrees/m4.5-A{N}`. Integration is fast-forward only.
+6. **Worktree-per-phase**: Agent `isolation:"worktree"` at `.claude/worktrees/agent-<id>`, based on `merge-base(run, main)` (the fork point, not run HEAD — ADR-M45-0024). Diff against the worktree's own base; integrate by 3-way-applying the scope-verified patch onto run HEAD.
 7. **Observability**: `STATUS.md` is the source of truth (live). `LOG/A{N}.md` is the audit trail. `NOTIFY` is the sentinel for terminal events. `run-stats.sh` is the post-hoc analyzer.
 
 ---

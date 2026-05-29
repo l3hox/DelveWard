@@ -28,65 +28,68 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/${PHASE}-verify.log"
 : > "$LOG_FILE"
 
-declare -A RESULTS
-
+# bash 3.2 (macOS) has no associative arrays; use plain per-check variables.
+# run_gate echoes its result so the caller captures it via $(...), deriving
+# every result from the command's real exit code — no silent default-green.
 run_gate() {
-    local name="$1"
-    shift
     local label="$1"
     shift
-    echo "" >> "$LOG_FILE"
-    echo "==== $label ====" >> "$LOG_FILE"
+    {
+        echo ""
+        echo "==== $label ===="
+    } >> "$LOG_FILE"
     if "$@" >> "$LOG_FILE" 2>&1; then
-        RESULTS[$name]=green
+        echo green
     else
-        RESULTS[$name]=red
+        echo red
     fi
 }
 
-# Run from the worktree so vitest/tsc/build pick up its files.
+# Run from the worktree so vitest/tsc/build pick up its files. Each $(...) runs
+# run_gate in a subshell that inherits this cwd.
 pushd "$WORKTREE" >/dev/null
 
-run_gate vitest "vitest"   bash -c "command npx vitest run"
-run_gate tsc    "tsc:app"  bash -c "command npx tsc --noEmit"
-if [ "${RESULTS[tsc]}" = "green" ]; then
-    run_gate tsc_test "tsc:test" bash -c "command npx tsc -p tsconfig.test.json --noEmit"
-    [ "${RESULTS[tsc_test]}" = "red" ] && RESULTS[tsc]=red
+result_vitest=$(run_gate "vitest"  bash -c "command npx vitest run")
+result_tsc=$(run_gate "tsc:app"    bash -c "command npx tsc --noEmit")
+result_tsc_test=skip
+if [ "$result_tsc" = "green" ]; then
+    result_tsc_test=$(run_gate "tsc:test" bash -c "command npx tsc -p tsconfig.test.json --noEmit")
+    [ "$result_tsc_test" = "red" ] && result_tsc=red
 fi
-run_gate build  "build"    bash -c "command npm run build"
+result_build=$(run_gate "build"    bash -c "command npm run build")
 
 # Smoke and goldens. The smoke driver lives at the repo root, not the worktree.
 SMOKE="$REPO_ROOT/planning/m4.5/scripts/smoke.mjs"
 if [ -f "$SMOKE" ]; then
-    run_gate smoke "smoke" bash -c "command node '$SMOKE'"
-    if [ "${RESULTS[smoke]}" = "green" ]; then
-        RESULTS[goldens]=green   # smoke compares goldens internally
+    result_smoke=$(run_gate "smoke" bash -c "command node '$SMOKE'")
+    if [ "$result_smoke" = "green" ]; then
+        result_goldens=green   # smoke compares goldens internally
     else
-        RESULTS[goldens]=red
+        result_goldens=red
     fi
 else
-    RESULTS[smoke]=skip
-    RESULTS[goldens]=skip
+    result_smoke=skip
+    result_goldens=skip
 fi
 
 popd >/dev/null
 
 LOG_REL="planning/m4.5/LOG/${PHASE}-verify.log"
 
-# Determine overall pass/fail (skip is not failure)
+# Determine overall pass/fail (skip is not failure; only an explicit red fails).
 overall=0
-for k in vitest tsc build smoke goldens; do
-    if [ "${RESULTS[$k]}" = "red" ]; then overall=1; fi
+for r in "$result_vitest" "$result_tsc" "$result_build" "$result_smoke" "$result_goldens"; do
+    [ "$r" = "red" ] && overall=1
 done
 
 # Emit structured line (caller parses)
 printf 'VERIFY phase=%s vitest=%s tsc=%s build=%s smoke=%s goldens=%s log=%s\n' \
     "$PHASE" \
-    "${RESULTS[vitest]:-skip}" \
-    "${RESULTS[tsc]:-skip}" \
-    "${RESULTS[build]:-skip}" \
-    "${RESULTS[smoke]:-skip}" \
-    "${RESULTS[goldens]:-skip}" \
+    "${result_vitest:-skip}" \
+    "${result_tsc:-skip}" \
+    "${result_build:-skip}" \
+    "${result_smoke:-skip}" \
+    "${result_goldens:-skip}" \
     "$LOG_REL"
 
 exit $overall

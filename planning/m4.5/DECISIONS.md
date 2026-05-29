@@ -830,7 +830,7 @@ B. Ignore it. Rejected: it validates the spec-as-design bet and offers a stronge
 ## ADR-M45-0024 — Agent worktree base is the merge-base with `main`, not run HEAD (run-3 live finding)
 
 **Status**: accepted
-**Date**: 2026-05-28
+**Date**: 2026-05-28; probe confirmed + fix implemented 2026-05-29
 
 ### Context
 
@@ -838,21 +838,26 @@ The run-3 attended A2 gate produced the first live evidence of where `Agent(isol
 
 ### Decision
 
-Treat the worktree base as **unknown-but-not-run-HEAD** until a dedicated probe confirms the mechanism. Working hypothesis: `isolation:"worktree"` bases on the default-branch fork point. Before run-4:
+Confirmed by probe (2026-05-29): `isolation:"worktree"` bases the worktree on `merge-base(current-branch, main)`. A probe spawned from `m4.5-preflight` (41 commits ahead of `main`) produced a worktree at `a8c5c85` = `merge-base(preflight, main)`, missing the preflight-only `RUN3-PROPOSAL.md`. It reproduces from the main session, not just runner-spawned, so it is consistent Agent-tool behavior.
 
-- Probe: spawn an `isolation:"worktree"` Agent from a branch well ahead of `main` and inspect `git -C <wt> rev-parse HEAD`. Confirm whether the base is the merge-base, `main` HEAD, or something else.
-- Source the diff and integrate base from the **worktree's own base** (`git -C <wt> merge-base HEAD <wt>` or the worktree's recorded base), never run HEAD. Against run HEAD, `phase-diff` shows phantom deletions of every commit the run branch has beyond the fork point (run-3 saw ~49; the runner worked around it by diffing against the worktree base, yielding clean `files=6`).
-- Integration must account for the stale base: an ff-merge of an ancestor branch is a no-op and drops the worker's edits. Either rebase/replay the worker's diff onto run HEAD, or apply the captured patch directly, rather than relying on ff-merge.
+Fix (Option A, implemented on `m4.5-preflight`):
+
+- **Diff** against the worktree's own base, never run HEAD. The runner captures `WT_BASE = git -C <WT> rev-parse HEAD` at spawn (the worker never commits, so it stays the fork-point commit) and passes it to `phase-diff.sh`, yielding the clean N-file diff. Against run HEAD instead, `phase-diff` shows phantom deletions of every commit the run branch has beyond the fork point (run-3 saw ~49).
+- **Integrate** by 3-way-applying the scope-verified patch (`LOG/A{N}-diff.patch`) onto run HEAD. `integrate-phase.sh` now runs `git apply --3way --index`, commits only the staged src files (the runner's `planning/m4.5/` working churn stays uncommitted), tags, and logs. A 3-way conflict (a diverged file with overlapping edits) → exit 6 → remediation, with the patch's files restored and the workspace untouched.
+- ff-merge is abandoned: the worktree branch is an *ancestor* of run HEAD, so a merge is a no-op that drops the worker's edits.
+
+Empirically validated: run-3's 6-file A2 patch 3-way-applies onto run HEAD with no conflict (including `main.ts`, which diverged `+74/-9` via preflight's dev-smoke scaffolding); an isolated end-to-end test confirmed scope-correct commit, workspace preservation, tag/log, and clean conflict restore.
 
 ### Alternatives considered
 
-A. Keep assuming run-HEAD base and rely on the divergence guard. Rejected: the guard sees an *ancestor* (not divergence), so it passes and silently integrates nothing.
-B. Drop Agent isolation and have the runner create its own worktree at run HEAD. Strongest fix; reconsider if the probe shows the base is not controllable. Trades away the `.claude/worktrees/` discriminator the sandbox uses (ADR-M45-0019).
+A. (chosen) 3-way patch-apply onto run HEAD. Works while a phase's touched files don't both diverge from the fork point and overlap preflight's edits; conflicts degrade to remediation. Sufficient for the A2 gate.
+B. Drop Agent isolation; runner creates its own worktree at run HEAD so diff/integrate are trivial. The robust fix that eliminates the stale-base class entirely, but reworks the spawn flow and the sandbox's `.claude/worktrees/` discriminator (ADR-M45-0019). Deferred to β.
+C. Keep assuming run-HEAD base and rely on the divergence guard. Rejected: the guard sees an *ancestor* (not divergence), passes, and integrates nothing.
 
 ### Consequences
 
-**Positive**: integration correctness is now grounded in observed behavior, not an undiverged-branch artifact. The diff-against-worktree-base workaround already yields clean scope results.
-**Negative**: no phase can integrate until this is fixed; run-3 only reached integration's doorstep (the A2 phase stalled first, on ADR-M45-0026's spec defect, so the broken ff-merge was never exercised).
+**Positive**: integration is grounded in observed behavior; the A2 gate can now reach integration. Diffs are clean (no phantoms); the scope gate operates on real worker output.
+**Negative**: Option A is not fully general — a phase that heavily rewrites a fork-point-diverged file (e.g., A3 rewrites `main.ts`) may 3-way-conflict and fall back to remediation. Option B remains the β fix.
 
 ### References
 
@@ -895,8 +900,8 @@ B. Require Homebrew bash 5 via `#!/usr/bin/env bash`. Rejected: adds an environm
 
 ## ADR-M45-0026 — Specs must preserve existing test mock/DI seams
 
-**Status**: proposed
-**Date**: 2026-05-28
+**Status**: accepted
+**Date**: 2026-05-28; template rule implemented 2026-05-29
 
 ### Context
 
@@ -904,7 +909,7 @@ Run-3's A2 spec was internally valid yet broke the existing test harness. A2 inv
 
 ### Decision
 
-The spec-author template (RUN3-PROPOSAL §3.2) gains a house rule: when a phase changes an import graph, identify existing test mock/DI seams that depend on the old graph and either keep them working (default impl registered at load) or bring the affected test files into `Scope: touch` with a budget bump. For A2 specifically, `LOG/A2.md` records two concrete fixes (A: add the 2 test files to scope, budget 6→8, pass `GameStateDeps` in the helpers; B: load-time-registered `createEnemyInstance` default preserving the mock chain, grep accept-check scoped to exclude the registration). A spec linter (β, §3.3) could later reject specs whose touch list cannot satisfy their own accept-checks.
+Implemented: the spec-author template (`templates/spec-author.md` House style) now carries the rule — when a phase changes an import graph, identify existing test mock/DI seams that depend on the old graph (especially `vi.mock` of a *transitive* import) and either keep them working (default impl registered at load) or bring the affected test files into `Scope: touch` with a budget bump; and verify every Accept assertion is achievable within the touch list. For run-4, A2 is **re-authored fresh** by the runtime SystemArchitect guided by this rule (not pre-seeded), so run-4 doubles as a test of whether the rule actually prevents the defect. The A-vs-B choice (`LOG/A2.md`: A = add the 2 test files to scope + pass `GameStateDeps`; B = load-time-registered `createEnemyInstance` default preserving the mock chain) is left to the author at runtime, steered by the rule's "keep the seam working OR widen scope" framing. A spec linter (β, §3.3) could later reject specs whose touch list cannot satisfy their own accept-checks.
 
 ### Alternatives considered
 
@@ -913,8 +918,8 @@ B. Loosen the "no `enemies/` imports in `core/`" accept-check. Rejected: that is
 
 ### Consequences
 
-**Positive**: a concrete data point on spec-authoring variance (the Conform theme), with a reusable authoring rule.
-**Negative**: the fix is not yet chosen (A vs B) — left to run-4 prep; this ADR is `proposed` until then.
+**Positive**: a concrete data point on spec-authoring variance (the Conform theme), with a reusable authoring rule now in the template.
+**Negative**: re-authoring carries residual risk — if the rule doesn't deterministically steer the author, A2 could STALL again before integration. Accepted: run-4 is A2-only and attended, so a re-stall is cheap to catch, and it tells us whether the rule works. A spec linter would close the gap; deferred to β.
 
 ### References
 
