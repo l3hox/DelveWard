@@ -964,28 +964,39 @@ B. Run the gate scripts from a read-only location outside the runner's writable 
 
 ## ADR-M45-0028 — Adopt Option B (runner-created run-HEAD worktree) for run-5
 
-**Status**: accepted (scoped for run-5)
+**Status**: accepted (scoped for run-5; NOT yet implemented — gate-lockdown 0027 landed first, Option B is the next step)
 **Date**: 2026-05-29
 
 ### Context
 
 Run-4 showed Option A (3-way patch-apply, ADR-M45-0024) fixed diff + integrate but **not verify**: verify runs *inside* the merge-base worktree, which lacks preflight's test scaffolding (`tsconfig.test.json` → `tsc:test` TS5058). The runner only got past it by editing its own gate (ADR-M45-0027); with that forbidden, verify must be legitimately passable, and a worker cannot create the missing config (out of scope). The single root cause behind diff phantoms, verify-missing-config, and integrate-ancestor is that `isolation:"worktree"` bases the worktree on `merge-base(branch, main)`, 41 commits behind run HEAD.
 
+**Why B is mandatory for the full A2–A7 run (not just verify):** the merge-base is *static* during a run, but phases depend on each other (A4 on A2, A3 on A4, …). With Agent isolation, A3's worker would start from the fork point — *without* A2/A4's integrated changes — so the dependency chain breaks. Only a runner-made worktree at the **current run HEAD**, which advances as each phase integrates, gives a dependent phase its predecessors' work. Option A (3-way apply) cannot fix this; it is an integration mechanism, not a worktree-base fix. So the dependent multi-phase baseline run *requires* Option B.
+
 ### Decision
 
 Adopt Option B for run-5: the runner creates its **own** worktree at **run HEAD** instead of relying on Agent `isolation:"worktree"`.
 
-- Runner loop: `git worktree add -b m4.5-A{N}-wt .worktrees/m4.5-A{N} <run-branch>` (worktree at run HEAD); spawn the worker Agent **without isolation**, instructed to do all edits under that path; write `ACTIVE_WORKTREE=<path>`.
+- Runner loop: `git worktree add -b m4.5-A{N}-wt .worktrees/m4.5-A{N} <run-branch>` (worktree at run HEAD); spawn the worker Agent **without isolation**, instructed to do all edits under that path; write `ACTIVE_WORKTREE=<path>`. **The worker is still a subagent** (the Agent tool always spawns a separate context window; `isolation:"worktree"` only adds the automatic git worktree, not the subagent boundary) — dropping isolation does NOT pollute the runner's context.
 - Sandbox: `scope-check.py` discriminates the worker by the `ACTIVE_WORKTREE` path (it already reads it) rather than the hardcoded `.claude/worktrees/agent-*`; a non-isolated worker's stray main-repo write stays deny-by-default.
 - Diff against run HEAD directly (no `WT_BASE` indirection); verify runs in a current worktree (config present); integrate becomes a trivial ff-merge (the worktree branch is a descendant). Option A's `WT_BASE`-diff + 3-way-apply become the fallback, not the primary.
 - Cleanup: `git worktree remove` + delete `m4.5-A{N}-wt`.
 
 This dissolves the entire stale-base class in one move.
 
+### Implementation plan (run-5 prep; probe-first)
+
+The worker model has an unverified assumption, so tackle in this order:
+
+1. **Probe first.** Spawn a non-isolated Agent told to work in a runner-made `.worktrees/X`; observe whether its `cwd` (as the PreToolUse hook sees it) stays inside that path across tool calls and whether Edits use paths under it. This decides the discriminator design. (Run-3/run-4 taught us not to build on unverified harness behavior.)
+2. **Sandbox discriminator (`scope-check.py`).** Treat a write as *worker-scope* when its canonicalized target is **inside `ACTIVE_WORKTREE`** (from `scope/ACTIVE_WORKTREE`), enforcing the touch list relative to that root. The runner deny-list (ADR-M45-0027) still applies to main-repo writes; a main-repo `src/` write *during an active phase* should be denied (a non-cd'd worker must not edit the main tree). Discriminate by **target path**, not just writer `cwd`, to be robust to a non-isolated worker's `cwd` drift.
+3. **Runner loop (`autonomous-runner.md`).** Step 6 → `git worktree add -b m4.5-A{N}-wt .worktrees/m4.5-A{N} <run-branch>`, write `ACTIVE_WORKTREE`, spawn worker without isolation pointed at that path; step 7 diff against run HEAD; step 11 integrate via ff-merge (keep 3-way apply as fallback); step 12 `git worktree remove` + delete the branch.
+4. **Offline-test** end-to-end (worker in-/out-of-scope, diff, ff-merge integrate, dependent-phase carry-forward), then cut run-5.
+
 ### Alternatives considered
 
 A. Keep Option A and sanction the `tsc:test` skip on preflight. Rejected: it permanently disables test-typechecking and masks the root cause — the runner's hack made official.
-C. Merge preflight (incl. test scaffolding) into `main` so the merge-base is current. Lighter (no spawn/sandbox rework) but puts the run-system on `main` and is a branch-topology change not yet sanctioned; revisit only if B proves too costly.
+C. Merge preflight into `main` so the merge-base is current. Rejected: the merge-base is *static* during a run, so it still would not carry intra-run phase integrations (A3 would lack A2); and it puts the run-system on `main`.
 
 ### Consequences
 

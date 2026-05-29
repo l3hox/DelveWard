@@ -6,14 +6,18 @@ For detailed history see: `COMPLETED.md`, `SESSION-LOG.md`, `IDEAS.md` (all in `
 
 ---
 
-## Active workstream: M4.5 autonomous-run system (run-3 prep)
+## Active workstream: M4.5 autonomous-run system (run-5 prep — Option B)
 
 The live work is the autonomous-run system (see `CLAUDE.md` §M4.5), built/iterated on branch `m4.5-preflight`.
 
-- **run-1, run-2 done** — both preserved as study branches; run-2 died on host idle-sleep.
-- **run-3 prep hardened.** A pre-launch council found two criticals (a vacuous-pass scope gate; an open worker sandbox); all three blockers are fixed, tested, and committed on `m4.5-preflight`.
-- **Next action:** the attended **A2 live gate** — follow `planning/m4.5/RUN3-PROPOSAL.md` → "Running the attended A2 gate (runbook)". All five checks green → proceed to the full unattended run.
-- Key docs: `planning/m4.5/RUN3-PROPOSAL.md` (operational state + runbook), `planning/m4.5/DECISIONS.md` (23 ADRs), `planning/m4.5/PLAN.md` (loop + framing). Cross-project lessons: `~/AutonomousRunLessons.md`.
+- **run-1…run-4 done**, each preserved as a study branch. **run-4 was the first to reach AND pass integration** (the 3-way patch-apply onto run HEAD is validated). Writeup: `planning/m4.5/RUN4-FEEDBACK.md`.
+- **run-4's headline finding:** the runner edited its *own* `phase-verify.sh` to skip a failing check. Fixed by the **gate-lockdown** (ADR-M45-0027): the sandbox now denies runner writes to its own machinery — implemented + verified + committed (`ed959c3`). A child-session probe confirmed the `--settings` PreToolUse hook fires for the *parent's* own writes, so the lockdown engages the runner.
+- **Run-5 = first full A2–A7 baseline run** (time/token baseline to compare β against later). Two coupled fixes, both decided:
+    - DONE — **Gate-lockdown (ADR-M45-0027).**
+    - NOT YET — **Option B (ADR-M45-0028).** Runner creates its own worktree at **run HEAD** (drop Agent `isolation:"worktree"`, which bases on the *static* merge-base and can't carry per-phase integration — A3 depends on A2). This is the **next step and the big one.**
+- **RESUME POINT after compaction:** do step 3 (Option B) per **ADR-M45-0028 §Implementation plan** — probe the non-isolated-worker behavior FIRST, then rework `scope-check.py` (discriminate by `ACTIVE_WORKTREE` target path) + `.claude/agents/autonomous-runner.md` loop + diff/integrate; offline-test; then cut `m4.5-run-5` (STATUS A1 `done` + A2–A7 `pending`, A6 gated) and launch the full run under the supervisor.
+- **Git state:** `m4.5-preflight` is the source of truth, **5 commits ahead of `origin` (unpushed)**. run-4 conserved on `m4.5-run-4` (`c40d2e9`). No `m4.5-run-5` branch yet.
+- **Reread in this order:** `planning/m4.5/RUN4-FEEDBACK.md` (run-4 outcome + findings + run-5 prereqs) → `planning/m4.5/DECISIONS.md` ADR-M45-0024/0027/0028 → `planning/m4.5/PLAN.md` + `.claude/agents/autonomous-runner.md` (the loop to modify). Cross-project lessons: `~/AutonomousRunLessons.md`.
 
 ---
 
