@@ -50,27 +50,27 @@ phases:
         depends_on: []
         worker_agent: RefactoringSpecialist
     A4:
-        status: pending
+        status: skipped
         title: "Split gameState.ts behind a GameState facade (inventory/combat/status/world)"
         depends_on: [A2]
         worker_agent: RefactoringSpecialist
     A3:
-        status: pending
+        status: skipped
         title: "Extract per-frame systems from main.ts into src/game/"
         depends_on: [A4]
         worker_agent: RefactoringSpecialist
     A5:
-        status: pending
+        status: skipped
         title: "Consolidate save-state sources through a single getSaveData/applySaveData seam"
         depends_on: [A3, A4]
         worker_agent: SoftwareDeveloper
     A7:
-        status: pending
+        status: skipped
         title: "Pull controller logic (torch drain, hunger drain, transition state machine) into core/"
         depends_on: [A3]
         worker_agent: RefactoringSpecialist
     A6:
-        status: pending
+        status: skipped
         title: "EntityKind registry (queued only if a6-gate.sh emits `queue`)"
         depends_on: [A3, A4]
         gated: true
